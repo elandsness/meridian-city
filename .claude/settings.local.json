@@ -26,7 +26,11 @@
       "Bash(mvn -B package -DskipTests -q)",
       "Bash(echo \"exit: $?\")",
       "Bash(brew list *)",
-      "Bash(find /usr/local /opt/homebrew ~/go /usr/bin -name \"go\" -type f 2>/dev/null | grep -v \".git\" | head -5)"
+      "Bash(find /usr/local /opt/homebrew ~/go /usr/bin -name \"go\" -type f 2>/dev/null | grep -v \".git\" | head -5)",
+      "Bash(grep -n 'fail-fast\\\\|permissions\\\\|go.mod\\\\|go mod tidy' __TRACKED_VAR__/.github/workflows/build.yml)",
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
