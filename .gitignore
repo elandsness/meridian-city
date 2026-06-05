@@ -35,7 +35,8 @@ secrets/
 .DS_Store
 
 # Go
-**/go.sum
+# go.sum is intentionally NOT ignored — it should be committed for reproducible builds.
+# Generate with: cd services/<service> && go mod tidy
 
 # Java
 **/*.class

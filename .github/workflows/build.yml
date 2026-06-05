@@ -10,6 +10,12 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/meridian-city-platform
 
+# Allow the workflow to push images to GitHub Container Registry.
+# GitHub's default token permissions are read-only since late 2022.
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   # -------------------------------------------------------------------------
   # Java services (Maven multi-module build would be ideal;
@@ -19,6 +25,7 @@ jobs:
     name: Build Java Services
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service:
           - citizen-service
@@ -63,6 +70,7 @@ jobs:
     name: Build Node.js Services
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service:
           - api-gateway
@@ -111,6 +119,7 @@ jobs:
     name: Build Python Services
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service:
           - analytics-service
@@ -157,6 +166,7 @@ jobs:
     name: Build Go Services
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service:
           - iot-ingestion
@@ -168,11 +178,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-          cache-dependency-path: services/${{ matrix.service }}/go.sum
+          # Use go.mod (always present) for cache key.
+          # go.sum is generated below if not yet committed.
+          cache-dependency-path: services/${{ matrix.service }}/go.mod
 
       - name: Build and test ${{ matrix.service }}
         working-directory: services/${{ matrix.service }}
         run: |
+          go mod tidy
           go build ./...
           go test ./... -short
 
@@ -201,6 +214,7 @@ jobs:
     name: Build Frontend Apps
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         app:
           - public-portal
