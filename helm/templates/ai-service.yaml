@@ -33,7 +33,7 @@ spec:
             - name: LLM_PROVIDER
               value: {{ .Values.llm.provider | quote }}
             - name: LLM_MODEL
-              value: {{ if eq .Values.llm.provider "openai" }}{{ .Values.llm.openai.model }}{{ else if eq .Values.llm.provider "anthropic" }}{{ .Values.llm.anthropic.model }}{{ else }}{{ .Values.llm.local.model }}{{ end | quote }}
+              value: {{ if eq .Values.llm.provider "openai" }}{{ .Values.llm.openai.model | quote }}{{ else if eq .Values.llm.provider "anthropic" }}{{ .Values.llm.anthropic.model | quote }}{{ else }}{{ .Values.llm.local.model | quote }}{{ end }}
             {{- if eq .Values.llm.provider "openai" }}
             - name: OPENAI_BASE_URL
               value: {{ .Values.llm.openai.baseUrl | quote }}
