@@ -1,0 +1,91 @@
+{{- if .Values.iotIngestion.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-ingestion
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iot-ingestion
+spec:
+  replicas: {{ .Values.iotIngestion.replicaCount }}
+  selector:
+    matchLabels:
+      app: iot-ingestion
+  template:
+    metadata:
+      labels:
+        app: iot-ingestion
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: iot-ingestion
+    spec:
+      containers:
+        - name: iot-ingestion
+          image: {{ include "meridian.image" (dict "repository" .Values.iotIngestion.image.repository "tag" .Values.iotIngestion.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "iot-ingestion"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ include "meridian.fullname" . }}-kafka:9092"
+            - name: KAFKA_TOPIC
+              value: "iot.telemetry.raw"
+            - name: HEALTH_PORT
+              value: "8089"
+            # iot-ingestion forwards its own spans to the OTel Collector via gRPC (host:port, no scheme)
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ include "meridian.fullname" . }}-opentelemetry-collector:4317"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment={{ .Values.dynatrace.deploymentEnvironment }},k8s.cluster.name={{ .Values.dynatrace.clusterName }}"
+            # DB credentials for device validator (queries city.assets for known device IDs)
+            - name: DB_HOST
+              value: "{{ include "meridian.fullname" . }}-postgresql"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: {{ .Values.postgresql.auth.database | quote }}
+            - name: DB_USER
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: db-password
+          livenessProbe:
+            tcpSocket:
+              port: 4317
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 4317
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.iotIngestion.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-ingestion
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iot-ingestion
+spec:
+  type: ClusterIP
+  selector:
+    app: iot-ingestion
+  ports:
+    - name: otlp-grpc
+      port: {{ .Values.iotIngestion.service.grpcPort }}
+      targetPort: 4317
+    - name: otlp-http
+      port: {{ .Values.iotIngestion.service.httpPort }}
+      targetPort: 4318
+{{- end }}

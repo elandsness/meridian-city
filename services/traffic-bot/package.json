@@ -1,0 +1,14 @@
+{
+  "name": "meridian-traffic-bot",
+  "version": "1.0.0",
+  "description": "Citizen user-journey simulator for Meridian City Platform",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "express": "^4.19.2"
+  }
+}

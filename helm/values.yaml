@@ -1,0 +1,531 @@
+# =============================================================================
+# Meridian City Platform — Helm Values
+# =============================================================================
+# Copy this file to values-custom.yaml and fill in the required values.
+# Required fields are marked with: # REQUIRED
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Global settings
+# ---------------------------------------------------------------------------
+global:
+  # Container image registry prefix. All service images are expected at:
+  # <imageRegistry>/<service-name>:<imageTag>
+  imageRegistry: "ghcr.io/your-org/meridian-city-platform"
+  imageTag: "latest"
+  namespace: "meridian"
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+# ---------------------------------------------------------------------------
+# Dynatrace configuration
+# ---------------------------------------------------------------------------
+dynatrace:
+  # REQUIRED: Dynatrace SaaS tenant API URL
+  # Format: https://<environment-id>.live.dynatrace.com/api
+  apiUrl: ""
+
+  # REQUIRED: Dynatrace API token
+  # Required scopes: metrics.ingest, logs.ingest, openTelemetryTrace.ingest,
+  #                  entities.read, settings.write, DataExport
+  apiToken: ""
+
+  # REQUIRED: OTLP ingest endpoint for OpenTelemetry data
+  # Format: https://<environment-id>.live.dynatrace.com/api/v2/otlp
+  otlpEndpoint: ""
+
+  # Dynatrace environment ID (the subdomain part of your tenant URL)
+  # e.g., abc12345 from https://abc12345.live.dynatrace.com
+  environmentId: ""
+
+  # Deployment environment label (visible in Dynatrace entity properties)
+  deploymentEnvironment: "demo"
+
+  # Kubernetes cluster name (visible in Dynatrace k8s monitoring)
+  clusterName: "meridian-cluster"
+
+  # Whether to deploy the Dynatrace Operator for OneAgent auto-instrumentation.
+  # When enabled, the operator and a DynaKube CR are created in the 'dynatrace' namespace.
+  operator:
+    enabled: true
+
+# ---------------------------------------------------------------------------
+# LLM / AI configuration (for the citizen chatbot and ai-service)
+# ---------------------------------------------------------------------------
+llm:
+  # Provider selection: openai | anthropic | local
+  provider: "openai"
+
+  openai:
+    # REQUIRED if provider=openai
+    apiKey: ""
+    model: "gpt-4o"
+    baseUrl: "https://api.openai.com/v1"
+
+  anthropic:
+    # REQUIRED if provider=anthropic
+    apiKey: ""
+    model: "claude-sonnet-4-6"
+
+  local:
+    # Used when provider=local; assumes Ollama running in-cluster
+    endpoint: "http://ollama:11434"
+    model: "llama3"
+
+# ---------------------------------------------------------------------------
+# Mock authentication (ops dashboard login)
+# Credentials are hardcoded — this is intentional (it's a demo).
+# The auth flow exists to generate login traces in Dynatrace, not for security.
+# ---------------------------------------------------------------------------
+auth:
+  username: "demo"
+  password: "dynatrace"
+
+# ---------------------------------------------------------------------------
+# API Gateway (Node.js / Fastify)
+# Single entry point for all frontend traffic.
+# ---------------------------------------------------------------------------
+apiGateway:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "api-gateway"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: "api.meridian.local"
+    tls: []
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Citizen Service (Java / Spring Boot)
+# Manages citizen accounts and service request submission.
+# ---------------------------------------------------------------------------
+citizenService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "citizen-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Service Dispatch (Java / Spring Boot)
+# Routes and assigns service requests; emits Business Events at each step.
+# ---------------------------------------------------------------------------
+serviceDispatch:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "service-dispatch"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8082
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# City Operations (Java / Spring Boot)
+# City asset registry, work orders, and incident management.
+# ---------------------------------------------------------------------------
+cityOperations:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "city-operations"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8083
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  # Fault injection flags — set by demo-control-api at runtime
+  faultInjection:
+    dbSlowdownEnabled: false
+    dbSlowdownDelayMs: 0
+    cpuSpikeEnabled: false
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Analytics Service (Python / FastAPI)
+# KPI aggregation, SRG metric endpoint, and Business Analytics support.
+# ---------------------------------------------------------------------------
+analyticsService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "analytics-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8084
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# AI Service (Python / FastAPI + OTel SDK)
+# Citizen chatbot with swappable LLM backend.
+# Uses OTel GenAI semantic conventions for Dynatrace AI Observability.
+# ---------------------------------------------------------------------------
+aiService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "ai-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8085
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  # Fault injection: simulated LLM latency (seconds)
+  faultInjection:
+    llmLatencyEnabled: false
+    llmLatencySeconds: 0
+  env: {}
+
+# ---------------------------------------------------------------------------
+# IoT Ingestion (Go + OTel SDK)
+# Receives OTLP/gRPC telemetry from IoT simulators; publishes to Kafka.
+# ---------------------------------------------------------------------------
+iotIngestion:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "iot-ingestion"
+    tag: ""
+  service:
+    type: ClusterIP
+    grpcPort: 4317
+    httpPort: 4318
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Telemetry Processor (Python / FastAPI + OTel SDK)
+# Kafka consumer: processes IoT telemetry, detects anomalies, stores in PostgreSQL.
+# ---------------------------------------------------------------------------
+telemetryProcessor:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "telemetry-processor"
+    tag: ""
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  # Fault injection: pause Kafka consumption to simulate consumer lag
+  faultInjection:
+    kafkaPauseEnabled: false
+    memoryPressureEnabled: false
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Notification Service (Node.js / Express)
+# Kafka consumer; delivers in-app notifications for incidents and work orders.
+# ---------------------------------------------------------------------------
+notificationService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "notification-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8087
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Demo Control API (Node.js / Fastify)
+# REST API backing the ops dashboard demo control panel.
+# Manages fault injection, fleet sizing, and scenario triggers.
+# ---------------------------------------------------------------------------
+demoControlApi:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "demo-control-api"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# IoT Simulator (Go + OTel SDK)
+# Simulates a dynamic fleet of IoT devices emitting OTLP telemetry.
+# Fleet size and anomalies are configurable at runtime via demo-control-api.
+# ---------------------------------------------------------------------------
+iotSimulator:
+  enabled: true
+  image:
+    repository: "iot-simulator"
+    tag: ""
+  fleet:
+    vehicles:
+      count: 30
+      # Interval between telemetry emissions per device
+      emitIntervalSeconds: 15
+      # Baseline probability that any given device emits an anomalous reading
+      anomalyProbability: 0.01
+    buildings:
+      count: 15
+      emitIntervalSeconds: 15
+      anomalyProbability: 0.01
+    machines:
+      count: 10
+      emitIntervalSeconds: 15
+      anomalyProbability: 0.01
+  # Target for OTLP telemetry (the iot-ingestion service)
+  otlpEndpoint: "http://iot-ingestion:4317"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# ---------------------------------------------------------------------------
+# Traffic Bot (Node.js)
+# Continuously simulates citizen user journeys against the public portal.
+# Drives realistic distributed traces through the full service stack.
+# ---------------------------------------------------------------------------
+trafficBot:
+  enabled: true
+  image:
+    repository: "traffic-bot"
+    tag: ""
+  config:
+    # Average HTTP requests per minute sent to the API gateway
+    requestsPerMinute: 60
+    # Target URL for the API gateway
+    targetUrl: "http://api-gateway:3000"
+    # Which journey types to simulate
+    scenarios:
+      citizenRequests: true
+      accountCreation: true
+      browsing: true
+      chatbot: false  # disable by default to avoid LLM API cost in steady-state
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ---------------------------------------------------------------------------
+# Public Portal (React / Vite)
+# Citizen-facing city portal: service requests, city map, AI chatbot.
+# ---------------------------------------------------------------------------
+publicPortal:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "public-portal"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: "city.meridian.local"
+    tls: []
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# ---------------------------------------------------------------------------
+# Ops Dashboard (React / Vite)
+# Internal operations view + Demo Control Panel.
+# Requires mock authentication (see auth.username / auth.password above).
+# ---------------------------------------------------------------------------
+opsDashboard:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "ops-dashboard"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: "ops.meridian.local"
+    tls: []
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# ---------------------------------------------------------------------------
+# Infrastructure: PostgreSQL (Bitnami chart dependency)
+# ---------------------------------------------------------------------------
+postgresql:
+  enabled: true
+  auth:
+    username: "meridian"
+    # CHANGE THIS in production / shared environments
+    password: "meridian-secret-change-me"
+    database: "meridian"
+  primary:
+    persistence:
+      enabled: true
+      size: "10Gi"
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+# ---------------------------------------------------------------------------
+# Infrastructure: Kafka (Bitnami chart dependency)
+# ---------------------------------------------------------------------------
+kafka:
+  enabled: true
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: "8Gi"
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  # Pre-create topics on chart install
+  provisioning:
+    enabled: true
+    topics:
+      - name: iot.telemetry.raw
+        partitions: 3
+        replicationFactor: 1
+        config:
+          retention.ms: "86400000"  # 24h
+      - name: iot.anomalies
+        partitions: 1
+        replicationFactor: 1
+        config:
+          retention.ms: "86400000"
+      - name: requests.events
+        partitions: 2
+        replicationFactor: 1
+        config:
+          retention.ms: "604800000"  # 7d
+      - name: notifications.outbound
+        partitions: 1
+        replicationFactor: 1
+        config:
+          retention.ms: "3600000"  # 1h
+
+# ---------------------------------------------------------------------------
+# Infrastructure: OpenTelemetry Collector (OTEL Helm chart dependency)
+# The collector config is injected via the otel-collector-config ConfigMap
+# defined in helm/templates/otel-configmap.yaml.
+# ---------------------------------------------------------------------------
+opentelemetry-collector:
+  enabled: true
+  mode: deployment
+  replicaCount: 1
+  # Override config via external ConfigMap (see helm/templates/otel-configmap.yaml)
+  configMap:
+    create: false
+    existingName: "otel-collector-config"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# ---------------------------------------------------------------------------
+# Infrastructure: Dynatrace Operator (Dynatrace Helm chart dependency)
+# The DynaKube CR is created separately in helm/templates/dynakube.yaml.
+# ---------------------------------------------------------------------------
+dynatrace-operator:
+  enabled: true

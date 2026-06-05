@@ -1,0 +1,77 @@
+# =============================================================================
+# Meridian City Platform — Development / Local Overrides
+# =============================================================================
+# Apply on top of values.yaml for local development (kind / Docker Desktop):
+#   helm install meridian ./helm -f helm/values.yaml -f helm/values-dev.yaml -f helm/values-custom.yaml
+# =============================================================================
+
+global:
+  imagePullPolicy: Always
+
+# Smaller fleet for faster startup in local k8s
+iotSimulator:
+  fleet:
+    vehicles:
+      count: 5
+      emitIntervalSeconds: 30
+    buildings:
+      count: 3
+      emitIntervalSeconds: 30
+    machines:
+      count: 2
+      emitIntervalSeconds: 30
+
+# Reduced traffic for local dev
+trafficBot:
+  config:
+    requestsPerMinute: 10
+    scenarios:
+      chatbot: false
+
+# Smaller resource footprints for local clusters
+postgresql:
+  primary:
+    persistence:
+      size: "2Gi"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+kafka:
+  replicaCount: 1
+  persistence:
+    size: "2Gi"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# Expose via NodePort for easy local access
+apiGateway:
+  service:
+    type: NodePort
+    nodePort: 30080
+
+publicPortal:
+  service:
+    type: NodePort
+    nodePort: 30081
+
+opsDashboard:
+  service:
+    type: NodePort
+    nodePort: 30082
+
+# Disable DT Operator in dev (optional — comment out if you have a DT tenant)
+dynatrace:
+  operator:
+    enabled: false
+dynatrace-operator:
+  enabled: false

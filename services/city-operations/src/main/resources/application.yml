@@ -1,0 +1,57 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: city-operations
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: city
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: city,incidents
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: city-operations-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Fault injection flags — set by demo-control-api at runtime
+fault:
+  db-slowdown:
+    enabled: ${FAULT_DB_SLOWDOWN_ENABLED:false}
+    delay-ms: ${FAULT_DB_SLOWDOWN_DELAY_MS:0}
+  cpu-spike:
+    enabled: ${FAULT_CPU_SPIKE_ENABLED:false}

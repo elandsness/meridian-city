@@ -1,0 +1,110 @@
+# =============================================================================
+# Meridian City Platform — OpenTelemetry Collector Configuration
+# =============================================================================
+# This is the reference/standalone copy. The Helm chart injects an identical
+# config via helm/templates/otel-configmap.yaml with values substituted.
+#
+# To test locally:
+#   docker run --rm -p 4317:4317 -p 4318:4318 \
+#     -v $(pwd)/otel/collector-config.yaml:/etc/otel/config.yaml \
+#     -e DT_OTLP_ENDPOINT=https://your-env.live.dynatrace.com/api/v2/otlp \
+#     -e DT_API_TOKEN=your-token \
+#     otel/opentelemetry-collector-contrib:latest \
+#     --config /etc/otel/config.yaml
+# =============================================================================
+
+receivers:
+  # OTLP receiver — accepts telemetry from:
+  #   IoT Simulator (Go)   → gRPC on 4317
+  #   IoT Ingestion (Go)   → gRPC on 4317 (forwarded device spans)
+  #   AI Service (Python)  → HTTP on 4318 (GenAI semantic convention spans)
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+        cors:
+          allowed_origins:
+            - "http://localhost:*"
+            - "http://public-portal*"
+            - "http://ops-dashboard*"
+
+processors:
+  # Prevent the collector from OOMing under burst IoT load
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 800
+    spike_limit_mib: 200
+
+  # Batch telemetry before exporting to reduce API calls to Dynatrace
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Add deployment context to every resource
+  resource:
+    attributes:
+      - key: deployment.environment
+        # Override with DT_DEPLOYMENT_ENV env var at runtime
+        value: "${env:DEPLOYMENT_ENV}"
+        action: upsert
+      - key: k8s.cluster.name
+        value: "${env:K8S_CLUSTER_NAME}"
+        action: upsert
+      - key: service.namespace
+        value: "meridian"
+        action: upsert
+
+exporters:
+  # Primary exporter: Dynatrace SaaS via OTLP/HTTP
+  otlphttp/dynatrace:
+    endpoint: "${env:DT_OTLP_ENDPOINT}"
+    headers:
+      Authorization: "Api-Token ${env:DT_API_TOKEN}"
+    compression: gzip
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 500
+
+  # Debug exporter — uncomment for local troubleshooting
+  # debug:
+  #   verbosity: detailed
+  #   sampling_initial: 5
+  #   sampling_thereafter: 200
+
+service:
+  # Collector self-observability
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: "0.0.0.0:8888"
+
+  extensions: []
+
+  pipelines:
+    # Distributed traces from IoT and AI services
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/dynatrace]
+
+    # Metrics from IoT device simulators (device telemetry as OTLP metrics)
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/dynatrace]
+
+    # Logs forwarded via OTel (supplementary to OneAgent log ingestion)
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/dynatrace]

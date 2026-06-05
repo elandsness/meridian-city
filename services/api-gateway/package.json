@@ -1,0 +1,19 @@
+{
+  "name": "meridian-api-gateway",
+  "version": "1.0.0",
+  "description": "API Gateway for Meridian City Platform",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/jwt": "^8.0.1",
+    "@fastify/sensible": "^5.6.0",
+    "fastify": "^4.29.0",
+    "pino": "^8.21.0",
+    "undici": "^6.21.0",
+    "uuid": "^9.0.1"
+  }
+}

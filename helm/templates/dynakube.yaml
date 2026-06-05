@@ -1,0 +1,39 @@
+{{- if and .Values.dynatrace.operator.enabled .Values.dynatrace.apiUrl }}
+# DynaKube custom resource — configures OneAgent deployment via the Dynatrace Operator.
+# The operator must be installed and running before this resource is applied.
+# Namespace: dynatrace (separate from app namespace, per Dynatrace operator requirements)
+apiVersion: dynatrace.com/v1beta2
+kind: DynaKube
+metadata:
+  name: {{ include "meridian.fullname" . }}
+  namespace: dynatrace
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+spec:
+  apiUrl: {{ .Values.dynatrace.apiUrl | quote }}
+
+  # Reference to the secret containing the Dynatrace API token
+  tokens: meridian-dynatrace-tokens
+
+  # CloudNativeFullStack deploys OneAgent as an init container into every pod
+  # in namespaces labeled dynatrace.com/inject=true (see namespace.yaml)
+  oneAgent:
+    cloudNativeFullStack:
+      env:
+        - name: DT_DEPLOYMENT_ENVIRONMENT
+          value: {{ .Values.dynatrace.deploymentEnvironment | quote }}
+
+  # ActiveGate: required for Kubernetes monitoring and routing telemetry
+  activeGate:
+    capabilities:
+      - routing
+      - kubernetes-monitoring
+      - dynatrace-api
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1.5Gi"
+{{- end }}

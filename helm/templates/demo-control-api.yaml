@@ -1,0 +1,124 @@
+{{- if .Values.demoControlApi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: demo-control-api
+spec:
+  replicas: {{ .Values.demoControlApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: demo-control-api
+  template:
+    metadata:
+      labels:
+        app: demo-control-api
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: demo-control-api
+    spec:
+      serviceAccountName: demo-control-api
+      containers:
+        - name: demo-control-api
+          image: {{ include "meridian.image" (dict "repository" .Values.demoControlApi.image.repository "tag" .Values.demoControlApi.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3001
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "demo-control-api"
+            - name: K8S_NAMESPACE
+              value: {{ include "meridian.namespace" . | quote }}
+            # URLs for services that support fault injection
+            - name: CITIZEN_SERVICE_URL
+              value: "http://citizen-service:8081"
+            - name: CITY_OPERATIONS_URL
+              value: "http://city-operations:8083"
+            - name: AI_SERVICE_URL
+              value: "http://ai-service:8085"
+            - name: TELEMETRY_PROCESSOR_URL
+              value: "http://telemetry-processor:8086"
+            - name: IOT_SIMULATOR_URL
+              value: "http://iot-simulator:8088"
+            - name: TRAFFIC_BOT_URL
+              value: "http://traffic-bot:8089"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.demoControlApi.resources | nindent 12 }}
+---
+# ServiceAccount with permissions to patch ConfigMaps and Deployments
+# (needed for fault injection that modifies runtime config)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: demo-control-api
+    namespace: {{ include "meridian.namespace" . }}
+roleRef:
+  kind: Role
+  name: demo-control-api
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: demo-control-api
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-control-api
+  ports:
+    - name: http
+      port: {{ .Values.demoControlApi.service.port }}
+      targetPort: 3001
+{{- end }}

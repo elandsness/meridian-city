@@ -1,0 +1,74 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    Meridian City Platform                                ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Values.global.namespace }}
+Version:   {{ .Values.global.imageTag }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CHECKING DEPLOYMENT STATUS:
+
+  kubectl get pods -n {{ .Values.global.namespace }}
+
+Wait for all pods to reach Running/Ready state (~2-3 minutes for first deploy).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACCESSING THE APPLICATION:
+
+{{- if .Values.publicPortal.ingress.enabled }}
+  Public Portal:    http://{{ .Values.publicPortal.ingress.host }}
+  Ops Dashboard:    http://{{ .Values.opsDashboard.ingress.host }}
+{{- else }}
+  To access the UIs via port-forward (local development):
+
+  Public Portal:
+    kubectl port-forward svc/public-portal 8080:80 -n {{ .Values.global.namespace }}
+    → open http://localhost:8080
+
+  Ops Dashboard (login: {{ .Values.auth.username }} / {{ .Values.auth.password }}):
+    kubectl port-forward svc/ops-dashboard 8081:80 -n {{ .Values.global.namespace }}
+    → open http://localhost:8081
+
+  API Gateway:
+    kubectl port-forward svc/api-gateway 3000:3000 -n {{ .Values.global.namespace }}
+    → curl http://localhost:3000/health
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DYNATRACE CONFIGURATION:
+
+{{- if .Values.dynatrace.apiUrl }}
+  Tenant:   {{ .Values.dynatrace.apiUrl }}
+  Env ID:   {{ .Values.dynatrace.environmentId }}
+
+  After pods start, verify OneAgent injection:
+    kubectl describe pod -n {{ .Values.global.namespace }} -l app.kubernetes.io/name=citizen-service \
+      | grep -A5 "Init Containers"
+
+  Verify OTel data:
+    In Dynatrace → Observe and Explore → Distributed Traces
+    Filter: Service = "iot-ingestion" or "ai-service"
+{{- else }}
+  ⚠  dynatrace.apiUrl is not set — Dynatrace integration is inactive.
+     Set this value and run `helm upgrade` to enable observability.
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DEMO SCENARIOS:
+
+  1. Distributed Trace:   Submit a service request in the Public Portal
+  2. Davis AI:            Ops Dashboard → Demo Panel → "Inject DB Slowdown"
+  3. IoT Alert:           Ops Dashboard → Demo Panel → "Trigger HVAC Anomaly"
+  4. AI Observability:    Use the chatbot in the Public Portal
+  5. Business Events:     Ops Dashboard → Business Analytics tab
+
+  See docs/demo-scripts/ for step-by-step scripts.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For full setup instructions: docs/setup-guide.md

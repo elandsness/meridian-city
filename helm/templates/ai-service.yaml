@@ -1,0 +1,99 @@
+{{- if .Values.aiService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-service
+spec:
+  replicas: {{ .Values.aiService.replicaCount }}
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ai-service
+    spec:
+      containers:
+        - name: ai-service
+          image: {{ include "meridian.image" (dict "repository" .Values.aiService.image.repository "tag" .Values.aiService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8085
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "ai-service"
+            # LLM provider selection and credentials
+            - name: LLM_PROVIDER
+              value: {{ .Values.llm.provider | quote }}
+            - name: LLM_MODEL
+              value: {{ if eq .Values.llm.provider "openai" }}{{ .Values.llm.openai.model }}{{ else if eq .Values.llm.provider "anthropic" }}{{ .Values.llm.anthropic.model }}{{ else }}{{ .Values.llm.local.model }}{{ end | quote }}
+            {{- if eq .Values.llm.provider "openai" }}
+            - name: OPENAI_BASE_URL
+              value: {{ .Values.llm.openai.baseUrl | quote }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: llm-openai-api-key
+            {{- end }}
+            {{- if eq .Values.llm.provider "anthropic" }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: llm-anthropic-api-key
+            {{- end }}
+            {{- if eq .Values.llm.provider "local" }}
+            - name: LOCAL_LLM_ENDPOINT
+              value: {{ .Values.llm.local.endpoint | quote }}
+            {{- end }}
+            # Fault injection
+            - name: FAULT_LLM_LATENCY_ENABLED
+              value: {{ .Values.aiService.faultInjection.llmLatencyEnabled | quote }}
+            - name: FAULT_LLM_LATENCY_SECONDS
+              value: {{ .Values.aiService.faultInjection.llmLatencySeconds | quote }}
+            # Backend service URLs (for context-aware chatbot responses)
+            - name: CITIZEN_SERVICE_URL
+              value: "http://citizen-service:8081"
+            - name: CITY_OPERATIONS_URL
+              value: "http://city-operations:8083"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8085
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8085
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.aiService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-service
+spec:
+  type: ClusterIP
+  selector:
+    app: ai-service
+  ports:
+    - name: http
+      port: {{ .Values.aiService.service.port }}
+      targetPort: 8085
+{{- end }}

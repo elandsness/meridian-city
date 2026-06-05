@@ -1,0 +1,77 @@
+{{- if .Values.serviceDispatch.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-dispatch
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: service-dispatch
+spec:
+  replicas: {{ .Values.serviceDispatch.replicaCount }}
+  selector:
+    matchLabels:
+      app: service-dispatch
+  template:
+    metadata:
+      labels:
+        app: service-dispatch
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: service-dispatch
+    spec:
+      containers:
+        - name: service-dispatch
+          image: {{ include "meridian.image" (dict "repository" .Values.serviceDispatch.image.repository "tag" .Values.serviceDispatch.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8082
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "service-dispatch"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: db-password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ include "meridian.fullname" . }}-kafka:9092"
+            - name: CITY_OPERATIONS_URL
+              value: "http://city-operations:8083"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.serviceDispatch.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-dispatch
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: service-dispatch
+spec:
+  type: ClusterIP
+  selector:
+    app: service-dispatch
+  ports:
+    - name: http
+      port: {{ .Values.serviceDispatch.service.port }}
+      targetPort: 8082
+{{- end }}

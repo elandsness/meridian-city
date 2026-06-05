@@ -1,0 +1,112 @@
+{{- if .Values.apiGateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-gateway
+spec:
+  replicas: {{ .Values.apiGateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: {{ include "meridian.image" (dict "repository" .Values.apiGateway.image.repository "tag" .Values.apiGateway.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "api-gateway"
+            - name: AUTH_USERNAME
+              value: {{ .Values.auth.username | quote }}
+            - name: AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: auth-password
+            - name: CITIZEN_SERVICE_URL
+              value: "http://citizen-service:8081"
+            - name: SERVICE_DISPATCH_URL
+              value: "http://service-dispatch:8082"
+            - name: CITY_OPERATIONS_URL
+              value: "http://city-operations:8083"
+            - name: ANALYTICS_SERVICE_URL
+              value: "http://analytics-service:8084"
+            - name: AI_SERVICE_URL
+              value: "http://ai-service:8085"
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:8087"
+            - name: DEMO_CONTROL_API_URL
+              value: "http://demo-control-api:3001"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.apiGateway.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-gateway
+spec:
+  type: {{ .Values.apiGateway.service.type }}
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: {{ .Values.apiGateway.service.port }}
+      targetPort: 3000
+---
+{{- if .Values.apiGateway.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.apiGateway.ingress.annotations | nindent 4 }}
+spec:
+  {{- if .Values.apiGateway.ingress.className }}
+  ingressClassName: {{ .Values.apiGateway.ingress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.apiGateway.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: {{ .Values.apiGateway.service.port }}
+{{- end }}
+{{- end }}

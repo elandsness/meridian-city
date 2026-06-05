@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x scripts/deploy.sh scripts/teardown.sh scripts/seed-data.sh)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c 'import json, sys; data=open\\('\\\\''__TRACKED_VAR__'\\\\''\\).read\\(\\); print\\('\\\\''OK __TRACKED_VAR__'\\\\''\\)')",
+      "Bash(helm version *)",
+      "Bash(npm install *)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(go version *)",
+      "Bash(python3 -)",
+      "Bash(node -e \"require\\('./src/app.js'\\)\")",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(kill %1)",
+      "Bash(node src/app.js)",
+      "Bash(curl -s -X POST http://localhost:3000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"demo\",\"password\":\"dynatrace\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"wrong\",\"password\":\"wrong\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"demo\",\"password\":\"dynatrace\"}')",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill -9)"
+    ]
+  }
+}

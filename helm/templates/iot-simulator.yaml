@@ -1,0 +1,81 @@
+{{- if .Values.iotSimulator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-simulator
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iot-simulator
+spec:
+  # Single replica — goroutines inside handle all device concurrency
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iot-simulator
+  template:
+    metadata:
+      labels:
+        app: iot-simulator
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: iot-simulator
+    spec:
+      containers:
+        - name: iot-simulator
+          image: {{ include "meridian.image" (dict "repository" .Values.iotSimulator.image.repository "tag" .Values.iotSimulator.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8088
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "iot-simulator"
+            # OTLP endpoint — iot-simulator sends all device telemetry here (gRPC, no scheme)
+            - name: OTLP_ENDPOINT
+              value: "iot-ingestion:4317"
+            # Fleet sizing — read directly by the Go application
+            - name: VEHICLE_COUNT
+              value: {{ .Values.iotSimulator.fleet.vehicles.count | quote }}
+            - name: BUILDING_COUNT
+              value: {{ .Values.iotSimulator.fleet.buildings.count | quote }}
+            - name: MACHINE_COUNT
+              value: {{ .Values.iotSimulator.fleet.machines.count | quote }}
+            - name: EMIT_INTERVAL_SECONDS
+              value: {{ .Values.iotSimulator.fleet.vehicles.emitIntervalSeconds | quote }}
+            - name: ADMIN_PORT
+              value: "8088"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment={{ .Values.dynatrace.deploymentEnvironment }},k8s.cluster.name={{ .Values.dynatrace.clusterName }}"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8088
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8088
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.iotSimulator.resources | nindent 12 }}
+---
+# Exposes the control API for fleet management from demo-control-api
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-simulator
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iot-simulator
+spec:
+  type: ClusterIP
+  selector:
+    app: iot-simulator
+  ports:
+    - name: http
+      port: 8088
+      targetPort: 8088
+{{- end }}

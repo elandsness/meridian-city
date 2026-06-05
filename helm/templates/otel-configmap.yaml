@@ -1,0 +1,91 @@
+{{- if index .Values "opentelemetry-collector" "enabled" }}
+# OTel Collector configuration ConfigMap.
+# The opentelemetry-collector chart is configured to use this existing ConfigMap
+# via configMap.existingName in values.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    receivers:
+      # Receives OTLP from:
+      #  - iot-simulator (Go): IoT device telemetry
+      #  - iot-ingestion (Go): forwarded device spans
+      #  - ai-service (Python): GenAI spans with token metadata
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+          http:
+            endpoint: "0.0.0.0:4318"
+            cors:
+              allowed_origins: ["*"]
+
+    processors:
+      # Prevent OOM by limiting collector memory
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 800
+        spike_limit_mib: 200
+
+      # Batch before exporting to reduce API calls
+      batch:
+        timeout: 5s
+        send_batch_size: 1024
+        send_batch_max_size: 2048
+
+      # Enrich every resource with deployment metadata
+      resource:
+        attributes:
+          - key: deployment.environment
+            value: "{{ .Values.dynatrace.deploymentEnvironment }}"
+            action: upsert
+          - key: k8s.cluster.name
+            value: "{{ .Values.dynatrace.clusterName }}"
+            action: upsert
+          - key: service.namespace
+            value: "meridian"
+            action: upsert
+
+    exporters:
+      # Export to Dynatrace via OTLP/HTTP
+      otlphttp/dynatrace:
+        endpoint: "{{ .Values.dynatrace.otlpEndpoint }}"
+        headers:
+          Authorization: "Api-Token {{ .Values.dynatrace.apiToken }}"
+        compression: gzip
+        retry_on_failure:
+          enabled: true
+          initial_interval: 5s
+          max_interval: 30s
+          max_elapsed_time: 300s
+
+      # Debug exporter (disabled in production — enable for troubleshooting)
+      # debug:
+      #   verbosity: detailed
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [otlphttp/dynatrace]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [otlphttp/dynatrace]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [otlphttp/dynatrace]
+
+      telemetry:
+        logs:
+          level: "info"
+        metrics:
+          address: "0.0.0.0:8888"
+{{- end }}

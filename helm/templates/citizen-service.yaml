@@ -1,0 +1,77 @@
+{{- if .Values.citizenService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citizen-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: citizen-service
+spec:
+  replicas: {{ .Values.citizenService.replicaCount }}
+  selector:
+    matchLabels:
+      app: citizen-service
+  template:
+    metadata:
+      labels:
+        app: citizen-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: citizen-service
+    spec:
+      containers:
+        - name: citizen-service
+          image: {{ include "meridian.image" (dict "repository" .Values.citizenService.image.repository "tag" .Values.citizenService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "citizen-service"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: db-password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ include "meridian.fullname" . }}-kafka:9092"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.citizenService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: citizen-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: citizen-service
+spec:
+  type: ClusterIP
+  selector:
+    app: citizen-service
+  ports:
+    - name: http
+      port: {{ .Values.citizenService.service.port }}
+      targetPort: 8081
+{{- end }}

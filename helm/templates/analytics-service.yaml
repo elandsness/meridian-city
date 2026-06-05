@@ -1,0 +1,64 @@
+{{- if .Values.analyticsService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: analytics-service
+spec:
+  replicas: {{ .Values.analyticsService.replicaCount }}
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: analytics-service
+    spec:
+      containers:
+        - name: analytics-service
+          image: {{ include "meridian.image" (dict "repository" .Values.analyticsService.image.repository "tag" .Values.analyticsService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8084
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "analytics-service"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.analyticsService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: analytics-service
+spec:
+  type: ClusterIP
+  selector:
+    app: analytics-service
+  ports:
+    - name: http
+      port: {{ .Values.analyticsService.service.port }}
+      targetPort: 8084
+{{- end }}

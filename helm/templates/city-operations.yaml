@@ -1,0 +1,82 @@
+{{- if .Values.cityOperations.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: city-operations
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: city-operations
+spec:
+  replicas: {{ .Values.cityOperations.replicaCount }}
+  selector:
+    matchLabels:
+      app: city-operations
+  template:
+    metadata:
+      labels:
+        app: city-operations
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: city-operations
+    spec:
+      containers:
+        - name: city-operations
+          image: {{ include "meridian.image" (dict "repository" .Values.cityOperations.image.repository "tag" .Values.cityOperations.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8083
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "city-operations"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: db-password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ include "meridian.fullname" . }}-kafka:9092"
+            # Fault injection flags — set by demo-control-api at runtime via ConfigMap
+            - name: FAULT_DB_SLOWDOWN_ENABLED
+              value: {{ .Values.cityOperations.faultInjection.dbSlowdownEnabled | quote }}
+            - name: FAULT_DB_SLOWDOWN_DELAY_MS
+              value: {{ .Values.cityOperations.faultInjection.dbSlowdownDelayMs | quote }}
+            - name: FAULT_CPU_SPIKE_ENABLED
+              value: {{ .Values.cityOperations.faultInjection.cpuSpikeEnabled | quote }}
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8083
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.cityOperations.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: city-operations
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: city-operations
+spec:
+  type: ClusterIP
+  selector:
+    app: city-operations
+  ports:
+    - name: http
+      port: {{ .Values.cityOperations.service.port }}
+      targetPort: 8083
+{{- end }}

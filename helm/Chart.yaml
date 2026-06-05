@@ -1,0 +1,48 @@
+apiVersion: v2
+name: meridian-city-platform
+description: >
+  Meridian City Platform — a fictional smart city operations application for demonstrating
+  Dynatrace full-stack observability across a polyglot microservices architecture.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+maintainers:
+  - name: Meridian Demo Team
+    email: demo@meridian.local
+
+keywords:
+  - dynatrace
+  - demo
+  - observability
+  - smart-city
+  - iot
+  - opentelemetry
+
+# External chart dependencies for infrastructure components.
+# Run `helm dependency update ./helm` before first install.
+# Pin to specific versions for reproducibility; update deliberately.
+dependencies:
+  - name: postgresql
+    version: ">=15.5.0 <17.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql
+
+  - name: kafka
+    version: ">=26.0.0 <32.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+    alias: kafka
+
+  - name: opentelemetry-collector
+    version: ">=0.100.0 <1.0.0"
+    repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+    condition: opentelemetry-collector.enabled
+    alias: opentelemetry-collector
+
+  - name: dynatrace-operator
+    version: ">=1.0.0 <2.0.0"
+    repository: https://raw.githubusercontent.com/Dynatrace/dynatrace-operator/main/config/helm/repos/stable
+    condition: dynatrace-operator.enabled
+    alias: dynatrace-operator

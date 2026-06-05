@@ -1,0 +1,73 @@
+{{- if .Values.trafficBot.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-bot
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: traffic-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic-bot
+  template:
+    metadata:
+      labels:
+        app: traffic-bot
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: traffic-bot
+    spec:
+      containers:
+        - name: traffic-bot
+          image: {{ include "meridian.image" (dict "repository" .Values.trafficBot.image.repository "tag" .Values.trafficBot.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8089
+          env:
+            - name: TARGET_URL
+              value: {{ .Values.trafficBot.config.targetUrl | quote }}
+            - name: REQUESTS_PER_MINUTE
+              value: {{ .Values.trafficBot.config.requestsPerMinute | quote }}
+            - name: SCENARIO_CITIZEN_REQUESTS
+              value: {{ .Values.trafficBot.config.scenarios.citizenRequests | quote }}
+            - name: SCENARIO_ACCOUNT_CREATION
+              value: {{ .Values.trafficBot.config.scenarios.accountCreation | quote }}
+            - name: SCENARIO_BROWSING
+              value: {{ .Values.trafficBot.config.scenarios.browsing | quote }}
+            - name: SCENARIO_CHATBOT
+              value: {{ .Values.trafficBot.config.scenarios.chatbot | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8089
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8089
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.trafficBot.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traffic-bot
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: traffic-bot
+spec:
+  type: ClusterIP
+  selector:
+    app: traffic-bot
+  ports:
+    - name: http
+      port: 8089
+      targetPort: 8089
+{{- end }}

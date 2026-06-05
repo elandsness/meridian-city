@@ -1,0 +1,64 @@
+{{- if .Values.notificationService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notification-service
+spec:
+  replicas: {{ .Values.notificationService.replicaCount }}
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: {{ include "meridian.image" (dict "repository" .Values.notificationService.image.repository "tag" .Values.notificationService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8087
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "notification-service"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8087
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8087
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.notificationService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notification-service
+spec:
+  type: ClusterIP
+  selector:
+    app: notification-service
+  ports:
+    - name: http
+      port: {{ .Values.notificationService.service.port }}
+      targetPort: 8087
+{{- end }}

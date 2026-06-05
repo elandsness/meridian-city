@@ -1,0 +1,15 @@
+{
+  "name": "meridian-notification-service",
+  "version": "1.0.0",
+  "description": "Real-time notification service for Meridian City Platform",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "kafkajs": "^2.2.4",
+    "uuid": "^9.0.1"
+  }
+}

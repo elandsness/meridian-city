@@ -1,0 +1,54 @@
+# Helm
+helm/charts/*.tgz
+helm/Chart.lock
+helm/values-custom.yaml
+helm/values-*.local.yaml
+
+# Secrets and local config
+*.env
+.env
+.env.*
+secrets/
+**/secrets.yaml
+**/secret.yaml
+
+# Build artifacts
+**/target/
+**/dist/
+**/build/
+**/.gradle/
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/venv/
+**/.venv/
+**/bin/
+**/vendor/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Go
+**/go.sum
+
+# Java
+**/*.class
+**/*.jar
+**/*.war
+
+# Logs
+**/*.log
+logs/
+
+# Docker
+**/Dockerfile.local
+
+# k8s local overrides
+kubeconfig
+*.kubeconfig
