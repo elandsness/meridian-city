@@ -18,7 +18,15 @@
       "Bash(curl -s -X POST http://localhost:3000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"wrong\",\"password\":\"wrong\"}')",
       "Bash(curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"demo\",\"password\":\"dynatrace\"}')",
       "Bash(lsof -ti:3000)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(helm lint *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('scripts:', d.get\\('scripts',{}\\)\\)\")",
+      "Bash(mvn -B package -DskipTests -q)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(brew list *)",
+      "Bash(find /usr/local /opt/homebrew ~/go /usr/bin -name \"go\" -type f 2>/dev/null | grep -v \".git\" | head -5)"
     ]
   }
 }
