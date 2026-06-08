@@ -40,7 +40,7 @@ Construct the full image reference for a service.
 Usage: include "meridian.image" (dict "repository" .Values.citizenService.image.repository "tag" .Values.citizenService.image.tag "context" $)
 */}}
 {{- define "meridian.image" -}}
-{{- $registry := .context.Values.global.imageRegistry -}}
+{{- $registry := .context.Values.global.appImageRegistry -}}
 {{- $tag := .tag | default .context.Values.global.imageTag -}}
 {{- printf "%s/%s:%s" $registry .repository $tag -}}
 {{- end }}
