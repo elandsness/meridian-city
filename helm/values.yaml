@@ -514,6 +514,8 @@ opentelemetry-collector:
   enabled: true
   mode: deployment
   replicaCount: 1
+  image:
+    repository: "otel/opentelemetry-collector-contrib"
   # Override config via external ConfigMap (see helm/templates/otel-configmap.yaml)
   configMap:
     create: false
