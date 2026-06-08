@@ -30,9 +30,9 @@ error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
 check_prerequisites() {
   local missing=0
-  for cmd in kubectl helm; do
-    if ! command -v "$cmd" &>/dev/null; then
-      error "Required tool not found: $cmd"
+  for tool in kubectl helm; do
+    if ! command -v "$tool" &>/dev/null; then
+      error "Required tool not found: $tool"
       missing=1
     fi
   done
