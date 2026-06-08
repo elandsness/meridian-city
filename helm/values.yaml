@@ -18,9 +18,6 @@ global:
   imageTag: "latest"
   namespace: "meridian"
   imagePullPolicy: IfNotPresent
-  # GKE Autopilot only: set to [dockerhub-pull-secret] when dockerhub.username
-  # and dockerhub.token are configured below. This tells the Bitnami sub-charts
-  # (PostgreSQL, Kafka) to use the pull secret the chart creates from those credentials.
   imagePullSecrets: []
 
 # ---------------------------------------------------------------------------
@@ -446,17 +443,13 @@ opsDashboard:
       memory: "256Mi"
 
 # ---------------------------------------------------------------------------
-# Docker Hub credentials (GKE Autopilot only)
-# GKE Autopilot's shared outbound IPs hit Docker Hub's anonymous pull rate
-# limit, causing Bitnami images (PostgreSQL, Kafka) to fail with "not found".
-# Setting these causes the chart to create a pull secret used by those images.
-# Also set global.imagePullSecrets above to activate it for the sub-charts.
-# Create a free read-only token: hub.docker.com → Account Settings → Personal access tokens
+# Docker Hub credentials (optional — for any remaining docker.io images)
+# Bitnami PostgreSQL and Kafka images are pulled from oci.bitnami.com (public,
+# no credentials needed). These fields exist in case other images in your
+# environment still require authenticated Docker Hub pulls.
 # ---------------------------------------------------------------------------
 dockerhub:
-  # GKE Autopilot only: your Docker Hub username
   username: ""
-  # GKE Autopilot only: your Docker Hub personal access token (read-only scope is sufficient)
   token: ""
 
 # ---------------------------------------------------------------------------
@@ -464,6 +457,9 @@ dockerhub:
 # ---------------------------------------------------------------------------
 postgresql:
   enabled: true
+  # Bitnami no longer publishes newer images to Docker Hub; use their OCI registry.
+  image:
+    registry: oci.bitnami.com
   auth:
     username: "meridian"
     # CHANGE THIS in production / shared environments
@@ -486,6 +482,9 @@ postgresql:
 # ---------------------------------------------------------------------------
 kafka:
   enabled: true
+  # Bitnami no longer publishes newer images to Docker Hub; use their OCI registry.
+  image:
+    registry: oci.bitnami.com
   replicaCount: 1
   persistence:
     enabled: true
