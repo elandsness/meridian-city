@@ -89,14 +89,30 @@ install_or_upgrade() {
     info "Created namespace: $DYNATRACE_NAMESPACE"
   fi
 
+  # GKE Autopilot cold-start: the OTel collector chart does not expose
+  # progressDeadlineSeconds as a value, so the default 600s can be exceeded
+  # while waiting for node provisioning + large image pull. Patch it in the
+  # background the moment Helm creates the deployment.
+  local otel_deploy="${RELEASE_NAME}-opentelemetry-collector"
+  (
+    until kubectl get deployment "$otel_deploy" -n "$NAMESPACE" &>/dev/null; do
+      sleep 5
+    done
+    kubectl patch deployment "$otel_deploy" -n "$NAMESPACE" \
+      --type=merge -p '{"spec":{"progressDeadlineSeconds":1800}}' &>/dev/null
+    info "Patched $otel_deploy: progressDeadlineSeconds=1800"
+  ) &
+  local patch_pid=$!
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   helm "$cmd" "$RELEASE_NAME" "$CHART_DIR" \
     --namespace "$NAMESPACE" \
     --create-namespace \
-    --timeout 10m \
+    --timeout 20m \
     --wait \
     "$@"
 
+  kill "$patch_pid" 2>/dev/null || true
   success "Deployment complete."
   echo ""
   kubectl get pods -n "$NAMESPACE"
