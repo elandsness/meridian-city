@@ -69,29 +69,34 @@ install_or_upgrade() {
 
   check_prerequisites
 
-  # If the app namespace is still terminating from a previous uninstall, wait
-  # for it to disappear fully before proceeding — creating resources in a
-  # terminating namespace is forbidden by the API server.
+  # Ensure the app namespace exists and carries Helm ownership labels before
+  # we try to create any resources in it (e.g. the Docker Hub pull secret).
+  # Three cases:
+  #   Terminating → wait for it to disappear, then fall through to create
+  #   Active      → stamp with Helm labels so the chart can adopt it
+  #   Missing     → create with Helm labels so the chart owns it from the start
   if kubectl get namespace "$NAMESPACE" &>/dev/null; then
     local ns_phase
     ns_phase=$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.status.phase}')
     if [[ "$ns_phase" == "Terminating" ]]; then
-      info "Namespace $NAMESPACE is terminating — waiting up to 2m for it to be deleted..."
+      info "Namespace $NAMESPACE is terminating — waiting up to 2m for deletion..."
       kubectl wait --for=delete namespace/"$NAMESPACE" --timeout=120s \
         || { error "Namespace $NAMESPACE is stuck in Terminating. Check for stuck finalizers."; exit 1; }
-    else
-      # Stamp with Helm ownership metadata so the chart can adopt it rather
-      # than failing with "invalid ownership metadata".
-      kubectl annotate namespace "$NAMESPACE" \
-        "meta.helm.sh/release-name=$RELEASE_NAME" \
-        "meta.helm.sh/release-namespace=$NAMESPACE" \
-        --overwrite
-      kubectl label namespace "$NAMESPACE" \
-        "app.kubernetes.io/managed-by=Helm" \
-        --overwrite
-      info "Adopted existing namespace: $NAMESPACE"
+      # Fall through: namespace is now gone, create it fresh below.
     fi
   fi
+  if ! kubectl get namespace "$NAMESPACE" &>/dev/null; then
+    kubectl create namespace "$NAMESPACE"
+    info "Created namespace: $NAMESPACE"
+  fi
+  kubectl annotate namespace "$NAMESPACE" \
+    "meta.helm.sh/release-name=$RELEASE_NAME" \
+    "meta.helm.sh/release-namespace=$NAMESPACE" \
+    --overwrite
+  kubectl label namespace "$NAMESPACE" \
+    "app.kubernetes.io/managed-by=Helm" \
+    --overwrite
+  info "Namespace ready: $NAMESPACE"
 
   # Ensure Dynatrace operator namespace exists (needed by DynaKube CR)
   if ! kubectl get namespace "$DYNATRACE_NAMESPACE" &>/dev/null; then
