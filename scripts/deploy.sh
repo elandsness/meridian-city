@@ -51,7 +51,8 @@ check_prerequisites() {
 
 add_repos() {
   info "Adding Helm chart repositories..."
-  helm repo add bitnami https://charts.bitnami.com/bitnami || true
+  helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts || true
+  helm repo add strimzi https://strimzi.io/charts/ || true
   helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts || true
   helm repo add dynatrace \
     https://raw.githubusercontent.com/Dynatrace/dynatrace-operator/main/config/helm/repos/stable || true

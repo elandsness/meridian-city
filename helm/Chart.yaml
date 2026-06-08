@@ -23,17 +23,17 @@ keywords:
 # Run `helm dependency update ./helm` before first install.
 # Pin to specific versions for reproducibility; update deliberately.
 dependencies:
-  - name: postgresql
-    version: ">=15.5.0 <17.0.0"
-    repository: https://charts.bitnami.com/bitnami
+  - name: cloudnative-pg
+    version: ">=0.20.0 <2.0.0"
+    repository: https://cloudnative-pg.github.io/charts
     condition: postgresql.enabled
-    alias: postgresql
+    alias: cloudnative-pg
 
-  - name: kafka
-    version: ">=26.0.0 <32.0.0"
-    repository: https://charts.bitnami.com/bitnami
+  - name: strimzi-kafka-operator
+    version: ">=0.40.0 <2.0.0"
+    repository: https://strimzi.io/charts/
     condition: kafka.enabled
-    alias: kafka
+    alias: strimzi-kafka-operator
 
   - name: opentelemetry-collector
     version: ">=0.100.0 <1.0.0"
