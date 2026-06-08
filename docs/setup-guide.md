@@ -128,7 +128,7 @@ This will:
 1. Create the `meridian` and `dynatrace` namespaces
 2. Deploy PostgreSQL and Kafka (Bitnami charts)
 3. Deploy the OTel Collector
-4. Deploy the Dynatrace Operator and create the DynaKube CR (if `dynatrace.operator.enabled=true`)
+4. Deploy the Dynatrace Operator; the DynaKube CR is then applied as a Helm `post-install`/`post-upgrade` hook, so it runs only after the operator (and its CRD + admission webhook) are ready — avoiding a first-install race
 5. Deploy all 12 application services
 6. Deploy the two frontend apps, IoT simulator, and traffic bot
 
@@ -269,7 +269,12 @@ If the DynaKube CR is not yet ready, the init container will wait (and eventuall
 kubectl describe dynakube meridian -n dynatrace
 ```
 
-Common cause: `dynatrace.apiToken` is wrong or has insufficient scopes.
+Common causes:
+- `dynatrace.apiToken` is wrong or has insufficient scopes.
+- **apiVersion / operator mismatch.** The chart pins the Dynatrace Operator to `>=1.7.0` and the DynaKube CR uses `dynatrace.com/v1beta5`. If your cluster has a different operator version, the CR may be rejected (`no matches for kind "DynaKube"` or an unknown-field error). Align `apiVersion` in `helm/templates/dynakube.yaml` and the operator version in `helm/Chart.yaml`, e.g.:
+  ```bash
+  kubectl get crd dynakubes.dynatrace.com -o jsonpath='{.spec.versions[*].name}'
+  ```
 
 ### PostgreSQL not ready
 

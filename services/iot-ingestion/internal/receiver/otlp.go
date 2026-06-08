@@ -33,7 +33,13 @@ func NewMetricsReceiver(v *validator.Validator, p *publisher.Publisher) *Metrics
 }
 
 // Export processes an ExportMetricsServiceRequest, validates devices, and publishes
-// enriched TelemetryReadings to Kafka.
+// one enriched TelemetryReading per device.
+//
+// A single iot-simulator process emits telemetry for many devices, so device
+// identity is carried on each metric DATA POINT's attributes (device.id, etc.),
+// not on the shared OTLP resource. We therefore group data points by device.id
+// and emit one reading per device. (Resource-level attributes are still used as
+// a fallback for clients that set them there.)
 func (r *MetricsReceiver) Export(ctx context.Context, req *metricsv1.ExportMetricsServiceRequest) (*metricsv1.ExportMetricsServiceResponse, error) {
 	ctx, span := telemetry.Tracer.Start(ctx, "otlp.metrics.receive")
 	defer span.End()
@@ -41,47 +47,54 @@ func (r *MetricsReceiver) Export(ctx context.Context, req *metricsv1.ExportMetri
 	traceID := span.SpanContext().TraceID().String()
 
 	for i, rm := range req.ResourceMetrics {
-		var attrs []*commonv1.KeyValue
+		var resAttrs []*commonv1.KeyValue
 		if rm.Resource != nil {
-			attrs = rm.Resource.Attributes
+			resAttrs = rm.Resource.Attributes
 		}
 
-		deviceID := getAttrString(attrs, "device.id")
-		if deviceID == "" {
-			deviceID = fmt.Sprintf("unknown-device-%d", i)
-		}
+		// deviceID → accumulating reading
+		readings := make(map[string]*publisher.TelemetryReading)
 
-		deviceType := getAttrString(attrs, "device.type")
-		deviceCategory := getAttrString(attrs, "device.category")
-		zone := getAttrString(attrs, "device.zone")
-		manufacturer := getAttrString(attrs, "device.manufacturer")
-
-		if !r.validator.IsKnown(deviceID) {
-			log.Printf("[receiver] warning: unknown device %q — processing anyway (fail-open)", deviceID)
-		}
-
-		metrics := make(map[string]float64)
 		for _, sm := range rm.ScopeMetrics {
 			for _, m := range sm.Metrics {
-				if val, ok := extractMetricValue(m); ok {
-					metrics[m.Name] = val
+				for _, dp := range numberDataPoints(m) {
+					deviceID := getAttrString(dp.Attributes, "device.id")
+					if deviceID == "" {
+						deviceID = getAttrString(resAttrs, "device.id")
+					}
+					if deviceID == "" {
+						deviceID = fmt.Sprintf("unknown-device-%d", i)
+					}
+
+					reading, ok := readings[deviceID]
+					if !ok {
+						reading = &publisher.TelemetryReading{
+							DeviceID:       deviceID,
+							DeviceType:     firstNonEmpty(getAttrString(dp.Attributes, "device.type"), getAttrString(resAttrs, "device.type")),
+							DeviceCategory: firstNonEmpty(getAttrString(dp.Attributes, "device.category"), getAttrString(resAttrs, "device.category")),
+							Zone:           firstNonEmpty(getAttrString(dp.Attributes, "device.zone"), getAttrString(resAttrs, "device.zone")),
+							Manufacturer:   firstNonEmpty(getAttrString(dp.Attributes, "device.manufacturer"), getAttrString(resAttrs, "device.manufacturer")),
+							Timestamp:      time.Now().UTC(),
+							Metrics:        make(map[string]float64),
+							TraceID:        traceID,
+						}
+						readings[deviceID] = reading
+					}
+
+					if val, ok := dataPointValue(dp); ok {
+						reading.Metrics[m.Name] = val
+					}
 				}
 			}
 		}
 
-		reading := &publisher.TelemetryReading{
-			DeviceID:       deviceID,
-			DeviceType:     deviceType,
-			DeviceCategory: deviceCategory,
-			Zone:           zone,
-			Manufacturer:   manufacturer,
-			Timestamp:      time.Now().UTC(),
-			Metrics:        metrics,
-			TraceID:        traceID,
-		}
-
-		if err := r.publisher.Publish(ctx, reading); err != nil {
-			log.Printf("[receiver] error publishing telemetry for device %q: %v", deviceID, err)
+		for deviceID, reading := range readings {
+			if !r.validator.IsKnown(deviceID) {
+				log.Printf("[receiver] warning: unknown device %q — processing anyway (fail-open)", deviceID)
+			}
+			if err := r.publisher.Publish(ctx, reading); err != nil {
+				log.Printf("[receiver] error publishing telemetry for device %q: %v", deviceID, err)
+			}
 		}
 	}
 
@@ -100,30 +113,35 @@ func getAttrString(attrs []*commonv1.KeyValue, key string) string {
 	return ""
 }
 
-// extractMetricValue pulls a float64 value from a Gauge metric's first data point.
-// Returns (0, false) if the metric has no supported numeric data.
-func extractMetricValue(m *otlpmetricsv1.Metric) (float64, bool) {
-	if g := m.GetGauge(); g != nil {
-		if len(g.DataPoints) > 0 {
-			dp := g.DataPoints[0]
-			switch v := dp.Value.(type) {
-			case *otlpmetricsv1.NumberDataPoint_AsDouble:
-				return v.AsDouble, true
-			case *otlpmetricsv1.NumberDataPoint_AsInt:
-				return float64(v.AsInt), true
-			}
+// firstNonEmpty returns the first non-empty string of its arguments.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
 		}
 	}
+	return ""
+}
+
+// numberDataPoints returns all numeric data points of a metric (Gauge or Sum).
+func numberDataPoints(m *otlpmetricsv1.Metric) []*otlpmetricsv1.NumberDataPoint {
+	if g := m.GetGauge(); g != nil {
+		return g.DataPoints
+	}
 	if s := m.GetSum(); s != nil {
-		if len(s.DataPoints) > 0 {
-			dp := s.DataPoints[0]
-			switch v := dp.Value.(type) {
-			case *otlpmetricsv1.NumberDataPoint_AsDouble:
-				return v.AsDouble, true
-			case *otlpmetricsv1.NumberDataPoint_AsInt:
-				return float64(v.AsInt), true
-			}
-		}
+		return s.DataPoints
+	}
+	return nil
+}
+
+// dataPointValue pulls a float64 value from a NumberDataPoint.
+// Returns (0, false) if the data point has no supported numeric value.
+func dataPointValue(dp *otlpmetricsv1.NumberDataPoint) (float64, bool) {
+	switch v := dp.Value.(type) {
+	case *otlpmetricsv1.NumberDataPoint_AsDouble:
+		return v.AsDouble, true
+	case *otlpmetricsv1.NumberDataPoint_AsInt:
+		return float64(v.AsInt), true
 	}
 	return 0, false
 }

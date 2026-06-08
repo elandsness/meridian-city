@@ -116,7 +116,8 @@ meridian-city-platform/
 
 ## Build Status
 
-![Build](https://github.com/elandsness/meridian-city/actions/workflows/build.yml/badge.svg)
+<!-- Update the org/repo below to match where this repository is hosted. -->
+![Build](https://github.com/your-org/meridian-city-platform/actions/workflows/build.yml/badge.svg)
 
 ## License
 

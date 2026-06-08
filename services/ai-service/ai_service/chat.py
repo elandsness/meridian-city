@@ -215,17 +215,19 @@ class ChatService:
             return ""
 
         try:
+            # citizen-service exposes service requests at /api/v1/service-requests/{id}
             resp = await self._http.get(
-                f"{self._citizen_url}/api/v1/requests/{request_id}"
+                f"{self._citizen_url}/api/v1/service-requests/{request_id}"
             )
             if resp.status_code == 200:
                 data = resp.json()
+                # Field names match citizen-service's ServiceRequestResponse DTO
                 return (
                     f"Request ID: {request_id}\n"
                     f"  Category: {data.get('category', 'unknown')}\n"
                     f"  Status: {data.get('status', 'unknown')}\n"
                     f"  Description: {data.get('description', '')}\n"
-                    f"  Submitted: {data.get('submittedAt', '')}\n"
+                    f"  Submitted: {data.get('createdAt', '')}\n"
                     f"  Last updated: {data.get('updatedAt', '')}"
                 )
         except Exception as exc:

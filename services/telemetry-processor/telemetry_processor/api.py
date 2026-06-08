@@ -7,7 +7,7 @@ Endpoints:
   POST /admin/fault       — runtime fault injection
 """
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from .fault import fault_state
@@ -56,8 +56,13 @@ async def status():
 # ---------------------------------------------------------------------------
 
 class FaultRequest(BaseModel):
-    kafka_pause: Optional[bool] = None
-    memory_pressure: Optional[bool] = None
+    # Field names match the payload sent by demo-control-api and the internal
+    # fault_state attributes. Legacy short names (kafka_pause / memory_pressure)
+    # are accepted as aliases for backward compatibility.
+    kafka_pause_enabled: Optional[bool] = Field(default=None, alias="kafka_pause")
+    memory_pressure_enabled: Optional[bool] = Field(default=None, alias="memory_pressure")
+
+    model_config = {"populate_by_name": True}
 
 
 @app.post("/admin/fault")
@@ -66,16 +71,16 @@ async def inject_fault(req: FaultRequest):
     Toggle fault injection flags at runtime.
 
     Examples:
-      {"kafka_pause": true}         → pause Kafka consumption (simulates lag)
-      {"memory_pressure": true}     → allocate large in-memory buffers
-      {"kafka_pause": false, "memory_pressure": false}  → reset all
+      {"kafka_pause_enabled": true}      → pause Kafka consumption (simulates lag)
+      {"memory_pressure_enabled": true}  → allocate large in-memory buffers
+      {"kafka_pause_enabled": false, "memory_pressure_enabled": false}  → reset all
     """
-    if req.kafka_pause is not None:
-        fault_state.kafka_pause_enabled = req.kafka_pause
+    if req.kafka_pause_enabled is not None:
+        fault_state.kafka_pause_enabled = req.kafka_pause_enabled
 
-    if req.memory_pressure is not None:
-        fault_state.memory_pressure_enabled = req.memory_pressure
-        if req.memory_pressure:
+    if req.memory_pressure_enabled is not None:
+        fault_state.memory_pressure_enabled = req.memory_pressure_enabled
+        if req.memory_pressure_enabled:
             fault_state.apply_memory_pressure()
         else:
             fault_state.release_memory_pressure()
@@ -83,7 +88,7 @@ async def inject_fault(req: FaultRequest):
     return {
         "ok": True,
         "faults": {
-            "kafka_pause": fault_state.kafka_pause_enabled,
-            "memory_pressure": fault_state.memory_pressure_enabled,
+            "kafka_pause_enabled": fault_state.kafka_pause_enabled,
+            "memory_pressure_enabled": fault_state.memory_pressure_enabled,
         },
     }

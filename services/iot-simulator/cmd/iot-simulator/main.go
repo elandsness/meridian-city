@@ -15,18 +15,21 @@ import (
 )
 
 func main() {
-	otlpEndpoint    := envStr("OTLP_ENDPOINT", "iot-ingestion:4317")
-	vehicleCount    := envInt("VEHICLE_COUNT", 30)
-	buildingCount   := envInt("BUILDING_COUNT", 15)
-	machineCount    := envInt("MACHINE_COUNT", 10)
-	emitInterval    := envInt("EMIT_INTERVAL_SECONDS", 15)
-	adminPort       := envStr("ADMIN_PORT", "8088")
+	otlpEndpoint     := envStr("OTLP_ENDPOINT", "iot-ingestion:4317")
+	collectorEndpoint := envStr("OTEL_COLLECTOR_ENDPOINT", "")
+	vehicleCount     := envInt("VEHICLE_COUNT", 30)
+	buildingCount    := envInt("BUILDING_COUNT", 15)
+	machineCount     := envInt("MACHINE_COUNT", 10)
+	emitInterval     := envInt("EMIT_INTERVAL_SECONDS", 15)
+	adminPort        := envStr("ADMIN_PORT", "8088")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Initialise OTel — non-fatal if endpoint is unreachable at startup.
-	shutdown, err := telemetry.InitOTel(ctx, otlpEndpoint)
+	// Initialise OTel — non-fatal if an endpoint is unreachable at startup.
+	// Metrics go to iot-ingestion (Kafka path) and, when configured, also to the
+	// OTel Collector (Dynatrace path); traces go to the Collector.
+	shutdown, err := telemetry.InitOTel(ctx, otlpEndpoint, collectorEndpoint)
 	if err != nil {
 		log.Printf("WARNING: OTel init error: %v — continuing without telemetry export", err)
 		shutdown = func(context.Context) error { return nil }
