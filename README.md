@@ -54,6 +54,7 @@ See [docs/architecture.md](docs/architecture.md) for the detailed service topolo
 - `kubectl` >= 1.26 configured against your cluster
 - `helm` >= 3.12
 - A Dynatrace SaaS tenant with an API token (scopes: `metrics.ingest`, `logs.ingest`, `openTelemetryTrace.ingest`, `entities.read`, `settings.write`, `DataExport`)
+- **GKE Autopilot only:** A Docker Hub account. GKE Autopilot's shared outbound IPs are rate-limited by Docker Hub for anonymous pulls, causing Bitnami infrastructure images (PostgreSQL, Kafka) to fail with "not found". Create a free access token at [hub.docker.com](https://hub.docker.com) → Account Settings → Personal access tokens.
 
 ### Deploy
 
@@ -64,15 +65,20 @@ See [docs/architecture.md](docs/architecture.md) for the detailed service topolo
 # 2. Copy and edit the values override file
 cp helm/values.yaml helm/values-custom.yaml
 # Required edits in values-custom.yaml:
-#   dynatrace.apiUrl      → your DT tenant URL
-#   dynatrace.apiToken    → your DT API token
+#   dynatrace.apiUrl       → your DT tenant URL
+#   dynatrace.apiToken     → your DT API token
 #   dynatrace.otlpEndpoint → your DT OTLP ingest endpoint
-#   llm.openai.apiKey     → your OpenAI API key (or switch llm.provider)
+#   llm.openai.apiKey      → your OpenAI API key (or switch llm.provider)
 
-# 3. Install
+# 3. (GKE Autopilot only) Export Docker Hub credentials so the deploy
+#    script can create a pull secret for Bitnami images
+export DOCKERHUB_USERNAME=<your-dockerhub-username>
+export DOCKERHUB_TOKEN=<your-dockerhub-access-token>
+
+# 4. Install
 ./scripts/deploy.sh install -f helm/values-custom.yaml
 
-# 4. Validate
+# 5. Validate
 kubectl get pods -n meridian
 ```
 
