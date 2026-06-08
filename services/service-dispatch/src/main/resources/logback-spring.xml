@@ -1,17 +1,6 @@
 <configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-      <providers>
-        <timestamp/>
-        <logLevel/>
-        <loggerName>
-          <shortenedLoggerNameLength>36</shortenedLoggerNameLength>
-        </loggerName>
-        <message/>
-        <mdc/>
-        <arguments/>
-        <stackTrace/>
-      </providers>
       <customFields>{"service":"service-dispatch"}</customFields>
     </encoder>
   </appender>

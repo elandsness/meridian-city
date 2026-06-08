@@ -89,14 +89,52 @@ install_or_upgrade() {
     info "Created namespace: $DYNATRACE_NAMESPACE"
   fi
 
+  # Optional: Docker Hub pull secret for Bitnami images.
+  # GKE Autopilot shares outbound IPs, which causes Docker Hub to silently
+  # reject anonymous pulls with "not found". Set DOCKERHUB_USERNAME and
+  # DOCKERHUB_TOKEN before running this script to authenticate.
+  local helm_extra_args=()
+  if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
+    kubectl create secret docker-registry dockerhub-pull-secret \
+      --docker-server="https://index.docker.io/v1/" \
+      --docker-username="$DOCKERHUB_USERNAME" \
+      --docker-password="$DOCKERHUB_TOKEN" \
+      --namespace "$NAMESPACE" \
+      --dry-run=client -o yaml | kubectl apply -f -
+    helm_extra_args+=(
+      --set "postgresql.global.imagePullSecrets[0]=dockerhub-pull-secret"
+      --set "kafka.global.imagePullSecrets[0]=dockerhub-pull-secret"
+    )
+    info "Docker Hub pull secret configured for Bitnami images"
+  else
+    warn "DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not set — Bitnami image pulls may fail on GKE Autopilot"
+  fi
+
+  # GKE Autopilot cold-start: the OTel collector chart does not expose
+  # progressDeadlineSeconds as a value, so the default 600s can be exceeded
+  # while waiting for node provisioning + large image pull. Patch it in the
+  # background the moment Helm creates the deployment.
+  local otel_deploy="${RELEASE_NAME}-opentelemetry-collector"
+  (
+    until kubectl get deployment "$otel_deploy" -n "$NAMESPACE" &>/dev/null; do
+      sleep 5
+    done
+    kubectl patch deployment "$otel_deploy" -n "$NAMESPACE" \
+      --type=merge -p '{"spec":{"progressDeadlineSeconds":1800}}' &>/dev/null
+    info "Patched $otel_deploy: progressDeadlineSeconds=1800"
+  ) &
+  local patch_pid=$!
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   helm "$cmd" "$RELEASE_NAME" "$CHART_DIR" \
     --namespace "$NAMESPACE" \
     --create-namespace \
-    --timeout 10m \
+    --timeout 20m \
     --wait \
+    "${helm_extra_args[@]}" \
     "$@"
 
+  kill "$patch_pid" 2>/dev/null || true
   success "Deployment complete."
   echo ""
   kubectl get pods -n "$NAMESPACE"
