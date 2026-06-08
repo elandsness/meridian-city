@@ -140,6 +140,26 @@ install_or_upgrade() {
   ) &
   local patch_pid=$!
 
+  # Background progress reporter: prints a pod summary every 20s so the
+  # terminal isn't silent during the long GKE Autopilot cold-start wait.
+  (
+    while true; do
+      sleep 20
+      local pods running total errors
+      pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null) || continue
+      total=$(echo "$pods" | grep -c . 2>/dev/null || true)
+      running=$(echo "$pods" | grep -c " Running " 2>/dev/null || true)
+      errors=$(echo "$pods" | grep -cE "Error|CrashLoop|OOMKill|ImagePull|ErrImage" 2>/dev/null || true)
+      [[ $total -eq 0 ]] && continue
+      if [[ $errors -gt 0 ]]; then
+        echo -e "${BLUE}[INFO]${NC}  pods: ${GREEN}${running} running${NC} / ${total} total  ${RED}(${errors} errors)${NC}"
+      else
+        echo -e "${BLUE}[INFO]${NC}  pods: ${GREEN}${running} running${NC} / ${total} total"
+      fi
+    done
+  ) &
+  local progress_pid=$!
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   helm "$cmd" "$RELEASE_NAME" "$CHART_DIR" \
     --namespace "$NAMESPACE" \
@@ -149,7 +169,7 @@ install_or_upgrade() {
     "${helm_extra_args[@]}" \
     "$@"
 
-  kill "$patch_pid" 2>/dev/null || true
+  kill "$patch_pid" "$progress_pid" 2>/dev/null || true
   success "Deployment complete."
   echo ""
   kubectl get pods -n "$NAMESPACE"
