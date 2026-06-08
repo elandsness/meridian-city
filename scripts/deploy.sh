@@ -69,8 +69,7 @@ install_or_upgrade() {
 
   check_prerequisites
 
-  # Ensure the app namespace exists and carries Helm ownership labels before
-  # we try to create any resources in it (e.g. the Docker Hub pull secret).
+  # Ensure the app namespace exists and carries Helm ownership labels.
   # Three cases:
   #   Terminating → wait for it to disappear, then fall through to create
   #   Active      → stamp with Helm labels so the chart can adopt it
@@ -102,27 +101,6 @@ install_or_upgrade() {
   if ! kubectl get namespace "$DYNATRACE_NAMESPACE" &>/dev/null; then
     kubectl create namespace "$DYNATRACE_NAMESPACE"
     info "Created namespace: $DYNATRACE_NAMESPACE"
-  fi
-
-  # Optional: Docker Hub pull secret for Bitnami images.
-  # GKE Autopilot shares outbound IPs, which causes Docker Hub to silently
-  # reject anonymous pulls with "not found". Set DOCKERHUB_USERNAME and
-  # DOCKERHUB_TOKEN before running this script to authenticate.
-  local helm_extra_args=()
-  if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
-    kubectl create secret docker-registry dockerhub-pull-secret \
-      --docker-server="https://index.docker.io/v1/" \
-      --docker-username="$DOCKERHUB_USERNAME" \
-      --docker-password="$DOCKERHUB_TOKEN" \
-      --namespace "$NAMESPACE" \
-      --dry-run=client -o yaml | kubectl apply -f -
-    helm_extra_args+=(
-      --set "postgresql.global.imagePullSecrets[0]=dockerhub-pull-secret"
-      --set "kafka.global.imagePullSecrets[0]=dockerhub-pull-secret"
-    )
-    info "Docker Hub pull secret configured for Bitnami images"
-  else
-    warn "DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not set — Bitnami image pulls may fail on GKE Autopilot"
   fi
 
   # GKE Autopilot cold-start: the OTel collector chart does not expose
@@ -166,7 +144,6 @@ install_or_upgrade() {
     --create-namespace \
     --timeout 20m \
     --wait \
-    "${helm_extra_args[@]}" \
     "$@"
 
   kill "$patch_pid" "$progress_pid" 2>/dev/null || true
