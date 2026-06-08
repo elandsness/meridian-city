@@ -18,6 +18,9 @@ global:
   imageTag: "latest"
   namespace: "meridian"
   imagePullPolicy: IfNotPresent
+  # GKE Autopilot only: set to [dockerhub-pull-secret] when dockerhub.username
+  # and dockerhub.token are configured below. This tells the Bitnami sub-charts
+  # (PostgreSQL, Kafka) to use the pull secret the chart creates from those credentials.
   imagePullSecrets: []
 
 # ---------------------------------------------------------------------------
@@ -444,23 +447,16 @@ opsDashboard:
 
 # ---------------------------------------------------------------------------
 # Docker Hub credentials (GKE Autopilot only)
-# ---------------------------------------------------------------------------
-# GKE Autopilot shares outbound IPs that are rate-limited by Docker Hub,
-# causing Bitnami images (PostgreSQL, Kafka) to fail with "not found" on
-# anonymous pulls. Set username + token here to authenticate.
-#
-# Create a free read-only token at:
-#   hub.docker.com → Account Settings → Personal access tokens
-#
-# When these are set, also add the following to your values-custom.yaml so
-# the Bitnami sub-charts know to use the pull secret that this chart creates:
-#
-#   global:
-#     imagePullSecrets:
-#       - dockerhub-pull-secret
+# GKE Autopilot's shared outbound IPs hit Docker Hub's anonymous pull rate
+# limit, causing Bitnami images (PostgreSQL, Kafka) to fail with "not found".
+# Setting these causes the chart to create a pull secret used by those images.
+# Also set global.imagePullSecrets above to activate it for the sub-charts.
+# Create a free read-only token: hub.docker.com → Account Settings → Personal access tokens
 # ---------------------------------------------------------------------------
 dockerhub:
+  # GKE Autopilot only: your Docker Hub username
   username: ""
+  # GKE Autopilot only: your Docker Hub personal access token (read-only scope is sufficient)
   token: ""
 
 # ---------------------------------------------------------------------------

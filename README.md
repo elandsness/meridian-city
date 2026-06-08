@@ -64,22 +64,11 @@ See [docs/architecture.md](docs/architecture.md) for the detailed service topolo
 
 # 2. Copy and edit the values override file
 cp helm/values.yaml helm/values-custom.yaml
-# Required edits in values-custom.yaml:
-#   dynatrace.apiUrl       → your DT tenant URL
-#   dynatrace.apiToken     → your DT API token
-#   dynatrace.otlpEndpoint → your DT OTLP ingest endpoint
-#   llm.openai.apiKey      → your OpenAI API key (or switch llm.provider)
-#
-# GKE Autopilot only — add these fields to values-custom.yaml to avoid
-# Docker Hub rate-limiting on anonymous Bitnami image pulls:
-#
-#   dockerhub:
-#     username: "<your-dockerhub-username>"
-#     token: "<your-dockerhub-access-token>"
-#
-#   global:
-#     imagePullSecrets:
-#       - dockerhub-pull-secret
+# Fill in the fields marked in values-custom.yaml:
+#   dynatrace.apiUrl / apiToken / otlpEndpoint  → your Dynatrace tenant
+#   llm.openai.apiKey                           → your OpenAI API key (or switch llm.provider)
+#   dockerhub.username / token                  → GKE Autopilot only (see comments in the file)
+#   global.imagePullSecrets                     → GKE Autopilot only (see comments in the file)
 
 # 3. Install
 ./scripts/deploy.sh install -f helm/values-custom.yaml
