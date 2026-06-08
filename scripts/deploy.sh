@@ -69,11 +69,21 @@ install_or_upgrade() {
 
   check_prerequisites
 
+  # If the app namespace already exists (e.g. from a previous failed install),
+  # stamp it with Helm's ownership metadata so the chart can adopt it rather
+  # than failing with "invalid ownership metadata".
+  if kubectl get namespace "$NAMESPACE" &>/dev/null; then
+    kubectl annotate namespace "$NAMESPACE" \
+      "meta.helm.sh/release-name=$RELEASE_NAME" \
+      "meta.helm.sh/release-namespace=$NAMESPACE" \
+      --overwrite
+    kubectl label namespace "$NAMESPACE" \
+      "app.kubernetes.io/managed-by=Helm" \
+      --overwrite
+    info "Adopted existing namespace: $NAMESPACE"
+  fi
+
   # Ensure Dynatrace operator namespace exists (needed by DynaKube CR)
-  # NOTE: the meridian app namespace is intentionally NOT pre-created here.
-  # helm/templates/namespace.yaml owns it so Helm can track it with proper
-  # ownership labels. Pre-creating it manually causes Helm to reject the
-  # install with "invalid ownership metadata".
   if ! kubectl get namespace "$DYNATRACE_NAMESPACE" &>/dev/null; then
     kubectl create namespace "$DYNATRACE_NAMESPACE"
     info "Created namespace: $DYNATRACE_NAMESPACE"
