@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/meridian-city-platform
+  IMAGE_PREFIX: ${{ github.repository_owner }}/meridian-city
 
 # Allow the workflow to push images to GitHub Container Registry.
 # GitHub's default token permissions are read-only since late 2022.
@@ -276,7 +276,12 @@ jobs:
           helm repo update
 
       - name: Resolve dependencies
-        run: helm dependency update helm/
+        run: |
+          for i in 1 2 3; do
+            helm dependency update helm/ && break
+            echo "Attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
 
       - name: Lint chart
         run: |
