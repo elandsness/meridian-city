@@ -69,14 +69,11 @@ install_or_upgrade() {
 
   check_prerequisites
 
-  # Ensure application namespace exists
-  if ! kubectl get namespace "$NAMESPACE" &>/dev/null; then
-    kubectl create namespace "$NAMESPACE"
-    kubectl label namespace "$NAMESPACE" dynatrace.com/inject=true --overwrite
-    info "Created namespace: $NAMESPACE"
-  fi
-
   # Ensure Dynatrace operator namespace exists (needed by DynaKube CR)
+  # NOTE: the meridian app namespace is intentionally NOT pre-created here.
+  # helm/templates/namespace.yaml owns it so Helm can track it with proper
+  # ownership labels. Pre-creating it manually causes Helm to reject the
+  # install with "invalid ownership metadata".
   if ! kubectl get namespace "$DYNATRACE_NAMESPACE" &>/dev/null; then
     kubectl create namespace "$DYNATRACE_NAMESPACE"
     info "Created namespace: $DYNATRACE_NAMESPACE"
