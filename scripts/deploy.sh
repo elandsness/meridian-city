@@ -69,18 +69,28 @@ install_or_upgrade() {
 
   check_prerequisites
 
-  # If the app namespace already exists (e.g. from a previous failed install),
-  # stamp it with Helm's ownership metadata so the chart can adopt it rather
-  # than failing with "invalid ownership metadata".
+  # If the app namespace is still terminating from a previous uninstall, wait
+  # for it to disappear fully before proceeding — creating resources in a
+  # terminating namespace is forbidden by the API server.
   if kubectl get namespace "$NAMESPACE" &>/dev/null; then
-    kubectl annotate namespace "$NAMESPACE" \
-      "meta.helm.sh/release-name=$RELEASE_NAME" \
-      "meta.helm.sh/release-namespace=$NAMESPACE" \
-      --overwrite
-    kubectl label namespace "$NAMESPACE" \
-      "app.kubernetes.io/managed-by=Helm" \
-      --overwrite
-    info "Adopted existing namespace: $NAMESPACE"
+    local ns_phase
+    ns_phase=$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.status.phase}')
+    if [[ "$ns_phase" == "Terminating" ]]; then
+      info "Namespace $NAMESPACE is terminating — waiting up to 2m for it to be deleted..."
+      kubectl wait --for=delete namespace/"$NAMESPACE" --timeout=120s \
+        || { error "Namespace $NAMESPACE is stuck in Terminating. Check for stuck finalizers."; exit 1; }
+    else
+      # Stamp with Helm ownership metadata so the chart can adopt it rather
+      # than failing with "invalid ownership metadata".
+      kubectl annotate namespace "$NAMESPACE" \
+        "meta.helm.sh/release-name=$RELEASE_NAME" \
+        "meta.helm.sh/release-namespace=$NAMESPACE" \
+        --overwrite
+      kubectl label namespace "$NAMESPACE" \
+        "app.kubernetes.io/managed-by=Helm" \
+        --overwrite
+      info "Adopted existing namespace: $NAMESPACE"
+    fi
   fi
 
   # Ensure Dynatrace operator namespace exists (needed by DynaKube CR)
