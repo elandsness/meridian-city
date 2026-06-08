@@ -30,13 +30,9 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "iot-simulator"
-            # OTLP endpoint — device metrics go here for Kafka enrichment (gRPC, no scheme)
+            # OTLP endpoint — iot-simulator sends all device telemetry here (gRPC, no scheme)
             - name: OTLP_ENDPOINT
               value: "iot-ingestion:4317"
-            # Collector endpoint — device metrics + traces also go here so they
-            # reach Dynatrace (gRPC, host:port, no scheme)
-            - name: OTEL_COLLECTOR_ENDPOINT
-              value: "{{ include "meridian.fullname" . }}-opentelemetry-collector:4317"
             # Fleet sizing — read directly by the Go application
             - name: VEHICLE_COUNT
               value: {{ .Values.iotSimulator.fleet.vehicles.count | quote }}

@@ -19,9 +19,7 @@ spec:
         {{- include "meridian.labels" . | nindent 8 }}
         app.kubernetes.io/component: demo-control-api
     spec:
-      # demo-control-api performs fault injection purely over HTTP (it calls each
-      # service's /admin/* endpoint and the simulator/traffic-bot admin APIs). It
-      # does not use the Kubernetes API, so no ServiceAccount/RBAC is required.
+      serviceAccountName: demo-control-api
       containers:
         - name: demo-control-api
           image: {{ include "meridian.image" (dict "repository" .Values.demoControlApi.image.repository "tag" .Values.demoControlApi.image.tag "context" $) }}
@@ -62,6 +60,50 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.demoControlApi.resources | nindent 12 }}
+---
+# ServiceAccount with permissions to patch ConfigMaps and Deployments
+# (needed for fault injection that modifies runtime config)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: demo-control-api
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: demo-control-api
+    namespace: {{ include "meridian.namespace" . }}
+roleRef:
+  kind: Role
+  name: demo-control-api
+  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
 kind: Service

@@ -22,10 +22,6 @@ spring:
   flyway:
     enabled: true
     schemas: citizens,requests
-    # Own history table so citizen-service and service-dispatch (which both
-    # touch the shared `requests` schema) never contend on one history table.
-    table: flyway_schema_history_citizen
-    create-schemas: true
     locations: classpath:db/migration
     baseline-on-migrate: true
   kafka:

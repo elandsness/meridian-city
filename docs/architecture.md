@@ -106,7 +106,7 @@ Meridian is a polyglot microservices application deliberately built across four 
 - **Language**: Java 21 / Spring Boot 3
 - **Port**: 8083
 - **Role**: City asset registry (buildings, vehicles, industrial zones). Work order management. Incident creation from IoT anomalies. **Business Events source** for `service_request.in_progress/resolved` and `workorder.*`.
-- **Instrumentation**: OneAgent (auto). **Fault injection**: DB slowdown and CPU spike are toggled at runtime via the `/admin/fault` endpoint called by `demo-control-api` (the `FAULT_*` env vars only set the initial state at boot).
+- **Instrumentation**: OneAgent (auto). **Fault injection**: DB slowdown and CPU spike are injectable via environment variables updated by `demo-control-api`.
 - **Database**: PostgreSQL schemas: `city`, `incidents`
 - **Kafka**: Consumer on `iot.anomalies`, `requests.events`; producer on `notifications.outbound`
 
@@ -126,9 +126,9 @@ Meridian is a polyglot microservices application deliberately built across four 
 
 ### IoT Ingestion
 - **Language**: Go 1.22
-- **Port**: gRPC 4317 (OTLP receiver), HTTP 8089 (health)
-- **Role**: OTLP/gRPC receiver for IoT device telemetry from the simulator. Reads per-device attributes (`device.id`, `device.zone`, `device.category`, …) from each metric data point, enriches the reading, and publishes one record per device to Kafka `iot.telemetry.raw`. It acknowledges incoming trace exports but does not forward them — device traces and metrics reach Dynatrace via the simulator's direct export to the OTel Collector (see below).
-- **Instrumentation**: **OTel SDK** (Go) — Go has no OneAgent APM agent. Go OTel SDK is used for self-instrumentation, exporting its own spans to the OTel Collector over gRPC (`:4317`).
+- **Port**: gRPC 4317, HTTP 4318
+- **Role**: OTLP/gRPC receiver for IoT device telemetry from the simulator. Validates device identity, enriches with zone/category metadata, and publishes to Kafka `iot.telemetry.raw`. Also mirrors OTel spans to the OTel Collector.
+- **Instrumentation**: **OTel SDK** (Go) — Go has no OneAgent APM agent. Go OTel SDK is used for self-instrumentation.
 
 ### Telemetry Processor
 - **Language**: Python 3.12 / FastAPI
@@ -139,13 +139,13 @@ Meridian is a polyglot microservices application deliberately built across four 
 ### Notification Service
 - **Language**: Node.js 20 / Express
 - **Port**: 8087
-- **Role**: Kafka consumer on `iot.anomalies`, `requests.events`, and `notifications.outbound`. Stores in-app notifications in an in-memory store (no external dependency) served to the ops dashboard via SSE (Server-Sent Events). The SSE endpoint (`/api/v1/notifications/stream`) is unauthenticated at the gateway, so the browser's `EventSource` connects without a bearer token.
+- **Role**: Kafka consumer on `notifications.outbound` and `iot.anomalies`. Stores in-app notifications in an in-memory store (no external dependency) served to the ops dashboard via SSE (Server-Sent Events).
 - **Instrumentation**: OneAgent (auto)
 
 ### Demo Control API
 - **Language**: Node.js 20 / Fastify
 - **Port**: 3001
-- **Role**: Internal REST API for the demo control panel. Triggers fault injection (calls service-specific `/admin/fault` endpoints), resizes the IoT fleet (calls the `iot-simulator` admin endpoint), and controls the traffic bot. All actions are performed over HTTP — it does **not** call the Kubernetes API, so no ServiceAccount/RBAC is required.
+- **Role**: Internal REST API for the demo control panel. Triggers fault injection (updates ConfigMaps or calls service-specific `/admin/fault` endpoints), resizes the IoT fleet (calls `iot-simulator` admin endpoint), and controls the traffic bot. Requires cluster RBAC to patch Deployments.
 - **Instrumentation**: OneAgent (auto)
 
 ### IoT Simulator
@@ -248,14 +248,12 @@ Example log event:
 
 ## Demo Control Architecture
 
-The `demo-control-api` service acts as an operator for fault injection, entirely over HTTP (no Kubernetes API access):
+The `demo-control-api` service acts as an operator for fault injection:
 
-1. **Service-level fault injection**: Calls each service's internal `/admin/fault` endpoint with `*_enabled` flags (e.g., `POST /admin/fault { "db_slowdown_enabled": true, "db_slowdown_seconds": 2 }`). Each service checks an in-memory flag and artificially delays or errors. Field names are consistent across all services (and match each service's internal fault state).
+1. **Service-level fault injection**: Calls each service's internal `/admin/fault` endpoint (e.g., `POST /admin/fault { "type": "db-slowdown", "enabled": true, "delayMs": 2000 }`). Each service checks a thread-local or in-memory flag and artificially delays or errors.
 
-2. **Fleet resize**: Calls `iot-simulator`'s admin endpoint (`POST /admin/fleet`). The simulator treats the counts as absolute, so demo-control-api always sends the full triple `{ "vehicles": N, "buildings": N, "machines": N }` (filling any omitted category from the last known count) to avoid stopping unrelated devices. The simulator dynamically starts or stops goroutines.
+2. **Fleet resize**: Calls `iot-simulator`'s admin endpoint (`POST /admin/fleet { "vehicles": 50 }`). The simulator dynamically starts or stops goroutines.
 
-3. **Anomaly injection**: Sets a per-device anomaly via `POST /admin/anomaly { "device_id": "...", "type": "...", "enabled": true }` and clears it via `DELETE /admin/anomaly/{device_id}`.
-
-4. **Traffic control**: Calls `traffic-bot`'s admin endpoint to pause, resume, or trigger burst patterns.
+3. **Traffic control**: Calls `traffic-bot`'s admin endpoint to pause, resume, or trigger burst patterns.
 
 The ops dashboard calls `demo-control-api` from the browser — `api-gateway` proxies these calls through to avoid CORS issues.
