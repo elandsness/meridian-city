@@ -2,13 +2,24 @@
 # DynaKube custom resource — configures OneAgent deployment via the Dynatrace Operator.
 # The operator must be installed and running before this resource is applied.
 # Namespace: dynatrace (separate from app namespace, per Dynatrace operator requirements)
-apiVersion: dynatrace.com/v1beta2
+# apiVersion must match the installed operator: v1beta1/v1beta2 are rejected by
+# operator >= 1.7.0. v1beta5 is the current version (compatible with v1beta3/v1beta4).
+# Keep this in sync with the dynatrace-operator chart version pinned in Chart.yaml.
+apiVersion: dynatrace.com/v1beta5
 kind: DynaKube
 metadata:
   name: {{ include "meridian.fullname" . }}
   namespace: dynatrace
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    # Apply the CR only after the operator (and its CRD + admission webhook) are
+    # up. Without this, a single `helm install` races the CR against the not-yet-
+    # ready operator webhook and fails with "no matches for kind DynaKube" or a
+    # webhook connection error. No delete policy is set, so the CR persists
+    # across upgrades (OneAgent is not torn down on every upgrade).
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
 spec:
   apiUrl: {{ .Values.dynatrace.apiUrl | quote }}
 

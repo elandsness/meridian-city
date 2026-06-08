@@ -26,11 +26,10 @@ spec:
           ports:
             - name: http
               containerPort: 80
-          env:
-            - name: VITE_API_URL
-              value: "http://api-gateway:3000"
-            - name: VITE_DEMO_CONTROL_URL
-              value: "http://demo-control-api:3001"
+          # No API URL env is needed: the app calls relative /api/... paths and
+          # nginx (see frontends/ops-dashboard/nginx.conf) proxies them to the
+          # api-gateway service, which in turn proxies /api/v1/demo-control/* to
+          # demo-control-api. Vite env vars are build-time only.
           livenessProbe:
             httpGet:
               path: /

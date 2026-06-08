@@ -26,11 +26,10 @@ spec:
           ports:
             - name: http
               containerPort: 80
-          env:
-            # API gateway URL — injected at build time or as a runtime env var
-            # The Vite app reads VITE_API_URL from the nginx config or env
-            - name: VITE_API_URL
-              value: "http://api-gateway:3000"
+          # No API URL env is needed: the app calls relative /api/... paths and
+          # nginx (see frontends/public-portal/nginx.conf) proxies them to the
+          # api-gateway service inside the cluster. Vite env vars are build-time
+          # only and cannot be injected at runtime here.
           livenessProbe:
             httpGet:
               path: /

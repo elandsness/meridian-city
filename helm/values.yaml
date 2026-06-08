@@ -13,6 +13,12 @@ global:
   # <imageRegistry>/<service-name>:<imageTag>
   imageRegistry: "ghcr.io/your-org/meridian-city-platform"
   imageTag: "latest"
+  # NOTE: app resources are placed in this namespace, while the PostgreSQL,
+  # Kafka and OTel Collector subcharts deploy into the Helm *release* namespace
+  # (helm --namespace ...). The in-cluster hostnames the app uses (e.g.
+  # <release>-postgresql) only resolve when these are the same namespace, so
+  # install with `--namespace meridian` (scripts/deploy.sh does this) and keep
+  # this value as "meridian", or change both together.
   namespace: "meridian"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
@@ -330,21 +336,26 @@ iotSimulator:
   image:
     repository: "iot-simulator"
     tag: ""
+  # NOTE on what the simulator currently consumes:
+  #   - *.count            → wired (VEHICLE_COUNT / BUILDING_COUNT / MACHINE_COUNT)
+  #   - emitIntervalSeconds → only vehicles.emitIntervalSeconds is used, applied
+  #                           globally to all device types (single EMIT_INTERVAL_SECONDS).
+  #   - anomalyProbability  → reserved; anomalies are injected on demand via
+  #                           demo-control-api, not by probability. Not yet wired.
   fleet:
     vehicles:
       count: 30
-      # Interval between telemetry emissions per device
+      # Interval between telemetry emissions per device (applies to all types)
       emitIntervalSeconds: 15
-      # Baseline probability that any given device emits an anomalous reading
-      anomalyProbability: 0.01
+      anomalyProbability: 0.01  # reserved — not currently wired
     buildings:
       count: 15
-      emitIntervalSeconds: 15
-      anomalyProbability: 0.01
+      emitIntervalSeconds: 15   # currently ignored (vehicles value is used)
+      anomalyProbability: 0.01  # reserved — not currently wired
     machines:
       count: 10
-      emitIntervalSeconds: 15
-      anomalyProbability: 0.01
+      emitIntervalSeconds: 15   # currently ignored (vehicles value is used)
+      anomalyProbability: 0.01  # reserved — not currently wired
   # Target for OTLP telemetry (the iot-ingestion service)
   otlpEndpoint: "http://iot-ingestion:4317"
   resources:

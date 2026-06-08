@@ -42,6 +42,9 @@ spec:
                 secretKeyRef:
                   name: meridian-secrets
                   key: llm-openai-api-key
+                  # optional so the pod still starts if the key is unset
+                  # (the secret key is only created when llm.openai.apiKey is provided).
+                  optional: true
             {{- end }}
             {{- if eq .Values.llm.provider "anthropic" }}
             - name: ANTHROPIC_API_KEY
@@ -49,6 +52,7 @@ spec:
                 secretKeyRef:
                   name: meridian-secrets
                   key: llm-anthropic-api-key
+                  optional: true
             {{- end }}
             {{- if eq .Values.llm.provider "local" }}
             - name: LOCAL_LLM_ENDPOINT

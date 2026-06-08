@@ -150,11 +150,27 @@ async function proxyRoutes (fastify, opts) {
       const methodsWithBody = ['POST', 'PUT', 'PATCH']
       const sendBody = methodsWithBody.includes(request.method.toUpperCase())
 
+      // Fastify has already parsed the incoming JSON body into an object.
+      // undici only accepts a string/Buffer/stream as `body`, so we must
+      // re-serialize it. Passing the object directly would send the literal
+      // "[object Object]" and break every downstream write. We also drop the
+      // stale content-length header and let undici compute the correct one.
+      let upstreamBody
+      if (sendBody && request.body !== undefined && request.body !== null) {
+        if (typeof request.body === 'string' || Buffer.isBuffer(request.body)) {
+          upstreamBody = request.body
+        } else {
+          upstreamBody = JSON.stringify(request.body)
+          upstreamHeaders['content-type'] = 'application/json'
+        }
+        delete upstreamHeaders['content-length']
+      }
+
       try {
         const upstreamResponse = await undiciRequest(targetUrl, {
           method: request.method,
           headers: upstreamHeaders,
-          body: sendBody ? request.body : undefined,
+          body: upstreamBody,
           headersTimeout: 30000,
           bodyTimeout: 30000,
         })

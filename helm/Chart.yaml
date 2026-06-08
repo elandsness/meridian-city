@@ -42,7 +42,10 @@ dependencies:
     alias: opentelemetry-collector
 
   - name: dynatrace-operator
-    version: ">=1.0.0 <2.0.0"
+    # >=1.7.0 ensures the DynaKube apiVersion used in templates/dynakube.yaml
+    # (dynatrace.com/v1beta5) is served; operators < 1.7 predate v1beta5 and
+    # operators >= 1.7 reject the older v1beta1/v1beta2.
+    version: ">=1.7.0 <2.0.0"
     repository: https://raw.githubusercontent.com/Dynatrace/dynatrace-operator/main/config/helm/repos/stable
     condition: dynatrace-operator.enabled
     alias: dynatrace-operator
