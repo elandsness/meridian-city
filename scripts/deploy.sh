@@ -140,12 +140,25 @@ install_or_upgrade() {
   local progress_pid=$!
 
   info "Running: helm $cmd $RELEASE_NAME ..."
+  # --wait is intentionally omitted: Java services crash-loop until DB is ready,
+  # which would deadlock the post-install hooks that provision the DB.
+  # Instead, a post-install Job (wait-for-operators) ensures operators are up
+  # before the CNPG Cluster and Strimzi Kafka CRs are created (hook weights 1→5→10).
   helm "$cmd" "$RELEASE_NAME" "$CHART_DIR" \
     --namespace "$NAMESPACE" \
     --create-namespace \
     --timeout 20m \
-    --wait \
     "$@"
+
+  # Helm has submitted resources and hooks are running. Wait for everything to converge.
+  info "Resources submitted. Waiting for full platform readiness (~3-5 min on first install)..."
+  warn "Java services will show CrashLoopBackOff briefly while DB initializes — this is expected."
+
+  kubectl wait pods \
+    --for=condition=ready \
+    --selector='app.kubernetes.io/part-of=meridian-city-platform' \
+    -n "$NAMESPACE" \
+    --timeout=900s 2>/dev/null || true
 
   kill "$patch_pid" "$progress_pid" 2>/dev/null || true
   success "Deployment complete."
