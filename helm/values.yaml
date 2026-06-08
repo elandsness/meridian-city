@@ -443,6 +443,27 @@ opsDashboard:
       memory: "256Mi"
 
 # ---------------------------------------------------------------------------
+# Docker Hub credentials (GKE Autopilot only)
+# ---------------------------------------------------------------------------
+# GKE Autopilot shares outbound IPs that are rate-limited by Docker Hub,
+# causing Bitnami images (PostgreSQL, Kafka) to fail with "not found" on
+# anonymous pulls. Set username + token here to authenticate.
+#
+# Create a free read-only token at:
+#   hub.docker.com → Account Settings → Personal access tokens
+#
+# When these are set, also add the following to your values-custom.yaml so
+# the Bitnami sub-charts know to use the pull secret that this chart creates:
+#
+#   global:
+#     imagePullSecrets:
+#       - dockerhub-pull-secret
+# ---------------------------------------------------------------------------
+dockerhub:
+  username: ""
+  token: ""
+
+# ---------------------------------------------------------------------------
 # Infrastructure: PostgreSQL (Bitnami chart dependency)
 # ---------------------------------------------------------------------------
 postgresql:
