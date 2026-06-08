@@ -10,8 +10,11 @@
 # ---------------------------------------------------------------------------
 global:
   # Container image registry prefix. All service images are expected at:
-  # <imageRegistry>/<service-name>:<imageTag>
-  imageRegistry: "ghcr.io/your-org/meridian-city-platform"
+  # <appImageRegistry>/<service-name>:<imageTag>
+  # NOTE: intentionally NOT named "imageRegistry" — that key is a Helm global
+  # reserved by Bitnami sub-charts and would cause them to prepend this value
+  # to their own images, breaking image verification.
+  appImageRegistry: "ghcr.io/your-org/meridian-city-platform"
   imageTag: "latest"
   namespace: "meridian"
   imagePullPolicy: IfNotPresent
