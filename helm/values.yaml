@@ -8,13 +8,13 @@
 # ---------------------------------------------------------------------------
 # Global settings
 # ---------------------------------------------------------------------------
+# Registry prefix for meridian-city application images only.
+# Kept outside of `global` so Bitnami/OTel sub-charts never inherit it
+# (Helm propagates every key under `global` to sub-charts automatically).
+# All service images are resolved as: <appImageRegistry>/<service-name>:<imageTag>
+appImageRegistry: "ghcr.io/your-org/meridian-city-platform"
+
 global:
-  # Container image registry prefix. All service images are expected at:
-  # <appImageRegistry>/<service-name>:<imageTag>
-  # NOTE: intentionally NOT named "imageRegistry" — that key is a Helm global
-  # reserved by Bitnami sub-charts and would cause them to prepend this value
-  # to their own images, breaking image verification.
-  appImageRegistry: "ghcr.io/your-org/meridian-city-platform"
   imageTag: "latest"
   namespace: "meridian"
   imagePullPolicy: IfNotPresent
