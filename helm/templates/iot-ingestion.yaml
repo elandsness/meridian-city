@@ -26,8 +26,8 @@ spec:
           ports:
             - name: otlp-grpc
               containerPort: 4317
-            - name: health
-              containerPort: 8089
+            - name: otlp-http
+              containerPort: 4318
           env:
             - name: OTEL_SERVICE_NAME
               value: "iot-ingestion"
@@ -57,15 +57,13 @@ spec:
                   name: meridian-secrets
                   key: db-password
           livenessProbe:
-            httpGet:
-              path: /health
-              port: 8089
+            tcpSocket:
+              port: 4317
             initialDelaySeconds: 15
             periodSeconds: 30
           readinessProbe:
-            httpGet:
-              path: /health
-              port: 8089
+            tcpSocket:
+              port: 4317
             initialDelaySeconds: 10
             periodSeconds: 10
           resources:
@@ -87,4 +85,7 @@ spec:
     - name: otlp-grpc
       port: {{ .Values.iotIngestion.service.grpcPort }}
       targetPort: 4317
+    - name: otlp-http
+      port: {{ .Values.iotIngestion.service.httpPort }}
+      targetPort: 4318
 {{- end }}

@@ -4,9 +4,8 @@
  * KafkaJS consumer for notification-service.
  *
  * Topics consumed:
- *   iot.anomalies          — IoT device anomaly events from telemetry-processor
- *   requests.events        — Service request lifecycle events from citizen-service / service-dispatch
- *   notifications.outbound — Operational notifications (e.g. work orders) from city-operations
+ *   iot.anomalies    — IoT device anomaly events from telemetry-processor
+ *   requests.events  — Service request lifecycle events from citizen-service / service-dispatch
  *
  * Each message is transformed into a notification and pushed to the in-memory
  * ring buffer (notifications.js), which broadcasts to SSE clients.
@@ -68,25 +67,6 @@ function mapRequestEvent (payload) {
 }
 
 /**
- * Map a notifications.outbound Kafka message to a notification object.
- * city-operations publishes payloads like:
- *   { type: 'work_order_created', workOrderId, requestId, department }
- */
-function mapOutbound (payload) {
-  const type = payload.type || 'notification'
-  const workOrderId = payload.workOrderId || payload.work_order_id || ''
-  const requestId = payload.requestId || payload.request_id || ''
-  const department = payload.department || ''
-  return {
-    type: 'work_order',
-    severity: 'info',
-    title: `Work order ${workOrderId}`.trim() + (department ? ` → ${department}` : ''),
-    message: `${type.replace(/_/g, ' ')}` + (requestId ? ` for request ${requestId}` : ''),
-    metadata: payload,
-  }
-}
-
-/**
  * Start the Kafka consumer. Non-fatal on initial connection error.
  */
 async function start () {
@@ -96,7 +76,7 @@ async function start () {
   try {
     await consumer.connect()
     await consumer.subscribe({
-      topics: ['iot.anomalies', 'requests.events', 'notifications.outbound'],
+      topics: ['iot.anomalies', 'requests.events'],
       fromBeginning: false,
     })
 
@@ -114,8 +94,6 @@ async function start () {
             push(mapAnomaly(payload))
           } else if (topic === 'requests.events') {
             push(mapRequestEvent(payload))
-          } else if (topic === 'notifications.outbound') {
-            push(mapOutbound(payload))
           }
         } catch (err) {
           console.error(JSON.stringify({
@@ -128,7 +106,7 @@ async function start () {
       },
     })
 
-    console.log(JSON.stringify({ level: 'info', msg: 'Kafka consumer started', topics: ['iot.anomalies', 'requests.events', 'notifications.outbound'] }))
+    console.log(JSON.stringify({ level: 'info', msg: 'Kafka consumer started', topics: ['iot.anomalies', 'requests.events'] }))
   } catch (err) {
     console.error(JSON.stringify({ level: 'error', msg: 'Kafka consumer start failed (will not retry)', error: err.message }))
     _started = false
