@@ -55,9 +55,9 @@ Provides OTel service name, OTLP exporter endpoint, and DB/Kafka coordinates.
 - name: OTEL_RESOURCE_ATTRIBUTES
   value: "deployment.environment={{ .context.Values.dynatrace.deploymentEnvironment }},k8s.cluster.name={{ .context.Values.dynatrace.clusterName }}"
 - name: KAFKA_BOOTSTRAP_SERVERS
-  value: "{{ include "meridian.fullname" .context }}-kafka:9092"
+  value: "meridian-kafka-bootstrap:9092"
 - name: DB_HOST
-  value: "{{ include "meridian.fullname" .context }}-postgresql"
+  value: "meridian-db-rw"
 - name: DB_PORT
   value: "5432"
 - name: DB_NAME

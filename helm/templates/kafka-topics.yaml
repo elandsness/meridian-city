@@ -1,0 +1,22 @@
+{{- if .Values.kafka.enabled }}
+{{- range .Values.kafka.topics }}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: {{ .name | replace "." "-" }}
+  namespace: {{ include "meridian.namespace" $ }}
+  labels:
+    strimzi.io/cluster: meridian
+    {{- include "meridian.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  partitions: {{ .partitions }}
+  replicas: {{ .replicationFactor }}
+  config:
+    {{- toYaml .config | nindent 4 }}
+{{- end }}
+{{- end }}
