@@ -42,6 +42,12 @@ spec:
                   key: db-password
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "meridian-kafka-bootstrap:9092"
+            # citizen-service calls service-dispatch over HTTP (DispatchClient).
+            # Without this it falls back to the application.yml default localhost:8082
+            # and every dispatch call is connection-refused, breaking the
+            # api-gateway -> citizen-service -> service-dispatch -> city-operations trace.
+            - name: SERVICE_DISPATCH_URL
+              value: "http://service-dispatch:8082"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:
