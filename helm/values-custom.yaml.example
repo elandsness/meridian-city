@@ -16,7 +16,15 @@
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Dynatrace tenant
+# Image registry (REQUIRED)
+# ---------------------------------------------------------------------------
+# All app images are pulled from: <appImageRegistry>/<service-name>:<tag>
+# The default in values.yaml is a placeholder — set this to your actual registry.
+# For the canonical elandsness/meridian-city repo:
+appImageRegistry: "ghcr.io/elandsness/meridian-city"
+
+# ---------------------------------------------------------------------------
+# Dynatrace tenant (REQUIRED)
 # ---------------------------------------------------------------------------
 dynatrace:
   # REQUIRED: Dynatrace SaaS tenant API URL
