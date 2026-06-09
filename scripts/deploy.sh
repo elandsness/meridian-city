@@ -148,6 +148,17 @@ install_or_upgrade() {
     kubectl apply --server-side --force-conflicts -f "${CHART_DIR}/crds/"
     kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null \
       | xargs -r kubectl wait --for=condition=Established --timeout=60s 2>/dev/null || true
+    # Stamp Helm ownership annotations so that CRDs sourced from operator templates/
+    # (not crds/) can be adopted by this release without "invalid ownership metadata" errors.
+    kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null | while read -r res; do
+      kubectl annotate "$res" \
+        "meta.helm.sh/release-name=${RELEASE_NAME}" \
+        "meta.helm.sh/release-namespace=${NAMESPACE}" \
+        --overwrite 2>/dev/null || true
+      kubectl label "$res" \
+        "app.kubernetes.io/managed-by=Helm" \
+        --overwrite 2>/dev/null || true
+    done
     # Flush the client-side discovery cache so Helm re-queries the API server.
     # Both kubectl and Helm share ~/.kube/cache/discovery/; a stale cache causes
     # "no matches for kind" even when CRDs are fully established.
