@@ -61,11 +61,13 @@ See [docs/architecture.md](docs/architecture.md) for the detailed service topolo
 # 1. Add required Helm chart repositories
 ./scripts/deploy.sh repos
 
-# 2. Copy and edit the values override file
-cp helm/values.yaml helm/values-custom.yaml
-# Fill in the fields marked in values-custom.yaml:
-#   dynatrace.apiUrl / apiToken / otlpEndpoint  → your Dynatrace tenant
-#   llm.openai.apiKey                           → your OpenAI API key (or switch llm.provider)
+# 2. Create your secrets file from the minimal template
+#    (copy from the example — do NOT copy all of values.yaml; stale values there
+#    silently override fixes made in values.yaml and cause hard-to-debug issues)
+cp helm/values-custom.yaml.example helm/values-custom.yaml
+# Fill in every "" in values-custom.yaml:
+#   dynatrace.apiUrl / apiToken / otlpEndpoint / environmentId → your Dynatrace tenant
+#   llm.openai.apiKey (or llm.anthropic.apiKey)                → your LLM API key
 
 # 3. Install
 ./scripts/deploy.sh install -f helm/values-custom.yaml

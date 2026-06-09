@@ -489,6 +489,11 @@ cloudnative-pg:
 # ---------------------------------------------------------------------------
 kafka:
   enabled: true
+  # Kafka broker version — MUST be supported by the installed Strimzi operator.
+  # If this version is wrong, the Kafka CR will go NotReady with an
+  # UnsupportedKafkaVersionException and no broker pod will be created.
+  # Check supported versions: kubectl describe kafka meridian -n meridian | grep -A3 Conditions
+  # Strimzi chart >=1.0.0 supports: 4.1.0, 4.1.1, 4.1.2, 4.2.0
   version: "4.2.0"
   storage:
     size: "8Gi"

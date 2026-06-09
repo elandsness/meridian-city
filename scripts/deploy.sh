@@ -4,13 +4,17 @@
 # =============================================================================
 # Usage:
 #   ./scripts/deploy.sh repos                          Add all required Helm repos
-#   ./scripts/deploy.sh install [helm flags...]        Full install (infra + app)
+#   ./scripts/deploy.sh install [helm flags...]        Full install (infra + app +
+#                                                      seed data + port-forwards)
 #   ./scripts/deploy.sh upgrade [helm flags...]        Upgrade existing release
+#                                                      (restarts port-forwards when done)
+#   ./scripts/deploy.sh seed [--reset] [--check]      Seed / re-seed demo data
 #   ./scripts/deploy.sh status                         Show pod status
-#   ./scripts/deploy.sh port-forward                   Port-forward UIs to localhost
+#   ./scripts/deploy.sh port-forward                   Start port-forwards only
 # =============================================================================
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RELEASE_NAME="${RELEASE_NAME:-meridian}"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)/helm"
 NAMESPACE="${NAMESPACE:-meridian}"
@@ -186,8 +190,18 @@ install_or_upgrade() {
     "$@"
 
   # Helm has submitted resources and hooks are running. Wait for everything to converge.
-  info "Resources submitted. Waiting for full platform readiness (~3-5 min on first install)..."
-  warn "Java services will show CrashLoopBackOff briefly while DB initializes — this is expected."
+  info "Resources submitted. Waiting for full platform readiness (up to 15 min on first install)..."
+  warn "Kafka broker takes 3–5 min to provision on first install."
+  warn "Kafka-dependent pods will show Init:0/1 until it is ready — this is expected."
+
+  # kubectl wait exits immediately with success when the label selector matches no pods.
+  # This is a race: pods may not be scheduled yet when helm returns.
+  # Block here until at least one platform pod exists so kubectl wait has something to watch.
+  until kubectl get pods -n "$NAMESPACE" \
+      -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+      --no-headers 2>/dev/null | grep -q .; do
+    sleep 5
+  done
 
   kubectl wait pods \
     --for=condition=ready \
@@ -196,9 +210,40 @@ install_or_upgrade() {
     --timeout=900s 2>/dev/null || true
 
   kill "$patch_pid" "$progress_pid" 2>/dev/null || true
-  success "Deployment complete."
+  trap - EXIT INT TERM  # clear install-time trap; port_forward sets its own
+
+  # Show actual pod state and only claim success when pods are genuinely ready.
   echo ""
   kubectl get pods -n "$NAMESPACE"
+  echo ""
+  local _total _ready
+  _total=$(kubectl get pods -n "$NAMESPACE" \
+      -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+      --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  _ready=$(kubectl get pods -n "$NAMESPACE" \
+      -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+      --no-headers 2>/dev/null \
+      | awk '{ split($2,a,"/"); if (a[1]+0==a[2]+0 && a[2]+0>0) c++ } END { print c+0 }')
+  if [[ "$_total" -gt 0 && "$_ready" -eq "$_total" ]]; then
+    success "Deployment complete — all $_total pods ready."
+  else
+    warn "Deployment submitted — ${_ready:-0}/${_total:-0} pods ready after 15 min wait."
+    warn "Some services may still be initializing."
+    warn "Check status with: ./scripts/deploy.sh status"
+  fi
+
+  # Seed demo data on a fresh install (idempotent — safe to re-run on upgrade too).
+  echo ""
+  info "Seeding demo data..."
+  if bash "${SCRIPT_DIR}/seed-data.sh"; then
+    echo ""
+  else
+    warn "Seed data failed — platform is up but demo data may be missing."
+    warn "Re-run manually: ./scripts/deploy.sh seed"
+    echo ""
+  fi
+
+  port_forward background
 }
 
 show_status() {
@@ -213,20 +258,68 @@ show_status() {
   kubectl get ingress -n "$NAMESPACE" 2>/dev/null || true
 }
 
+_PF_PIDS_FILE="/tmp/meridian-pf-pids"
+
 port_forward() {
-  info "Starting port-forwards (Ctrl+C to stop)..."
+  # mode: "background" (after install — return the shell prompt)
+  #        "foreground" (standalone port-forward command — block until Ctrl+C)
+  local mode="${1:-foreground}"
+
   info "  Public Portal   → http://localhost:8080"
   info "  Ops Dashboard   → http://localhost:8081  (login: demo / dynatrace)"
   info "  API Gateway     → http://localhost:3000"
   info "  Demo Control    → http://localhost:3001"
+  info "Port-forwards restart automatically when pods are replaced."
 
-  kubectl port-forward svc/public-portal   8080:80   -n "$NAMESPACE" &
-  kubectl port-forward svc/ops-dashboard   8081:80   -n "$NAMESPACE" &
-  kubectl port-forward svc/api-gateway     3000:3000 -n "$NAMESPACE" &
-  kubectl port-forward svc/demo-control-api 3001:3001 -n "$NAMESPACE" &
+  # Each port-forward runs inside a restart loop so that kubectl reconnects
+  # after a pod is replaced (e.g. after 'rollout restart').  We bind to
+  # 0.0.0.0 so ports are reachable from the host machine (required for kind
+  # and remote setups — 127.0.0.1 only works when the browser is on the same
+  # host as kubectl).
+  local -a pf_loop_pids=()
 
-  trap 'kill $(jobs -p) 2>/dev/null; echo; info "Port-forwards stopped."' EXIT INT TERM
-  wait
+  # _pf_loop <svc> <localPort:remotePort>
+  # Runs kubectl port-forward in a tight restart loop; exits when killed.
+  _pf_loop() {
+    local svc=$1 ports=$2
+    while true; do
+      kubectl port-forward --address 0.0.0.0 "$svc" "$ports" -n "$NAMESPACE" &
+      wait $! 2>/dev/null || true
+      # Brief pause before retrying to avoid spin-looping when a pod is
+      # temporarily unavailable (e.g. during a rollout restart).
+      sleep 3
+    done
+  }
+
+  _pf_loop svc/public-portal    8080:80   & pf_loop_pids+=($!)
+  _pf_loop svc/ops-dashboard    8081:80   & pf_loop_pids+=($!)
+  _pf_loop svc/api-gateway      3000:3000 & pf_loop_pids+=($!)
+  _pf_loop svc/demo-control-api 3001:3001 & pf_loop_pids+=($!)
+
+  if [[ "$mode" == "background" ]]; then
+    # Save loop PIDs so teardown.sh can stop them cleanly, then detach
+    # so the loops survive after this script exits.
+    printf '%s\n' "${pf_loop_pids[@]}" > "$_PF_PIDS_FILE"
+    disown "${pf_loop_pids[@]}" 2>/dev/null || true
+    success "Port-forwards running in the background."
+    info "  Stop with: ./scripts/teardown.sh"
+  else
+    # Foreground / interactive mode: block until Ctrl+C, then clean up.
+    info "Press Ctrl+C to stop."
+    _stop_pf() {
+      trap - EXIT INT TERM  # prevent re-entrant calls
+      local pid
+      for pid in "${pf_loop_pids[@]}"; do
+        kill   "$pid"   2>/dev/null || true
+        pkill -P "$pid" 2>/dev/null || true  # also kill the kubectl child
+      done
+      rm -f "$_PF_PIDS_FILE"
+      echo
+      info "Port-forwards stopped."
+    }
+    trap '_stop_pf' EXIT INT TERM
+    wait
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -242,6 +335,10 @@ case "${1:-}" in
     shift
     install_or_upgrade upgrade "$@"
     ;;
+  seed)
+    shift
+    bash "${SCRIPT_DIR}/seed-data.sh" "$@"
+    ;;
   status)
     show_status
     ;;
@@ -249,13 +346,14 @@ case "${1:-}" in
     port_forward
     ;;
   *)
-    echo "Usage: $0 {repos|install|upgrade|status|port-forward} [helm flags...]"
+    echo "Usage: $0 {repos|install|upgrade|seed|status|port-forward} [flags...]"
     echo ""
     echo "Examples:"
     echo "  $0 repos"
     echo "  $0 install -f helm/values-custom.yaml"
-    echo "  $0 install -f helm/values-custom.yaml -f helm/values-dev.yaml"
-    echo "  $0 upgrade -f helm/values-custom.yaml --set global.imageTag=v1.2.0"
+    echo "  $0 upgrade -f helm/values-custom.yaml"
+    echo "  $0 seed"
+    echo "  $0 seed --reset"
     echo "  $0 status"
     echo "  $0 port-forward"
     exit 1
