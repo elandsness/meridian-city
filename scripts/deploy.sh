@@ -291,12 +291,15 @@ port_forward() {
     done
   }
 
-  _pf_loop svc/public-portal    8080:80   & pf_loop_pids+=($!)
-  _pf_loop svc/ops-dashboard    8081:80   & pf_loop_pids+=($!)
-  _pf_loop svc/api-gateway      3000:3000 & pf_loop_pids+=($!)
-  _pf_loop svc/demo-control-api 3001:3001 & pf_loop_pids+=($!)
-
   if [[ "$mode" == "background" ]]; then
+    # Redirect stdio to /dev/null before disowning: without this the loops
+    # inherit the terminal's file descriptors and kubectl's "Forwarding from..."
+    # / "Handling connection for..." output bleeds onto the user's prompt after
+    # the deploy script exits.
+    _pf_loop svc/public-portal    8080:80   </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
+    _pf_loop svc/ops-dashboard    8081:80   </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
+    _pf_loop svc/api-gateway      3000:3000 </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
+    _pf_loop svc/demo-control-api 3001:3001 </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
     # Save loop PIDs so teardown.sh can stop them cleanly, then detach
     # so the loops survive after this script exits.
     printf '%s\n' "${pf_loop_pids[@]}" > "$_PF_PIDS_FILE"
@@ -304,7 +307,12 @@ port_forward() {
     success "Port-forwards running in the background."
     info "  Stop with: ./scripts/teardown.sh"
   else
-    # Foreground / interactive mode: block until Ctrl+C, then clean up.
+    # Foreground / interactive mode: keep kubectl output visible so the user
+    # can see connection activity, then block until Ctrl+C.
+    _pf_loop svc/public-portal    8080:80   & pf_loop_pids+=($!)
+    _pf_loop svc/ops-dashboard    8081:80   & pf_loop_pids+=($!)
+    _pf_loop svc/api-gateway      3000:3000 & pf_loop_pids+=($!)
+    _pf_loop svc/demo-control-api 3001:3001 & pf_loop_pids+=($!)
     info "Press Ctrl+C to stop."
     _stop_pf() {
       trap - EXIT INT TERM  # prevent re-entrant calls
