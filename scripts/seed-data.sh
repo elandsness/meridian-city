@@ -69,10 +69,12 @@ info "Using database pod: $DB_POD"
 # Helper: run SQL via kubectl exec (no local psql required)
 # ---------------------------------------------------------------------------
 run_sql() {
-  # -T: no TTY allocation (prevents psql from prompting for a password interactively)
   # -w: never prompt for a password — fail fast instead of hanging
   # statement_timeout: abort if a lock-wait or slow query exceeds 30 s
-  kubectl exec -T -n "$NAMESPACE" "$DB_POD" -- \
+  # Note: do NOT pass -i (stdin) or -t (tty) to kubectl exec — we don't need
+  # interactive input and avoiding them keeps psql from reading from the terminal.
+  # (-T is a docker exec flag; it does not exist in kubectl exec.)
+  kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
     psql -w -U "$PG_USER" -d "$PG_DB" \
       -c "SET statement_timeout = '30s';" \
       -c "$1" -q
