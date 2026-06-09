@@ -148,6 +148,10 @@ install_or_upgrade() {
     kubectl apply --server-side --force-conflicts -f "${CHART_DIR}/crds/"
     kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null \
       | xargs -r kubectl wait --for=condition=Established --timeout=60s 2>/dev/null || true
+    # Flush the client-side discovery cache so Helm re-queries the API server.
+    # Both kubectl and Helm share ~/.kube/cache/discovery/; a stale cache causes
+    # "no matches for kind" even when CRDs are fully established.
+    rm -rf "${HOME}/.kube/cache/discovery/"
     success "CRDs established."
   fi
 
