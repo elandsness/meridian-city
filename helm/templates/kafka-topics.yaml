@@ -9,10 +9,6 @@ metadata:
   labels:
     strimzi.io/cluster: meridian
     {{- include "meridian.labels" $ | nindent 4 }}
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "10"
-    "helm.sh/hook-delete-policy": hook-failed
 spec:
   partitions: {{ .partitions }}
   replicas: {{ .replicationFactor }}

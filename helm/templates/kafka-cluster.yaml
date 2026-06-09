@@ -9,9 +9,7 @@ metadata:
     strimzi.io/cluster: meridian
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
-    "helm.sh/hook-delete-policy": hook-failed
+    strimzi.io/next-node-ids: "[0]"
 spec:
   replicas: 1
   roles:
@@ -34,9 +32,6 @@ metadata:
   annotations:
     strimzi.io/node-pools: enabled
     strimzi.io/kraft: enabled
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
-    "helm.sh/hook-delete-policy": hook-failed
 spec:
   kafka:
     version: {{ .Values.kafka.version }}
