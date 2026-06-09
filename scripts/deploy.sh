@@ -4,13 +4,17 @@
 # =============================================================================
 # Usage:
 #   ./scripts/deploy.sh repos                          Add all required Helm repos
-#   ./scripts/deploy.sh install [helm flags...]        Full install (infra + app)
+#   ./scripts/deploy.sh install [helm flags...]        Full install (infra + app +
+#                                                      seed data + port-forwards)
 #   ./scripts/deploy.sh upgrade [helm flags...]        Upgrade existing release
+#                                                      (restarts port-forwards when done)
+#   ./scripts/deploy.sh seed [--reset] [--check]      Seed / re-seed demo data
 #   ./scripts/deploy.sh status                         Show pod status
-#   ./scripts/deploy.sh port-forward                   Port-forward UIs to localhost
+#   ./scripts/deploy.sh port-forward                   Start port-forwards only
 # =============================================================================
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RELEASE_NAME="${RELEASE_NAME:-meridian}"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)/helm"
 NAMESPACE="${NAMESPACE:-meridian}"
@@ -200,7 +204,18 @@ install_or_upgrade() {
   success "Deployment complete."
   echo ""
   kubectl get pods -n "$NAMESPACE"
+
+  # Seed demo data on a fresh install (idempotent — safe to re-run on upgrade too).
   echo ""
+  info "Seeding demo data..."
+  if bash "${SCRIPT_DIR}/seed-data.sh"; then
+    echo ""
+  else
+    warn "Seed data failed — platform is up but demo data may be missing."
+    warn "Re-run manually: ./scripts/deploy.sh seed"
+    echo ""
+  fi
+
   port_forward
 }
 
@@ -278,6 +293,10 @@ case "${1:-}" in
     shift
     install_or_upgrade upgrade "$@"
     ;;
+  seed)
+    shift
+    bash "${SCRIPT_DIR}/seed-data.sh" "$@"
+    ;;
   status)
     show_status
     ;;
@@ -285,13 +304,14 @@ case "${1:-}" in
     port_forward
     ;;
   *)
-    echo "Usage: $0 {repos|install|upgrade|status|port-forward} [helm flags...]"
+    echo "Usage: $0 {repos|install|upgrade|seed|status|port-forward} [flags...]"
     echo ""
     echo "Examples:"
     echo "  $0 repos"
     echo "  $0 install -f helm/values-custom.yaml"
-    echo "  $0 install -f helm/values-custom.yaml -f helm/values-dev.yaml"
-    echo "  $0 upgrade -f helm/values-custom.yaml --set global.imageTag=v1.2.0"
+    echo "  $0 upgrade -f helm/values-custom.yaml"
+    echo "  $0 seed"
+    echo "  $0 seed --reset"
     echo "  $0 status"
     echo "  $0 port-forward"
     exit 1

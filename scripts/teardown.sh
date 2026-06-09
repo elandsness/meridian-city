@@ -2,10 +2,18 @@
 # =============================================================================
 # Meridian City Platform — Teardown Script
 # =============================================================================
-# Removes the Helm release and optionally the namespaces.
 # Usage:
-#   ./scripts/teardown.sh              Uninstall the Helm release
-#   ./scripts/teardown.sh --all        Also delete the meridian and dynatrace namespaces
+#   ./scripts/teardown.sh              Full teardown — kills port-forwards,
+#                                      uninstalls Helm release, deletes PVCs
+#                                      and namespaces.  This is the default
+#                                      because a stale PostgreSQL PVC causes
+#                                      Flyway / schema problems on the next
+#                                      fresh install.
+#
+#   ./scripts/teardown.sh --soft       Helm uninstall only.  Port-forwards are
+#                                      still stopped, but namespaces and PVCs
+#                                      are preserved (useful for iterating on
+#                                      Helm chart changes without losing data).
 # =============================================================================
 set -euo pipefail
 
@@ -23,19 +31,33 @@ info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 
-DELETE_NAMESPACES=false
-[[ "${1:-}" == "--all" ]] && DELETE_NAMESPACES=true
+SOFT=false
+[[ "${1:-}" == "--soft" ]] && SOFT=true
 
-if $DELETE_NAMESPACES; then
-  warn "This will delete the Helm release AND the '$NAMESPACE' and '$DYNATRACE_NAMESPACE' namespaces."
-  warn "All persistent data (PostgreSQL, Kafka) will be permanently deleted."
+if $SOFT; then
+  warn "Soft teardown: port-forwards will be stopped and the Helm release will"
+  warn "be uninstalled, but namespaces and PVCs are preserved."
 else
-  warn "This will uninstall the '$RELEASE_NAME' Helm release from namespace '$NAMESPACE'."
+  warn "Full teardown: port-forwards, Helm release, ALL persistent data"
+  warn "(PostgreSQL PVCs, Kafka PVCs), and namespaces will be permanently deleted."
 fi
 
 read -rp "Continue? [y/N] " confirm
 [[ "${confirm:-N}" =~ ^[Yy]$ ]] || { info "Aborted."; exit 0; }
 
+# ---------------------------------------------------------------------------
+# 1. Kill port-forwards
+# ---------------------------------------------------------------------------
+info "Stopping port-forwards..."
+if pkill -f "kubectl port-forward" 2>/dev/null; then
+  success "Port-forwards stopped."
+else
+  info "No port-forwards were running."
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Helm uninstall
+# ---------------------------------------------------------------------------
 if helm status "$RELEASE_NAME" -n "$NAMESPACE" &>/dev/null; then
   info "Uninstalling Helm release: $RELEASE_NAME..."
   helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --timeout 5m
@@ -44,14 +66,39 @@ else
   warn "Helm release '$RELEASE_NAME' not found in namespace '$NAMESPACE'. Skipping."
 fi
 
-if $DELETE_NAMESPACES; then
-  for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
-    if kubectl get namespace "$ns" &>/dev/null; then
-      info "Deleting namespace: $ns..."
-      kubectl delete namespace "$ns" --timeout=120s
-      success "Namespace $ns deleted."
-    fi
-  done
+if $SOFT; then
+  success "Soft teardown complete."
+  exit 0
 fi
 
-success "Teardown complete."
+# ---------------------------------------------------------------------------
+# 3. Delete PVCs explicitly before namespace deletion.
+#    CNPG and Strimzi operators create PVCs outside of Helm's ownership, so
+#    helm uninstall does not remove them.  Leaving them behind causes Flyway
+#    schema-history conflicts and Kafka offset conflicts on the next fresh
+#    install.  Namespace deletion normally cascades to PVCs, but we delete
+#    them explicitly first so the namespace is not held in Terminating state
+#    by PVC finalizers.
+# ---------------------------------------------------------------------------
+for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
+  if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+    pvc_count=$(kubectl get pvc -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$pvc_count" -gt 0 ]]; then
+      info "Deleting $pvc_count PVC(s) in namespace $ns..."
+      kubectl delete pvc --all -n "$ns" --timeout=60s 2>/dev/null || true
+    fi
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# 4. Delete namespaces
+# ---------------------------------------------------------------------------
+for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
+  if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+    info "Deleting namespace: $ns..."
+    kubectl delete namespace "$ns" --timeout=120s
+    success "Namespace $ns deleted."
+  fi
+done
+
+success "Full teardown complete."
