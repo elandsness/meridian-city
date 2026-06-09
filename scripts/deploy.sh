@@ -220,10 +220,13 @@ port_forward() {
   info "  API Gateway     → http://localhost:3000"
   info "  Demo Control    → http://localhost:3001"
 
-  kubectl port-forward svc/public-portal   8080:80   -n "$NAMESPACE" &
-  kubectl port-forward svc/ops-dashboard   8081:80   -n "$NAMESPACE" &
-  kubectl port-forward svc/api-gateway     3000:3000 -n "$NAMESPACE" &
-  kubectl port-forward svc/demo-control-api 3001:3001 -n "$NAMESPACE" &
+  # Bind to 0.0.0.0 so ports are reachable from the host machine directly
+  # (required for kind clusters and remote machines — 127.0.0.1 binding only
+  # works when the browser runs on the same host as kubectl).
+  kubectl port-forward --address 0.0.0.0 svc/public-portal    8080:80   -n "$NAMESPACE" &
+  kubectl port-forward --address 0.0.0.0 svc/ops-dashboard    8081:80   -n "$NAMESPACE" &
+  kubectl port-forward --address 0.0.0.0 svc/api-gateway      3000:3000 -n "$NAMESPACE" &
+  kubectl port-forward --address 0.0.0.0 svc/demo-control-api 3001:3001 -n "$NAMESPACE" &
 
   trap 'kill $(jobs -p) 2>/dev/null; echo; info "Port-forwards stopped."' EXIT INT TERM
   wait
