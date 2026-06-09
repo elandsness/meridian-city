@@ -68,7 +68,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: wait
-          image: rancher/kubectl:latest
+          image: registry.k8s.io/kubectl:v1.29.2
           command:
             - /bin/sh
             - -c
