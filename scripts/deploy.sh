@@ -219,16 +219,46 @@ port_forward() {
   info "  Ops Dashboard   → http://localhost:8081  (login: demo / dynatrace)"
   info "  API Gateway     → http://localhost:3000"
   info "  Demo Control    → http://localhost:3001"
+  info "Port-forwards restart automatically when pods are replaced."
 
-  # Bind to 0.0.0.0 so ports are reachable from the host machine directly
-  # (required for kind clusters and remote machines — 127.0.0.1 binding only
-  # works when the browser runs on the same host as kubectl).
-  kubectl port-forward --address 0.0.0.0 svc/public-portal    8080:80   -n "$NAMESPACE" &
-  kubectl port-forward --address 0.0.0.0 svc/ops-dashboard    8081:80   -n "$NAMESPACE" &
-  kubectl port-forward --address 0.0.0.0 svc/api-gateway      3000:3000 -n "$NAMESPACE" &
-  kubectl port-forward --address 0.0.0.0 svc/demo-control-api 3001:3001 -n "$NAMESPACE" &
+  # Each port-forward runs inside a restart loop so that kubectl reconnects
+  # after a pod is replaced (e.g. after 'rollout restart').  We bind to
+  # 0.0.0.0 so ports are reachable from the host machine (required for kind
+  # and remote setups — 127.0.0.1 only works when the browser is on the same
+  # host as kubectl).
+  local -a pf_loop_pids=()
 
-  trap 'kill $(jobs -p) 2>/dev/null; echo; info "Port-forwards stopped."' EXIT INT TERM
+  # _pf_loop <svc> <localPort:remotePort>
+  # Runs kubectl port-forward in a tight restart loop; exits when killed.
+  _pf_loop() {
+    local svc=$1 ports=$2
+    while true; do
+      kubectl port-forward --address 0.0.0.0 "$svc" "$ports" -n "$NAMESPACE" &
+      wait $! 2>/dev/null || true
+      # Brief pause before retrying to avoid spin-looping when a pod is
+      # temporarily unavailable (e.g. during a rollout restart).
+      sleep 3
+    done
+  }
+
+  _pf_loop svc/public-portal    8080:80   & pf_loop_pids+=($!)
+  _pf_loop svc/ops-dashboard    8081:80   & pf_loop_pids+=($!)
+  _pf_loop svc/api-gateway      3000:3000 & pf_loop_pids+=($!)
+  _pf_loop svc/demo-control-api 3001:3001 & pf_loop_pids+=($!)
+
+  # Clean up all restart loops and their current kubectl children on exit.
+  _stop_pf() {
+    trap - EXIT INT TERM  # prevent re-entrant calls
+    local pid
+    for pid in "${pf_loop_pids[@]}"; do
+      kill   "$pid"   2>/dev/null || true
+      pkill -P "$pid" 2>/dev/null || true  # also kill the kubectl child
+    done
+    echo
+    info "Port-forwards stopped."
+  }
+  trap '_stop_pf' EXIT INT TERM
+
   wait
 }
 
