@@ -40,6 +40,13 @@ public class ServiceRequestService {
 
     @Transactional
     public ServiceRequestResponse submitRequest(CreateServiceRequestDto dto) {
+        // Validate required fields up front. Without this, a null/blank value hits a
+        // NOT NULL column constraint and surfaces as a 500 via the catch-all handler;
+        // a bad request must map to 400 instead (see docs/API_CONVENTIONS.md §4).
+        requireField(dto.citizenId(), "citizen_id");
+        requireField(dto.category(), "category");
+        requireField(dto.title(), "title");
+
         // 1. Create and persist the service request
         ServiceRequest request = ServiceRequest.create(
                 dto.citizenId(),
@@ -132,5 +139,11 @@ public class ServiceRequestService {
                     .getContent();
         }
         return results.stream().map(ServiceRequestResponse::from).toList();
+    }
+
+    private static void requireField(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, name + " is required");
+        }
     }
 }

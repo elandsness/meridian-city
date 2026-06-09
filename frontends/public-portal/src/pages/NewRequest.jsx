@@ -29,11 +29,17 @@ export default function NewRequest() {
     setError('')
     setLoading(true)
 
+    // The public portal has no per-citizen identity — the gateway's local
+    // /auth/login returns only { username, role }, so user.id is undefined.
+    // Fall back to a seeded citizen (the seed creates cit-00001..cit-00050).
+    const { location, ...rest } = form
     const payload = {
-      ...form,
-      citizen_id: user?.id,
+      ...rest,
+      citizen_id: user?.id ?? 'cit-00001',
     }
-    if (!payload.location) delete payload.location
+    // citizen-service has no free-text location field; map it onto the optional
+    // zone_id. Keep it omitted when blank.
+    if (location) payload.zone_id = location
 
     try {
       await createServiceRequest(payload)
@@ -133,6 +139,7 @@ export default function NewRequest() {
               name="location"
               value={form.location}
               onChange={handleChange}
+              maxLength={50}
               className={inputClass}
               placeholder="e.g. 123 Main St or intersection of Oak Ave & 5th"
             />
