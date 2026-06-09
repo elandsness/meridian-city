@@ -92,13 +92,24 @@ done
 
 # ---------------------------------------------------------------------------
 # 4. Delete namespaces
+#    Submit with --wait=false so we don't block on CNPG/Strimzi CRD
+#    finalizers.  We then poll for up to 60 s; if the namespace is still
+#    terminating after that, we exit cleanly — 'deploy.sh install' already
+#    handles Terminating namespaces by waiting for them to clear.
 # ---------------------------------------------------------------------------
 for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
   if kubectl get namespace "$ns" &>/dev/null 2>&1; then
     info "Deleting namespace: $ns..."
-    kubectl delete namespace "$ns" --timeout=120s
-    success "Namespace $ns deleted."
+    kubectl delete namespace "$ns" --wait=false 2>/dev/null || true
+    # Poll briefly so a fast delete prints a clean success message.
+    if kubectl wait --for=delete namespace/"$ns" --timeout=60s 2>/dev/null; then
+      success "Namespace $ns deleted."
+    else
+      warn "Namespace $ns is still terminating (common with CNPG/Strimzi finalizers)."
+      warn "It will finish in the background.  If you re-deploy immediately,"
+      warn "'deploy.sh install' will wait for it to clear automatically."
+    fi
   fi
 done
 
-success "Full teardown complete."
+success "Teardown complete."
