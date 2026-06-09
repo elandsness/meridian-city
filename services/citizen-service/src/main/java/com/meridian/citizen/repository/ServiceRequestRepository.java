@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, String> {
 
-    List<ServiceRequest> findByCitizenId(String citizenId);
+    List<ServiceRequest> findByCitizenIdOrderByCreatedAtDesc(String citizenId);
 }

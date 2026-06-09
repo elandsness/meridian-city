@@ -9,6 +9,8 @@ import com.meridian.citizen.repository.ServiceRequestRepository;
 import com.meridian.citizen.util.BusinessEventLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,10 +118,19 @@ public class ServiceRequestService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceRequestResponse> findByCitizenId(String citizenId) {
-        return serviceRequestRepository.findByCitizenId(citizenId)
-                .stream()
-                .map(ServiceRequestResponse::from)
-                .toList();
+    public List<ServiceRequestResponse> list(String citizenId, int limit) {
+        int capped = Math.min(Math.max(limit, 1), 200);
+        List<ServiceRequest> results;
+        if (citizenId != null && !citizenId.isBlank()) {
+            results = serviceRequestRepository.findByCitizenIdOrderByCreatedAtDesc(citizenId);
+            if (results.size() > capped) {
+                results = results.subList(0, capped);
+            }
+        } else {
+            results = serviceRequestRepository
+                    .findAll(PageRequest.of(0, capped, Sort.by(Sort.Direction.DESC, "createdAt")))
+                    .getContent();
+        }
+        return results.stream().map(ServiceRequestResponse::from).toList();
     }
 }
