@@ -47,6 +47,16 @@ spec:
               value: {{ .Values.cityOperations.faultInjection.dbSlowdownDelayMs | quote }}
             - name: FAULT_CPU_SPIKE_ENABLED
               value: {{ .Values.cityOperations.faultInjection.cpuSpikeEnabled | quote }}
+            # Bridge for images built before the CityAsset @JdbcTypeCode(SqlTypes.JSON)
+            # fix landed.  Those images have ddl-auto=validate in application.yml and
+            # will fail schema validation against the JSONB metadata column because the
+            # old entity declared @Column(columnDefinition = "TEXT").  Setting this to
+            # "none" bypasses validation entirely — JSONB reads/writes work fine at the
+            # JDBC level regardless.  Remove this override once all deployed images
+            # include the entity fix (i.e. after the fix/strimzi-api-v1 PR is merged
+            # and CI has published new images to GHCR).
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:

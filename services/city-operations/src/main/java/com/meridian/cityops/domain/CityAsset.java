@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 
@@ -34,7 +36,11 @@ public class CityAsset {
     @Builder.Default
     private String status = "operational";
 
-    @Column(columnDefinition = "TEXT")
+    // V1 migration creates this column as JSONB (correct for JSON data in PostgreSQL).
+    // @JdbcTypeCode(SqlTypes.JSON) tells Hibernate 6 to map this field to the
+    // JSON/JSONB JDBC type so that ddl-auto=validate passes against a JSONB column.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
     private String metadata;
 
     @Column(name = "created_at")
