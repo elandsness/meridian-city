@@ -2,7 +2,7 @@
 # DynaKube custom resource — configures OneAgent deployment via the Dynatrace Operator.
 # Deployed as a post-install/post-upgrade hook so that Helm applies it only after
 # the dynatrace-operator sub-chart has installed and its CRDs are registered.
-apiVersion: dynatrace.com/v1beta4
+apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
 metadata:
   name: {{ include "meridian.fullname" . }}
