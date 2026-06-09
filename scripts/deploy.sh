@@ -108,6 +108,10 @@ install_or_upgrade() {
   # progressDeadlineSeconds as a value, so the default 600s can be exceeded
   # while waiting for node provisioning + large image pull. Patch it in the
   # background the moment Helm creates the deployment.
+  local patch_pid="" progress_pid=""
+  # Kill background helpers on Ctrl+C, normal exit, or SIGTERM.
+  trap 'kill ${patch_pid:-} ${progress_pid:-} 2>/dev/null; trap - EXIT INT TERM' EXIT INT TERM
+
   local otel_deploy="${RELEASE_NAME}-opentelemetry-collector"
   (
     until kubectl get deployment "$otel_deploy" -n "$NAMESPACE" &>/dev/null; do
@@ -117,14 +121,16 @@ install_or_upgrade() {
       --type=merge -p '{"spec":{"progressDeadlineSeconds":1800}}' &>/dev/null
     info "Patched $otel_deploy: progressDeadlineSeconds=1800"
   ) &
-  local patch_pid=$!
+  patch_pid=$!
 
-  # Background progress reporter: prints a pod summary every 20s so the
-  # terminal isn't silent during the long GKE Autopilot cold-start wait.
+  # Background progress reporter: prints a pod summary every 20s.
+  # Loop condition checks that the parent script is still alive (kill -0 $$
+  # returns 0 as long as the process exists). Stops automatically once all
+  # pods are running, or when the parent exits / is Ctrl+C'd.
+  local parent_pid=$$
   (
-    while true; do
+    while kill -0 "$parent_pid" 2>/dev/null; do
       sleep 20
-      local pods running total errors
       pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null) || continue
       total=$(echo "$pods" | grep -c . 2>/dev/null || true)
       running=$(echo "$pods" | grep -c " Running " 2>/dev/null || true)
@@ -135,9 +141,11 @@ install_or_upgrade() {
       else
         echo -e "${BLUE}[INFO]${NC}  pods: ${GREEN}${running} running${NC} / ${total} total"
       fi
+      # Stop once everything is running and stable.
+      [[ $errors -eq 0 && $running -eq $total && $total -gt 0 ]] && break
     done
   ) &
-  local progress_pid=$!
+  progress_pid=$!
 
   # Pre-apply CRDs before helm install so the REST mapper discovers them at startup.
   # Helm's KubeClient.Build() uses a mapper locked at client init — CRDs applied
