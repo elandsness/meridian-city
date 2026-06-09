@@ -17,7 +17,13 @@ appImageRegistry: "ghcr.io/your-org/meridian-city-platform"
 global:
   imageTag: "latest"
   namespace: "meridian"
-  imagePullPolicy: IfNotPresent
+  # Always pull so that a fresh CI build of the floating ":latest" tag is
+  # actually fetched on each (re)deploy.  With IfNotPresent, a kind node that
+  # already cached ":latest" will keep serving the stale image after CI
+  # rebuilds it — pods silently run old code until the cached layer is purged.
+  # If you pin imageTag to an immutable tag (e.g. a git SHA), IfNotPresent is
+  # safe and faster; revert this then.
+  imagePullPolicy: Always
   imagePullSecrets: []
 
 # ---------------------------------------------------------------------------
