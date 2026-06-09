@@ -46,7 +46,7 @@ export default function Overview() {
     refetchInterval: 60_000,
   });
 
-  const chartData = history.map((snap) => ({
+  const chartData = (Array.isArray(history) ? history : []).map((snap) => ({
     time: formatHHmm(snap.timestamp),
     requests: snap.requests_today ?? 0,
   }));
