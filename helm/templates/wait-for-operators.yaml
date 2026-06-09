@@ -66,23 +66,38 @@ spec:
     spec:
       serviceAccountName: meridian-wait-for-operators
       restartPolicy: OnFailure
-      containers:
-        - name: wait
+      # registry.k8s.io/kubectl is distroless (no shell); use command arrays directly.
+      # Init containers run sequentially — each must succeed before the next starts.
+      initContainers:
+        {{- if .Values.postgresql.enabled }}
+        - name: wait-cnpg
           image: registry.k8s.io/kubectl:v1.29.2
           command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              {{- if .Values.postgresql.enabled }}
-              echo "Waiting for CNPG operator to be ready..."
-              kubectl rollout status deployment/meridian-cloudnative-pg \
-                -n {{ include "meridian.namespace" . }} --timeout=300s
-              {{- end }}
-              {{- if .Values.kafka.enabled }}
-              echo "Waiting for Strimzi operator to be ready..."
-              kubectl rollout status deployment/strimzi-cluster-operator \
-                -n {{ include "meridian.namespace" . }} --timeout=300s
-              {{- end }}
-              echo "All operators ready."
+            - kubectl
+            - rollout
+            - status
+            - deployment/meridian-cloudnative-pg
+            - -n
+            - {{ include "meridian.namespace" . }}
+            - --timeout=300s
+        {{- end }}
+        {{- if .Values.kafka.enabled }}
+        - name: wait-strimzi
+          image: registry.k8s.io/kubectl:v1.29.2
+          command:
+            - kubectl
+            - rollout
+            - status
+            - deployment/strimzi-cluster-operator
+            - -n
+            - {{ include "meridian.namespace" . }}
+            - --timeout=300s
+        {{- end }}
+      containers:
+        - name: done
+          image: registry.k8s.io/kubectl:v1.29.2
+          command:
+            - kubectl
+            - version
+            - --client
 {{- end }}
