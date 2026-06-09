@@ -7,7 +7,8 @@ export async function getKpis() {
 
 export async function getKpiHistory(hours = 24) {
   const res = await client.get(`/api/v1/kpis/history?hours=${hours}`);
-  return res.data;
+  // Backend wraps the array as { snapshots, count }; callers expect the array.
+  return res.data?.snapshots ?? [];
 }
 
 export async function getFunnel(name) {
