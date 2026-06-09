@@ -31,8 +31,13 @@ public class ServiceRequestController {
     }
 
     @GetMapping
-    public List<ServiceRequestResponse> findByCitizenId(@RequestParam String citizenId) {
-        return serviceRequestService.findByCitizenId(citizenId);
+    public List<ServiceRequestResponse> list(
+            @RequestParam(name = "citizen_id", required = false) String citizenId,
+            @RequestParam(name = "limit", required = false, defaultValue = "50") int limit) {
+        // citizen_id is optional: when absent we return the most recent requests
+        // across all citizens (the public portal's list view). page is accepted
+        // by the client but ignored here — limit alone is sufficient for the demo.
+        return serviceRequestService.list(citizenId, limit);
     }
 
     @PatchMapping("/{id}/status")

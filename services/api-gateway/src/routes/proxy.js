@@ -92,6 +92,9 @@ function buildUpstreamHeaders (originalHeaders, requestId) {
   delete headers['host']
   delete headers['connection']
   delete headers['transfer-encoding']
+  // Drop the original content-length: the body is re-serialized below, so its
+  // byte length may differ. Let undici recompute it from the outgoing body.
+  delete headers['content-length']
 
   headers['x-request-id'] = requestId
   headers['x-meridian-gateway'] = 'true'
@@ -150,11 +153,24 @@ async function proxyRoutes (fastify, opts) {
       const methodsWithBody = ['POST', 'PUT', 'PATCH']
       const sendBody = methodsWithBody.includes(request.method.toUpperCase())
 
+      // Fastify has already parsed JSON bodies into a plain object; undici only
+      // accepts string/Buffer/stream, so re-serialize objects to JSON. Passing
+      // the raw object straight through makes undici throw, which surfaced as a
+      // 502 on every proxied POST (chat, create service request, etc.).
+      let upstreamBody
+      if (sendBody && request.body != null) {
+        if (typeof request.body === 'string' || Buffer.isBuffer(request.body)) {
+          upstreamBody = request.body
+        } else {
+          upstreamBody = JSON.stringify(request.body)
+        }
+      }
+
       try {
         const upstreamResponse = await undiciRequest(targetUrl, {
           method: request.method,
           headers: upstreamHeaders,
-          body: sendBody ? request.body : undefined,
+          body: upstreamBody,
           headersTimeout: 30000,
           bodyTimeout: 30000,
         })

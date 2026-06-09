@@ -110,7 +110,7 @@ export default function ServiceRequests() {
                       <StatusBadge status={req.status} />
                     </td>
                     <td className="px-4 py-3 text-slate-300 capitalize">{req.priority}</td>
-                    <td className="px-4 py-3 text-slate-400">{formatDate(req.created_at)}</td>
+                    <td className="px-4 py-3 text-slate-400">{formatDate(req.created_at ?? req.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -130,7 +130,7 @@ export default function ServiceRequests() {
                   <span>·</span>
                   <span className="capitalize">{req.priority}</span>
                   <span>·</span>
-                  <span>{formatDate(req.created_at)}</span>
+                  <span>{formatDate(req.created_at ?? req.createdAt)}</span>
                 </div>
               </div>
             ))}
