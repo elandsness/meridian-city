@@ -1,6 +1,6 @@
 {{- if .Values.kafka.enabled }}
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaNodePool
 metadata:
   name: combined
@@ -22,7 +22,7 @@ spec:
   resources:
     {{- toYaml .Values.kafka.resources | nindent 4 }}
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
   name: meridian
