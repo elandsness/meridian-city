@@ -10,7 +10,11 @@ metadata:
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
 data:
-  config.yaml: |
+  relay: |
+    extensions:
+      health_check:
+        endpoint: "0.0.0.0:13133"
+
     receivers:
       # Receives OTLP from:
       #  - iot-simulator (Go): IoT device telemetry
@@ -53,7 +57,7 @@ data:
 
     exporters:
       # Export to Dynatrace via OTLP/HTTP
-      otlphttp/dynatrace:
+      otlp_http/dynatrace:
         endpoint: "{{ .Values.dynatrace.otlpEndpoint }}"
         headers:
           Authorization: "Api-Token {{ .Values.dynatrace.apiToken }}"
@@ -69,23 +73,22 @@ data:
       #   verbosity: detailed
 
     service:
+      extensions: [health_check]
       pipelines:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, resource, batch]
-          exporters: [otlphttp/dynatrace]
+          exporters: [otlp_http/dynatrace]
         metrics:
           receivers: [otlp]
           processors: [memory_limiter, resource, batch]
-          exporters: [otlphttp/dynatrace]
+          exporters: [otlp_http/dynatrace]
         logs:
           receivers: [otlp]
           processors: [memory_limiter, resource, batch]
-          exporters: [otlphttp/dynatrace]
+          exporters: [otlp_http/dynatrace]
 
       telemetry:
         logs:
           level: "info"
-        metrics:
-          address: "0.0.0.0:8888"
 {{- end }}
