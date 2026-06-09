@@ -70,7 +70,7 @@ info "Using database pod: $DB_POD"
 # ---------------------------------------------------------------------------
 run_sql() {
   kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
-    psql -U "$PG_USER" -d "$PG_DB" -c "$1" -q 2>/dev/null
+    psql -U "$PG_USER" -d "$PG_DB" -c "$1" -q
 }
 
 check_counts() {
@@ -124,9 +124,10 @@ fi
 # publishes new images, the V2 migrations will run on startup and these
 # CREATE TABLE IF NOT EXISTS statements become harmless no-ops.
 # ---------------------------------------------------------------------------
-info "Ensuring schema tables exist (idempotent bridge for pre-V2 images)..."
-run_sql "
-CREATE TABLE IF NOT EXISTS requests.dispatch_log (
+info "Ensuring schema tables exist (bridge for images where baseline-version=0 fix is not yet deployed)..."
+# These are non-fatal: if Flyway already created the tables (once the
+# baseline-version: 0 fix is live in the image) the IF NOT EXISTS is a no-op.
+run_sql "CREATE TABLE IF NOT EXISTS requests.dispatch_log (
     id                  BIGSERIAL        PRIMARY KEY,
     request_id          VARCHAR(50)      NOT NULL,
     category            VARCHAR(50),
@@ -134,8 +135,8 @@ CREATE TABLE IF NOT EXISTS requests.dispatch_log (
     assigned_department VARCHAR(100),
     routing_reason      TEXT,
     dispatched_at       TIMESTAMPTZ      DEFAULT NOW()
-);"
-success "Schema tables ready."
+);" || warn "dispatch_log bridge skipped (may already exist or schema not ready yet)"
+success "Schema bridge step complete."
 
 # ---------------------------------------------------------------------------
 info "Seeding city zones..."

@@ -49,11 +49,23 @@ read -rp "Continue? [y/N] " confirm
 # 1. Kill port-forwards
 # ---------------------------------------------------------------------------
 info "Stopping port-forwards..."
-if pkill -f "kubectl port-forward" 2>/dev/null; then
-  success "Port-forwards stopped."
-else
-  info "No port-forwards were running."
+_pf_stopped=false
+# Kill the restart loops first (so they don't respawn kubectl after pkill).
+_PF_PIDS_FILE="/tmp/meridian-pf-pids"
+if [[ -f "$_PF_PIDS_FILE" ]]; then
+  while IFS= read -r pid; do
+    kill   "$pid"   2>/dev/null || true
+    pkill -P "$pid" 2>/dev/null || true  # also kill the kubectl child
+  done < "$_PF_PIDS_FILE"
+  rm -f "$_PF_PIDS_FILE"
+  _pf_stopped=true
 fi
+# Fallback: catch any kubectl port-forward processes not tracked via PID file
+# (e.g. from a manual ./scripts/deploy.sh port-forward run).
+if pkill -f "kubectl port-forward" 2>/dev/null; then
+  _pf_stopped=true
+fi
+$_pf_stopped && success "Port-forwards stopped." || info "No port-forwards were running."
 
 # ---------------------------------------------------------------------------
 # 2. Helm uninstall

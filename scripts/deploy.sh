@@ -243,7 +243,7 @@ install_or_upgrade() {
     echo ""
   fi
 
-  port_forward
+  port_forward background
 }
 
 show_status() {
@@ -258,8 +258,13 @@ show_status() {
   kubectl get ingress -n "$NAMESPACE" 2>/dev/null || true
 }
 
+_PF_PIDS_FILE="/tmp/meridian-pf-pids"
+
 port_forward() {
-  info "Starting port-forwards (Ctrl+C to stop)..."
+  # mode: "background" (after install — return the shell prompt)
+  #        "foreground" (standalone port-forward command — block until Ctrl+C)
+  local mode="${1:-foreground}"
+
   info "  Public Portal   → http://localhost:8080"
   info "  Ops Dashboard   → http://localhost:8081  (login: demo / dynatrace)"
   info "  API Gateway     → http://localhost:3000"
@@ -291,20 +296,30 @@ port_forward() {
   _pf_loop svc/api-gateway      3000:3000 & pf_loop_pids+=($!)
   _pf_loop svc/demo-control-api 3001:3001 & pf_loop_pids+=($!)
 
-  # Clean up all restart loops and their current kubectl children on exit.
-  _stop_pf() {
-    trap - EXIT INT TERM  # prevent re-entrant calls
-    local pid
-    for pid in "${pf_loop_pids[@]}"; do
-      kill   "$pid"   2>/dev/null || true
-      pkill -P "$pid" 2>/dev/null || true  # also kill the kubectl child
-    done
-    echo
-    info "Port-forwards stopped."
-  }
-  trap '_stop_pf' EXIT INT TERM
-
-  wait
+  if [[ "$mode" == "background" ]]; then
+    # Save loop PIDs so teardown.sh can stop them cleanly, then detach
+    # so the loops survive after this script exits.
+    printf '%s\n' "${pf_loop_pids[@]}" > "$_PF_PIDS_FILE"
+    disown "${pf_loop_pids[@]}" 2>/dev/null || true
+    success "Port-forwards running in the background."
+    info "  Stop with: ./scripts/teardown.sh"
+  else
+    # Foreground / interactive mode: block until Ctrl+C, then clean up.
+    info "Press Ctrl+C to stop."
+    _stop_pf() {
+      trap - EXIT INT TERM  # prevent re-entrant calls
+      local pid
+      for pid in "${pf_loop_pids[@]}"; do
+        kill   "$pid"   2>/dev/null || true
+        pkill -P "$pid" 2>/dev/null || true  # also kill the kubectl child
+      done
+      rm -f "$_PF_PIDS_FILE"
+      echo
+      info "Port-forwards stopped."
+    }
+    trap '_stop_pf' EXIT INT TERM
+    wait
+  fi
 }
 
 # ---------------------------------------------------------------------------
