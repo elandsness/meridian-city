@@ -196,9 +196,12 @@ install_or_upgrade() {
     --timeout=900s 2>/dev/null || true
 
   kill "$patch_pid" "$progress_pid" 2>/dev/null || true
+  trap - EXIT INT TERM  # clear install-time trap; port_forward sets its own
   success "Deployment complete."
   echo ""
   kubectl get pods -n "$NAMESPACE"
+  echo ""
+  port_forward
 }
 
 show_status() {
