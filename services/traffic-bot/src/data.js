@@ -86,21 +86,21 @@ function generateCitizen() {
   const lastName  = randomItem(LAST_NAMES)
   const num       = randomInt(10, 999)
   return {
-    firstName,
-    lastName,
-    email:  `${firstName.toLowerCase()}.${lastName.toLowerCase()}${num}@${randomItem(EMAIL_DOMAINS)}`,
-    zoneId: randomItem(ZONES),
+    first_name: firstName,
+    last_name:  lastName,
+    email:      `${firstName.toLowerCase()}.${lastName.toLowerCase()}${num}@${randomItem(EMAIL_DOMAINS)}`,
+    zone_id:    randomItem(ZONES),
   }
 }
 
 function generateServiceRequest(citizenId) {
   const template = randomItem(REQUEST_TEMPLATES)
   return {
-    citizenId,
+    citizen_id:  citizenId,
     category:    template.category,
     title:       template.title,
     description: template.description,
-    zoneId:      randomItem(ZONES),
+    zone_id:     randomItem(ZONES),
     priority:    randomItem(PRIORITIES),
   }
 }

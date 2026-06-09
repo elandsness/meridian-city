@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: service-dispatch
+  jackson:
+    # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    property-naming-strategy: SNAKE_CASE
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
     username: ${SPRING_DATASOURCE_USERNAME:meridian}
