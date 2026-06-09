@@ -1,0 +1,46 @@
+# =============================================================================
+# Meridian City Platform — Custom Secrets / Local Overrides
+# =============================================================================
+# This file contains ONLY the values you must supply.  Everything else is
+# already set to sensible defaults in values.yaml — do NOT copy the entire
+# values.yaml here, as stale overrides in this file silently win over any
+# fixes made in values.yaml.
+#
+# Setup:
+#   cp helm/values-custom.yaml.example helm/values-custom.yaml
+#   # Edit values-custom.yaml and fill in every "" below.
+#   # values-custom.yaml is git-ignored (it contains secrets).
+#
+# Deploy:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Dynatrace tenant (REQUIRED)
+# ---------------------------------------------------------------------------
+dynatrace:
+  # https://<environment-id>.live.dynatrace.com/api
+  apiUrl: ""
+
+  # API token — required scopes:
+  #   metrics.ingest, logs.ingest, openTelemetryTrace.ingest,
+  #   entities.read, settings.write, DataExport
+  apiToken: ""
+
+  # https://<environment-id>.live.dynatrace.com/api/v2/otlp
+  otlpEndpoint: ""
+
+  # The subdomain part of your tenant URL (e.g. abc12345)
+  environmentId: ""
+
+# ---------------------------------------------------------------------------
+# LLM / AI service (REQUIRED — choose one provider)
+# ---------------------------------------------------------------------------
+llm:
+  provider: "openai"   # openai | anthropic | local
+
+  openai:
+    apiKey: ""         # required when provider=openai
+
+  anthropic:
+    apiKey: ""         # required when provider=anthropic
