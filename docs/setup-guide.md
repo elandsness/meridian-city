@@ -39,8 +39,8 @@ This guide walks through deploying the Meridian City Platform into a cloud-manag
 ## Step 1: Clone and Prepare
 
 ```bash
-git clone https://github.com/your-org/meridian-city-platform.git
-cd meridian-city-platform
+git clone https://github.com/elandsness/meridian-city.git
+cd meridian-city
 
 # Make scripts executable
 chmod +x scripts/deploy.sh scripts/teardown.sh scripts/seed-data.sh
@@ -97,8 +97,6 @@ llm:
 global:
   # Tag matching your current image build (or "latest" for the first deploy)
   imageTag: "latest"
-  # Your GitHub Container Registry org
-  imageRegistry: "ghcr.io/your-org/meridian-city-platform"
 
 # Enable ingress if you have an ingress controller
 apiGateway:
