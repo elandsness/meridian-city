@@ -21,7 +21,11 @@ set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-meridian}"
 PG_DB="${PG_DB:-meridian}"
-PG_USER="${PG_USER:-meridian}"
+# CNPG's pg_hba.conf uses peer auth on the Unix socket, which requires the
+# OS user to match the PG user.  The container runs as OS user "postgres", so
+# we connect as the postgres superuser.  Override with PG_USER=<other> if you
+# have a version of CNPG that allows socket connections with non-superuser roles.
+PG_USER="${PG_USER:-postgres}"
 
 # CloudNativePG names pods <cluster>-<ordinal>; the primary is always -1.
 # Override DB_POD if your cluster uses a different name.
@@ -69,20 +73,19 @@ info "Using database pod: $DB_POD"
 # Helper: run SQL via kubectl exec (no local psql required)
 # ---------------------------------------------------------------------------
 run_sql() {
-  # -w: never prompt for a password — fail fast instead of hanging
-  # statement_timeout: abort if a lock-wait or slow query exceeds 30 s
-  # Note: do NOT pass -i (stdin) or -t (tty) to kubectl exec — we don't need
-  # interactive input and avoiding them keeps psql from reading from the terminal.
-  # (-T is a docker exec flag; it does not exist in kubectl exec.)
+  # Peer auth via Unix socket (no password needed when connecting as postgres).
+  # statement_timeout: abort if a lock-wait or slow query exceeds 30 s.
+  # No -i flag: SQL is passed via -c, so we don't need stdin forwarding.
   kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
-    psql -w -U "$PG_USER" -d "$PG_DB" \
+    psql -U "$PG_USER" -d "$PG_DB" \
       -c "SET statement_timeout = '30s';" \
       -c "$1" -q
 }
 
 check_counts() {
   info "Verifying seed data counts..."
-  kubectl exec -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+  # -i: forward stdin so psql receives the heredoc SQL
+  kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 SELECT 'zones'            AS "table", COUNT(*)::int AS rows FROM city.zones
 UNION ALL
 SELECT 'buildings',        COUNT(*)::int FROM city.assets WHERE asset_type = 'building'
@@ -104,7 +107,7 @@ fi
 
 if $RESET; then
   info "Resetting existing data..."
-  kubectl exec -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+  kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 TRUNCATE
   city.assets,
   city.buildings,
@@ -122,18 +125,12 @@ EOF
 fi
 
 # ---------------------------------------------------------------------------
-# Schema bridge: ensure tables that may be missing from the current image exist.
-#
-# V2 Flyway migrations for city-operations and service-dispatch were added to
-# the fix/strimzi-api-v1 branch but haven't merged to main yet, so the GHCR
-# images were built without them.  We create the tables here (idempotent) so
-# the running services have them available.  Once the branch merges and CI
-# publishes new images, the V2 migrations will run on startup and these
-# CREATE TABLE IF NOT EXISTS statements become harmless no-ops.
+# Schema bridge: ensure any tables that Flyway might not yet have created
+# exist before we try to insert data.  The IF NOT EXISTS makes this idempotent
+# — if Flyway already ran the V2 migration on startup, this is a harmless no-op.
 # ---------------------------------------------------------------------------
-info "Ensuring schema tables exist (bridge for images where baseline-version=0 fix is not yet deployed)..."
-# These are non-fatal: if Flyway already created the tables (once the
-# baseline-version: 0 fix is live in the image) the IF NOT EXISTS is a no-op.
+info "Ensuring schema tables exist..."
+# Non-fatal: skips gracefully if the table already exists or the schema isn't ready.
 run_sql "CREATE TABLE IF NOT EXISTS requests.dispatch_log (
     id                  BIGSERIAL        PRIMARY KEY,
     request_id          VARCHAR(50)      NOT NULL,
@@ -159,7 +156,7 @@ success "Zones seeded."
 
 # ---------------------------------------------------------------------------
 info "Seeding buildings..."
-kubectl exec -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 INSERT INTO city.assets (id, name, asset_type, zone_id, status)
 SELECT
   'bldg-' || lpad(n::text, 2, '0'),
@@ -185,7 +182,7 @@ success "Buildings seeded."
 
 # ---------------------------------------------------------------------------
 info "Seeding vehicles..."
-kubectl exec -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 INSERT INTO city.assets (id, name, asset_type, zone_id, status)
 SELECT
   'veh-' || lpad(n::text, 3, '0'),
@@ -209,7 +206,7 @@ success "Vehicles seeded."
 
 # ---------------------------------------------------------------------------
 info "Seeding industrial machines..."
-kubectl exec -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 INSERT INTO city.assets (id, name, asset_type, zone_id, status, metadata)
 SELECT
   'mach-' || lpad(n::text, 2, '0'),
@@ -225,7 +222,7 @@ success "Industrial machines seeded."
 
 # ---------------------------------------------------------------------------
 info "Seeding citizen accounts..."
-kubectl exec -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 INSERT INTO citizens.citizens (id, first_name, last_name, email, zone_id)
 SELECT
   'cit-' || lpad(n::text, 5, '0'),
