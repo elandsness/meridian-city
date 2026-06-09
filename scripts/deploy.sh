@@ -190,8 +190,18 @@ install_or_upgrade() {
     "$@"
 
   # Helm has submitted resources and hooks are running. Wait for everything to converge.
-  info "Resources submitted. Waiting for full platform readiness (~3-5 min on first install)..."
-  warn "Java services will show CrashLoopBackOff briefly while DB initializes — this is expected."
+  info "Resources submitted. Waiting for full platform readiness (up to 15 min on first install)..."
+  warn "Kafka broker takes 3–5 min to provision on first install."
+  warn "Kafka-dependent pods will show Init:0/1 until it is ready — this is expected."
+
+  # kubectl wait exits immediately with success when the label selector matches no pods.
+  # This is a race: pods may not be scheduled yet when helm returns.
+  # Block here until at least one platform pod exists so kubectl wait has something to watch.
+  until kubectl get pods -n "$NAMESPACE" \
+      -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+      --no-headers 2>/dev/null | grep -q .; do
+    sleep 5
+  done
 
   kubectl wait pods \
     --for=condition=ready \
@@ -201,9 +211,26 @@ install_or_upgrade() {
 
   kill "$patch_pid" "$progress_pid" 2>/dev/null || true
   trap - EXIT INT TERM  # clear install-time trap; port_forward sets its own
-  success "Deployment complete."
+
+  # Show actual pod state and only claim success when pods are genuinely ready.
   echo ""
   kubectl get pods -n "$NAMESPACE"
+  echo ""
+  local _total _ready
+  _total=$(kubectl get pods -n "$NAMESPACE" \
+      -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+      --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  _ready=$(kubectl get pods -n "$NAMESPACE" \
+      -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+      --no-headers 2>/dev/null \
+      | awk '{ split($2,a,"/"); if (a[1]+0==a[2]+0 && a[2]+0>0) c++ } END { print c+0 }')
+  if [[ "$_total" -gt 0 && "$_ready" -eq "$_total" ]]; then
+    success "Deployment complete — all $_total pods ready."
+  else
+    warn "Deployment submitted — ${_ready:-0}/${_total:-0} pods ready after 15 min wait."
+    warn "Some services may still be initializing."
+    warn "Check status with: ./scripts/deploy.sh status"
+  fi
 
   # Seed demo data on a fresh install (idempotent — safe to re-run on upgrade too).
   echo ""
