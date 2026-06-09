@@ -139,6 +139,18 @@ install_or_upgrade() {
   ) &
   local progress_pid=$!
 
+  # Pre-apply CRDs before helm install so the REST mapper discovers them at startup.
+  # Helm's KubeClient.Build() uses a mapper locked at client init — CRDs applied
+  # during install (from crds/) don't refresh it, so any template type not yet in
+  # the cluster causes a "no matches for kind" build failure.
+  if [[ -d "${CHART_DIR}/crds" ]] && [[ -n "$(ls -A "${CHART_DIR}/crds/" 2>/dev/null)" ]]; then
+    info "Pre-applying CRDs from helm/crds/ ..."
+    kubectl apply --server-side --force-conflicts -f "${CHART_DIR}/crds/"
+    kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null \
+      | xargs -r kubectl wait --for=condition=Established --timeout=60s 2>/dev/null || true
+    success "CRDs established."
+  fi
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   # --wait is intentionally omitted: Java services crash-loop until DB is ready,
   # which would deadlock the post-install hooks that provision the DB.
