@@ -145,7 +145,7 @@ install_or_upgrade() {
   # the cluster causes a "no matches for kind" build failure.
   if [[ -d "${CHART_DIR}/crds" ]] && [[ -n "$(ls -A "${CHART_DIR}/crds/" 2>/dev/null)" ]]; then
     info "Pre-applying CRDs from helm/crds/ ..."
-    kubectl apply --server-side --force-conflicts -f "${CHART_DIR}/crds/"
+    kubectl apply --server-side --field-manager=helm --force-conflicts -f "${CHART_DIR}/crds/"
     kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null \
       | xargs -r kubectl wait --for=condition=Established --timeout=60s 2>/dev/null || true
     # Stamp Helm ownership annotations so that CRDs sourced from operator templates/
