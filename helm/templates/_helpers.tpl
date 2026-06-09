@@ -77,3 +77,27 @@ Namespace — all app resources go into the configured namespace.
 {{- define "meridian.namespace" -}}
 {{ .Values.global.namespace }}
 {{- end }}
+
+{{/*
+Init container that blocks until the Strimzi Kafka bootstrap service is
+reachable.  Without this, Java services that hard-fail on missing Kafka DNS
+(consumers, KafkaAdmin) enter CrashLoopBackOff for the 3-5 minutes it takes
+Strimzi to provision the Kafka broker on a fresh install.
+
+Usage (inside a pod spec, before containers:):
+  initContainers:
+    {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
+*/}}
+{{- define "meridian.kafkaWaitInitContainer" -}}
+- name: wait-for-kafka
+  image: busybox:1.36
+  command:
+    - sh
+    - -c
+    - |
+      until nc -z meridian-kafka-bootstrap 9092; do
+        echo "Waiting for Kafka bootstrap (meridian-kafka-bootstrap:9092)...";
+        sleep 3;
+      done
+      echo "Kafka ready."
+{{- end }}

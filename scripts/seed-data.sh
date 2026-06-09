@@ -115,6 +115,29 @@ EOF
 fi
 
 # ---------------------------------------------------------------------------
+# Schema bridge: ensure tables that may be missing from the current image exist.
+#
+# V2 Flyway migrations for city-operations and service-dispatch were added to
+# the fix/strimzi-api-v1 branch but haven't merged to main yet, so the GHCR
+# images were built without them.  We create the tables here (idempotent) so
+# the running services have them available.  Once the branch merges and CI
+# publishes new images, the V2 migrations will run on startup and these
+# CREATE TABLE IF NOT EXISTS statements become harmless no-ops.
+# ---------------------------------------------------------------------------
+info "Ensuring schema tables exist (idempotent bridge for pre-V2 images)..."
+run_sql "
+CREATE TABLE IF NOT EXISTS requests.dispatch_log (
+    id                  BIGSERIAL        PRIMARY KEY,
+    request_id          VARCHAR(50)      NOT NULL,
+    category            VARCHAR(50),
+    zone_id             VARCHAR(50),
+    assigned_department VARCHAR(100),
+    routing_reason      TEXT,
+    dispatched_at       TIMESTAMPTZ      DEFAULT NOW()
+);"
+success "Schema tables ready."
+
+# ---------------------------------------------------------------------------
 info "Seeding city zones..."
 run_sql "
 INSERT INTO city.zones (id, name, zone_type, geojson) VALUES

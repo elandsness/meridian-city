@@ -19,6 +19,8 @@ spec:
         {{- include "meridian.labels" . | nindent 8 }}
         app.kubernetes.io/component: city-operations
     spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: city-operations
           image: {{ include "meridian.image" (dict "repository" .Values.cityOperations.image.repository "tag" .Values.cityOperations.image.tag "context" $) }}

@@ -19,6 +19,8 @@ spec:
         {{- include "meridian.labels" . | nindent 8 }}
         app.kubernetes.io/component: service-dispatch
     spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: service-dispatch
           image: {{ include "meridian.image" (dict "repository" .Values.serviceDispatch.image.repository "tag" .Values.serviceDispatch.image.tag "context" $) }}
@@ -42,6 +44,14 @@ spec:
               value: "meridian-kafka-bootstrap:9092"
             - name: CITY_OPERATIONS_URL
               value: "http://city-operations:8083"
+            # Bridge for images built before the DispatchLog V2 Flyway migration
+            # was merged to main and baked into the GHCR image.  Without this,
+            # Hibernate ddl-auto=validate fails on startup because requests.dispatch_log
+            # doesn't exist yet (V2 is in the branch but the image predates it).
+            # seed-data.sh creates the table on deploy.  Remove once the fix branch
+            # is merged and CI has published new images.
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:
