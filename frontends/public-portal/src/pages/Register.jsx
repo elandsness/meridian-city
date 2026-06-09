@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import client from '../api/client.js'
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', address: '' })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -16,8 +16,18 @@ export default function Register() {
     e.preventDefault()
     setError('')
     setLoading(true)
+    // citizen-service expects { first_name, last_name, email, zone_id } (snake_case
+    // via the global Jackson strategy). There is no phone field; the optional
+    // address maps onto zone_id.
+    const payload = {
+      first_name: form.firstName,
+      last_name: form.lastName,
+      email: form.email,
+    }
+    if (form.address) payload.zone_id = form.address
+
     try {
-      await client.post('/api/v1/citizens', form)
+      await client.post('/api/v1/citizens', payload)
       setSuccess(true)
     } catch (err) {
       setError(
@@ -52,17 +62,31 @@ export default function Register() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                required
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                placeholder="Jane Smith"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">First Name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={form.firstName}
+                  onChange={handleChange}
+                  required
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  placeholder="Jane"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={form.lastName}
+                  onChange={handleChange}
+                  required
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  placeholder="Smith"
+                />
+              </div>
             </div>
 
             <div>
@@ -79,24 +103,15 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
-              <input
-                type="tel"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                placeholder="+1 555-0100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Address</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Address <span className="text-slate-500 font-normal">(optional)</span>
+              </label>
               <input
                 type="text"
                 name="address"
                 value={form.address}
                 onChange={handleChange}
+                maxLength={50}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                 placeholder="123 Main St, Meridian City"
               />

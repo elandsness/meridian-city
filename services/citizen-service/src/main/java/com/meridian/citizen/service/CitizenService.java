@@ -28,6 +28,19 @@ public class CitizenService {
 
     @Transactional
     public CitizenResponse createCitizen(CreateCitizenRequest request) {
+        // Validate required fields up front. Without this, a null/blank value hits a
+        // NOT NULL column constraint and surfaces as a 500 via the catch-all handler;
+        // a bad request must map to 400 instead (see docs/API_CONVENTIONS.md §4).
+        requireField(request.firstName(), "first_name");
+        requireField(request.lastName(), "last_name");
+        requireField(request.email(), "email");
+
+        // email is UNIQUE; reject duplicates with 409 rather than letting the
+        // constraint violation surface as a 500.
+        citizenRepository.findByEmail(request.email()).ifPresent(existing -> {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
+        });
+
         Citizen citizen = Citizen.create(
                 request.firstName(),
                 request.lastName(),
@@ -49,5 +62,11 @@ public class CitizenService {
                 .map(CitizenResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Citizen not found: " + id));
+    }
+
+    private static void requireField(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, name + " is required");
+        }
     }
 }
