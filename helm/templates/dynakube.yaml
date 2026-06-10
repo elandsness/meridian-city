@@ -21,13 +21,19 @@ spec:
   # Reference to the secret containing the Dynatrace API token
   tokens: meridian-dynatrace-tokens
 
-  # CloudNativeFullStack deploys OneAgent as an init container into every pod
-  # in namespaces labeled dynatrace.com/inject=true (see namespace.yaml)
+  # applicationMonitoring: inject the OneAgent code module into pods in
+  # namespaces labeled dynatrace.com/inject=true (see namespace.yaml), via the
+  # CSI driver. This gives code-level/app instrumentation (PurePaths, service
+  # flow) WITHOUT a host OneAgent DaemonSet.
+  #
+  # We deliberately do NOT use cloudNativeFullStack here: its host OneAgent
+  # DaemonSet cannot initialize on kind (a kind "node" is a Docker container,
+  # not a real host) and crash-loops with "Initialization procedure failed".
+  # Kubernetes infrastructure data still flows via the ActiveGate below.
+  # On a real-host cluster you can switch this to cloudNativeFullStack (and add
+  # an env block setting DT_DEPLOYMENT_ENVIRONMENT from .Values.dynatrace.deploymentEnvironment).
   oneAgent:
-    cloudNativeFullStack:
-      env:
-        - name: DT_DEPLOYMENT_ENVIRONMENT
-          value: {{ .Values.dynatrace.deploymentEnvironment | quote }}
+    applicationMonitoring: {}
 
   # ActiveGate: required for Kubernetes monitoring and routing telemetry
   activeGate:
