@@ -62,6 +62,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/funnels',
+      target: config.ANALYTICS_SERVICE_URL,
+      serviceName: 'analytics-service',
+      requiresAuth: false,
+    },
+    {
       prefix: '/api/v1/chat',
       target: config.AI_SERVICE_URL,
       serviceName: 'ai-service',

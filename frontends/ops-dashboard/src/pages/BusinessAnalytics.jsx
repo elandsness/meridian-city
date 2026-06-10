@@ -28,7 +28,13 @@ function FunnelSection({ funnel }) {
     refetchInterval: 60_000,
   });
 
-  const stages = data?.stages ?? [];
+  // Backend returns { funnel, stages: [{ stage, count }] }; FunnelChart expects
+  // { name, count }. Map at the boundary and unwrap defensively (no error
+  // boundaries — a bad shape would blank the page). See docs/API_CONVENTIONS.md.
+  const stages = (Array.isArray(data?.stages) ? data.stages : []).map((s) => ({
+    name: s.stage,
+    count: s.count,
+  }));
 
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-3">
@@ -46,7 +52,7 @@ function FunnelSection({ funnel }) {
           <p className="text-rose-400 text-sm">Failed to load: {error.message}</p>
         </div>
       ) : (
-        <FunnelChart data={stages} title={data?.funnel_name} />
+        <FunnelChart data={stages} title={data?.funnel} />
       )}
 
       <p className="text-xs text-gray-600 italic">

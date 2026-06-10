@@ -12,6 +12,9 @@ export async function getKpiHistory(hours = 24) {
 }
 
 export async function getFunnel(name) {
-  const res = await client.get(`/api/v1/analytics/funnels/${name}`);
+  // Gateway forwards /api/v1/funnels/* verbatim to analytics-service
+  // (GET /api/v1/funnels/{funnel_name}); the /api/v1/analytics prefix is not a
+  // real upstream path. See docs/API_CONVENTIONS.md §5.
+  const res = await client.get(`/api/v1/funnels/${name}`);
   return res.data;
 }
