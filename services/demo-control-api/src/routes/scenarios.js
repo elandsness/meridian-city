@@ -10,10 +10,9 @@
  * POST   /api/v1/scenarios/reset-all     — reset all scenarios + faults + IoT anomalies
  */
 
-const proxy = require('../proxy')
-const config = require('../config')
 const { getActiveScenario, clearActiveScenario } = require('../state')
 const { listScenarios, activateScenario, resetAll } = require('../scenarios')
+const { clearAllFleetAnomalies } = require('../fleetOps')
 
 /**
  * @param {import('fastify').FastifyInstance} fastify
@@ -59,13 +58,14 @@ async function scenarioRoutes (fastify) {
   fastify.post('/api/v1/scenarios/reset-all', async (_request, reply) => {
     const [faultResults] = await Promise.allSettled([resetAll()])
 
-    // Also clear IoT anomalies via iot-simulator
-    await proxy.del(`${config.IOT_SIMULATOR_URL}/api/v1/fleet/anomaly`).catch(() => {})
+    // Also clear IoT anomalies via the iot-simulator (per-device clears under
+    // /admin/anomaly/{id}); see fleetOps.clearAllFleetAnomalies.
+    const anomalyReset = await clearAllFleetAnomalies().catch(() => ({ ok: false, cleared: [] }))
 
     return reply.send({
       reset: true,
       faults_reset: faultResults.status === 'fulfilled' ? faultResults.value : [],
-      anomalies_cleared: true,
+      anomalies_cleared: anomalyReset.cleared ?? [],
     })
   })
 }
