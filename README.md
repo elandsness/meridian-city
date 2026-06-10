@@ -119,6 +119,13 @@ meridian-city-platform/
 <!-- Update the org/repo below to match where this repository is hosted. -->
 ![Build](https://github.com/elandsness/meridian-city/actions/workflows/build.yml/badge.svg)
 
+CI builds and pushes every service image to GHCR on each push to `main`. The
+build authenticates to Docker Hub so base-image pulls aren't throttled by Docker
+Hub's anonymous rate limit — set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` as
+repository **Actions secrets** (use a Docker Hub access token). See
+[docs/setup-guide.md](docs/setup-guide.md#continuous-integration-image-builds)
+for details.
+
 ## License
 
 Apache 2.0
