@@ -47,7 +47,7 @@ export default function Overview() {
   });
 
   const chartData = (Array.isArray(history) ? history : []).map((snap) => ({
-    time: formatHHmm(snap.timestamp),
+    time: formatHHmm(snap.snapshot_at ?? snap.timestamp),
     requests: snap.requests_today ?? 0,
   }));
 
