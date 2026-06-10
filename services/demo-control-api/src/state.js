@@ -43,21 +43,24 @@ function hasActiveFaults () {
 // Scenario state
 // ---------------------------------------------------------------------------
 
-let _activeScenario = null
+let _activeScenarioId = null
+let _activeScenarioName = null
 let _scenarioStartedAt = null
 /** @type {NodeJS.Timeout | null} */
 let _scenarioTimer = null
 
 function getActiveScenario () {
-  if (!_activeScenario) return null
+  if (!_activeScenarioId) return null
   return {
-    name: _activeScenario,
+    id: _activeScenarioId,
+    name: _activeScenarioName,
     started_at: _scenarioStartedAt,
   }
 }
 
-function setActiveScenario (name, autoResetMs, onReset) {
-  _activeScenario = name
+function setActiveScenario (id, name, autoResetMs, onReset) {
+  _activeScenarioId = id
+  _activeScenarioName = name
   _scenarioStartedAt = new Date().toISOString()
 
   if (_scenarioTimer) clearTimeout(_scenarioTimer)
@@ -70,7 +73,8 @@ function setActiveScenario (name, autoResetMs, onReset) {
 }
 
 function clearActiveScenario () {
-  _activeScenario = null
+  _activeScenarioId = null
+  _activeScenarioName = null
   _scenarioStartedAt = null
   if (_scenarioTimer) {
     clearTimeout(_scenarioTimer)

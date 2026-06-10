@@ -142,7 +142,7 @@ async function activateScenario (id) {
   const result = await scenario.activate()
 
   const autoResetMs = scenario.duration_seconds ? scenario.duration_seconds * 1000 : null
-  state.setActiveScenario(id, autoResetMs, () => scenario.reset())
+  state.setActiveScenario(id, scenario.name, autoResetMs, () => scenario.reset())
 
   return {
     ok: result.ok !== false,
