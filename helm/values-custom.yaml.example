@@ -77,3 +77,25 @@ llm:
     # Used when provider=local; assumes Ollama running in-cluster
     endpoint: "http://ollama:11434"
     model: "llama3"
+
+# ---------------------------------------------------------------------------
+# Docker Hub credentials (OPTIONAL)
+# ---------------------------------------------------------------------------
+# Only needed if your cluster pulls images from Docker Hub and hits the
+# anonymous pull rate limit (e.g. GKE Autopilot, shared NAT egress). The app
+# images come from appImageRegistry (GHCR) and the Postgres/Kafka operators use
+# public ghcr.io / quay.io images, so most clusters can leave this blank.
+#
+# When both fields are set, the chart creates a `dockerhub-pull-secret`
+# (kubernetes.io/dockerconfigjson); reference it from global.imagePullSecrets to
+# actually use it for pulls.
+#
+# Use a Docker Hub ACCESS TOKEN (Account → Security → New Access Token), not
+# your account password.
+#
+# NOTE: this is the CLUSTER-side credential. CI image builds authenticate
+# separately via the DOCKERHUB_USERNAME / DOCKERHUB_TOKEN GitHub Actions repo
+# secrets — see docs/setup-guide.md (Continuous Integration).
+dockerhub:
+  username: ""
+  token: ""

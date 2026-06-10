@@ -233,6 +233,35 @@ See [dynatrace-config-guide.md](dynatrace-config-guide.md) for:
 
 ---
 
+## Continuous Integration (Image Builds)
+
+Service images are built and pushed to GHCR by `.github/workflows/build.yml` on
+every push to `main`. The workflow logs in to Docker Hub before building so that
+base-image pulls (`eclipse-temurin`, `maven`, `node`, `python`, `golang`) are
+authenticated.
+
+> **Why:** Docker Hub rate-limits *anonymous* pulls per source IP over a rolling
+> ~6-hour window. Once a day's builds exhaust it, the next pull fails with a
+> misleading `401 UNAUTHORIZED` / `authentication required` on
+> `docker.io/library/*` and the image build step fails — even though the Maven /
+> npm compile step succeeded. Authenticating raises the limit substantially.
+
+Set these as repository **Actions secrets** (*repo → Settings → Secrets and
+variables → Actions*):
+
+| Secret | Value |
+|---|---|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | A Docker Hub **access token** (*Account Settings → Security → New Access Token*) — not your password |
+
+If the secrets are absent the login step is skipped and the build falls back to
+anonymous pulls (so it never hard-fails on a missing secret — it just remains
+subject to the rate limit). These are separate from the optional **cluster-side**
+Docker Hub credentials in `helm/values-custom.yaml.example` (`dockerhub:`), which
+only matter if your cluster itself pulls Docker Hub images and hits the same limit.
+
+---
+
 ## Upgrading
 
 After building new images (CI pushes to GHCR):
@@ -291,6 +320,16 @@ Common causes:
 - `OPENAI_API_KEY` not set or invalid
 - Rate limit hit (reduce traffic bot's `SCENARIO_CHATBOT=false`)
 - Wrong `llm.provider` value (must be `openai`, `anthropic`, or `local`)
+
+### CI build fails with `401 UNAUTHORIZED` on a `docker.io/library/*` pull
+
+This is Docker Hub's *anonymous* pull rate limit (it reports as `authentication
+required`, not `429`), not a real auth failure — the build's `mvn` / `npm` step
+succeeds and only the Docker image build fails. Authenticate the CI build by
+setting the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` Actions secrets (see
+[Continuous Integration (Image Builds)](#continuous-integration-image-builds)).
+A bare re-run may pass once the window resets, but it recurs until the secrets
+are in place.
 
 ### Helm dependency error
 

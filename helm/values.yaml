@@ -449,17 +449,6 @@ opsDashboard:
       memory: "256Mi"
 
 # ---------------------------------------------------------------------------
-# Docker Hub credentials (optional)
-# PostgreSQL (ghcr.io/cloudnative-pg) and Kafka (quay.io/strimzi) images are
-# public and require no authentication. Set these only if other images in your
-# environment require authenticated Docker Hub pulls (GKE Autopilot rate limits,
-# private registries, etc.).
-# ---------------------------------------------------------------------------
-dockerhub:
-  username: ""
-  token: ""
-
-# ---------------------------------------------------------------------------
 # Infrastructure: PostgreSQL (CloudNativePG operator)
 # Images: ghcr.io/cloudnative-pg/* — public, no auth required.
 # The operator creates a single-instance Postgres cluster named meridian-db.
