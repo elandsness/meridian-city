@@ -38,7 +38,7 @@ export default function ChatWidget() {
 
     try {
       const data = await sendMessage({ message: text, session_id: sessionId })
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.response ?? data.reply }])
     } catch {
       setMessages((prev) => [
         ...prev,
