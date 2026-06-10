@@ -16,9 +16,16 @@ import java.time.OffsetDateTime;
  * nested {@code location {lat,lng}} for the map; ops-dashboard reads
  * {@code work_order_count} and {@code resolved_at}.
  *
- * city-operations has not been flipped to a global Jackson SNAKE_CASE strategy
- * (that would also re-case AssetResponse/WorkOrderResponse, which service-dispatch
- * consumes cross-service), so the snake_case names are pinned per-field here.
+ * city-operations runs the global Jackson SNAKE_CASE strategy (see
+ * application.yml: spring.jackson.property-naming-strategy: SNAKE_CASE), so these
+ * snake_case keys are emitted automatically. The per-field {@code @JsonProperty}
+ * pins below are therefore belt-and-suspenders — each maps to exactly the name the
+ * global strategy would produce, kept here to make the wire contract explicit at
+ * the point the frontends depend on it.
+ *
+ * The cross-service DTOs that service-dispatch consumes as camelCase
+ * (CreateWorkOrderDto, WorkOrderResponse) opt out of the global strategy via
+ * {@code @JsonNaming(LowerCamelCaseStrategy)} instead.
  */
 @Data
 @Builder

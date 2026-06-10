@@ -12,7 +12,7 @@
  *   1. Create a new citizen account  (POST /api/v1/citizens)
  *   2. Submit a service request      (POST /api/v1/service-requests)
  *   3. View the created request      (GET  /api/v1/service-requests/:id)
- *   4. List citizen's requests       (GET  /api/v1/service-requests?citizenId=:id)
+ *   4. List citizen's requests       (GET  /api/v1/service-requests?citizen_id=:id)
  */
 
 const axios = require('axios')
@@ -48,7 +48,7 @@ async function run() {
   await client.get(`/api/v1/service-requests/${requestId}`)
 
   // Step 4: List citizen's requests
-  await client.get(`/api/v1/service-requests?citizenId=${citizenId}`)
+  await client.get(`/api/v1/service-requests?citizen_id=${citizenId}`)
 }
 
 module.exports = { run }
