@@ -71,8 +71,16 @@ add_repos() {
 install_or_upgrade() {
   local cmd="$1"
   shift
+  local dt_enabled=false
 
   check_prerequisites
+
+  # The Dynatrace Operator is no longer a sub-chart (it's installed as its own
+  # release in the 'dynatrace' namespace below). Remove any stale operator
+  # sub-chart tarball left in charts/ by a previous 'helm dependency update' —
+  # Helm loads sub-charts from charts/ regardless of Chart.yaml, so a leftover
+  # would redeploy the operator into the meridian namespace and break injection.
+  rm -f "${CHART_DIR}"/charts/dynatrace-operator-*.tgz 2>/dev/null || true
 
   # Ensure the app namespace exists and carries Helm ownership labels.
   # Three cases:
@@ -178,6 +186,39 @@ install_or_upgrade() {
     success "CRDs established."
   fi
 
+  # ---------------------------------------------------------------------------
+  # Dynatrace Operator — installed as its OWN Helm release in the 'dynatrace'
+  # namespace, NOT as a sub-chart. A sub-chart always deploys into the parent
+  # release namespace (meridian), but the operator only reconciles DynaKube CRs
+  # in its own namespace, and the DynaKube lives in 'dynatrace'. Mismatched
+  # namespaces = the DynaKube never reconciles and no OneAgent injection happens.
+  #
+  # We install it only when Dynatrace is actually configured, detected by
+  # rendering the chart and checking whether the DynaKube template emits anything
+  # (it is gated on dynatrace.operator.enabled && dynatrace.apiUrl). installCRD is
+  # left at the chart default so the operator release owns the dynatrace CRDs —
+  # they were removed from helm/crds/ to avoid cross-release ownership conflicts.
+  # ---------------------------------------------------------------------------
+  if helm template "$RELEASE_NAME" "$CHART_DIR" --namespace "$NAMESPACE" "$@" 2>/dev/null \
+       | grep -q "kind: DynaKube"; then
+    dt_enabled=true
+    info "Dynatrace configured — installing the Dynatrace Operator into '$DYNATRACE_NAMESPACE'..."
+    if helm upgrade --install dynatrace-operator dynatrace/dynatrace-operator \
+         --namespace "$DYNATRACE_NAMESPACE" \
+         --create-namespace \
+         --wait --timeout 5m; then
+      success "Dynatrace Operator ready in '$DYNATRACE_NAMESPACE'."
+      # The operator just registered the DynaKube CRD; flush the shared discovery
+      # cache so the umbrella install's hook client can resolve kind: DynaKube.
+      rm -rf "${HOME}/.kube/cache/discovery/"
+    else
+      warn "Dynatrace Operator install did not complete — OneAgent injection will be unavailable."
+      warn "The rest of the platform will still deploy. Check: kubectl get pods -n $DYNATRACE_NAMESPACE"
+    fi
+  else
+    info "Dynatrace not configured (DynaKube does not render) — skipping operator install."
+  fi
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   # --wait is intentionally omitted: Java services crash-loop until DB is ready,
   # which would deadlock the post-install hooks that provision the DB.
@@ -241,6 +282,18 @@ install_or_upgrade() {
     warn "Seed data failed — platform is up but demo data may be missing."
     warn "Re-run manually: ./scripts/deploy.sh seed"
     echo ""
+  fi
+
+  # OneAgent injection happens at pod creation, but app pods come up before the
+  # DynaKube (a post-install hook) is reconciled — so they need one restart to be
+  # instrumented. (We don't auto-restart: an injected init container can stall if
+  # it starts before the DynaKube is fully Running.)
+  if [[ "$dt_enabled" == true ]]; then
+    echo ""
+    info "Dynatrace Operator installed in '$DYNATRACE_NAMESPACE'. To instrument the app pods,"
+    info "wait for the DynaKube to be Running, then restart the workloads once:"
+    info "  kubectl get dynakube $RELEASE_NAME -n $DYNATRACE_NAMESPACE     # STATUS should be Running"
+    info "  kubectl -n $NAMESPACE rollout restart deploy"
   fi
 
   port_forward background

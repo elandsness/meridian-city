@@ -84,6 +84,19 @@ if $SOFT; then
 fi
 
 # ---------------------------------------------------------------------------
+# 2b. Uninstall the Dynatrace Operator — it is its own Helm release in the
+#     dynatrace namespace (see scripts/deploy.sh), not part of the meridian
+#     release. Uninstall it before deleting the namespace so it can clean up
+#     its webhook configuration and finalizers, and so its cluster-scoped CRDs
+#     are removed rather than orphaned.
+# ---------------------------------------------------------------------------
+if helm status dynatrace-operator -n "$DYNATRACE_NAMESPACE" &>/dev/null; then
+  info "Uninstalling Dynatrace Operator..."
+  helm uninstall dynatrace-operator -n "$DYNATRACE_NAMESPACE" --timeout 5m 2>/dev/null || true
+  success "Dynatrace Operator removed."
+fi
+
+# ---------------------------------------------------------------------------
 # 3. Delete PVCs explicitly before namespace deletion.
 #    CNPG and Strimzi operators create PVCs outside of Helm's ownership, so
 #    helm uninstall does not remove them.  Leaving them behind causes Flyway

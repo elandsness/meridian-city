@@ -549,8 +549,12 @@ opentelemetry-collector:
       memory: "1Gi"
 
 # ---------------------------------------------------------------------------
-# Infrastructure: Dynatrace Operator (Dynatrace Helm chart dependency)
-# The DynaKube CR is created separately in helm/templates/dynakube.yaml.
+# Infrastructure: Dynatrace Operator
+# The operator is installed as its OWN Helm release in the 'dynatrace'
+# namespace by scripts/deploy.sh (NOT as a sub-chart — a sub-chart would land
+# in the meridian release namespace and never reconcile the DynaKube, which
+# lives in 'dynatrace'). It is installed only when Dynatrace is configured,
+# i.e. when the DynaKube renders (dynatrace.operator.enabled && dynatrace.apiUrl).
+# The DynaKube CR + token secret are created by this chart in the 'dynatrace'
+# namespace (helm/templates/dynakube.yaml, helm/templates/app-secrets.yaml).
 # ---------------------------------------------------------------------------
-dynatrace-operator:
-  enabled: true
