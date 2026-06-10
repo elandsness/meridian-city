@@ -1,7 +1,9 @@
 {{- if and .Values.dynatrace.operator.enabled .Values.dynatrace.apiUrl }}
 # DynaKube custom resource — configures OneAgent deployment via the Dynatrace Operator.
-# Deployed as a post-install/post-upgrade hook so that Helm applies it only after
-# the dynatrace-operator sub-chart has installed and its CRDs are registered.
+# Lives in the 'dynatrace' namespace, alongside the operator (which scripts/deploy.sh
+# installs there as its own release). Deployed as a post-install/post-upgrade hook so
+# Helm applies it only after the operator release is up and its CRDs are registered,
+# and after the token secret (app-secrets.yaml) exists.
 apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
 metadata:
