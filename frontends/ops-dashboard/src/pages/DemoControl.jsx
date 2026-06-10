@@ -86,7 +86,7 @@ function SystemStatus({ status, onResetAll }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const activeScenario = status?.scenario?.active_scenario;
+  const activeScenario = status?.active_scenario?.name;
 
   async function handleResetAll() {
     if (!confirm) {
@@ -265,7 +265,7 @@ const FAULT_DEFS = [
 ];
 
 function FaultRow({ def, faultStatus }) {
-  const svcStatus = faultStatus?.[def.id] ?? {};
+  const svcStatus = faultStatus?.faults?.[def.id] ?? {};
   const currentEnabled = svcStatus[def.enableKey] ?? false;
   const currentSecs = svcStatus[def.secKey] ?? def.secDefault ?? 5;
 
@@ -644,8 +644,8 @@ function TrafficCard() {
             {isRunning ? '● Running' : '○ Stopped'}
           </span>
         )}
-        {trafficStatus?.rps != null && (
-          <span className="text-xs text-gray-500 ml-2">{trafficStatus.rps} req/s</span>
+        {trafficStatus?.rpm_current != null && (
+          <span className="text-xs text-gray-500 ml-2">{trafficStatus.rpm_current} req/min</span>
         )}
       </div>
 
@@ -706,7 +706,7 @@ export default function DemoControl() {
     qc.invalidateQueries({ queryKey: ['traffic-status'] });
   }
 
-  const activeScenarioId = demoStatus?.scenario?.active_scenario_id;
+  const activeScenarioId = demoStatus?.active_scenario?.id;
 
   return (
     <div className="space-y-5">

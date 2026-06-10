@@ -49,7 +49,7 @@ async function scenarioRoutes (fastify) {
     }
 
     const { resetScenario } = require('../scenarios')
-    await resetScenario(active.name).catch(() => {})
+    await resetScenario(active.id).catch(() => {})
     clearActiveScenario()
 
     return reply.send({ reset: true, cleared: active.name })
