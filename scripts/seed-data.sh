@@ -96,7 +96,9 @@ SELECT 'machines',         COUNT(*)::int FROM city.assets WHERE asset_type = 'ma
 UNION ALL
 SELECT 'citizens',         COUNT(*)::int FROM citizens.citizens
 UNION ALL
-SELECT 'service_requests', COUNT(*)::int FROM requests.service_requests;
+SELECT 'service_requests', COUNT(*)::int FROM requests.service_requests
+UNION ALL
+SELECT 'incidents',        COUNT(*)::int FROM incidents.incidents;
 EOF
 }
 
@@ -157,25 +159,29 @@ success "Zones seeded."
 # ---------------------------------------------------------------------------
 info "Seeding buildings..."
 kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+-- IDs match the iot-simulator device scheme: <prefix>-<3-digit>, 0-indexed
+-- (bldg-000..bldg-014). This is required so an IoT anomaly on, e.g., bldg-000
+-- creates an incident whose asset_id resolves to a seeded asset → zone →
+-- map coordinates. Zone index uses n % 5 (not (n-1) % 5) because n starts at 0.
 INSERT INTO city.assets (id, name, asset_type, zone_id, status)
 SELECT
-  'bldg-' || lpad(n::text, 2, '0'),
-  'Meridian Building ' || lpad(n::text, 2, '0'),
+  'bldg-' || lpad(n::text, 3, '0'),
+  'Meridian Building ' || lpad(n::text, 3, '0'),
   'building',
-  (ARRAY['zone-north','zone-south','zone-central','zone-west','zone-central'])[(n - 1) % 5 + 1],
+  (ARRAY['zone-north','zone-south','zone-central','zone-west','zone-central'])[n % 5 + 1],
   'operational'
-FROM generate_series(1, 15) AS n
+FROM generate_series(0, 14) AS n
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO city.buildings (id, name, zone_id, floors, year_built, sensor_ids)
 SELECT
-  'bldg-' || lpad(n::text, 2, '0'),
-  'Meridian Building ' || lpad(n::text, 2, '0'),
-  (ARRAY['zone-north','zone-south','zone-central','zone-west','zone-central'])[(n - 1) % 5 + 1],
+  'bldg-' || lpad(n::text, 3, '0'),
+  'Meridian Building ' || lpad(n::text, 3, '0'),
+  (ARRAY['zone-north','zone-south','zone-central','zone-west','zone-central'])[n % 5 + 1],
   5 + (n % 20),
   1980 + (n % 40),
   ARRAY['sensor-hvac-' || n, 'sensor-energy-' || n, 'sensor-occupancy-' || n]
-FROM generate_series(1, 15) AS n
+FROM generate_series(0, 14) AS n
 ON CONFLICT (id) DO NOTHING;
 EOF
 success "Buildings seeded."
@@ -183,23 +189,24 @@ success "Buildings seeded."
 # ---------------------------------------------------------------------------
 info "Seeding vehicles..."
 kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+-- veh-000..veh-029 (3-digit, 0-indexed) to match the iot-simulator devices.
 INSERT INTO city.assets (id, name, asset_type, zone_id, status)
 SELECT
   'veh-' || lpad(n::text, 3, '0'),
   'Vehicle ' || lpad(n::text, 3, '0'),
   'vehicle',
-  (ARRAY['zone-north','zone-south','zone-east','zone-west','zone-central'])[(n - 1) % 5 + 1],
+  (ARRAY['zone-north','zone-south','zone-east','zone-west','zone-central'])[n % 5 + 1],
   'operational'
-FROM generate_series(1, 30) AS n
+FROM generate_series(0, 29) AS n
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO city.vehicles (id, license_plate, vehicle_type, zone_id)
 SELECT
   'veh-' || lpad(n::text, 3, '0'),
   'MRD-' || lpad((1000 + n)::text, 4, '0'),
-  (ARRAY['bus','truck','maintenance','patrol'])[(n - 1) % 4 + 1],
-  (ARRAY['zone-north','zone-south','zone-east','zone-west','zone-central'])[(n - 1) % 5 + 1]
-FROM generate_series(1, 30) AS n
+  (ARRAY['bus','truck','maintenance','patrol'])[n % 4 + 1],
+  (ARRAY['zone-north','zone-south','zone-east','zone-west','zone-central'])[n % 5 + 1]
+FROM generate_series(0, 29) AS n
 ON CONFLICT (id) DO NOTHING;
 EOF
 success "Vehicles seeded."
@@ -207,15 +214,16 @@ success "Vehicles seeded."
 # ---------------------------------------------------------------------------
 info "Seeding industrial machines..."
 kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+-- mach-000..mach-009 (3-digit, 0-indexed) to match the iot-simulator devices.
 INSERT INTO city.assets (id, name, asset_type, zone_id, status, metadata)
 SELECT
-  'mach-' || lpad(n::text, 2, '0'),
-  'Industrial Unit ' || lpad(n::text, 2, '0'),
+  'mach-' || lpad(n::text, 3, '0'),
+  'Industrial Unit ' || lpad(n::text, 3, '0'),
   'machine',
   'zone-east',
   'operational',
   ('{"manufacturer":"MechCorp","model":"MC-' || lpad((1000 + n)::text, 4, '0') || '"}')::jsonb
-FROM generate_series(1, 10) AS n
+FROM generate_series(0, 9) AS n
 ON CONFLICT (id) DO NOTHING;
 EOF
 success "Industrial machines seeded."
@@ -251,6 +259,25 @@ VALUES
   ('req-00008','cit-00008','infrastructure','high',    'assigned',    'Traffic signal malfunction',    NOW() - INTERVAL '6 hours')
 ON CONFLICT (id) DO NOTHING;"
 success "Service requests seeded."
+
+# ---------------------------------------------------------------------------
+# Sample incidents so the incident UIs (public-portal Home + map, ops Incidents
+# page) show data before any IoT anomaly is injected. asset_ids reference the
+# seeded assets above (bldg-000/mach-000/veh-000), so each resolves to a zone →
+# map coordinates (see city-operations IncidentService). status is open/
+# in_progress so they appear in GET /api/v1/incidents (listActive excludes
+# 'resolved'). At runtime, injecting an anomaly via Demo Control adds more.
+info "Seeding sample incidents..."
+run_sql "
+INSERT INTO incidents.incidents
+  (id, asset_id, source, severity, status, title, description, created_at)
+VALUES
+  ('inc-00001','mach-000','iot',   'high',     'open',        'High vibration on Industrial Unit 000', 'Vibration exceeded 8 mm/s threshold across multiple windows.', NOW() - INTERVAL '2 hours'),
+  ('inc-00002','bldg-000','iot',   'critical', 'in_progress', 'HVAC overtemperature in Meridian Building 000', 'HVAC temperature sustained above 85C.',                     NOW() - INTERVAL '40 minutes'),
+  ('inc-00003','veh-000', 'iot',   'medium',   'open',        'Engine overtemperature on Vehicle 000', 'Engine temperature reading above 110C.',                       NOW() - INTERVAL '15 minutes'),
+  ('inc-00004','bldg-003','manual','low',      'open',        'Routine HVAC inspection flagged', 'Operator-raised follow-up from a scheduled inspection.',              NOW() - INTERVAL '1 day')
+ON CONFLICT (id) DO NOTHING;"
+success "Sample incidents seeded."
 
 # ---------------------------------------------------------------------------
 check_counts
