@@ -39,6 +39,8 @@ spec:
               value: "http://city-operations:8083"
             - name: AI_SERVICE_URL
               value: "http://ai-service:8085"
+            - name: ANALYTICS_SERVICE_URL
+              value: "http://analytics-service:8084"
             - name: TELEMETRY_PROCESSOR_URL
               value: "http://telemetry-processor:8086"
             - name: IOT_SIMULATOR_URL

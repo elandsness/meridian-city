@@ -56,8 +56,12 @@ async def status():
 # ---------------------------------------------------------------------------
 
 class FaultRequest(BaseModel):
-    kafka_pause: Optional[bool] = None
-    memory_pressure: Optional[bool] = None
+    # Field names follow the platform fault convention (<name>_enabled), matching
+    # analytics-service / ai-service and what demo-control-api + the dashboard
+    # send. (Previously these were kafka_pause / memory_pressure, so the
+    # _enabled keys demo-control sent were silently ignored.)
+    kafka_pause_enabled: Optional[bool] = None
+    memory_pressure_enabled: Optional[bool] = None
 
 
 @app.post("/admin/fault")
@@ -66,16 +70,16 @@ async def inject_fault(req: FaultRequest):
     Toggle fault injection flags at runtime.
 
     Examples:
-      {"kafka_pause": true}         → pause Kafka consumption (simulates lag)
-      {"memory_pressure": true}     → allocate large in-memory buffers
-      {"kafka_pause": false, "memory_pressure": false}  → reset all
+      {"kafka_pause_enabled": true}      → pause Kafka consumption (simulates lag)
+      {"memory_pressure_enabled": true}  → allocate large in-memory buffers
+      {"kafka_pause_enabled": false, "memory_pressure_enabled": false}  → reset all
     """
-    if req.kafka_pause is not None:
-        fault_state.kafka_pause_enabled = req.kafka_pause
+    if req.kafka_pause_enabled is not None:
+        fault_state.kafka_pause_enabled = req.kafka_pause_enabled
 
-    if req.memory_pressure is not None:
-        fault_state.memory_pressure_enabled = req.memory_pressure
-        if req.memory_pressure:
+    if req.memory_pressure_enabled is not None:
+        fault_state.memory_pressure_enabled = req.memory_pressure_enabled
+        if req.memory_pressure_enabled:
             fault_state.apply_memory_pressure()
         else:
             fault_state.release_memory_pressure()
@@ -83,7 +87,7 @@ async def inject_fault(req: FaultRequest):
     return {
         "ok": True,
         "faults": {
-            "kafka_pause": fault_state.kafka_pause_enabled,
-            "memory_pressure": fault_state.memory_pressure_enabled,
+            "kafka_pause_enabled": fault_state.kafka_pause_enabled,
+            "memory_pressure_enabled": fault_state.memory_pressure_enabled,
         },
     }

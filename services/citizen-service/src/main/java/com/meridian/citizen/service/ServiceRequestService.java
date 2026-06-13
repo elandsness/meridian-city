@@ -1,5 +1,6 @@
 package com.meridian.citizen.service;
 
+import com.meridian.citizen.config.FaultState;
 import com.meridian.citizen.domain.ServiceRequest;
 import com.meridian.citizen.dto.CreateServiceRequestDto;
 import com.meridian.citizen.dto.ServiceRequestResponse;
@@ -27,15 +28,18 @@ public class ServiceRequestService {
     private final BusinessEventLogger businessEventLogger;
     private final DispatchClient dispatchClient;
     private final RequestEventPublisher requestEventPublisher;
+    private final FaultState faultState;
 
     public ServiceRequestService(ServiceRequestRepository serviceRequestRepository,
                                   BusinessEventLogger businessEventLogger,
                                   DispatchClient dispatchClient,
-                                  RequestEventPublisher requestEventPublisher) {
+                                  RequestEventPublisher requestEventPublisher,
+                                  FaultState faultState) {
         this.serviceRequestRepository = serviceRequestRepository;
         this.businessEventLogger = businessEventLogger;
         this.dispatchClient = dispatchClient;
         this.requestEventPublisher = requestEventPublisher;
+        this.faultState = faultState;
     }
 
     @Transactional
@@ -47,7 +51,9 @@ public class ServiceRequestService {
         requireField(dto.category(), "category");
         requireField(dto.title(), "title");
 
-        // 1. Create and persist the service request
+        // 1. Create and persist the service request.
+        // Apply the db-slowdown fault (if enabled) right before the write so the
+        // latency is attributed to the DB operation in the distributed trace.
         ServiceRequest request = ServiceRequest.create(
                 dto.citizenId(),
                 dto.category(),
@@ -56,6 +62,7 @@ public class ServiceRequestService {
                 dto.zoneId(),
                 dto.priority()
         );
+        faultState.maybeDelay();
         request = serviceRequestRepository.save(request);
 
         log.info("Service request submitted: requestId={} citizenId={} category={}",
