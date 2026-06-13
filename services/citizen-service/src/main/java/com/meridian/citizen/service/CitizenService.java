@@ -1,13 +1,16 @@
 package com.meridian.citizen.service;
 
+import com.meridian.citizen.domain.Account;
 import com.meridian.citizen.domain.Citizen;
 import com.meridian.citizen.dto.CitizenResponse;
 import com.meridian.citizen.dto.CreateCitizenRequest;
+import com.meridian.citizen.repository.AccountRepository;
 import com.meridian.citizen.repository.CitizenRepository;
 import com.meridian.citizen.util.BusinessEventLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,11 +21,17 @@ public class CitizenService {
     private static final Logger log = LoggerFactory.getLogger(CitizenService.class);
 
     private final CitizenRepository citizenRepository;
+    private final AccountRepository accountRepository;
+    private final PasswordEncoder passwordEncoder;
     private final BusinessEventLogger businessEventLogger;
 
     public CitizenService(CitizenRepository citizenRepository,
+                          AccountRepository accountRepository,
+                          PasswordEncoder passwordEncoder,
                           BusinessEventLogger businessEventLogger) {
         this.citizenRepository = citizenRepository;
+        this.accountRepository = accountRepository;
+        this.passwordEncoder = passwordEncoder;
         this.businessEventLogger = businessEventLogger;
     }
 
@@ -48,7 +57,19 @@ public class CitizenService {
                 request.zoneId()
         );
 
-        citizen = citizenRepository.save(citizen);
+        // saveAndFlush so the citizen row exists before the accounts FK insert
+        // below (Account.citizenId is a plain column, so Hibernate won't order
+        // the inserts for the foreign key on its own).
+        citizen = citizenRepository.saveAndFlush(citizen);
+
+        // Create a login account when a password was supplied. Optional so
+        // non-interactive callers (traffic-bot) can still create citizens.
+        if (request.password() != null && !request.password().isBlank()) {
+            Account account = Account.create(
+                    citizen.getId(), passwordEncoder.encode(request.password()));
+            accountRepository.save(account);
+            log.info("Login account created for citizenId={}", citizen.getId());
+        }
 
         log.info("Citizen created: citizenId={} email={}", citizen.getId(), citizen.getEmail());
         businessEventLogger.citizenRegistered(citizen.getId(), citizen.getEmail(), citizen.getZoneId());

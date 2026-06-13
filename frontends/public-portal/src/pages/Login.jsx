@@ -38,7 +38,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Username</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Email or username</label>
             <input
               type="text"
               value={username}
@@ -46,7 +46,7 @@ export default function Login() {
               required
               autoFocus
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-              placeholder="Enter username"
+              placeholder="your@email.com"
             />
           </div>
 
@@ -84,9 +84,14 @@ export default function Login() {
               Register
             </Link>
           </p>
-          <div className="bg-slate-700/50 rounded-lg px-4 py-3 text-xs text-slate-400 text-center">
-            Demo credentials: <span className="text-slate-200 font-mono">demo</span> /{' '}
-            <span className="text-slate-200 font-mono">dynatrace</span>
+          <div className="bg-slate-700/50 rounded-lg px-4 py-3 text-xs text-slate-400 text-center space-y-1">
+            <p>
+              Registered? Sign in with your <span className="text-slate-200">email</span> and password.
+            </p>
+            <p>
+              Demo operator: <span className="text-slate-200 font-mono">demo</span> /{' '}
+              <span className="text-slate-200 font-mono">dynatrace</span>
+            </p>
           </div>
         </div>
       </div>

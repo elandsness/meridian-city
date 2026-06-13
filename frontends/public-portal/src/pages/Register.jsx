@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import client from '../api/client.js'
 
 export default function Register() {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', address: '' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', address: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -16,13 +16,15 @@ export default function Register() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    // citizen-service expects { first_name, last_name, email, zone_id } (snake_case
-    // via the global Jackson strategy). There is no phone field; the optional
-    // address maps onto zone_id.
+    // citizen-service expects { first_name, last_name, email, zone_id, password }
+    // (snake_case via the global Jackson strategy). There is no phone field; the
+    // optional address maps onto zone_id. password creates a login account so the
+    // citizen can sign in afterward (email + password).
     const payload = {
       first_name: form.firstName,
       last_name: form.lastName,
       email: form.email,
+      password: form.password,
     }
     if (form.address) payload.zone_id = form.address
 
@@ -100,6 +102,21 @@ export default function Register() {
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                 placeholder="jane@example.com"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                minLength={6}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                placeholder="Choose a password"
+              />
+              <p className="text-xs text-slate-500 mt-1">You'll sign in with your email and this password.</p>
             </div>
 
             <div>

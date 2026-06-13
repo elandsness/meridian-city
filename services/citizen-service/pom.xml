@@ -40,6 +40,14 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- BCrypt password hashing for citizen accounts. crypto-only artifact:
+             provides BCryptPasswordEncoder WITHOUT the full Spring Security
+             filter chain (which would otherwise lock down every endpoint). -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <!-- Spring Kafka -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
