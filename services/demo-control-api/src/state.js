@@ -18,8 +18,7 @@
 const _faults = {
   'ai-service':           { llm_latency_enabled: false, llm_latency_seconds: 0 },
   'citizen-service':      { db_slowdown_enabled: false, db_slowdown_seconds: 0 },
-  'city-operations':      { db_slowdown_enabled: false, db_slowdown_seconds: 0 },
-  'analytics-service':    { db_slowdown_enabled: false, db_slowdown_seconds: 0 },
+  'analytics-service':    { memory_pressure_enabled: false },
   'telemetry-processor':  { kafka_pause_enabled: false, memory_pressure_enabled: false },
 }
 

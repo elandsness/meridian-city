@@ -173,14 +173,7 @@ async function resetAll () {
     s.reset().then(r => ({ id, ...r })).catch(e => ({ id, ok: false, error: e.message }))
   )
 
-  // city-operations has a /admin/fault endpoint but is not covered by any named scenario
-  const extraResets = [
-    proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`, { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
-      .then(r => ({ id: 'city-operations-extra', ...r }))
-      .catch(e => ({ id: 'city-operations-extra', ok: false, error: e.message })),
-  ]
-
-  const results = await Promise.all([...scenarioResets, ...extraResets])
+  const results = await Promise.all(scenarioResets)
 
   state.clearActiveScenario()
 
@@ -191,7 +184,6 @@ async function resetAll () {
       Object.keys(currentFault).map(k => [k, typeof currentFault[k] === 'number' ? 0 : false])
     ))
   }
-  state.setFault('city-operations', { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
 
   return results
 }

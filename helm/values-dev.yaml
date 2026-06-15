@@ -69,9 +69,8 @@ opsDashboard:
     type: NodePort
     nodePort: 30082
 
-# Disable DT Operator in dev (optional — comment out if you have a DT tenant)
+# Disable the Dynatrace Operator in dev (optional — comment out if you have a DT
+# tenant). deploy.sh skips the operator install when this is false / apiUrl unset.
 dynatrace:
   operator:
     enabled: false
-dynatrace-operator:
-  enabled: false
