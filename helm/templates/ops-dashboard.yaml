@@ -14,6 +14,8 @@ spec:
       app: ops-dashboard
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/frontend-nginx-configmap.yaml") . | sha256sum }}
       labels:
         app: ops-dashboard
         {{- include "meridian.labels" . | nindent 8 }}
@@ -22,7 +24,7 @@ spec:
       volumes:
         - name: nginx-config
           configMap:
-            name: frontend-nginx-config
+            name: ops-dashboard-nginx-config
       containers:
         - name: ops-dashboard
           image: {{ include "meridian.image" (dict "repository" .Values.opsDashboard.image.repository "tag" .Values.opsDashboard.image.tag "context" $) }}

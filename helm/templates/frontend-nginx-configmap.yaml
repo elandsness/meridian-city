@@ -1,43 +1,70 @@
-# Nginx config for both frontend pods (public-portal and ops-dashboard).
+# Nginx config for the frontend pods (public-portal and ops-dashboard).
 # Overrides the baked-in nginx.conf from the Docker image by mounting over
 # /etc/nginx/conf.d/default.conf.
 #
-# Adds proxy_pass for /api/ so browsers can use relative API URLs at runtime
-# without requiring the Vite VITE_API_BASE_URL to be set at image build time.
-# All /api/* requests are forwarded to the api-gateway service inside the cluster.
+# Two responsibilities:
+#  1. Proxy /api/ to the api-gateway so the SPAs use relative URLs at runtime
+#     (no VITE_API_BASE_URL needed at image build time).
+#  2. Inject the Dynatrace agentless RUM snippet into served HTML via sub_filter,
+#     when <app>.rum.enabled is true. The RUM application id / agent URL is shipped
+#     to every browser and is NOT a secret, so it lives in values.yaml (unlike the
+#     Dynatrace API token, which stays in the meridian-secrets Secret). Each SPA
+#     has its own ConfigMap so it can register as its own Dynatrace web application.
+{{- define "meridian.frontendNginxConf" -}}
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Proxy all /api/ calls to the api-gateway service.
+    location /api/ {
+        proxy_pass http://api-gateway:3000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Connection        "";
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SPA catch-all: serve index.html for any non-file route.
+    location / {
+        {{- if .rum.enabled }}
+        # Dynatrace RUM: inject the agentless snippet before </head> at request time.
+        sub_filter_once on;
+        sub_filter_types text/html;
+        sub_filter '</head>' '{{ .rum.snippet }}</head>';
+        {{- end }}
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
+}
+{{- end -}}
+{{- if .Values.publicPortal.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: frontend-nginx-config
+  name: public-portal-nginx-config
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
 data:
   default.conf: |
-    server {
-        listen 80;
-        server_name _;
-        root /usr/share/nginx/html;
-        index index.html;
-
-        # Proxy all /api/ calls to the api-gateway service.
-        # This allows the React apps to use relative URLs (no VITE_API_BASE_URL
-        # needed at build time), which is the correct pattern for containerised SPAs.
-        location /api/ {
-            proxy_pass http://api-gateway:3000/api/;
-            proxy_http_version 1.1;
-            proxy_set_header Connection        "";
-            proxy_set_header Host              $host;
-            proxy_set_header X-Real-IP         $remote_addr;
-            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-
-        # SPA catch-all: serve index.html for any non-file route.
-        location / {
-            try_files $uri $uri/ /index.html;
-        }
-
-        gzip on;
-        gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
-    }
+    {{- include "meridian.frontendNginxConf" (dict "rum" .Values.publicPortal.rum) | nindent 4 }}
+{{- end }}
+{{- if .Values.opsDashboard.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ops-dashboard-nginx-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    {{- include "meridian.frontendNginxConf" (dict "rum" .Values.opsDashboard.rum) | nindent 4 }}
+{{- end }}

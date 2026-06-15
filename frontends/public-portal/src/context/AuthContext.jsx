@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import client from '../api/client.js'
+import { identifyUser } from '../lib/rum.js'
 
 const AuthContext = createContext(null)
 
@@ -29,6 +30,12 @@ export function AuthProvider({ children }) {
     setToken(null)
     setUser(null)
   }, [])
+
+  // Tag the RUM session with the citizen identity (on login and on reload while
+  // a session is already stored). No-op when RUM is absent.
+  useEffect(() => {
+    if (user) identifyUser(user.email || user.username || user.id)
+  }, [user])
 
   const value = {
     token,

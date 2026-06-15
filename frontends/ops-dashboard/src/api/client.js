@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { reportError } from '../lib/rum.js';
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -15,10 +16,13 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    if (status === 401) {
       localStorage.removeItem('ops_token');
       localStorage.removeItem('ops_user');
       window.location.href = '/login';
+    } else if (status >= 500) {
+      reportError(error);
     }
     return Promise.reject(error);
   }

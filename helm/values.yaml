@@ -403,6 +403,13 @@ publicPortal:
   image:
     repository: "public-portal"
     tag: ""
+  # Dynatrace RUM (agentless). The application id / agent URL is shipped to every
+  # browser and is NOT a secret. Paste the full <script ...></script> tag from
+  # Dynatrace (Application > Setup > Manual insertion) on a single line, no single
+  # quotes (it is injected into nginx sub_filter). Enabling rolls the pod.
+  rum:
+    enabled: false
+    snippet: ""
   service:
     type: ClusterIP
     port: 80
@@ -431,6 +438,11 @@ opsDashboard:
   image:
     repository: "ops-dashboard"
     tag: ""
+  # Dynatrace RUM (agentless) — see publicPortal.rum above. Register a separate
+  # Dynatrace web application for the ops dashboard and paste its snippet here.
+  rum:
+    enabled: false
+    snippet: ""
   service:
     type: ClusterIP
     port: 80
