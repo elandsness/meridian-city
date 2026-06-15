@@ -2,13 +2,14 @@
 
 **Duration**: ~5 minutes  
 **Dynatrace features**: Distributed traces, service flow, SQL visibility, Kafka publish  
-**Narrative**: "Watch a citizen's service request travel through 5 services in a single distributed trace."
+**Narrative**: "Watch a citizen's service request travel through four services in a single distributed trace."
 
 ---
 
 ## Setup
 
-- Public Portal is open in a browser tab: http://localhost:8080
+- Public Portal is open in a browser tab: http://localhost:8080, **logged in**
+  (operator `demo` / `dynatrace`, or a registered citizen's email + password)
 - Dynatrace is open in a second tab on **Observe and Explore → Distributed Traces**
 - A second Dynatrace tab on **Services** (or **Service Flow**)
 
@@ -23,10 +24,12 @@
 ### 2. Submit a service request (1 min)
 
 In the Public Portal:
-1. Click **Report an Issue** (or **New Service Request**)
-2. Fill in: Category = "Infrastructure", Description = "Pothole on Elm Street"
+1. Go to **Service Requests → New Service Request** (`/service-requests/new`)
+2. Fill in: Category = Infrastructure, **Title** = "Pothole on Elm Street" (required),
+   Description = optional details, Priority = Normal
 3. Click **Submit**
-4. Note the Request ID shown on the confirmation screen (e.g., `req-00901`)
+4. You're returned to the request list with the new request at the top — note its
+   `req-…` id there
 
 ### 3. Find the trace in Dynatrace (1 min)
 
@@ -40,10 +43,13 @@ In Dynatrace Distributed Traces:
 Point out:
 
 - **api-gateway** → receives the HTTP request from the citizen's browser
-- **citizen-service** → validates the request, writes to PostgreSQL (SQL query visible — point out the table name and parameters)
+- **citizen-service** → validates the request, writes to PostgreSQL (SQL query visible — point out the table name and parameters), then publishes to Kafka `requests.events`
 - **service-dispatch** → routes based on category and zone; another SQL write visible
-- **city-operations** → creates the work order; SQL write + Kafka publish to `requests.events`
-- **notification-service** → Kafka consume, creates the in-app notification
+- **city-operations** → creates the work order (SQL write)
+
+> notification-service consumes `requests.events` asynchronously and creates the
+> in-app notification — it appears as a separate (Kafka-linked) trace, not part
+> of this synchronous four-service waterfall.
 
 > "Dynatrace captured this entire flow automatically. I didn't add a single line of monitoring code. And notice — I can see the exact SQL query, the database host, even the execution time at each step."
 
@@ -64,4 +70,4 @@ Use the Demo Control Panel to inject a DB slowdown, then submit another request.
 - Zero-code instrumentation via OneAgent
 - Full end-to-end visibility including SQL and message queue
 - Automatic service dependency mapping
-- Works across Java, Node.js, Python, and Go — all visible in a single trace
+- This trace spans Node.js (api-gateway) and Java (citizen-service, service-dispatch, city-operations); the platform also instruments Python and Go (see Scenarios 3 & 4)

@@ -23,9 +23,11 @@ many runtime-only bugs (blank screens, 500s, 502s, silently-empty UI).
 
 The rules that bite most often:
 
-- **Casing: `snake_case` everywhere** (bodies, responses, query params). Java
-  services emit camelCase unless `spring.jackson.property-naming-strategy: SNAKE_CASE`
-  is set — most aren't yet, so read responses defensively (`x.created_at ?? x.createdAt`).
+- **Casing: `snake_case` everywhere** (bodies, responses, query params). The Java
+  services now set `spring.jackson.property-naming-strategy: SNAKE_CASE`, so they
+  emit/accept snake_case at the API boundary. The only camelCase left is on
+  **internal service-to-service DTOs**, pinned with `@JsonNaming(...LowerCamelCase...)`
+  (e.g. the citizen→dispatch→city-ops chain) — don't snake-case those.
 - **Gateway forwards paths verbatim** except `/api/v1/demo-control/*`. A frontend
   path must match the upstream route *including the prefix* (e.g.
   `/api/v1/analytics/funnels/x` ≠ analytics-service's `/api/v1/funnels/x` → 404).
@@ -36,9 +38,12 @@ The rules that bite most often:
   violation into a **500**, not a 400.
 - **Frontends must unwrap responses defensively** (`Array.isArray(d) ? d : d?.items ?? []`)
   — there are no React error boundaries, so one bad shape blanks the whole page.
-- **`/api/v1/auth/login` is local to the gateway** (hardcoded `demo/dynatrace`,
-  returns `{token, user:{username, role}}`). The public-portal has no per-citizen
-  identity — `user.id` is always undefined.
+- **`/api/v1/auth/login` is a gateway dispatcher.** `demo`/`dynatrace` → operator
+  JWT (`user:{username, role:'operator'}`, no `id`). Otherwise the username is
+  treated as a citizen email and verified (email + BCrypt password) against
+  citizen-service; success mints a citizen JWT whose `user.id` is the citizen id.
+  So a logged-in citizen *does* have an identity (`user.id`), while the demo
+  operator does not — flows that need a citizen id should fall back when absent.
 
 When adding/changing an endpoint, use the checklist in `docs/API_CONVENTIONS.md`.
 

@@ -82,14 +82,14 @@ Meridian is a polyglot microservices application deliberately built across four 
 ### API Gateway
 - **Language**: Node.js 20 / Fastify
 - **Port**: 3000
-- **Role**: Single ingress for all frontend HTTP traffic. Handles mock authentication (validates `demo`/`dynatrace` credentials and issues a short-lived JWT for the ops dashboard), and proxies requests to downstream services. Adds `x-request-id` and `x-trace-id` headers for correlation.
+- **Role**: Single ingress for all frontend HTTP traffic. `/api/v1/auth/login` is a dispatcher — `demo`/`dynatrace` returns an operator JWT; any other username is treated as a citizen email and verified (email + BCrypt password) against citizen-service, returning a citizen JWT carrying the citizen id. Proxies all other `/api/v1/*` to downstream services by prefix. Adds `x-request-id` for correlation.
 - **Instrumentation**: OneAgent (auto)
 - **Key upstream services**: All 4 core Java/Python services
 
 ### Citizen Service
 - **Language**: Java 21 / Spring Boot 3
 - **Port**: 8081
-- **Role**: Citizen account lifecycle (register, login, profile). Service request submission and retrieval. **Business Events source** — emits structured JSON logs for `account.*` and `service_request.submitted/validated` events.
+- **Role**: Citizen registration (optionally with a password → BCrypt login account in `citizens.accounts`), credential verification (email + password, called by the gateway dispatcher), and service-request submission/retrieval. **Business Events source** — emits structured JSON logs for `citizen.registered` and `service_request.submitted`/`validated`/`status_updated`.
 - **Instrumentation**: OneAgent (auto) — full Spring Boot auto-instrumentation including SQL, HTTP, Kafka
 - **Database**: PostgreSQL schemas: `citizens`, `requests`
 - **Kafka**: Producer on `requests.events`
@@ -105,10 +105,10 @@ Meridian is a polyglot microservices application deliberately built across four 
 ### City Operations
 - **Language**: Java 21 / Spring Boot 3
 - **Port**: 8083
-- **Role**: City asset registry (buildings, vehicles, industrial zones). Work order management. Incident creation from IoT anomalies. **Business Events source** for `service_request.in_progress/resolved` and `workorder.*`.
-- **Instrumentation**: OneAgent (auto). **Fault injection**: DB slowdown and CPU spike are injectable via environment variables updated by `demo-control-api`.
+- **Role**: City asset registry (buildings, vehicles, machines, zones). Work order management. Incident creation — from IoT anomalies (via Kafka), from manual `POST /api/v1/incidents`, and pre-seeded by `seed-data.sh`. **Business Events source** for `incident.created`, `workorder.created`, and `iot.anomaly_detected`.
+- **Instrumentation**: OneAgent (auto). (No fault injection — the DB-slowdown demo fault lives in citizen-service, on the request-write path.)
 - **Database**: PostgreSQL schemas: `city`, `incidents`
-- **Kafka**: Consumer on `iot.anomalies`, `requests.events`; producer on `notifications.outbound`
+- **Kafka**: Consumer on `iot.anomalies`; producer on `notifications.outbound`
 
 ### Analytics Service
 - **Language**: Python 3.12 / FastAPI
@@ -121,12 +121,12 @@ Meridian is a polyglot microservices application deliberately built across four 
 - **Language**: Python 3.12 / FastAPI
 - **Port**: 8085
 - **Role**: Citizen chatbot ("Ask the City Assistant"). Accepts a citizen message, optionally queries `citizen-service` and `city-operations` for context, builds a prompt, and calls the configured LLM. Returns the response with source citations.
-- **Instrumentation**: **OTel SDK** (Python) using GenAI semantic conventions. Emits spans with `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.prompt_tokens`, `gen_ai.usage.completion_tokens`. Flows through OTel Collector to Dynatrace AI Observability.
+- **Instrumentation**: **OTel SDK** (Python) using GenAI semantic conventions. Emits spans with `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`. Flows through OTel Collector to Dynatrace AI Observability.
 - **LLM provider**: Configurable via `LLM_PROVIDER` env var (`openai` | `anthropic` | `local`)
 
 ### IoT Ingestion
 - **Language**: Go 1.22
-- **Port**: gRPC 4317, HTTP 4318
+- **Port**: OTLP gRPC 4317; health HTTP 8089 (no 4318 listener)
 - **Role**: OTLP/gRPC receiver for IoT device telemetry from the simulator. Validates device identity, enriches with zone/category metadata, and publishes to Kafka `iot.telemetry.raw`. Also mirrors OTel spans to the OTel Collector.
 - **Instrumentation**: **OTel SDK** (Go) — Go has no OneAgent APM agent. Go OTel SDK is used for self-instrumentation.
 
@@ -139,13 +139,13 @@ Meridian is a polyglot microservices application deliberately built across four 
 ### Notification Service
 - **Language**: Node.js 20 / Express
 - **Port**: 8087
-- **Role**: Kafka consumer on `notifications.outbound` and `iot.anomalies`. Stores in-app notifications in an in-memory store (no external dependency) served to the ops dashboard via SSE (Server-Sent Events).
+- **Role**: Kafka consumer on `requests.events`, `iot.anomalies`, and `notifications.outbound`. Stores in-app notifications in an in-memory store (no external dependency) served to the ops dashboard via SSE (Server-Sent Events).
 - **Instrumentation**: OneAgent (auto)
 
 ### Demo Control API
 - **Language**: Node.js 20 / Fastify
 - **Port**: 3001
-- **Role**: Internal REST API for the demo control panel. Triggers fault injection (updates ConfigMaps or calls service-specific `/admin/fault` endpoints), resizes the IoT fleet (calls `iot-simulator` admin endpoint), and controls the traffic bot. Requires cluster RBAC to patch Deployments.
+- **Role**: Internal REST API for the demo control panel. Injects faults purely over HTTP — `POST /admin/fault` on each target service (in-memory flags) — resizes/anomalizes the IoT fleet via `iot-simulator`'s `/admin/*` endpoints, and controls the traffic bot via its `/api/v1/*` API. No Kubernetes API access or RBAC.
 - **Instrumentation**: OneAgent (auto)
 
 ### IoT Simulator
@@ -170,11 +170,11 @@ Meridian is a polyglot microservices application deliberately built across four 
 meridian (database)
 ├── citizens
 │   ├── citizens          Citizen profiles (name, email, zone)
-│   ├── accounts          Login credentials (mock, hashed)
-│   └── sessions          Active session tokens
+│   └── accounts          Login credentials (BCrypt password hash)
 ├── requests
 │   ├── service_requests  Request submissions
-│   └── request_events    State transition events (for Business Events)
+│   ├── request_events    State transition events
+│   └── dispatch_log      service-dispatch routing log
 ├── city
 │   ├── assets            Generic city asset registry
 │   ├── buildings         Building-specific metadata
@@ -184,12 +184,10 @@ meridian (database)
 │   ├── incidents         Active/resolved operational incidents
 │   └── work_orders       Field work orders
 ├── iot
-│   ├── devices           Known device registry
 │   ├── device_readings   IoT telemetry aggregates (1-min windows)
 │   └── anomalies         Detected anomaly events
 └── analytics
-    ├── kpi_snapshots     Hourly KPI rollups
-    └── business_event_log Structured event log (for BizEvents)
+    └── kpi_snapshots     KPI snapshots (for the history chart)
 ```
 
 ### Kafka Topics
@@ -198,7 +196,7 @@ meridian (database)
 |---|---|---|---|
 | `iot.telemetry.raw` | 3 | 24h | iot-ingestion → telemetry-processor |
 | `iot.anomalies` | 1 | 24h | telemetry-processor → notification-service, city-operations |
-| `requests.events` | 2 | 7d | citizen-service, service-dispatch → notification-service, analytics-service |
+| `requests.events` | 2 | 7d | citizen-service, service-dispatch → notification-service (analytics-service reads from PostgreSQL, not Kafka) |
 | `notifications.outbound` | 1 | 1h | city-operations → notification-service |
 
 ---
@@ -207,7 +205,7 @@ meridian (database)
 
 ### OneAgent (automatic, no code changes)
 
-The Dynatrace Operator deploys OneAgent as a k8s init container into every pod in the `meridian` namespace (enabled via the `dynatrace.com/inject=true` namespace label). OneAgent automatically instruments:
+The Dynatrace Operator — installed by `scripts/deploy.sh` as its own Helm release in the `dynatrace` namespace — runs in `applicationMonitoring` mode: it injects the OneAgent code module as an init container (via the CSI driver) into pods in the `meridian` namespace (label `dynatrace.com/inject=true`). There is no host OneAgent DaemonSet (it can't initialise on a kind node). OneAgent automatically instruments:
 
 - Java services (Spring Boot): full APM — SQL traces, HTTP spans, Kafka producer/consumer spans, JVM metrics
 - Node.js services (Fastify, Express): HTTP spans, library traces, process metrics
@@ -248,12 +246,21 @@ Example log event:
 
 ## Demo Control Architecture
 
-The `demo-control-api` service acts as an operator for fault injection:
+The `demo-control-api` service orchestrates fault injection purely over HTTP (no
+Kubernetes API access — it has no k8s client and needs no RBAC):
 
-1. **Service-level fault injection**: Calls each service's internal `/admin/fault` endpoint (e.g., `POST /admin/fault { "type": "db-slowdown", "enabled": true, "delayMs": 2000 }`). Each service checks a thread-local or in-memory flag and artificially delays or errors.
+1. **Service-level fault injection**: `POST /admin/fault` on each target service. The
+   body shape varies — city-operations takes `{ "type": "db-slowdown", "enabled": true, "delayMs": 2000 }`;
+   the Python and citizen services take `{ "<fault>_enabled": true, "<fault>_seconds": N }`.
+   Each service holds an in-memory flag and artificially delays (e.g. citizen-service
+   delays the service-request DB write, analytics allocates memory, telemetry-processor
+   pauses its Kafka consumer, ai-service delays the LLM call).
 
-2. **Fleet resize**: Calls `iot-simulator`'s admin endpoint (`POST /admin/fleet { "vehicles": 50 }`). The simulator dynamically starts or stops goroutines.
+2. **Fleet resize / anomalies**: Calls `iot-simulator`'s `/admin/fleet` (resize) and
+   `/admin/anomaly[/{id}]` (inject/clear) endpoints. The simulator starts/stops device
+   goroutines and toggles anomalous readings (which flow through to incidents).
 
-3. **Traffic control**: Calls `traffic-bot`'s admin endpoint to pause, resume, or trigger burst patterns.
+3. **Traffic control**: Calls `traffic-bot`'s `/api/v1/{start,stop,burst}` endpoints.
 
-The ops dashboard calls `demo-control-api` from the browser — `api-gateway` proxies these calls through to avoid CORS issues.
+The ops dashboard calls `demo-control-api` through `api-gateway` (prefix
+`/api/v1/demo-control/*`, rewritten to `/api/v1/*`, JWT-protected).

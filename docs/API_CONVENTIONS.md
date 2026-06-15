@@ -18,11 +18,10 @@ the contract. When you add or change an endpoint, follow them on *both* sides.
 The platform is snake_case-majority: Python (analytics, ai) and Node
 (demo-control, notification, traffic-bot) services and almost every frontend
 consumer already use snake_case (`requests_today`, `device_id`,
-`anomaly_type`, `created_at`). Only the Java/Spring services
-(citizen-service, service-dispatch, city-operations) emit camelCase, because
-Spring's default Jackson naming is camelCase and nothing overrides it.
-
-**Java services must opt into snake_case** so they match everyone else:
+`anomaly_type`, `created_at`). The Java/Spring services
+(citizen-service, service-dispatch, city-operations) used to emit camelCase
+(Spring's default Jackson naming); they now set the snake_case strategy so they
+match everyone else:
 
 ```yaml
 # application.yml
@@ -36,8 +35,10 @@ deserialization (`citizen_id` in the request binds to the `citizenId` field).
 Note: it does **not** affect `@RequestParam` / `@PathVariable` names — those are
 declared literally (see §2).
 
-Until a service is converted, frontend consumers should read defensively:
-`req.created_at ?? req.createdAt`.
+All three Java services are converted. **Internal service-to-service DTOs are
+deliberately pinned to camelCase** with `@JsonNaming(...LowerCamelCaseStrategy...)`
+(the citizen → dispatch → city-ops chain), so do not snake-case those. Frontend
+consumers can still read defensively (`req.created_at ?? req.createdAt`).
 
 ## 2. Query & path parameters
 
@@ -105,12 +106,17 @@ the upstream path (with prefix) actually exists on the target service.
 
 ## 6. Auth & identity
 
-- `/api/v1/auth/login` is handled **locally by the gateway** (hardcoded
-  `demo/dynatrace`), returning `{ token, user: { username, role } }`. It is **not**
-  proxied to citizen-service. Both the ops-dashboard and the public-portal use it,
-  so the public-portal has **no per-citizen identity** — `user.id` is always
-  undefined. Any flow that needs a citizen id must supply a real (seeded) one,
-  not `user.id`.
+- `/api/v1/auth/login` is a **dispatcher in the gateway**. `demo`/`dynatrace` →
+  operator JWT (`{ token, user: { username, role: 'operator' } }`, no `id`).
+  Otherwise the username is treated as a **citizen email** and verified
+  (email + BCrypt password) against citizen-service `POST /api/v1/auth/login`; on
+  success the gateway mints a citizen JWT and returns
+  `{ token, user: { id: <citizen_id>, username: <email>, name, role: 'citizen' } }`.
+  So a logged-in citizen has `user.id`; the demo operator does not — flows that
+  need a citizen id should fall back when it's absent. Citizen credentials are set
+  at registration (`POST /api/v1/citizens` with a `password` → BCrypt account row
+  in `citizens.accounts`); registration without a password (e.g. traffic-bot)
+  creates a non-loginable citizen.
 - `EventSource` (SSE, `/api/v1/notifications/stream`) cannot send the `Authorization`
   header. Keep SSE endpoints unauthenticated at the gateway (they currently are).
 
@@ -129,24 +135,11 @@ the upstream path (with prefix) actually exists on the target service.
 
 ---
 
-## Audit findings
+## Audit findings (resolved)
 
-From the 2026-06-09 cross-tier audit (gateway route table × both frontends ×
-all backends). Severity: **High** = feature broken; **Med** = silent functional
-gap (no crash, defensive frontend); **Low** = missing optional/cosmetic field.
-
-| # | Sev | Endpoint | Problem | Fix side |
-|---|-----|----------|---------|----------|
-| 1 | High | `POST /api/v1/chat` | ai-service returns `{response}`; ChatWidget reads `data.reply` → empty bubble | frontend (read `response`) |
-| 2 | High | `GET /api/v1/analytics/funnels/{n}` | gateway forwards verbatim; analytics serves `/api/v1/funnels/{n}` → **404**. Also `funnel`≠`funnel_name`, stage `stage`≠`name` | frontend path+keys (or gateway rewrite + backend keys) |
-| 3 | High | `POST /api/v1/service-requests` | portal sends `citizen_id` (snake) = `user.id` (undefined; portal has no citizen identity); backend wants `citizenId` (non-null) → **500** | both: send valid seeded `citizen_id` + Java SNAKE_CASE |
-| 4 | High | `GET /api/v1/kpis/history` | snapshot rows keyed `snapshot_at`; Overview reads `snap.timestamp` → chart X-axis labels broken | frontend (read `snapshot_at`) |
-| 5 | High | `POST /api/v1/citizens` (Register) | portal sends `{name,email,phone,address}`; backend wants `{first_name,last_name,email,zone_id}` → fields unbound, likely 500 | both |
-| 6 | Med | `GET /api/v1/demo-control/fault/status` | backend returns `{faults:{...}}`; DemoControl reads `faultStatus[serviceId]` (top level) → toggles don't reflect live state | frontend (read `.faults`) |
-| 7 | Med | `GET /api/v1/demo-control/status` | backend returns `active_scenario`; DemoControl reads `scenario.active_scenario_id` → active highlight never shows | frontend |
-| 8 | Med | `GET /api/v1/demo-control/traffic/status` | traffic-bot returns `rpm_current`/`rpm_normal`; DemoControl reads `rps` → rate display blank | frontend (or backend alias) |
-| 9 | Med | `GET /api/v1/incidents` (portal Home/map) | backend returns no `location {lat,lng}` (nor `description`/`location_name`); CityMap plots nothing | backend (add fields) |
-| 10 | Low | `GET /api/v1/incidents` (ops) | backend omits `work_order_count`, `service`, `resolved_at`; frontend handles via fallbacks | backend (optional) |
-
-Items 1–4 are confirmed by reading both sides. Items 5–10 are confirmed from the
-contract inventory; verify the exact entity/handler before applying each fix.
+The 2026-06-09 cross-tier audit (gateway route table × both frontends × all
+backends) turned up 10 contract mismatches — chat reply key, funnels routing,
+new-request 500, kpis `snapshot_at`, register fields, demo-control fault wiring,
+fleet/anomaly paths, and incident map fields. **All have since been fixed** (see
+the `fix/*` PRs in the git history). The conventions in §§1–6 above are what keep
+them from recurring — follow them when adding or changing an endpoint.

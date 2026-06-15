@@ -4,6 +4,14 @@ After deploying the platform, configure your Dynatrace tenant to enable the adva
 
 **Time required**: ~45 minutes for a full configuration.
 
+**Prerequisite — API token scopes.** The token in `values-custom.yaml`
+(`dynatrace.apiToken`) needs ingest scopes (`metrics.ingest`, `logs.ingest`,
+`openTelemetryTrace.ingest`, `entities.read`, `settings.write`, `DataExport`)
+**plus** the operator scopes the DynaKube needs for `applicationMonitoring`
+(`installerDownload`, `activeGateTokenManagement.create`, `settings.read`). A
+token with only ingest scopes leaves the DynaKube in `Error` and OneAgent never
+injects.
+
 ---
 
 ## 1. Verify Auto-Instrumentation
@@ -36,7 +44,10 @@ The Java services emit JSON logs. Configure Dynatrace to parse them correctly.
 **Settings → Log Monitoring → Log sources and storage**
 
 - Verify that `meridian` namespace log sources appear.
-- If not: ensure the DynaKube CR has log monitoring enabled (it is by default in CloudNativeFullStack mode).
+- The DynaKube uses `applicationMonitoring` (no host OneAgent — it crash-loops on
+  kind), so pod/container logs reach Dynatrace via the OTel Collector's `logs`
+  pipeline rather than host log monitoring. If logs are missing, confirm the
+  collector is exporting (see the setup-guide troubleshooting section).
 
 ### 2.2 Create a Log Processing Rule
 
@@ -87,26 +98,27 @@ Create a new Business Events source with these settings:
 | `service_request.validated` | `service_request.validated` | `request.id` |
 | `service_request.dispatched` | `service_request.dispatched` | `request.id`, `assigned_department` |
 | `service_request.assigned` | `service_request.assigned` | `request.id`, `assigned_to` |
-| `service_request.in_progress` | `service_request.in_progress` | `request.id` |
-| `service_request.resolved` | `service_request.resolved` | `request.id`, `resolution_time_minutes` |
+| `service_request.status_updated` | `service_request.status_updated` | `request.id`, `previous_status`, `new_status` |
+
+> The app emits one `service_request.status_updated` event per status change
+> (carrying `previous_status`/`new_status`) — there are no separate
+> `in_progress`/`resolved` events. Derive those stages from the status fields.
 
 **Funnel configuration** (in Business Analytics):
 - Create a funnel with steps in the order above
 - Correlation key: `request.id`
 - Funnel name: `Service Request Journey`
 
-### Flow B: Citizen Account Creation
+### Flow B: Citizen Registration
 
-| Business Event Name | Log event.type value |
-|---|---|
-| `account.registration_started` | `account.registration_started` |
-| `account.details_submitted` | `account.details_submitted` |
-| `account.verification_sent` | `account.verification_sent` |
-| `account.verified` | `account.verified` |
-| `account.activated` | `account.activated` |
+Registration is a single step today — citizen-service emits one
+`citizen.registered` event per `POST /api/v1/citizens`. There is no multi-stage
+verification/activation flow in the app, so there's no abandonment funnel to
+build unless the app is extended to emit intermediate `account.*` events.
 
-- Correlation key: `citizen.id`
-- Funnel name: `Account Registration Funnel`
+| Business Event Name | Log event.type value | Attributes |
+|---|---|---|
+| `citizen.registered` | `citizen.registered` | `citizen.id`, `email`, `zone.id` |
 
 ### Flow C: IoT Incident Resolution
 
@@ -115,9 +127,10 @@ Create a new Business Events source with these settings:
 | `iot.anomaly_detected` | `iot.anomaly_detected` |
 | `incident.created` | `incident.created` |
 | `workorder.created` | `workorder.created` |
-| `workorder.assigned` | `workorder.assigned` |
-| `workorder.acknowledged` | `workorder.acknowledged` |
-| `workorder.resolved` | `workorder.resolved` |
+
+> Only these three events are emitted today. `workorder.assigned` /
+> `acknowledged` / `resolved` don't exist as business events — work-order status
+> lives in the DB. Add app events to extend the funnel.
 
 - Correlation key: `incident.id`
 - Funnel name: `IoT Incident Resolution`
@@ -195,8 +208,8 @@ This ensures that when the demo panel injects a DB slowdown, Davis AI will detec
 
 | Setting | Value |
 |---|---|
-| **Metric** | `iot.device.building.hvac_temp` |
-| **Condition** | Average > 85°C for 1 minute |
+| **Metric** | `iot.building.hvac_temp` |
+| **Condition** | Average > 85°C (note: the platform's own detector requires 3 consecutive 1-min windows, so an injected HVAC anomaly raises an incident after ~3 min) |
 | **Alert name** | Building HVAC Temperature Alert |
 | **Severity** | Error |
 
@@ -212,8 +225,8 @@ Create a new dashboard with these tiles:
 
 1. **Service Health Overview**: Single Value tile — `builtin:service.availability` for all meridian services
 2. **Request Throughput**: Time Series — `builtin:service.requestCount.total` for `citizen-service`
-3. **IoT Metrics**: Time Series — `iot.device.vehicle.engine_temp`, `iot.device.building.hvac_temp`
-4. **AI Chatbot Usage**: Time Series — `gen_ai.usage.prompt_tokens`, `gen_ai.usage.completion_tokens`
+3. **IoT Metrics**: Time Series — `iot.vehicle.engine_temp`, `iot.building.hvac_temp`
+4. **AI Chatbot Usage**: Time Series — `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`
 5. **Business Events Funnel**: Business Analytics tile — Service Request Journey funnel
 6. **SLO Status**: SLO tile — all four SLOs
 
@@ -247,7 +260,7 @@ If the AI Observability menu item is not visible, enable it in **Settings → Fe
 Before a customer demo, verify these are all working:
 
 - [ ] All 9 services visible in Dynatrace Services
-- [ ] IoT metrics visible under `iot.device.*`
+- [ ] IoT metrics visible under `iot.*` (e.g. `iot.building.hvac_temp`)
 - [ ] AI Observability shows chatbot traces
 - [ ] Business Events funnel shows data (submit a test request)
 - [ ] All 4 SLOs are in the green

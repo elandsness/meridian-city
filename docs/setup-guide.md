@@ -55,7 +55,8 @@ chmod +x scripts/deploy.sh scripts/teardown.sh scripts/seed-data.sh
 ```
 
 This adds:
-- `bitnami` (PostgreSQL, Kafka)
+- `cloudnative-pg` (PostgreSQL via the CloudNativePG operator)
+- `strimzi` (Kafka via the Strimzi operator)
 - `open-telemetry` (OTel Collector)
 - `dynatrace` (Dynatrace Operator)
 
@@ -66,12 +67,19 @@ And runs `helm dependency update` to download chart archives into `helm/charts/`
 ## Step 3: Create Your Values Override File
 
 ```bash
-cp helm/values.yaml helm/values-custom.yaml
+cp helm/values-custom.yaml.example helm/values-custom.yaml
 ```
+
+> Copy the **example**, not `values.yaml`. `values-custom.yaml` overrides
+> `values.yaml`, so copying the full default file silently pins stale values and
+> causes hard-to-debug drift.
 
 Edit `helm/values-custom.yaml` and set the following **required** values:
 
 ```yaml
+# Your image registry (where CI pushed the images)
+appImageRegistry: "ghcr.io/<org>/meridian-city"
+
 dynatrace:
   # Your DT tenant API URL — find this in Dynatrace → Help → API
   apiUrl: "https://abc12345.live.dynatrace.com/api"
@@ -82,14 +90,13 @@ dynatrace:
   # OTLP ingest endpoint — replace the env ID
   otlpEndpoint: "https://abc12345.live.dynatrace.com/api/v2/otlp"
 
-  # Your environment ID (the subdomain, e.g., "abc12345")
-  environmentId: "abc12345"
-
 llm:
   provider: "openai"   # or "anthropic" or "local"
   openai:
     apiKey: "sk-..."   # Your OpenAI API key
 ```
+
+`environmentId`, `deploymentEnvironment`, and `clusterName` are optional labels.
 
 ### Optional but recommended overrides:
 
@@ -124,13 +131,27 @@ For local development (smaller resources, no DT Operator):
 
 This will:
 1. Create the `meridian` and `dynatrace` namespaces
-2. Deploy PostgreSQL and Kafka (Bitnami charts)
+2. Deploy PostgreSQL (CloudNativePG) and Kafka (Strimzi)
 3. Deploy the OTel Collector
-4. Deploy the Dynatrace Operator and create the DynaKube CR (if `dynatrace.operator.enabled=true`)
-5. Deploy all 12 application services
-6. Deploy the two frontend apps, IoT simulator, and traffic bot
+4. Install the Dynatrace Operator as its own release in the `dynatrace` namespace
+   and create the DynaKube CR there — only when `dynatrace.operator.enabled=true`
+   **and** `dynatrace.apiUrl` is set
+5. Deploy all 12 application services + the two frontends, IoT simulator, and traffic bot
+6. **Seed demo data** and start **background port-forwards** automatically (Steps
+   5–6 below are only needed to re-run those independently)
 
-The `--wait` flag waits up to 10 minutes for all pods to reach Ready state.
+`deploy.sh` does not pass `helm --wait` (Java services crash-loop until the DB is
+ready, which would deadlock the post-install hooks). It submits the release with
+`--timeout 20m`, then runs `kubectl wait` for up to ~15 minutes. On first install,
+Kafka takes 3–5 minutes to provision, so Kafka-dependent pods show `Init:0/1`
+until it's ready — this is expected.
+
+Once the DynaKube reaches `Running`, restart the app workloads once so OneAgent
+injects them (deploy.sh prints this reminder):
+
+```bash
+kubectl -n meridian rollout restart deploy
+```
 
 ---
 
@@ -171,9 +192,11 @@ Then open:
 ```
 
 This populates:
-- 15 smart buildings, 30 connected vehicles, 10 industrial machines
-- 50 citizen accounts
-- 8 sample service requests in various states
+- 5 city zones
+- 15 smart buildings, 30 connected vehicles, 10 industrial machines (device ids
+  match the IoT simulator: `bldg-000…`, `veh-000…`, `mach-000…`)
+- 50 citizens
+- 8 sample service requests and 4 sample incidents in various states
 
 Run `./scripts/seed-data.sh --check` at any time to verify data counts.
 
@@ -187,7 +210,11 @@ Run `./scripts/seed-data.sh --check` at any time to verify data counts.
 kubectl describe pod -l app=citizen-service -n meridian | grep -A5 "Init Containers"
 ```
 
-You should see `install-oneagent-sdk` or similar init container — confirms OneAgent is injecting.
+You should see an `install-oneagent` init container — confirms OneAgent is injecting.
+The DynaKube uses `applicationMonitoring` (code-module injection via the CSI driver,
+no host OneAgent — the host agent crash-loops on kind). Pods are only injected if
+they (re)started **after** the DynaKube reached `Running`; if you don't see it, run
+the `kubectl -n meridian rollout restart deploy` from Step 4.
 
 ### Services visible in Dynatrace
 
@@ -275,8 +302,11 @@ After building new images (CI pushes to GHCR):
 ## Teardown
 
 ```bash
-./scripts/teardown.sh           # Remove the Helm release
-./scripts/teardown.sh --all     # Also delete namespaces (destroys all data)
+./scripts/teardown.sh           # Full teardown (default): stops port-forwards, uninstalls
+                                # the Helm release + Dynatrace Operator, deletes PVCs and the
+                                # meridian/dynatrace namespaces (destroys all data)
+./scripts/teardown.sh --soft    # Helm uninstall + stop port-forwards only; keeps namespaces
+                                # and PVCs (for iterating on chart changes)
 ```
 
 ---
@@ -285,18 +315,24 @@ After building new images (CI pushes to GHCR):
 
 ### Pod stuck in `Init:0/1`
 
-The Dynatrace Operator's OneAgent init container is waiting. Check operator is running:
+On first install the most common cause is **Kafka still provisioning** (3–5 min):
+the Kafka-dependent Java services wait on a `wait-for-kafka` init container until
+the broker is up. Give it a few minutes:
+```bash
+kubectl get pods -n meridian
+kubectl get kafka -n meridian      # broker Ready?
+```
+
+If a pod stays in `Init` well after Kafka is ready, check OneAgent injection /
+the DynaKube:
 ```bash
 kubectl get pods -n dynatrace
-kubectl describe pod -l app=citizen-service -n meridian
+kubectl describe dynakube meridian -n dynatrace        # look at Status / Conditions
 ```
-
-If the DynaKube CR is not yet ready, the init container will wait (and eventually timeout). Fix:
-```bash
-kubectl describe dynakube meridian -n dynatrace
-```
-
-Common cause: `dynatrace.apiToken` is wrong or has insufficient scopes.
+A `dynatrace.apiToken` with insufficient scopes leaves the DynaKube in `Error`.
+The operator token for `applicationMonitoring` needs more than ingest scopes —
+e.g. `installerDownload`, `activeGateTokenManagement.create`, `entities.read`,
+`settings.read`/`settings.write`, `DataExport`.
 
 ### PostgreSQL not ready
 
