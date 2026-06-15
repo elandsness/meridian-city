@@ -1,8 +1,13 @@
 # Documentation Review Checklist
 
 A cross-tier documentation audit performed 2026-06-12 against `main`. Each doc was
-read and verified against the actual code/config. This file tracks the changes
-still needed; check items off as they land. **No doc edits have been made yet.**
+read and verified against the actual code/config.
+
+**Status (2026-06-15): all doc items below (A–I) are addressed**, across two PRs —
+`docs/sync-core-docs` (CLAUDE.md, API_CONVENTIONS, README, setup-guide,
+architecture, dynatrace-config-guide, the 5 demo-scripts) and `docs/service-readmes`
+(the 13 service/frontend READMEs). The **code/config issues** at the bottom (1–5)
+are intentionally left open for a separate decision.
 
 ## Sequencing
 Everything audited is live on `main` **except per-citizen auth** (branch
