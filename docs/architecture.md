@@ -106,7 +106,7 @@ Meridian is a polyglot microservices application deliberately built across four 
 - **Language**: Java 21 / Spring Boot 3
 - **Port**: 8083
 - **Role**: City asset registry (buildings, vehicles, machines, zones). Work order management. Incident creation — from IoT anomalies (via Kafka), from manual `POST /api/v1/incidents`, and pre-seeded by `seed-data.sh`. **Business Events source** for `incident.created`, `workorder.created`, and `iot.anomaly_detected`.
-- **Instrumentation**: OneAgent (auto). **Fault injection**: DB slowdown and CPU spike are toggled at runtime via `POST /admin/fault` (in-memory flags), called by `demo-control-api`.
+- **Instrumentation**: OneAgent (auto). (No fault injection — the DB-slowdown demo fault lives in citizen-service, on the request-write path.)
 - **Database**: PostgreSQL schemas: `city`, `incidents`
 - **Kafka**: Consumer on `iot.anomalies`; producer on `notifications.outbound`
 
