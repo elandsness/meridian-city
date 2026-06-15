@@ -1,8 +1,7 @@
 # ai-service
 
 **Language**: Python 3.12 / FastAPI  
-**Port**: 8085  
-**Status**: Phase 4 — not yet implemented
+**Port**: 8085
 
 ## Role
 

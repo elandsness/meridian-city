@@ -1,8 +1,7 @@
 # citizen-service
 
 **Language**: Java 21 / Spring Boot 3  
-**Port**: 8081  
-**Status**: Phase 2 — not yet implemented
+**Port**: 8081
 
 ## Role
 
@@ -11,7 +10,7 @@ Manages citizen accounts and service request submissions. The primary Business E
 ## Responsibilities
 
 - Citizen registration and profile management
-- Mock authentication (validate credentials, store session)
+- Credential verification (email + BCrypt password) backing the gateway login dispatcher
 - Service request CRUD (submit, retrieve, update status)
 - Emits structured Business Event logs at each request lifecycle step
 - Publishes to Kafka topic `requests.events`
@@ -30,10 +29,17 @@ Manages citizen accounts and service request submissions. The primary Business E
 
 ## Key endpoints
 
-- `POST /api/v1/citizens` — register citizen
-- `POST /api/v1/auth/login` — authenticate
+- `POST /api/v1/citizens` — register citizen. Accepts an optional `password`; when present a
+  login account (BCrypt-hashed) is created so the citizen can log in by email.
+- `POST /api/v1/auth/login` — verifies `{ email, password }` against `citizens.accounts`
+  (BCrypt). Called internally by the api-gateway login dispatcher, not exposed directly
+  through the gateway. Returns the citizen identity on success, `401` otherwise.
 - `POST /api/v1/service-requests` — submit request
 - `GET /api/v1/service-requests/{id}` — get request status
+- `GET /api/v1/service-requests?citizen_id=&limit=` — list requests; both params optional.
+  Omit `citizen_id` to get the most recent requests across all citizens (`limit` defaults to 50).
+- `POST /admin/fault` `{ "db_slowdown_enabled": true, "db_slowdown_seconds": 2 }` — runtime
+  fault injection, called by demo-control-api. Not under `/api/v1`, so not exposed through the gateway.
 - `GET /actuator/health` — Spring Boot health endpoint
 
 ## Dynatrace instrumentation

@@ -1,8 +1,7 @@
 # service-dispatch
 
 **Language**: Java 21 / Spring Boot 3  
-**Port**: 8082  
-**Status**: Phase 2 — not yet implemented
+**Port**: 8082
 
 ## Role
 

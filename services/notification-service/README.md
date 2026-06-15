@@ -1,8 +1,7 @@
 # notification-service
 
 **Language**: Node.js 20 / Express  
-**Port**: 8087  
-**Status**: Phase 5 — not yet implemented
+**Port**: 8087
 
 ## Role
 

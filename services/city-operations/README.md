@@ -1,8 +1,7 @@
 # city-operations
 
 **Language**: Java 21 / Spring Boot 3  
-**Port**: 8083  
-**Status**: Phase 2 — not yet implemented
+**Port**: 8083
 
 ## Role
 
@@ -31,21 +30,27 @@ The city's asset registry and operational hub. Manages buildings, vehicles, indu
 
 ## Fault injection
 
-Supports runtime fault injection via environment variables (set by demo-control-api):
+Faults are toggled at runtime via `POST /admin/fault` (called by demo-control-api).
+Body:
 
-| Env var | Type | Effect |
-|---|---|---|
-| `FAULT_DB_SLOWDOWN_ENABLED` | bool | Adds artificial delay to all JDBC calls |
-| `FAULT_DB_SLOWDOWN_DELAY_MS` | int | Delay in ms (default 2000) |
-| `FAULT_CPU_SPIKE_ENABLED` | bool | Runs a CPU-intensive computation in a background thread |
+```json
+{ "type": "db-slowdown" | "cpu-spike", "enabled": true, "delayMs": 2000 }
+```
+
+- `db-slowdown` — adds artificial delay (`delayMs`) to JDBC calls
+- `cpu-spike` — runs a CPU-intensive computation in a background thread (`delayMs` ignored)
+
+The initial state can also be seeded at startup via env vars
+(`FAULT_DB_SLOWDOWN_ENABLED`, `FAULT_DB_SLOWDOWN_DELAY_MS`, `FAULT_CPU_SPIKE_ENABLED`;
+defaults off, delay 0).
 
 ## Key endpoints
 
 - `GET /api/v1/assets` — list all city assets
-- `GET /api/v1/buildings` — list buildings with IoT status
+- `GET /api/v1/city/buildings` — list buildings with IoT status
 - `GET /api/v1/incidents` — active incidents
 - `POST /api/v1/work-orders` — create work order
-- `POST /admin/fault` — runtime fault injection (internal, not proxied)
+- `POST /admin/fault` `{ type, enabled, delayMs }` — runtime fault injection (internal, not proxied)
 - `GET /actuator/health`
 
 ## Build
