@@ -68,6 +68,50 @@ fi
 $_pf_stopped && success "Port-forwards stopped." || info "No port-forwards were running."
 
 # ---------------------------------------------------------------------------
+# 1b. (Full teardown only) Delete operator-managed CRs BEFORE uninstalling the
+#     operators.
+#     The CNPG Cluster (created as a post-install hook with
+#     hook-delete-policy: hook-failed, so 'helm uninstall' leaves it behind)
+#     and the Strimzi Kafka CRs carry finalizers (e.g. cnpg.io/cluster) that
+#     ONLY their operators can clear. 'helm uninstall' removes those operators.
+#     If the CRs are still present when that happens, their finalizers can
+#     never be processed: the CRs hang in Terminating, the postgres pod is
+#     left 'Completed', and the whole namespace is stuck Terminating forever
+#     (this was the teardown bug).
+#     So while the operators are still running, delete the CRs and give them a
+#     bounded window to finalize cleanly. If that window elapses — e.g. the
+#     operator is already gone from a previous half-finished teardown — strip
+#     the finalizers directly so an already-stuck namespace can recover.
+# ---------------------------------------------------------------------------
+if ! $SOFT; then
+  delete_operator_crs() {  # <fully-qualified resource type> <human label>
+    local kind="$1" label="$2" existing res
+    # -o name returns nothing (and errors) when the CRD/operator is already
+    # gone; treat that as "nothing to do".
+    existing="$(kubectl get "$kind" -n "$NAMESPACE" -o name 2>/dev/null)" || true
+    [[ -z "$existing" ]] && return 0
+    info "Deleting $label before operator removal (lets finalizers clear cleanly)..."
+    if kubectl delete "$kind" --all -n "$NAMESPACE" --timeout=120s 2>/dev/null; then
+      success "$label deleted."
+    else
+      warn "$label did not finalize in time — stripping finalizers directly."
+      for res in $existing; do
+        kubectl patch "$res" -n "$NAMESPACE" --type=merge \
+          -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+      done
+      # Reap any leftover completed/succeeded pods the operator can no longer collect.
+      kubectl delete pods --all -n "$NAMESPACE" \
+        --field-selector=status.phase=Succeeded --force --grace-period=0 2>/dev/null || true
+    fi
+  }
+
+  delete_operator_crs "clusters.postgresql.cnpg.io"   "CNPG PostgreSQL cluster(s)"
+  delete_operator_crs "kafkatopics.kafka.strimzi.io"  "Strimzi Kafka topic(s)"
+  delete_operator_crs "kafkas.kafka.strimzi.io"       "Strimzi Kafka cluster(s)"
+  delete_operator_crs "kafkanodepools.kafka.strimzi.io" "Strimzi Kafka node pool(s)"
+fi
+
+# ---------------------------------------------------------------------------
 # 2. Helm uninstall
 # ---------------------------------------------------------------------------
 if helm status "$RELEASE_NAME" -n "$NAMESPACE" &>/dev/null; then
@@ -136,5 +180,26 @@ for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
     fi
   fi
 done
+
+# ---------------------------------------------------------------------------
+# 5. Remove the orphaned CNPG CRDs.
+#    The cloudnative-pg sub-chart ships its CRDs with
+#    helm.sh/resource-policy: keep, so 'helm uninstall' deliberately leaves
+#    every *.postgresql.cnpg.io CRD behind ("kept due to the resource policy").
+#    They are cluster-scoped — they don't block namespace deletion — but they
+#    accumulate across teardowns. The CNPG Cluster CR was already deleted in
+#    step 1b, so no custom resources remain and the CRDs delete immediately.
+# ---------------------------------------------------------------------------
+cnpg_crds="$(kubectl get crd -o name 2>/dev/null | grep '\.postgresql\.cnpg\.io$' || true)"
+if [[ -n "$cnpg_crds" ]]; then
+  info "Removing orphaned CNPG CRDs..."
+  # shellcheck disable=SC2086  # intentional word-splitting: one delete per CRD name
+  if kubectl delete $cnpg_crds --timeout=60s 2>/dev/null; then
+    success "CNPG CRDs removed."
+  else
+    warn "Some CNPG CRDs did not delete — a lingering CNPG resource may still hold a finalizer."
+    warn "Check: kubectl get clusters.postgresql.cnpg.io -A"
+  fi
+fi
 
 success "Teardown complete."
