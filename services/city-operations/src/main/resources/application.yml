@@ -51,11 +51,3 @@ management:
       probes:
         enabled: true
       show-details: always
-
-# Fault injection flags — set by demo-control-api at runtime
-fault:
-  db-slowdown:
-    enabled: ${FAULT_DB_SLOWDOWN_ENABLED:false}
-    delay-ms: ${FAULT_DB_SLOWDOWN_DELAY_MS:0}
-  cpu-spike:
-    enabled: ${FAULT_CPU_SPIKE_ENABLED:false}

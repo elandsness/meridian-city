@@ -1,6 +1,5 @@
 package com.meridian.cityops.service;
 
-import com.meridian.cityops.config.FaultInjectionConfig;
 import com.meridian.cityops.domain.WorkOrder;
 import com.meridian.cityops.dto.CreateWorkOrderDto;
 import com.meridian.cityops.dto.WorkOrderResponse;
@@ -25,12 +24,9 @@ public class WorkOrderService {
     private final WorkOrderRepository workOrderRepository;
     private final NotificationPublisher notificationPublisher;
     private final BusinessEventLogger businessEventLogger;
-    private final FaultInjectionConfig faultConfig;
 
     @Transactional
     public WorkOrderResponse createFromRequest(CreateWorkOrderDto dto) {
-        applyDbSlowdownIfEnabled();
-
         WorkOrder workOrder = WorkOrder.createFromRequest(
                 dto.getRequestId(),
                 dto.getTitle(),
@@ -86,19 +82,6 @@ public class WorkOrderService {
     }
 
     // -------------------------------------------------------------------------
-
-    private void applyDbSlowdownIfEnabled() {
-        FaultInjectionConfig.DbSlowdown cfg = faultConfig.getDbSlowdown();
-        if (cfg.isEnabled() && cfg.getDelayMs() > 0) {
-            log.warn("DB slowdown fault active — sleeping {}ms before DB write", cfg.getDelayMs());
-            try {
-                Thread.sleep(cfg.getDelayMs());
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("DB slowdown sleep interrupted");
-            }
-        }
-    }
 
     private WorkOrderResponse toResponse(WorkOrder wo) {
         return WorkOrderResponse.builder()
