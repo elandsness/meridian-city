@@ -78,13 +78,13 @@ async def _query_event_log(pool, stages: list[str]) -> list[dict]:
     Count events per stage from requests.request_events.
 
     The Java services emit a row per lifecycle transition, e.g.:
-      event_type = 'service_request.submitted', entity_id = 'req-00123'
+      event_type = 'service_request.submitted', request_id = 'req-00123'
     """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
             count = await safe_fetchval(conn, """
-                SELECT COUNT(DISTINCT entity_id)
+                SELECT COUNT(DISTINCT request_id)
                 FROM requests.request_events
                 WHERE event_type = $1
             """, stage)

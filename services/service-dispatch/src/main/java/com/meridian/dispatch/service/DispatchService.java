@@ -1,10 +1,12 @@
 package com.meridian.dispatch.service;
 
 import com.meridian.dispatch.domain.DispatchLog;
+import com.meridian.dispatch.domain.RequestEvent;
 import com.meridian.dispatch.dto.CreateWorkOrderDto;
 import com.meridian.dispatch.dto.DispatchRequestDto;
 import com.meridian.dispatch.dto.DispatchResultDto;
 import com.meridian.dispatch.repository.DispatchLogRepository;
+import com.meridian.dispatch.repository.RequestEventRepository;
 import com.meridian.dispatch.util.BusinessEventLogger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ public class DispatchService {
 
     private final RoutingEngine routingEngine;
     private final DispatchLogRepository dispatchLogRepository;
+    private final RequestEventRepository requestEventRepository;
     private final CityOperationsClient cityOperationsClient;
     private final BusinessEventLogger businessEventLogger;
 
@@ -29,13 +32,15 @@ public class DispatchService {
         String assignedDepartment = routingEngine.assignDepartment(dto.getCategory());
         String routingReason = routingEngine.buildRoutingReason(dto.getCategory(), dto.getZoneId());
 
-        // 2. Log Business Event: service_request.dispatched
+        // 2. Log Business Event: service_request.dispatched (+ request_events row
+        //    for the ops-dashboard Business Analytics funnel)
         businessEventLogger.logDispatched(
                 dto.getRequestId(),
                 dto.getCitizenId(),
                 assignedDepartment,
                 dto.getZoneId()
         );
+        recordEvent(dto.getRequestId(), "service_request.dispatched");
 
         // 3. Save DispatchLog entry
         DispatchLog dispatchLog = DispatchLog.builder()
@@ -59,8 +64,9 @@ public class DispatchService {
 
         DispatchResultDto result = cityOperationsClient.createWorkOrder(workOrderDto);
 
-        // 5. Log Business Event: service_request.assigned
+        // 5. Log Business Event: service_request.assigned (+ request_events row)
         businessEventLogger.logAssigned(dto.getRequestId(), assignedDepartment);
+        recordEvent(dto.getRequestId(), "service_request.assigned");
 
         // 6. Return result with consistent assigned department
         return DispatchResultDto.builder()
@@ -69,5 +75,13 @@ public class DispatchService {
                 .status(result.getStatus() != null ? result.getStatus() : "dispatched")
                 .dispatchedAt(result.getDispatchedAt() != null ? result.getDispatchedAt() : dispatchLog.getDispatchedAt())
                 .build();
+    }
+
+    /** Persist a request lifecycle event for the Business Analytics funnel. */
+    private void recordEvent(String requestId, String eventType) {
+        requestEventRepository.save(RequestEvent.builder()
+                .requestId(requestId)
+                .eventType(eventType)
+                .build());
     }
 }
