@@ -1,8 +1,7 @@
 # iot-ingestion
 
 **Language**: Go 1.22  
-**Port**: gRPC 4317, HTTP 4318  
-**Status**: Phase 3 — not yet implemented
+**Port**: OTLP gRPC 4317, health HTTP 8089
 
 ## Role
 

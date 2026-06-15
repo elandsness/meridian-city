@@ -1,8 +1,7 @@
 # iot-simulator
 
 **Language**: Go 1.22  
-**Port**: 8088 (admin/control HTTP API)  
-**Status**: Phase 3 — not yet implemented
+**Port**: 8088 (admin/control HTTP API)
 
 ## Role
 

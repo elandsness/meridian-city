@@ -1,8 +1,7 @@
 # analytics-service
 
 **Language**: Python 3.12 / FastAPI  
-**Port**: 8084  
-**Status**: Phase 5 — not yet implemented
+**Port**: 8084
 
 ## Role
 

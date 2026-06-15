@@ -1,8 +1,7 @@
 # telemetry-processor
 
 **Language**: Python 3.12 / FastAPI  
-**Port**: 8086 (health/status API)  
-**Status**: Phase 3 — not yet implemented
+**Port**: 8086 (health/status API)
 
 ## Role
 
@@ -30,14 +29,17 @@ Kafka consumer that processes raw IoT telemetry. Aggregates readings into 1-minu
 
 ## Fault injection
 
-- `FAULT_KAFKA_PAUSE_ENABLED=true` — stops consuming from Kafka (simulates consumer lag)
-- `FAULT_MEMORY_PRESSURE_ENABLED=true` — allocates large buffers (simulates memory leak)
+Faults are toggled at runtime via `POST /admin/fault` (called by demo-control-api), not env vars:
+
+- `{ "kafka_pause_enabled": true }` — stops consuming from Kafka (simulates consumer lag)
+- `{ "memory_pressure_enabled": true }` — allocates large buffers (simulates memory leak)
+- `{ "kafka_pause_enabled": false, "memory_pressure_enabled": false }` — reset all
 
 ## Key endpoints
 
 - `GET /health` — health check + Kafka consumer lag status
 - `GET /api/v1/status` — current consumer group offsets and lag
-- `POST /admin/fault` — runtime fault injection
+- `POST /admin/fault` `{ kafka_pause_enabled, memory_pressure_enabled }` — runtime fault injection
 
 ## Build
 

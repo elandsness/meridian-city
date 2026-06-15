@@ -1,8 +1,7 @@
 # traffic-bot
 
 **Language**: Node.js 20  
-**Port**: 8089 (control API)  
-**Status**: Phase 7 — not yet implemented
+**Port**: 8089 (control API)
 
 ## Role
 
@@ -24,14 +23,15 @@ Continuously simulates citizen user journeys against the public portal / API gat
 
 ## Burst mode
 
-The demo-control-api can trigger burst mode: `POST /admin/burst` — sends 10× normal load for 2 minutes. Used to demo traffic-based anomaly detection.
+The demo-control-api can trigger burst mode: `POST /api/v1/burst` `{ duration_minutes? }` — sends 10× normal load (default 2 minutes). Used to demo traffic-based anomaly detection.
 
 ## Admin API
 
-- `GET /admin/status` — current rate, active journeys, RPM counter
-- `POST /admin/pause` — pause all traffic
-- `POST /admin/resume` — resume
-- `POST /admin/burst` — trigger burst
+- `GET /api/v1/status` — current rate, active journeys, RPM counter
+- `POST /api/v1/start` — start the journey loop
+- `POST /api/v1/stop` — stop the journey loop
+- `POST /api/v1/burst` — trigger burst `{ duration_minutes? }`
+- `POST /api/v1/scenario` — run one journey `{ scenario }`
 - `GET /health`
 
 ## Dynatrace instrumentation
