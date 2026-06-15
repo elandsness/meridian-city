@@ -261,6 +261,34 @@ ON CONFLICT (id) DO NOTHING;"
 success "Service requests seeded."
 
 # ---------------------------------------------------------------------------
+# Request lifecycle events for the sample requests, so the ops-dashboard Business
+# Analytics "Service Request Journey" funnel shows a realistic descending shape
+# immediately (analytics-service counts DISTINCT request_id per event_type). At
+# runtime citizen-service + service-dispatch append these events per request.
+# Each seeded request gets the events its status implies (idempotent: scoped to
+# the seeded req-0000* ids + NOT EXISTS so re-runs don't duplicate).
+info "Seeding request lifecycle events (Business Analytics funnel)..."
+run_sql "
+INSERT INTO requests.request_events (request_id, event_type)
+SELECT sr.id, ev.event_type
+FROM requests.service_requests sr
+CROSS JOIN (VALUES
+    ('service_request.submitted',   ARRAY['submitted','assigned','in_progress','resolved','cancelled']),
+    ('service_request.validated',   ARRAY['submitted','assigned','in_progress','resolved','cancelled']),
+    ('service_request.dispatched',  ARRAY['assigned','in_progress','resolved']),
+    ('service_request.assigned',    ARRAY['assigned','in_progress','resolved']),
+    ('service_request.in_progress', ARRAY['in_progress','resolved']),
+    ('service_request.resolved',    ARRAY['resolved'])
+) AS ev(event_type, statuses)
+WHERE sr.id LIKE 'req-0000%'
+  AND sr.status = ANY(ev.statuses)
+  AND NOT EXISTS (
+        SELECT 1 FROM requests.request_events e
+        WHERE e.request_id = sr.id AND e.event_type = ev.event_type
+  );"
+success "Request lifecycle events seeded."
+
+# ---------------------------------------------------------------------------
 # Sample incidents so the incident UIs (public-portal Home + map, ops Incidents
 # page) show data before any IoT anomaly is injected. asset_ids reference the
 # seeded assets above (bldg-000/mach-000/veh-000), so each resolves to a zone →

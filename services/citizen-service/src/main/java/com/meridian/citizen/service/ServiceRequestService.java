@@ -1,11 +1,13 @@
 package com.meridian.citizen.service;
 
 import com.meridian.citizen.config.FaultState;
+import com.meridian.citizen.domain.RequestEvent;
 import com.meridian.citizen.domain.ServiceRequest;
 import com.meridian.citizen.dto.CreateServiceRequestDto;
 import com.meridian.citizen.dto.ServiceRequestResponse;
 import com.meridian.citizen.dto.UpdateRequestStatusDto;
 import com.meridian.citizen.messaging.RequestEventPublisher;
+import com.meridian.citizen.repository.RequestEventRepository;
 import com.meridian.citizen.repository.ServiceRequestRepository;
 import com.meridian.citizen.util.BusinessEventLogger;
 import org.slf4j.Logger;
@@ -25,17 +27,20 @@ public class ServiceRequestService {
     private static final Logger log = LoggerFactory.getLogger(ServiceRequestService.class);
 
     private final ServiceRequestRepository serviceRequestRepository;
+    private final RequestEventRepository requestEventRepository;
     private final BusinessEventLogger businessEventLogger;
     private final DispatchClient dispatchClient;
     private final RequestEventPublisher requestEventPublisher;
     private final FaultState faultState;
 
     public ServiceRequestService(ServiceRequestRepository serviceRequestRepository,
+                                  RequestEventRepository requestEventRepository,
                                   BusinessEventLogger businessEventLogger,
                                   DispatchClient dispatchClient,
                                   RequestEventPublisher requestEventPublisher,
                                   FaultState faultState) {
         this.serviceRequestRepository = serviceRequestRepository;
+        this.requestEventRepository = requestEventRepository;
         this.businessEventLogger = businessEventLogger;
         this.dispatchClient = dispatchClient;
         this.requestEventPublisher = requestEventPublisher;
@@ -63,12 +68,14 @@ public class ServiceRequestService {
                 dto.priority()
         );
         faultState.maybeDelay();
-        request = serviceRequestRepository.save(request);
+        // saveAndFlush so the request row exists before the request_events FK insert below.
+        request = serviceRequestRepository.saveAndFlush(request);
 
         log.info("Service request submitted: requestId={} citizenId={} category={}",
                 request.getId(), request.getCitizenId(), request.getCategory());
 
-        // 2. Emit Business Event: submitted
+        // 2. Emit Business Event: submitted — both a JSON log (for Dynatrace) and a
+        //    request_events row (powers the ops-dashboard Business Analytics funnel).
         businessEventLogger.requestSubmitted(
                 request.getId(),
                 request.getCitizenId(),
@@ -76,8 +83,10 @@ public class ServiceRequestService {
                 request.getPriority(),
                 request.getZoneId()
         );
+        recordEvent(request.getId(), "service_request.submitted");
 
-        // 3. Synchronous call to service-dispatch (creates multi-hop distributed trace)
+        // 3. Synchronous call to service-dispatch (creates the multi-hop distributed
+        //    trace). service-dispatch records the dispatched/assigned events.
         dispatchClient.dispatchRequest(request);
 
         // 4. Emit Business Event: validated (after dispatch, regardless of dispatch outcome)
@@ -87,6 +96,7 @@ public class ServiceRequestService {
                 request.getCategory(),
                 request.getPriority()
         );
+        recordEvent(request.getId(), "service_request.validated");
 
         // 5. Publish to Kafka
         requestEventPublisher.publishRequestSubmitted(request);
@@ -119,6 +129,9 @@ public class ServiceRequestService {
                 request.getStatus(),
                 request.getAssignedDepartment()
         );
+        // Per-status lifecycle event (e.g. service_request.in_progress,
+        // service_request.resolved) for the Business Analytics funnel.
+        recordEvent(request.getId(), "service_request." + request.getStatus());
 
         return ServiceRequestResponse.from(request);
     }
@@ -146,6 +159,11 @@ public class ServiceRequestService {
                     .getContent();
         }
         return results.stream().map(ServiceRequestResponse::from).toList();
+    }
+
+    /** Persist a request lifecycle event for the Business Analytics funnel. */
+    private void recordEvent(String requestId, String eventType) {
+        requestEventRepository.save(RequestEvent.of(requestId, eventType));
     }
 
     private static void requireField(String value, String name) {
