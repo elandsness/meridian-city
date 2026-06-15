@@ -30,31 +30,38 @@ Point to each step in the funnel:
 2. **Validated** — "Slightly fewer — some were rejected by the validation logic."
 3. **Dispatched** — "Routed to the right department."
 4. **Assigned** — "Point out any significant drop here"
-5. **In Progress** — "Work has started."
-6. **Resolved** — "What percentage made it all the way to resolution?"
+5. **Status Updated** — "Each status change emits one
+   `service_request.status_updated` event carrying `new_status`; filter on it to
+   see how many reached `in_progress`, `resolved`, etc."
 
 > "What you're looking at is built entirely from structured log lines. No database queries, no custom metrics — Dynatrace is extracting these business events from the application logs in real time."
 
 Click on one event in the funnel:
 > "I can drill into any individual request ID and see its exact progression through the pipeline — when it was submitted, how long dispatch took, who it was assigned to."
 
-### 3. Show Flow B: Account Registration (1 min)
+### 3. Show Flow B: Citizen Registration (1 min)
 
-Navigate to the Account Registration Funnel:
-> "Here's the citizen account creation flow. This looks more like an e-commerce conversion funnel — did citizens who started registration actually complete it? Where did they abandon the process?"
+> "Registration is a single business event today — `citizen.registered`, one per
+> sign-up. You can chart registrations over time and segment by zone, all from a
+> log line — no developer built an analytics pipeline."
 
-Point out the verification step:
-> "Interesting — there's a drop at the 'verification sent' to 'verified' step. That might mean our email verification UX needs work, or that some citizens are using disposable email addresses."
-
-> "The business team can now act on this insight. And all they needed was Dynatrace's log processing rule — no developer had to build a custom analytics pipeline."
+> "If we wanted a full conversion funnel (started → details → verified →
+> activated), the app would emit those intermediate `account.*` events. It's a
+> clean example of how you extend Business Events as the product grows — pure
+> tenant config plus a few log lines, no analytics pipeline to build."
 
 ### 4. Show Flow C: IoT Incident Resolution (1 min)
 
 Navigate to the IoT Incident Resolution Funnel:
-> "And here's an operational flow — when our IoT systems detect a problem, how quickly do we move from detection to resolution? Are work orders getting acknowledged? Are they getting resolved?"
+> "And here's an operational flow: when our IoT systems detect a problem, how
+> quickly do we move from detection to a work order? The emitted steps are
+> `iot.anomaly_detected` → `incident.created` → `workorder.created`."
 
 Point out the time axis:
-> "I can measure the time between each step. If work orders are sitting in 'assigned' for more than 4 hours without an acknowledgment, that's an SLA breach. Dynatrace can alert on that."
+> "I can measure the time between each step — e.g. detection to work-order
+> creation. Later stages like acknowledgment/resolution live in the operational
+> data today; emit `workorder.*` status events to extend the funnel and alert on
+> an SLA breach."
 
 ### 5. KPI metrics (1 min)
 

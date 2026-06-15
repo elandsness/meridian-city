@@ -28,10 +28,15 @@ Point out the response time graph and the green health indicator.
 ### 2. Inject the failure (30 sec)
 
 In the Ops Dashboard → Demo Control Panel:
-1. Under **Failure Injection**, click **"Inject DB Slowdown"**
-2. The panel confirms: *"DB slowdown active — citizen-service PostgreSQL queries delayed by 2000ms"*
+1. Under **Failure Injection**, toggle on **"Citizen Service — DB Slowdown"** (set
+   the seconds slider, e.g. 3s) — or click **▶ Activate** on the **"Database
+   Slowdown"** scenario (2s, auto-resets after 5 min)
+2. The toggle switches on; citizen-service now delays its service-request DB write
 
-> "I just injected an artificial 2-second delay into every database query from citizen-service. This simulates what would happen if the database started struggling — maybe a slow query, a lock contention issue, or a connection pool problem."
+> "I just injected an artificial delay before citizen-service's service-request
+> database write. This simulates a struggling database — a slow query, lock
+> contention, a connection-pool problem — on the request-submission path. The
+> traffic bot is submitting requests continuously, so it'll start hitting this."
 
 ### 3. Watch Davis AI detect it (2-3 min wait)
 
@@ -58,11 +63,11 @@ Point out:
 
 In Problems → Root Cause → View traces:
 - Compare a trace from before the injection with one from during
-- Point out: the SQL span is now showing 2000ms instead of <50ms
+- Point out: the citizen-service DB write span now shows the injected delay (2–3s) instead of a few ms
 
 ### 6. Reset and show recovery (1 min)
 
-In Demo Control Panel → **"Reset All Failures"**:
+In Demo Control Panel → **"Reset All"** (or just wait — the Database Slowdown scenario auto-resets after 5 minutes):
 
 > "Let's clear the failure."
 

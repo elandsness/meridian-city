@@ -47,8 +47,10 @@ Navigate to Dynatrace → AI Observability:
 Point out:
 - **Model**: `gpt-4o` (or whichever provider is configured)
 - **Request latency**: P95 response time per LLM call
-- **Token usage**: prompt tokens and completion tokens per request
-- **Cost estimate**: derived from token usage and model pricing
+- **Token usage**: input and output tokens per request (span attributes
+  `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`)
+- **Cost**: Dynatrace can derive it from token usage + model pricing in the
+  tenant — the service emits the token counts, not a cost figure
 
 Click on one of the individual LLM call spans:
 > "Drilling into a single call — I can see exactly what was sent to the model, how many tokens the prompt consumed, how many were in the response, and how long the model took to respond. This is the level of visibility you need when you're deploying LLMs at enterprise scale."
@@ -62,21 +64,22 @@ Find a trace that includes the chatbot flow:
 
 ### 5. Optional: Inject LLM latency (bonus)
 
-In Demo Control Panel: **"Simulate LLM Latency Spike"** (injects 10s delay)
+In Demo Control Panel → Failure Injection: toggle on **"AI Service — LLM Latency"**
+(default 10s) — or ▶ Activate the **"LLM Latency Spike"** scenario.
 
 Submit another chatbot message — it hangs.
 
 In Dynatrace, watch the LLM span latency spike. If Davis AI detects it (may take a minute):
 > "Davis AI is now flagging the AI service as degraded. The root cause points directly to the LLM response time — not our services, but the model itself."
 
-Reset: **"Clear all failures"**
+Reset: **"Reset All"**
 
 ---
 
 ## Key talking points
 
 - Dynatrace AI Observability works via standard OTel GenAI semantic conventions — no proprietary SDK
-- Every LLM call is traced with model, tokens, latency, and cost attribution
+- Every LLM call is traced with model, token counts, and latency (cost is derived tenant-side from tokens)
 - LLM calls appear in the same distributed trace as the rest of the application
 - Supports any LLM provider: OpenAI, Anthropic, local models via Ollama
 - Critical for enterprise AI governance: cost control, performance SLOs, anomaly detection
