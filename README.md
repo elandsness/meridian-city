@@ -65,9 +65,11 @@ See [docs/architecture.md](docs/architecture.md) for the detailed service topolo
 #    (copy from the example — do NOT copy all of values.yaml; stale values there
 #    silently override fixes made in values.yaml and cause hard-to-debug issues)
 cp helm/values-custom.yaml.example helm/values-custom.yaml
-# Fill in every "" in values-custom.yaml:
-#   dynatrace.apiUrl / apiToken / otlpEndpoint / environmentId → your Dynatrace tenant
-#   llm.openai.apiKey (or llm.anthropic.apiKey)                → your LLM API key
+# Fill in the required "" values in values-custom.yaml:
+#   appImageRegistry                            → your image registry (e.g. ghcr.io/<org>/meridian-city)
+#   dynatrace.apiUrl / apiToken / otlpEndpoint  → your Dynatrace tenant
+#   llm.openai.apiKey (or llm.anthropic.apiKey) → your LLM API key
+# (dynatrace.environmentId / deploymentEnvironment / clusterName are optional labels.)
 
 # 3. Install
 ./scripts/deploy.sh install -f helm/values-custom.yaml
@@ -91,7 +93,7 @@ Full instructions in [docs/setup-guide.md](docs/setup-guide.md).
 ## Repository Structure
 
 ```
-meridian-city-platform/
+meridian-city/
 ├── services/           # 12 backend microservices
 │   ├── api-gateway/        Node.js (Fastify)
 │   ├── citizen-service/    Java (Spring Boot)
