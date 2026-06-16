@@ -20,6 +20,7 @@ const config = {
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:8085',
   NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8087',
   COMMERCE_SERVICE_URL: process.env.COMMERCE_SERVICE_URL || 'http://localhost:8090',
+  BILLING_SERVICE_URL: process.env.BILLING_SERVICE_URL || 'http://localhost:8091',
   DEMO_CONTROL_API_URL: process.env.DEMO_CONTROL_API_URL || 'http://localhost:3001',
 }
 

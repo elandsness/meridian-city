@@ -48,6 +48,7 @@ export default function Layout() {
             <NavLink to="/" end className={navLinkClass}>Home</NavLink>
             <NavLink to="/service-requests" className={navLinkClass}>Service requests</NavLink>
             <NavLink to="/store" className={navLinkClass}>City store</NavLink>
+            <NavLink to="/billing" className={navLinkClass}>Pay bills</NavLink>
           </div>
 
           <div className="ml-auto flex items-center gap-3">

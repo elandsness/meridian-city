@@ -86,6 +86,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/billing',
+      target: config.BILLING_SERVICE_URL,
+      serviceName: 'billing-service',
+      requiresAuth: false,
+    },
+    {
       // demo-control strips /api/v1/demo-control and forwards as /api/v1/<remainder>
       prefix: '/api/v1/demo-control',
       target: config.DEMO_CONTROL_API_URL,

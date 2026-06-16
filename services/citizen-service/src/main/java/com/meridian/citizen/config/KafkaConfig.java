@@ -11,4 +11,9 @@ public class KafkaConfig {
     public NewTopic requestsEventsTopic() {
         return new NewTopic("requests.events", 2, (short) 1);
     }
+
+    @Bean
+    public NewTopic citizensEventsTopic() {
+        return new NewTopic("citizens.events", 2, (short) 1);
+    }
 }

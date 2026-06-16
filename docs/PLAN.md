@@ -112,15 +112,19 @@ service-map node with DB + Kafka spans.
 ---
 
 ## Stage 6 — Tax / billing
-- [ ] `billing-service` (bills + pay + quarterly history generation) +
-      `billing.events` topic
-- [ ] citizen-service publish hook → `citizens.events`; billing consumes it
-- [ ] Portal `Billing` page + Home balance-due tile
-- [ ] gateway `/api/v1/billing` route + Helm template + values block
-- [ ] traffic-bot `payTax` journey
-- [ ] `tax.bill_issued` / `tax.payment_completed` events; `tax.pay` RUM action
+- [x] `billing-service` (bills + pay + quarterly history generation; 12 Java files)
+      + `billing.events` topic + `citizens.events` consumer (idempotent generation)
+- [x] citizen-service publish hook → `citizens.events` (`CitizenEventPublisher`);
+      billing consumes `citizen.registered`
+- [x] Portal `Billing` page (outstanding + paid history + pay) + Home balance-due
+      tile + "Pay bills" nav/quick action; `api/billing.js`
+- [x] gateway `/api/v1/billing` route + Helm template + values block + CI matrix
+- [x] traffic-bot `payTax` journey (polls async-generated bills) + scenario wiring
+- [x] `tax.bill_issued` / `tax.payment_completed` events; `tax.pay` RUM action
 
 **Instrumentation:** Tax Payment funnel (Flow E) + Payment Availability SLO.
+- [ ] Pending (tenant/ops): add `tax-payment` (+ `purchase`) to
+      `analytics-service/funnels.py`; add Flow D/E detail to `dynatrace-config-guide.md` §3
 
 ---
 

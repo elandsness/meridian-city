@@ -1,0 +1,79 @@
+{{- if .Values.billingService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: billing-service
+spec:
+  replicas: {{ .Values.billingService.replicaCount }}
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: billing-service
+    spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
+      containers:
+        - name: billing-service
+          image: {{ include "meridian.image" (dict "repository" .Values.billingService.image.repository "tag" .Values.billingService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8091
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "billing-service"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://meridian-db-rw:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: db-password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "meridian-kafka-bootstrap:9092"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8091
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8091
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.billingService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: billing-service
+spec:
+  type: ClusterIP
+  selector:
+    app: billing-service
+  ports:
+    - name: http
+      port: {{ .Values.billingService.service.port }}
+      targetPort: 8091
+{{- end }}
