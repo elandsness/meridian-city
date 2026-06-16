@@ -6,6 +6,7 @@ const navItems = [
   { to: '/overview', label: 'Overview', icon: '📊' },
   { to: '/iot', label: 'IoT Fleet', icon: '🌐' },
   { to: '/incidents', label: 'Incidents', icon: '🚨' },
+  { to: '/requests', label: 'Requests', icon: '📋' },
   { to: '/analytics', label: 'Business Analytics', icon: '📈' },
   { to: '/demo-control', label: 'Demo Control', icon: '🎛' },
 ];

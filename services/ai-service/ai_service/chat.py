@@ -6,19 +6,15 @@ Responsibilities:
   2. Build a Meridian City Assistant system prompt
   3. Optionally enrich context from citizen-service / city-operations
   4. Apply fault injection (LLM latency)
-  5. Call the LLM provider
-  6. Emit OTel GenAI semantic convention span attributes
+  5. Call the LLM provider (OpenLLMetry auto-instruments it)
+  6. Attach session.id correlation to the trace
   7. Emit a structured Business Event log (chatbot.interaction) for Dynatrace Business Analytics
 
-OTel GenAI attributes applied per span:
-  gen_ai.operation.name       "chat"
-  gen_ai.system               "openai" | "anthropic" | "ollama"
-  gen_ai.request.model        requested model name
-  gen_ai.response.model       actual model returned in the response
-  gen_ai.usage.input_tokens   prompt token count
-  gen_ai.usage.output_tokens  completion token count
-  gen_ai.response.finish_reason  "stop" | "length" | …
-  session.id                  opaque session identifier
+GenAI spans (gen_ai.request.model, gen_ai.usage.*, gen_ai.response.finish_reason,
+…) are produced automatically by the Traceloop OpenLLMetry instrumentation of the
+OpenAI/Anthropic clients — see otel.py. This module only adds a thin parent span
+carrying session.id and sets it as a Traceloop association property so the
+auto-spans inherit it.
 """
 from __future__ import annotations
 
@@ -42,25 +38,42 @@ biz_logger = logging.getLogger("BusinessEvents")
 MAX_HISTORY_TURNS = 10
 
 _SYSTEM_PROMPT = """\
-You are the Meridian City Assistant, a helpful AI for residents of Meridian City.
-You can help citizens with:
+You are Meri, the official virtual assistant for the City of Meridian — a real,
+mid-sized city. Always respond as though Meridian City genuinely exists and you
+are its assistant. Never say you are a generic AI model or that the city is
+fictional, and never break character.
+
+You help residents with:
 - Reporting city issues (potholes, broken streetlights, water main breaks, graffiti)
-- Checking the status of submitted service requests
-- Information about city services, departments, and contact numbers
-- City facilities: parks, libraries, recreation centres, public transportation
-- Permit applications and zoning enquiries
-- Upcoming city events and public meetings
+  — remind residents they can file a service request in the Meridian City Portal.
+- Checking the status of a submitted service request (by request ID, e.g. req-00123).
+- Current incidents and city service information (parks, libraries, transit, permits).
+- Paying city tax bills and shopping the Meridian City store — both in the portal.
 
-Be concise, friendly, and professional. If you cannot answer a question, direct the
-citizen to the appropriate department or provide the general enquiry line:
-(555) 867-5309, available Mon–Fri 8 am – 6 pm.
+If a resident needs to reach a person, give the Meridian City services line:
+1-555-MERIDIAN (1-555-637-4326), available Mon–Fri 8 am – 6 pm, or direct them to
+submit a service request in the portal.
 
-Always acknowledge the citizen's concern before providing information.
-If a service request ID is mentioned, use the context below to give a specific update.\
+Be concise, warm, and professional. Acknowledge the resident's concern before
+providing information. If a service request ID is mentioned, use the context below
+to give a specific update.\
 """
 
 # Regex to extract a service request ID embedded in the user's message (e.g., "req-00123").
 _REQUEST_ID_RE = re.compile(r"\breq[-_]?(\d+)\b", re.IGNORECASE)
+
+
+def _associate_session(session_id: str) -> None:
+    """
+    Tag the current trace with the session id via Traceloop so the auto-emitted
+    gen_ai.* span inherits it. Dev-safe: a no-op when OpenLLMetry isn't installed.
+    """
+    try:
+        from traceloop.sdk import Traceloop
+
+        Traceloop.set_association_properties({"session_id": session_id})
+    except Exception:
+        pass
 
 
 class ChatService:
@@ -104,13 +117,14 @@ class ChatService:
         history = self._sessions[session_id]
         messages = self._build_messages(message, context, history)
 
-        span_name = f"{self._provider.gen_ai_system} chat"
+        # Associate the session id with every span in this trace, including the
+        # gen_ai.* span OpenLLMetry emits for the provider call below.
+        _associate_session(session_id)
 
-        with tracer.start_as_current_span(span_name) as span:
-            span.set_attribute("gen_ai.operation.name", "chat")
-            span.set_attribute("gen_ai.system", self._provider.gen_ai_system)
-            span.set_attribute("gen_ai.request.model", self._provider.model)
+        with tracer.start_as_current_span("meridian.chat") as span:
             span.set_attribute("session.id", session_id)
+            if request_id:
+                span.set_attribute("request.id", request_id)
 
             # Fault injection — artificial LLM latency
             await fault_state.maybe_delay()
@@ -126,11 +140,6 @@ class ChatService:
                 )
                 raise
 
-            # OTel GenAI semantic convention attributes
-            span.set_attribute("gen_ai.response.model", response.model)
-            span.set_attribute("gen_ai.usage.input_tokens", response.input_tokens)
-            span.set_attribute("gen_ai.usage.output_tokens", response.output_tokens)
-            span.set_attribute("gen_ai.response.finish_reason", response.finish_reason)
             span.set_status(StatusCode.OK)
 
         # Update session history

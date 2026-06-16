@@ -141,6 +141,28 @@ citizenService:
   env: {}
 
 # ---------------------------------------------------------------------------
+# Commerce Service (Java / Spring Boot)
+# City store: products, cart, one-click checkout, and the simulated order
+# lifecycle (placed -> packed -> shipped -> delivered). Emits commerce.events.
+# ---------------------------------------------------------------------------
+commerceService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "commerce-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8090
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# ---------------------------------------------------------------------------
 # Service Dispatch (Java / Spring Boot)
 # Routes and assigns service requests; emits Business Events at each step.
 # ---------------------------------------------------------------------------
@@ -384,6 +406,7 @@ trafficBot:
       citizenRequests: true
       accountCreation: true
       browsing: true
+      storePurchase: true
       chatbot: false  # disable by default to avoid LLM API cost in steady-state
   resources:
     requests:
@@ -403,6 +426,13 @@ publicPortal:
   image:
     repository: "public-portal"
     tag: ""
+  # Dynatrace RUM (agentless). The application id / agent URL is shipped to every
+  # browser and is NOT a secret. Paste the full <script ...></script> tag from
+  # Dynatrace (Application > Setup > Manual insertion) on a single line, no single
+  # quotes (it is injected into nginx sub_filter). Enabling rolls the pod.
+  rum:
+    enabled: false
+    snippet: ""
   service:
     type: ClusterIP
     port: 80
@@ -431,6 +461,11 @@ opsDashboard:
   image:
     repository: "ops-dashboard"
     tag: ""
+  # Dynatrace RUM (agentless) — see publicPortal.rum above. Register a separate
+  # Dynatrace web application for the ops dashboard and paste its snippet here.
+  rum:
+    enabled: false
+    snippet: ""
   service:
     type: ClusterIP
     port: 80
@@ -520,6 +555,11 @@ kafka:
       replicationFactor: 1
       config:
         retention.ms: "3600000"
+    - name: commerce.events
+      partitions: 2
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
 
 # Strimzi operator sub-chart values
 strimzi-kafka-operator:

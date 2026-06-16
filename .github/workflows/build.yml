@@ -31,6 +31,7 @@ jobs:
           - citizen-service
           - service-dispatch
           - city-operations
+          - commerce-service
     steps:
       - uses: actions/checkout@v4
 

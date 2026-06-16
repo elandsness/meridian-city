@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
+import { identifyUser } from '../lib/rum.js';
 
 const AuthContext = createContext(null);
 
@@ -28,6 +29,11 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
   }, []);
+
+  // Tag the RUM session with the operator identity (on login and on reload).
+  useEffect(() => {
+    if (user) identifyUser(user.username || user.email || user.id);
+  }, [user]);
 
   const isAuthenticated = Boolean(token);
 

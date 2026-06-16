@@ -33,6 +33,22 @@ public class BusinessEventLogger {
         );
     }
 
+    public void incidentCommented(String incidentId, String author) {
+        BUSINESS_EVENTS.info("incident.commented",
+                StructuredArguments.keyValue("event.type", "incident.commented"),
+                StructuredArguments.keyValue("incident.id", incidentId),
+                StructuredArguments.keyValue("comment.author", author)
+        );
+    }
+
+    public void incidentResolved(String incidentId, String severity) {
+        BUSINESS_EVENTS.info("incident.resolved",
+                StructuredArguments.keyValue("event.type", "incident.resolved"),
+                StructuredArguments.keyValue("incident.id", incidentId),
+                StructuredArguments.keyValue("severity", severity)
+        );
+    }
+
     public void iotAnomalyDetected(String assetId, String anomalyType) {
         BUSINESS_EVENTS.info("iot.anomaly_detected",
                 StructuredArguments.keyValue("event.type", "iot.anomaly_detected"),

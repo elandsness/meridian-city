@@ -41,7 +41,6 @@ export default function NotificationBell() {
     })
   }
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e) {
       if (panelRef.current && !panelRef.current.contains(e.target)) {
@@ -56,21 +55,21 @@ export default function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <button
         onClick={handleToggle}
-        className="relative text-slate-300 hover:text-white transition-colors p-1"
+        className="relative text-white/80 hover:text-white transition-colors p-1"
         aria-label="Notifications"
       >
         <BellIcon />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+          <span className="absolute -top-0.5 -right-0.5 bg-noon-sun text-noon-ink text-xs font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <h3 className="text-sm font-semibold text-white">Notifications</h3>
+        <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
           </div>
 
           <div className="max-h-72 overflow-y-auto">
@@ -80,16 +79,16 @@ export default function NotificationBell() {
               notifications.map((n, i) => (
                 <div
                   key={n.id || i}
-                  className="px-4 py-3 border-b border-slate-700 last:border-0 hover:bg-slate-750"
+                  className="px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-white">{n.title || 'Notification'}</p>
-                    <span className="text-xs text-slate-500 whitespace-nowrap">
+                    <p className="text-sm font-medium text-slate-900">{n.title || 'Notification'}</p>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">
                       {formatTime(n.timestamp || n.created_at)}
                     </span>
                   </div>
                   {n.message && (
-                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
                   )}
                 </div>
               ))

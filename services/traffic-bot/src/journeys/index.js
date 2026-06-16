@@ -19,6 +19,7 @@ const REGISTRY = [
   { name: 'citizenRequest', key: 'citizenRequests', weight: 40, journey: require('./citizenRequest') },
   { name: 'accountCreation', key: 'accountCreation', weight: 25, journey: require('./accountCreation') },
   { name: 'browsing',        key: 'browsing',        weight: 30, journey: require('./browsing') },
+  { name: 'storePurchase',   key: 'storePurchase',   weight: 15, journey: require('./storePurchase') },
   { name: 'chatbot',         key: 'chatbot',         weight:  5, journey: require('./chatbot') },
 ]
 

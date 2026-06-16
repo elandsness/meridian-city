@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { createServiceRequest } from '../api/serviceRequests.js'
+import { startAction, addActionProperties, endAction, reportError } from '../lib/rum.js'
+import Card from '../ui/Card.jsx'
+import Button from '../ui/Button.jsx'
+import { inputClass, labelClass } from '../ui/form.js'
 
 const CATEGORIES = ['infrastructure', 'utilities', 'safety', 'environment', 'transport', 'other']
 const PRIORITIES = ['low', 'normal', 'high', 'urgent']
@@ -29,9 +33,8 @@ export default function NewRequest() {
     setError('')
     setLoading(true)
 
-    // The public portal has no per-citizen identity — the gateway's local
-    // /auth/login returns only { username, role }, so user.id is undefined.
-    // Fall back to a seeded citizen (the seed creates cit-00001..cit-00050).
+    // Citizen login now mints a real citizen id (user.id === citizen_id). Fall
+    // back to a seeded citizen only for the anonymous/operator case.
     const { location, ...rest } = form
     const payload = {
       ...rest,
@@ -41,10 +44,17 @@ export default function NewRequest() {
     // zone_id. Keep it omitted when blank.
     if (location) payload.zone_id = location
 
+    // RUM custom action; request.id (from the response) is the join key to the
+    // service_request.submitted business event (see docs/INSTRUMENTATION.md).
+    const action = startAction('service_request.submit')
     try {
-      await createServiceRequest(payload)
+      const created = await createServiceRequest(payload)
+      addActionProperties(action, { 'request.id': created?.id })
+      endAction(action)
       navigate('/service-requests', { state: { success: true } })
     } catch (err) {
+      reportError(err)
+      endAction(action)
       setError(
         err.response?.data?.message ||
           err.response?.data?.error ||
@@ -55,39 +65,28 @@ export default function NewRequest() {
     }
   }
 
-  const inputClass =
-    'w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500'
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link to="/service-requests" className="text-slate-400 hover:text-white transition-colors text-sm">
+        <Link to="/service-requests" className="text-slate-500 hover:text-slate-900 transition-colors text-sm">
           ← Back
         </Link>
-        <h1 className="text-2xl font-bold text-white">Submit New Request</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Submit a request</h1>
       </div>
 
-      <div className="bg-slate-800 rounded-2xl p-6 shadow-xl">
+      <Card>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Category</label>
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleChange}
-              required
-              className={inputClass}
-            >
+            <label className={labelClass}>Category</label>
+            <select name="category" value={form.category} onChange={handleChange} required className={inputClass}>
               {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat} className="capitalize">
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </option>
+                <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Title</label>
+            <label className={labelClass}>Title</label>
             <input
               type="text"
               name="title"
@@ -101,7 +100,7 @@ export default function NewRequest() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+            <label className={labelClass}>Description</label>
             <textarea
               name="description"
               value={form.description}
@@ -109,30 +108,22 @@ export default function NewRequest() {
               required
               rows={4}
               className={inputClass + ' resize-none'}
-              placeholder="Provide more details about the issue..."
+              placeholder="Provide more details about the issue…"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Priority</label>
-            <select
-              name="priority"
-              value={form.priority}
-              onChange={handleChange}
-              required
-              className={inputClass}
-            >
+            <label className={labelClass}>Priority</label>
+            <select name="priority" value={form.priority} onChange={handleChange} required className={inputClass}>
               {PRIORITIES.map((p) => (
-                <option key={p} value={p} className="capitalize">
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </option>
+                <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Location <span className="text-slate-500 font-normal">(optional)</span>
+            <label className={labelClass}>
+              Location <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <input
               type="text"
@@ -146,28 +137,17 @@ export default function NewRequest() {
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm bg-red-900/30 border border-red-800 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
           )}
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors"
-            >
-              {loading ? 'Submitting...' : 'Submit Request'}
-            </button>
-            <Link
-              to="/service-requests"
-              className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition-colors text-center"
-            >
-              Cancel
-            </Link>
+          <div className="flex gap-3 pt-1">
+            <Button type="submit" variant="primary" disabled={loading} className="flex-1">
+              {loading ? 'Submitting…' : 'Submit request'}
+            </Button>
+            <Button to="/service-requests" variant="outline">Cancel</Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   )
 }
