@@ -129,15 +129,20 @@ service-map node with DB + Kafka spans.
 ---
 
 ## Stage 7 — Messages inbox + IoT status + demo-control upgrade
-- [ ] notification-service: Postgres + `messages` schema; consume
-      `commerce.events` / `billing.events` / `requests.events`; `/api/v1/messages`
-- [ ] Portal `Messages` inbox + IoT status map; "Your package has arrived" closes
-      the loop
+### 7a — Messages inbox (done)
+- [x] notification-service: Postgres (`pg`) + `messages` schema (runtime DDL);
+      consume `commerce.events` / `billing.events` / `requests.events`; `/api/v1/messages`
+      (list / read / read-all) + gateway route
+- [x] Portal `Messages` inbox page + Home preview wired to it + nav; `api/messages.js`.
+      "Your package has arrived" loop closed (order.delivered → inbox)
+### 7b — IoT status (pending)
 - [ ] telemetry-processor `GET /api/v1/devices` aggregation + gateway `/api/v1/devices`
-- [ ] Ops IoT fleet device → incident links
+- [ ] Portal IoT status map; Ops IoT fleet device → incident links
+### 7c — Demo-control upgrade (pending)
 - [ ] Demo control: live counters (sessions/spans/incidents/orders/requests) +
       inline `docs/demo-scripts/*.md` rendering (`react-markdown`)
 - [ ] traffic-bot `handleOpenRequests` journey
+- [ ] Fold the 3 untracked city-ops fault files back in (per user)
 
 **Instrumentation:** live counters from analytics KPIs + incident/order counts;
 the full purchase → delivery → inbox loop is observable end-to-end.

@@ -80,6 +80,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/messages',
+      target: config.NOTIFICATION_SERVICE_URL,
+      serviceName: 'notification-service',
+      requiresAuth: false,
+    },
+    {
       prefix: '/api/v1/store',
       target: config.COMMERCE_SERVICE_URL,
       serviceName: 'commerce-service',

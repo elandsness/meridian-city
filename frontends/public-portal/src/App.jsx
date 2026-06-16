@@ -12,6 +12,7 @@ import RequestDetail from './pages/RequestDetail.jsx'
 import Store from './pages/Store.jsx'
 import Orders from './pages/Orders.jsx'
 import Billing from './pages/Billing.jsx'
+import Messages from './pages/Messages.jsx'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -73,6 +74,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Billing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <Messages />
             </ProtectedRoute>
           }
         />

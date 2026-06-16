@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom'
 import { getIncidents } from '../api/incidents.js'
 import { getServiceRequests } from '../api/serviceRequests.js'
 import { getBills } from '../api/billing.js'
+import { getMessages } from '../api/messages.js'
 import CityMap from '../components/CityMap.jsx'
 import Card from '../ui/Card.jsx'
 import StatTile from '../ui/StatTile.jsx'
 import Button from '../ui/Button.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { useNotifications } from '../context/NotificationContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { timeAgo, displayName, greeting, severityMeta, severityRank, formatCents } from '../lib/format.js'
 
@@ -70,7 +70,6 @@ function QuickAction({ icon, title, subtitle, to, onClick }) {
 
 export default function Home() {
   const { isAuthenticated, user } = useAuth()
-  const { notifications, unreadCount } = useNotifications()
   const { openChat } = useChat()
 
   const { data: incData, isLoading, isError } = useQuery({
@@ -93,6 +92,13 @@ export default function Home() {
     refetchInterval: 60000,
   })
 
+  const { data: messagesData } = useQuery({
+    queryKey: ['messages', user?.id],
+    queryFn: () => getMessages(user?.id),
+    enabled: isAuthenticated,
+    refetchInterval: 20000,
+  })
+
   const incidents = unwrap(incData, 'incidents', 'items')
   const requests = unwrap(reqData, 'items', 'service_requests', 'requests')
   const feed = [...incidents]
@@ -107,7 +113,8 @@ export default function Home() {
   const myResolved = requests.filter((r) => (r.status || '').toLowerCase() === 'resolved').length
   const bills = unwrap(billsData, 'items')
   const balanceCents = bills.reduce((sum, b) => sum + (b.amount_cents || 0), 0)
-  const messages = notifications.slice(0, 4)
+  const messages = (Array.isArray(messagesData?.messages) ? messagesData.messages : []).slice(0, 4)
+  const unreadCount = messagesData?.unread ?? 0
 
   return (
     <div className="space-y-6">
@@ -166,11 +173,9 @@ export default function Home() {
           <Card
             title="Messages"
             action={
-              unreadCount > 0 ? (
-                <span className="text-xs bg-meridian-tint text-meridian-blue px-2 py-0.5 rounded-full">
-                  {unreadCount} new
-                </span>
-              ) : null
+              <Link to="/messages" className="text-xs text-meridian-blue hover:underline font-medium">
+                {unreadCount > 0 ? `${unreadCount} new` : 'View all'}
+              </Link>
             }
           >
             {messages.length === 0 ? (
@@ -179,8 +184,8 @@ export default function Home() {
               <div className="-my-1">
                 {messages.map((m, i) => (
                   <div key={m.id || i} className="py-2.5 border-b border-slate-100 last:border-0">
-                    <p className="text-sm text-slate-900">{m.title || 'Notification'}</p>
-                    {m.message && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{m.message}</p>}
+                    <p className={`text-sm ${m.read ? 'text-slate-700' : 'font-medium text-slate-900'}`}>{m.title || 'Notification'}</p>
+                    {m.body && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{m.body}</p>}
                   </div>
                 ))}
               </div>
