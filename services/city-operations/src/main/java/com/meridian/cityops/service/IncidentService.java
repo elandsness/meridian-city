@@ -2,19 +2,25 @@ package com.meridian.cityops.service;
 
 import com.meridian.cityops.domain.CityAsset;
 import com.meridian.cityops.domain.Incident;
+import com.meridian.cityops.domain.IncidentComment;
 import com.meridian.cityops.domain.WorkOrder;
 import com.meridian.cityops.domain.Zone;
+import com.meridian.cityops.dto.IncidentCommentResponse;
 import com.meridian.cityops.dto.IncidentResponse;
 import com.meridian.cityops.repository.CityAssetRepository;
+import com.meridian.cityops.repository.IncidentCommentRepository;
 import com.meridian.cityops.repository.IncidentRepository;
 import com.meridian.cityops.repository.WorkOrderRepository;
 import com.meridian.cityops.repository.ZoneRepository;
 import com.meridian.cityops.util.BusinessEventLogger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +33,7 @@ import java.util.stream.Collectors;
 public class IncidentService {
 
     private final IncidentRepository incidentRepository;
+    private final IncidentCommentRepository incidentCommentRepository;
     private final CityAssetRepository cityAssetRepository;
     private final ZoneRepository zoneRepository;
     private final WorkOrderRepository workOrderRepository;
@@ -109,6 +116,70 @@ public class IncidentService {
         return enrich(incident);
     }
 
+    @Transactional(readOnly = true)
+    public IncidentResponse findOne(String id) {
+        return enrich(getOrThrow(id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<IncidentCommentResponse> listComments(String id) {
+        getOrThrow(id);
+        return incidentCommentRepository.findByIncidentIdOrderByCreatedAtAsc(id).stream()
+                .map(this::toCommentResponse)
+                .toList();
+    }
+
+    @Transactional
+    public IncidentCommentResponse addComment(String id, String author, String body) {
+        getOrThrow(id);
+        if (body == null || body.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "comment body is required");
+        }
+        IncidentComment comment = incidentCommentRepository.save(IncidentComment.builder()
+                .incidentId(id)
+                .author(author)
+                .body(body)
+                .createdAt(OffsetDateTime.now())
+                .build());
+        log.info("Added comment id={} to incident id={}", comment.getId(), id);
+        businessEventLogger.incidentCommented(id, author);
+        return toCommentResponse(comment);
+    }
+
+    @Transactional
+    public IncidentResponse updateStatus(String id, String status) {
+        if (status == null || status.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status is required");
+        }
+        Incident incident = getOrThrow(id);
+        String newStatus = status.toLowerCase();
+        boolean nowResolved = "resolved".equals(newStatus)
+                && !"resolved".equalsIgnoreCase(incident.getStatus());
+        incident.setStatus(newStatus);
+        incident.setResolvedAt("resolved".equals(newStatus) ? OffsetDateTime.now() : null);
+        incident = incidentRepository.save(incident);
+        log.info("Incident id={} status -> {}", id, newStatus);
+        if (nowResolved) {
+            businessEventLogger.incidentResolved(id, incident.getSeverity());
+        }
+        return enrich(incident);
+    }
+
+    private Incident getOrThrow(String id) {
+        return incidentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "incident not found: " + id));
+    }
+
+    private IncidentCommentResponse toCommentResponse(IncidentComment c) {
+        return IncidentCommentResponse.builder()
+                .id(c.getId())
+                .incidentId(c.getIncidentId())
+                .author(c.getAuthor())
+                .body(c.getBody())
+                .createdAt(c.getCreatedAt())
+                .build();
+    }
+
     // -------------------------------------------------------------------------
 
     /** Enrich a single, freshly created incident with its zone-derived fields. */
@@ -129,6 +200,7 @@ public class IncidentService {
                 .id(incident.getId())
                 .assetId(incident.getAssetId())
                 .severity(incident.getSeverity())
+                .source(incident.getSource())
                 .status(incident.getStatus())
                 .title(incident.getTitle())
                 .description(incident.getDescription())

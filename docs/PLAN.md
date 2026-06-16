@@ -82,12 +82,14 @@ LLM interaction to its RUM session.
 ---
 
 ## Stage 4 — Incident management (ops)
-- [ ] city-operations: `GET /incidents/{id}`, `GET/POST /incidents/{id}/comments`,
+- [x] city-operations: `GET /incidents/{id}`, `GET/POST /incidents/{id}/comments`,
       `PATCH /incidents/{id}`; `V3__incident_comments.sql` + `IncidentComment`
-- [ ] Ops `IncidentDetail` page (link from list; comment box; close button)
-- [ ] `incident.commented` / `incident.resolved` business events
+      entity/repo + DTOs; `source` added to `IncidentResponse`
+- [x] Ops `IncidentDetail` page (rows link instead of expand; comments; resolve/reopen)
+- [x] `incident.commented` / `incident.resolved` business events
 
 **Instrumentation:** new events extend Flow C (IoT incident resolution).
+No gateway/Helm change — `/api/v1/incidents` already routes to city-operations.
 
 ---
 

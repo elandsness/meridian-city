@@ -43,6 +43,9 @@ public class IncidentResponse {
     @JsonProperty("severity")
     private String severity;
 
+    @JsonProperty("source")
+    private String source;
+
     @JsonProperty("status")
     private String status;
 
