@@ -22,14 +22,14 @@
 *Goal: agree the written requirements and stand up the brand + RUM foundation
 everything else builds on. No new user-facing feature.*
 
-- [~] `docs/REQUIREMENTS.md`, `docs/INSTRUMENTATION.md`, `docs/PLAN.md`
-- [ ] Brand tokens in both `tailwind.config.js` (`meridian.blue`, `noon.sun`)
-- [ ] Shared `src/ui/` set in both apps: `Card`, `Button`, `Badge`, `StatTile`,
-      `Timeline`, `AppShell`
-- [ ] `src/lib/rum.js` dtrum wrapper in both apps
-- [ ] RUM injection: split `frontend-nginx-configmap.yaml` per app, `sub_filter`,
+- [x] `docs/REQUIREMENTS.md`, `docs/INSTRUMENTATION.md`, `docs/PLAN.md`
+- [x] Brand tokens in both `tailwind.config.js` (`meridian.blue`, `noon.sun`)
+- [x] Shared `src/ui/` set: `Card`, `Button`, `Badge`, `StatTile` (built in Stage 1
+      where they render; `Timeline` deferred to Stage 3, ops `src/ui/` to Stage 4)
+- [x] `src/lib/rum.js` dtrum wrapper in both apps
+- [x] RUM injection: split `frontend-nginx-configmap.yaml` per app, `sub_filter`,
       `values.yaml` `rum:` blocks, pod `checksum/config` annotation
-- [ ] Wire `identifyUser(email)` in both `AuthContext.jsx`; `reportError` in both
+- [x] Wire `identifyUser(email)` in both `AuthContext.jsx`; `reportError` in both
       `api/client.js`
 
 **Instrumentation:** RUM sessions / replay / Core Web Vitals / JS errors live in
@@ -38,9 +38,13 @@ both SPAs; sessions tagged with citizen email.
 ---
 
 ## Stage 1 — Citizen dashboard home + live incidents
-- [ ] Rebuild `public-portal/src/pages/Home.jsx` as the live city dashboard
-      (StatTiles, incident cards, map, messages preview, quick actions)
-- [ ] Lift `ChatWidget` into the layout so it is persistent
+- [x] Shared `src/ui/` components (Card, Button, Badge, StatTile)
+- [x] Reskin `Layout.jsx` to the Meridian brand (blue/amber top nav, avatar)
+- [x] Rebuild `public-portal/src/pages/Home.jsx` as the live city dashboard
+      (StatTiles, live incident feed w/ 30s poll, map, messages preview, quick actions)
+- [x] Lift `ChatWidget` into the layout (persistent) via `ChatContext`; brand reskin
+- [ ] Follow-up: reskin `Login.jsx` / `Register.jsx` / `ServiceRequests.jsx` /
+      `NewRequest.jsx` to the light brand (still dark-slate) — pending
 
 **Instrumentation:** RUM user actions on quick actions; incident poll + SSE feed
 visible in session detail.

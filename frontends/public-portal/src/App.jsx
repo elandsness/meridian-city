@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { NotificationProvider } from './context/NotificationContext.jsx'
+import { ChatProvider } from './context/ChatContext.jsx'
 import Layout from './components/Layout.jsx'
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
@@ -48,7 +49,9 @@ export default function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <AppRoutes />
+        <ChatProvider>
+          <AppRoutes />
+        </ChatProvider>
       </NotificationProvider>
     </AuthProvider>
   )
