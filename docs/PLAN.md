@@ -135,14 +135,17 @@ service-map node with DB + Kafka spans.
       (list / read / read-all) + gateway route
 - [x] Portal `Messages` inbox page + Home preview wired to it + nav; `api/messages.js`.
       "Your package has arrived" loop closed (order.delivered → inbox)
-### 7b — IoT status (pending)
-- [ ] telemetry-processor `GET /api/v1/devices` aggregation + gateway `/api/v1/devices`
-- [ ] Portal IoT status map; Ops IoT fleet device → incident links
-### 7c — Demo-control upgrade (pending)
-- [ ] Demo control: live counters (sessions/spans/incidents/orders/requests) +
-      inline `docs/demo-scripts/*.md` rendering (`react-markdown`)
-- [ ] traffic-bot `handleOpenRequests` journey
-- [ ] Fold the 3 untracked city-ops fault files back in (per user)
+### 7b — IoT status (done)
+- [x] telemetry-processor `GET /api/v1/devices` (live fleet + open-incident join) +
+      gateway `/api/v1/devices` + `IOT_SIMULATOR_URL`
+- [x] Citizen Home map device summary; Ops IoT page device table → incident links
+### 7c — Demo-control upgrade (done)
+- [x] Demo control: `LiveCounters` card (traffic rpm / requests sent / open incidents /
+      journeys; sessions+spans noted as Dynatrace-side) + inline `DemoGuideCard`
+      (concise summaries of the 5 demo scenarios)
+- [x] traffic-bot `handleOpenRequests` journey + scenario wiring
+- [x] Restored the 3 city-ops fault files (AdminController / FaultInjectionConfig /
+      CpuSpikeScheduler) to re-enable city-ops fault injection
 
 **Instrumentation:** live counters from analytics KPIs + incident/order counts;
 the full purchase → delivery → inbox loop is observable end-to-end.

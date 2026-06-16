@@ -16,6 +16,7 @@ module.exports = {
     browsing:        process.env.SCENARIO_BROWSING        !== 'false',
     storePurchase:   process.env.SCENARIO_STORE_PURCHASE  !== 'false',
     payTax:          process.env.SCENARIO_PAY_TAX         !== 'false',
+    handleOpenRequests: process.env.SCENARIO_HANDLE_OPEN_REQUESTS !== 'false',
     chatbot:         process.env.SCENARIO_CHATBOT         === 'true',  // off by default
   },
 }

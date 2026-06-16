@@ -430,6 +430,7 @@ trafficBot:
       browsing: true
       storePurchase: true
       payTax: true
+      handleOpenRequests: true
       chatbot: false  # disable by default to avoid LLM API cost in steady-state
   resources:
     requests:

@@ -21,6 +21,7 @@ const REGISTRY = [
   { name: 'browsing',        key: 'browsing',        weight: 30, journey: require('./browsing') },
   { name: 'storePurchase',   key: 'storePurchase',   weight: 15, journey: require('./storePurchase') },
   { name: 'payTax',          key: 'payTax',          weight: 10, journey: require('./payTax') },
+  { name: 'handleOpenRequests', key: 'handleOpenRequests', weight: 10, journey: require('./handleOpenRequests') },
   { name: 'chatbot',         key: 'chatbot',         weight:  5, journey: require('./chatbot') },
 ]
 
