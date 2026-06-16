@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx';
 import Overview from './pages/Overview.jsx';
 import IoTPage from './pages/IoTPage.jsx';
 import IncidentsPage from './pages/IncidentsPage.jsx';
+import RequestQueue from './pages/RequestQueue.jsx';
 import BusinessAnalytics from './pages/BusinessAnalytics.jsx';
 import DemoControl from './pages/DemoControl.jsx';
 
@@ -34,6 +35,7 @@ function AppRoutes() {
         <Route path="/overview" element={<Overview />} />
         <Route path="/iot" element={<IoTPage />} />
         <Route path="/incidents" element={<IncidentsPage />} />
+        <Route path="/requests" element={<RequestQueue />} />
         <Route path="/analytics" element={<BusinessAnalytics />} />
         <Route path="/demo-control" element={<DemoControl />} />
       </Route>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { createServiceRequest } from '../api/serviceRequests.js'
+import { startAction, addActionProperties, endAction, reportError } from '../lib/rum.js'
 import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
 import { inputClass, labelClass } from '../ui/form.js'
@@ -43,10 +44,17 @@ export default function NewRequest() {
     // zone_id. Keep it omitted when blank.
     if (location) payload.zone_id = location
 
+    // RUM custom action; request.id (from the response) is the join key to the
+    // service_request.submitted business event (see docs/INSTRUMENTATION.md).
+    const action = startAction('service_request.submit')
     try {
-      await createServiceRequest(payload)
+      const created = await createServiceRequest(payload)
+      addActionProperties(action, { 'request.id': created?.id })
+      endAction(action)
       navigate('/service-requests', { state: { success: true } })
     } catch (err) {
+      reportError(err)
+      endAction(action)
       setError(
         err.response?.data?.message ||
           err.response?.data?.error ||

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getServiceRequests } from '../api/serviceRequests.js'
 import Card from '../ui/Card.jsx'
@@ -27,6 +28,7 @@ function truncateId(id) {
 
 export default function ServiceRequests() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const params = { page: 1, limit: 20 }
   if (user?.id) params.citizen_id = user.id
@@ -84,7 +86,11 @@ export default function ServiceRequests() {
               </thead>
               <tbody>
                 {requests.map((req, i) => (
-                  <tr key={req.id || i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={req.id || i}
+                    onClick={() => req.id && navigate(`/service-requests/${req.id}`)}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3 font-mono text-slate-400 text-xs">{truncateId(req.id)}</td>
                     <td className="px-4 py-3 text-slate-900 max-w-xs truncate">{req.title}</td>
                     <td className="px-4 py-3 text-slate-600 capitalize">{req.category}</td>
@@ -100,7 +106,11 @@ export default function ServiceRequests() {
           {/* Mobile cards */}
           <div className="md:hidden divide-y divide-slate-100">
             {requests.map((req, i) => (
-              <div key={req.id || i} className="p-4 space-y-2">
+              <div
+                key={req.id || i}
+                onClick={() => req.id && navigate(`/service-requests/${req.id}`)}
+                className="p-4 space-y-2 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium text-slate-900">{req.title}</p>
                   <StatusBadge status={req.status} />

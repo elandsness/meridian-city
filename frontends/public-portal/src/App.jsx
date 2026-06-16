@@ -8,6 +8,7 @@ import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import ServiceRequests from './pages/ServiceRequests.jsx'
 import NewRequest from './pages/NewRequest.jsx'
+import RequestDetail from './pages/RequestDetail.jsx'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -37,6 +38,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <NewRequest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/service-requests/:id"
+          element={
+            <ProtectedRoute>
+              <RequestDetail />
             </ProtectedRoute>
           }
         />

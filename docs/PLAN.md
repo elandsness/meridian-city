@@ -67,11 +67,17 @@ LLM interaction to its RUM session.
 ---
 
 ## Stage 3 — Service-request slice
-- [ ] Portal `NewRequest` / `ServiceRequests` with status `Timeline`
-- [ ] Ops `RequestQueue` page (existing `updateStatus`)
-- [ ] `service_request.submit` RUM action + `request.id`
+- [x] `Timeline` ui primitive + portal `RequestDetail` page (status timeline);
+      `ServiceRequests` rows now link to detail
+- [x] Ops `RequestQueue` page (list + advance via `updateStatus`; dark ops theme)
+      + `api/requests.js` + nav/route
+- [x] `service_request.submit` RUM action carrying `request.id` (from response)
 
 **Instrumentation:** RUM action joins Flow A funnel on `request.id`.
+
+> Note: ops-dashboard keeps its dark/data-forward aesthetic (cyan accents) — a
+> defensible "operator console" look distinct from the light citizen portal; a
+> full ops brand reskin can be a later polish pass if desired.
 
 ---
 
