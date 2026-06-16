@@ -102,9 +102,8 @@ No gateway/Helm change — `/api/v1/incidents` already routes to city-operations
 - [x] traffic-bot `storePurchase` journey (+ SCENARIO_STORE_PURCHASE wiring)
 - [x] `cart.item_added` / `checkout.completed` / `order.packed` / `order.shipped`
       / `order.delivered` events; `store.add_to_cart` + `store.checkout` RUM actions
-- [ ] Pending (tenant/ops): add `purchase` to `analytics-service/funnels.py` so the
-      ops Business Analytics page renders Flow D; add Flow D detail to
-      `dynatrace-config-guide.md` §3 (funnel is configured in the Dynatrace UI)
+- [x] `purchase` funnel in `analytics-service/funnels.py` + ops Business Analytics tile;
+      Flow D detail in `dynatrace-config-guide.md` §3
 
 **Instrumentation:** Purchase funnel (Flow D) + Checkout Success SLO; commerce
 service-map node with DB + Kafka spans.
@@ -123,8 +122,9 @@ service-map node with DB + Kafka spans.
 - [x] `tax.bill_issued` / `tax.payment_completed` events; `tax.pay` RUM action
 
 **Instrumentation:** Tax Payment funnel (Flow E) + Payment Availability SLO.
-- [ ] Pending (tenant/ops): add `tax-payment` (+ `purchase`) to
-      `analytics-service/funnels.py`; add Flow D/E detail to `dynatrace-config-guide.md` §3
+- [x] `tax-payment` funnel in `analytics-service/funnels.py` + ops tile; Flow E
+      detail + SLO 5/6 + RUM tiles + log matcher in `dynatrace-config-guide.md`;
+      RUM enablement (§8 + values-custom.yaml.example `rum:` blocks)
 
 ---
 

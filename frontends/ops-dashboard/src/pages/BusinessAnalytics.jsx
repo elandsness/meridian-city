@@ -19,6 +19,16 @@ const FUNNELS = [
     label: 'IoT Incident Resolution',
     description: 'Device anomaly detection through remediation.',
   },
+  {
+    key: 'purchase',
+    label: 'City Store Purchase',
+    description: 'Shopping cart through order delivery.',
+  },
+  {
+    key: 'tax-payment',
+    label: 'Tax Payment',
+    description: 'Tax bills issued through payment.',
+  },
 ];
 
 function FunnelSection({ funnel }) {

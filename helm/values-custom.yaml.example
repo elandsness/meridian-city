@@ -56,6 +56,24 @@ dynatrace:
     enabled: true
 
 # ---------------------------------------------------------------------------
+# RUM (Real User Monitoring) — front-end user sessions for the two SPAs.
+# The agentless RUM JS is injected at runtime via nginx sub_filter (no rebuild).
+# The application id / agent URL is shipped to every browser and is NOT a secret.
+#
+# To enable: in Dynatrace create a web application for each SPA
+#   (Web > <app> > Settings > Instrumentation > Manual insertion), copy the
+#   single-line <script ...></script> tag, paste it below, and set enabled: true.
+# ---------------------------------------------------------------------------
+publicPortal:
+  rum:
+    enabled: false
+    snippet: ""   # e.g. '<script src="https://js-cdn.dynatrace.com/jstag/.../ruxitagentjs_....js" ...></script>'
+opsDashboard:
+  rum:
+    enabled: false
+    snippet: ""
+
+# ---------------------------------------------------------------------------
 # LLM / AI configuration (for the citizen chatbot and ai-service)
 # ---------------------------------------------------------------------------
 llm:

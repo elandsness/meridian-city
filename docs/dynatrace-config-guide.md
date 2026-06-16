@@ -55,7 +55,11 @@ The Java services emit JSON logs. Configure Dynatrace to parse them correctly.
 
 **Name**: `Meridian Business Event Extraction`
 
-**Matcher**: `log.source matches "citizen-service" OR log.source matches "service-dispatch" OR log.source matches "city-operations"`
+**Matcher**: `log.source matches "citizen-service" OR log.source matches "service-dispatch" OR log.source matches "city-operations" OR log.source matches "commerce-service" OR log.source matches "billing-service"`
+
+> commerce-service and billing-service emit the same `event.type` business-event
+> log shape (see §3 Flow D/E), so they must be included for the purchase and tax
+> funnels to populate.
 
 **Processor definition** (DQL):
 ```
@@ -135,6 +139,35 @@ build unless the app is extended to emit intermediate `account.*` events.
 - Correlation key: `incident.id`
 - Funnel name: `IoT Incident Resolution`
 
+### Flow D: City Store Purchase
+
+Emitted by commerce-service (`event.type` in the JSON business-event log).
+
+| Business Event Name | Log event.type value | Attributes |
+|---|---|---|
+| `cart.item_added` | `cart.item_added` | `cart.id`, `citizen.id`, `product.id`, `quantity` |
+| `checkout.completed` | `checkout.completed` | `order.id`, `citizen.id`, `order.total_cents`, `order.item_count` |
+| `order.packed` | `order.packed` | `order.id`, `citizen.id` |
+| `order.shipped` | `order.shipped` | `order.id`, `citizen.id`, `carrier` |
+| `order.delivered` | `order.delivered` | `order.id`, `citizen.id` |
+
+- Correlation key: `order.id` (the open cart converts to an order at checkout).
+- Funnel name: `City Store Purchase`. The `store.add_to_cart` / `store.checkout` RUM
+  actions carry `product.id` / `order.id`, so a user session joins this funnel on `order.id`.
+- The ops Business Analytics page renders it from `commerce.orders` (analytics-service `funnels.py` → `purchase`).
+
+### Flow E: Tax Payment
+
+Emitted by billing-service.
+
+| Business Event Name | Log event.type value | Attributes |
+|---|---|---|
+| `tax.bill_issued` | `tax.bill_issued` | `bill.id`, `citizen.id`, `bill.period`, `bill.amount_cents` |
+| `tax.payment_completed` | `tax.payment_completed` | `bill.id`, `citizen.id`, `bill.amount_cents` |
+
+- Correlation key: `bill.id`. The `tax.pay` RUM action carries `bill.id` for session↔funnel join.
+- Funnel name: `Tax Payment`. Rendered from `billing.tax_bills` (funnels.py → `tax-payment`).
+
 ---
 
 ## 4. Site Reliability Guardian — SLO Configuration
@@ -188,6 +221,28 @@ Create one guardian named **Meridian City Platform SLOs** with the following obj
 | **Target** | 99% |
 | **Timeframe** | 7 days |
 
+### SLO 5: Checkout Success Rate
+
+| Setting | Value |
+|---|---|
+| **Name** | Checkout Success Rate |
+| **Objective type** | Service-level objective |
+| **Metric** | `builtin:service.errors.total.rate` |
+| **Entity selector** | `type(SERVICE),tag(app:commerce-service)` |
+| **Target** | 99.5% |
+| **Timeframe** | 7 days |
+
+### SLO 6: Payment Processing Availability
+
+| Setting | Value |
+|---|---|
+| **Name** | Payment Processing Availability |
+| **Objective type** | Service-level objective |
+| **Metric** | `builtin:service.availability` |
+| **Entity selector** | `type(SERVICE),tag(app:billing-service)` |
+| **Target** | 99% |
+| **Timeframe** | 7 days |
+
 ---
 
 ## 5. Alerting — Davis AI Problem Detection
@@ -227,8 +282,16 @@ Create a new dashboard with these tiles:
 2. **Request Throughput**: Time Series — `builtin:service.requestCount.total` for `citizen-service`
 3. **IoT Metrics**: Time Series — `iot.vehicle.engine_temp`, `iot.building.hvac_temp`
 4. **AI Chatbot Usage**: Time Series — `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`
-5. **Business Events Funnel**: Business Analytics tile — Service Request Journey funnel
-6. **SLO Status**: SLO tile — all four SLOs
+5. **Business Events Funnels**: Business Analytics tiles — Service Request Journey, **City Store Purchase**, and **Tax Payment** funnels
+6. **Orders & Revenue**: Business Analytics — count of `checkout.completed` events and sum of `order.total_cents` (÷100 for dollars)
+7. **RUM — Core Web Vitals**: Web application tile for the public-portal and ops-dashboard apps
+8. **RUM — User actions**: Top user actions by application (`store.checkout`, `tax.pay`, `service_request.submit`, `chat.send`)
+9. **SLO Status**: SLO tile — all six SLOs
+
+> **Session → business outcome:** because each RUM custom action carries the same
+> key as its funnel (`order.id`, `bill.id`, `request.id`, `session.id`), you can
+> open a user session and pivot to the `checkout.completed → order.delivered`
+> business events on `order.id` — the headline "front-end to business outcome" story.
 
 ### Export and share
 
@@ -257,15 +320,46 @@ If the AI Observability menu item is not visible, enable it in **Settings → Fe
 
 ---
 
+## 8. RUM — Front-end User Sessions
+
+Both SPAs (public-portal, ops-dashboard) report Real User Monitoring via the
+Dynatrace agentless RUM JS, injected at runtime (no image rebuild).
+
+1. In Dynatrace create a **web application** for each SPA:
+   **Web → Set up → Manual insertion** (one app per SPA so sessions segment cleanly).
+2. Copy each app's single-line `<script ...></script>` tag.
+3. Paste into `values-custom.yaml` and enable:
+   ```yaml
+   publicPortal:
+     rum:
+       enabled: true
+       snippet: '<script src="https://.../ruxitagentjs_....js" ...></script>'
+   opsDashboard:
+     rum:
+       enabled: true
+       snippet: '<script ...></script>'
+   ```
+   The application id / agent URL is public (shipped to every browser) — keep it in
+   values, not the `meridian-secrets` token.
+4. Redeploy (`scripts/deploy.sh`). The frontend pods roll automatically (a
+   `checksum/config` annotation on the deployment tracks the snippet).
+
+Verify under **Web → <app>**: sessions, user actions, Core Web Vitals, and JS
+errors. The custom actions (`store.checkout`, `tax.pay`, `service_request.submit`,
+`chat.send`) carry the correlation keys used for the session → funnel join (§3, §6).
+
+---
+
 ## Quick Checklist
 
 Before a customer demo, verify these are all working:
 
-- [ ] All 9 services visible in Dynatrace Services
+- [ ] All 11 services visible in Dynatrace Services (incl. commerce-service, billing-service)
 - [ ] IoT metrics visible under `iot.*` (e.g. `iot.building.hvac_temp`)
-- [ ] AI Observability shows chatbot traces
-- [ ] Business Events funnel shows data (submit a test request)
-- [ ] All 4 SLOs are in the green
+- [ ] AI Observability shows chatbot traces (OpenLLMetry `gen_ai.*` spans)
+- [ ] RUM: both web apps report sessions + user actions (§8)
+- [ ] Business Events funnels show data: Service Request, **City Store Purchase**, **Tax Payment**
+- [ ] All 6 SLOs are in the green
 - [ ] Davis AI baseline established (needs ~24h of traffic)
 - [ ] Test fault injection: inject DB slowdown → wait 2 min → confirm Davis problem card
 - [ ] Reset all faults before the demo
