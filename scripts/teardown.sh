@@ -141,16 +141,31 @@ if helm status dynatrace-operator -n "$DYNATRACE_NAMESPACE" &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Delete PVCs explicitly before namespace deletion.
+# 3. Force-delete leftover pods, then PVCs, before namespace deletion.
 #    CNPG and Strimzi operators create PVCs outside of Helm's ownership, so
 #    helm uninstall does not remove them.  Leaving them behind causes Flyway
 #    schema-history conflicts and Kafka offset conflicts on the next fresh
 #    install.  Namespace deletion normally cascades to PVCs, but we delete
 #    them explicitly first so the namespace is not held in Terminating state
 #    by PVC finalizers.
+#
+#    Pods must be reaped FIRST.  A pod left in a terminal (Completed) phase —
+#    e.g. the CNPG instance pod the operator shut down but didn't delete
+#    before 'helm uninstall' removed the operator — keeps the
+#    kubernetes.io/pvc-protection finalizer on its PVC.  That finalizer blocks
+#    PVC deletion AND holds the whole namespace in Terminating indefinitely
+#    (kubectl confirms: "pvc-protection in 1 resource instances").  Nothing
+#    else collects such a pod once its operator is gone, so we force-delete
+#    it; the PVC's finalizer then releases and both the PVC and the namespace
+#    can finish terminating.
 # ---------------------------------------------------------------------------
 for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
   if kubectl get namespace "$ns" &>/dev/null 2>&1; then
+    pod_count=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$pod_count" -gt 0 ]]; then
+      info "Force-deleting $pod_count leftover pod(s) in namespace $ns..."
+      kubectl delete pods --all -n "$ns" --force --grace-period=0 2>/dev/null || true
+    fi
     pvc_count=$(kubectl get pvc -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
     if [[ "$pvc_count" -gt 0 ]]; then
       info "Deleting $pvc_count PVC(s) in namespace $ns..."
