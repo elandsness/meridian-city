@@ -228,6 +228,8 @@ Save the JSON to `docs/dashboards/meridian-city-ops.json` for distribution to DX
 
 ## 7. AI Observability Setup
 
+The `gen_ai.*` spans are produced by the **OpenLLMetry (Traceloop) SDK** auto-instrumenting the OpenAI/Anthropic clients in ai-service (no manual span attributes) and exported via the OTel collector. Each carries `session_id` as a Traceloop association property, so an AI interaction can be correlated to its RUM session and `chatbot.interaction` business event. See `docs/INSTRUMENTATION.md` §2.
+
 AI Observability is enabled automatically when Dynatrace receives spans with GenAI semantic convention attributes. Verify:
 
 **AI Observability** (in the left nav)

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { sendMessage } from '../api/chat.js'
 import { useChat } from '../context/ChatContext.jsx'
+import { trackAction } from '../lib/rum.js'
 
 function ChatIcon() {
   return (
@@ -46,8 +47,15 @@ export default function ChatWidget() {
     setLoading(true)
 
     try {
-      const data = await sendMessage({ message: text, session_id: sessionId })
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.response ?? data.reply }])
+      // RUM custom action; the session.id property is the join key to the
+      // chatbot.interaction business event (see docs/INSTRUMENTATION.md).
+      const data = await trackAction('chat.send', { 'session.id': sessionId }, () =>
+        sendMessage({ message: text, session_id: sessionId })
+      )
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.response ?? data.reply ?? "Sorry, I didn't catch that — could you rephrase?" },
+      ])
     } catch {
       setMessages((prev) => [
         ...prev,

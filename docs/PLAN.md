@@ -52,13 +52,17 @@ visible in session detail.
 ---
 
 ## Stage 2 — AI chat + OpenLLMetry
-- [ ] Reskin persistent `ChatWidget`; fix the `data.response` read; bake the
-      "Meridian is real" persona + fake phone number
-- [ ] OpenLLMetry migration in ai-service (`requirements.txt`, `otel.py`, `chat.py`)
-- [ ] `chat.send` RUM action carrying `session.id`
+- [x] Reskin persistent `ChatWidget` (Stage 1); harden `data.response` read; bake the
+      "Meridian is real" persona + fake phone (1-555-MERIDIAN) in ai-service prompt
+- [x] OpenLLMetry migration in ai-service (`requirements.txt` → traceloop-sdk;
+      `otel.py` → `Traceloop.init`; `chat.py` → drop manual `gen_ai.*`, keep
+      session.id parent span + association property + `chatbot.interaction` log)
+- [x] `chat.send` RUM action carrying `session.id`
+- [x] `dynatrace-config-guide.md` §7 note: spans now via OpenLLMetry
 
 **Instrumentation:** AI Observability shows OpenLLMetry `gen_ai` spans + token
-usage; `chatbot.interaction` business-event log preserved.
+usage; `chatbot.interaction` business-event log preserved; session.id ties the
+LLM interaction to its RUM session.
 
 ---
 

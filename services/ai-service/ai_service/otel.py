@@ -1,29 +1,24 @@
 """
-OpenTelemetry SDK initialisation for ai-service.
+OpenTelemetry / OpenLLMetry initialisation for ai-service.
 
-Uses OTLP/HTTP exporter — endpoint is injected by Helm as:
-  OTEL_EXPORTER_OTLP_ENDPOINT=http://<release>-opentelemetry-collector:4318
+Uses the Traceloop SDK (OpenLLMetry), which:
+  - configures the OTel TracerProvider + an OTLP/HTTP exporter pointed at the
+    collector (OTEL_EXPORTER_OTLP_ENDPOINT, injected by Helm), and
+  - auto-instruments the OpenAI / Anthropic clients so every LLM call emits a
+    span carrying the GenAI semantic-convention attributes (gen_ai.request.model,
+    gen_ai.usage.*, gen_ai.response.finish_reason, …) with no manual code.
 
-The Python OTLP HTTP exporter reads that env var automatically and appends
-the signal-specific path (/v1/traces, /v1/metrics), so no manual URL
-construction is required here.
-
-GenAI semantic convention attributes are applied manually in chat.py, not here.
-FastAPI request spans are added via FastAPIInstrumentor in main.py.
+chat.py keeps a thin parent span that carries the non-GenAI correlation key
+(session.id) and sets Traceloop association properties so the auto-spans inherit
+it. FastAPI request spans are added via FastAPIInstrumentor in main.py and use the
+same tracer provider configured here.
 """
 from __future__ import annotations
 
 import logging
 import os
 
-from opentelemetry import metrics, trace
-from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 
@@ -33,39 +28,35 @@ _tracer: trace.Tracer = trace.get_tracer("ai-service")
 
 def init_otel() -> None:
     """
-    Initialise the SDK TracerProvider and MeterProvider.
-    Non-fatal: if the OTel Collector is unreachable at startup the service
-    still starts; reconnection is handled automatically by the exporter.
+    Initialise OpenLLMetry (Traceloop). Non-fatal: if the collector is
+    unreachable at startup the service still starts and the exporter reconnects.
+    When no OTLP endpoint is configured (e.g. local dev) tracing is left disabled
+    rather than falling back to Traceloop's hosted endpoint.
     """
     global _tracer
 
     service_name = os.getenv("OTEL_SERVICE_NAME", "ai-service")
-    resource = Resource.create({SERVICE_NAME: service_name})
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 
-    # --- Traces -----------------------------------------------------------
-    try:
-        # OTLPSpanExporter reads OTEL_EXPORTER_OTLP_ENDPOINT from the environment
-        # and appends /v1/traces automatically.
-        span_exporter = OTLPSpanExporter()
-        tracer_provider = TracerProvider(resource=resource)
-        tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
-        trace.set_tracer_provider(tracer_provider)
-        logger.info("OTel trace provider initialised")
-    except Exception as exc:
-        logger.warning("OTel trace exporter init failed — tracing disabled: %s", exc)
+    if not endpoint:
+        logger.info("OTEL_EXPORTER_OTLP_ENDPOINT unset — AI tracing disabled (dev mode)")
+        _tracer = trace.get_tracer("ai-service")
+        return
 
-    # --- Metrics ----------------------------------------------------------
     try:
-        # OTLPMetricExporter similarly reads the env var and appends /v1/metrics.
-        metric_exporter = OTLPMetricExporter()
-        reader = PeriodicExportingMetricReader(
-            metric_exporter, export_interval_millis=60_000
+        from traceloop.sdk import Traceloop
+
+        # api_endpoint is the OTLP/HTTP base; Traceloop appends /v1/traces.
+        # telemetry_enabled=False stops the SDK from phoning home with usage stats.
+        Traceloop.init(
+            app_name=service_name,
+            api_endpoint=endpoint,
+            disable_batch=False,
+            telemetry_enabled=False,
         )
-        meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
-        metrics.set_meter_provider(meter_provider)
-        logger.info("OTel metrics provider initialised")
+        logger.info("OpenLLMetry (Traceloop) initialised — exporting to %s", endpoint)
     except Exception as exc:
-        logger.warning("OTel metrics exporter init failed — metrics disabled: %s", exc)
+        logger.warning("OpenLLMetry init failed — AI tracing disabled: %s", exc)
 
     _tracer = trace.get_tracer("ai-service")
 
