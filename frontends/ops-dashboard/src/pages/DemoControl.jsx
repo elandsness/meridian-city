@@ -708,13 +708,14 @@ function LiveCounters() {
   const incidents = Array.isArray(incData) ? incData : incData?.incidents ?? [];
   const running = traffic?.running ?? traffic?.status === 'running';
   const rpm = traffic?.rpm_current ?? traffic?.rate_rpm ?? traffic?.rpm ?? 0;
-  const reqsSent = traffic?.requests_sent ?? traffic?.requestsSent ?? null;
-  const journeys = traffic?.active_journeys ?? traffic?.journeys ?? null;
+  const completed = traffic?.journeys_completed ?? null;
+  // traffic-bot getStatus() returns `journeys` as an array of { name, weight, enabled }.
+  const journeys = Array.isArray(traffic?.journeys) ? traffic.journeys : [];
 
   const tiles = [
     { label: 'Traffic', value: running ? 'Running' : 'Stopped', cls: running ? 'text-green-400' : 'text-gray-400' },
     { label: 'Requests / min', value: Math.round(rpm), cls: 'text-cyan-400' },
-    { label: 'Requests sent', value: reqsSent != null ? Number(reqsSent).toLocaleString() : '—', cls: 'text-cyan-400' },
+    { label: 'Journeys run', value: completed != null ? Number(completed).toLocaleString() : '—', cls: 'text-cyan-400' },
     { label: 'Open incidents', value: incidents.length, cls: incidents.length > 0 ? 'text-rose-400' : 'text-gray-300' },
   ];
 
@@ -734,10 +735,17 @@ function LiveCounters() {
           </div>
         ))}
       </div>
-      {journeys && typeof journeys === 'object' && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
-          {Object.entries(journeys).map(([k, v]) => (
-            <span key={k}>{k}: <span className="text-gray-300">{v}</span></span>
+      {journeys.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-xs">
+          <span className="text-gray-500">Journeys:</span>
+          {journeys.map((j) => (
+            <span
+              key={j.name}
+              title={typeof j.weight === 'number' ? `weight ${j.weight}` : undefined}
+              className={j.enabled ? 'text-gray-300' : 'text-gray-600 line-through'}
+            >
+              {j.name}
+            </span>
           ))}
         </div>
       )}
