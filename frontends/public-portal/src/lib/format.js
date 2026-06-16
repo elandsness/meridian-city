@@ -45,3 +45,19 @@ const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1 }
 export function severityRank(sev) {
   return SEV_RANK[(sev || '').toLowerCase()] || 0
 }
+
+const REQUEST_STATUS = {
+  submitted: { tone: 'blue', label: 'Submitted' },
+  dispatched: { tone: 'blue', label: 'Dispatched' },
+  assigned: { tone: 'amber', label: 'Assigned' },
+  acknowledged: { tone: 'amber', label: 'Acknowledged' },
+  in_progress: { tone: 'amber', label: 'In progress' },
+  resolved: { tone: 'green', label: 'Resolved' },
+  cancelled: { tone: 'slate', label: 'Cancelled' },
+  closed: { tone: 'slate', label: 'Closed' },
+}
+
+export function requestStatusMeta(status) {
+  const key = (status || '').toLowerCase()
+  return REQUEST_STATUS[key] || { tone: 'slate', label: (status || 'unknown').replace(/_/g, ' ') }
+}

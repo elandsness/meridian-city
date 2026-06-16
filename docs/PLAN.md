@@ -43,8 +43,8 @@ both SPAs; sessions tagged with citizen email.
 - [x] Rebuild `public-portal/src/pages/Home.jsx` as the live city dashboard
       (StatTiles, live incident feed w/ 30s poll, map, messages preview, quick actions)
 - [x] Lift `ChatWidget` into the layout (persistent) via `ChatContext`; brand reskin
-- [ ] Follow-up: reskin `Login.jsx` / `Register.jsx` / `ServiceRequests.jsx` /
-      `NewRequest.jsx` to the light brand (still dark-slate) — pending
+- [x] Reskin `Login.jsx` / `Register.jsx` / `ServiceRequests.jsx` / `NewRequest.jsx`
+      to the light brand (+ shared `AuthShell`, `ui/form.js`, `requestStatusMeta`)
 
 **Instrumentation:** RUM user actions on quick actions; incident poll + SSE feed
 visible in session detail.

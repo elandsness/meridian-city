@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import AuthShell from '../components/AuthShell.jsx'
+import Button from '../ui/Button.jsx'
+import { inputClass, labelClass } from '../ui/form.js'
 
 export default function Login() {
   const { login } = useAuth()
@@ -28,73 +31,57 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
-      <div className="bg-slate-800 rounded-2xl p-8 w-full max-w-md shadow-xl">
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🏙</div>
-          <h1 className="text-2xl font-bold text-white">Meridian City Portal</h1>
-          <p className="text-slate-400 mt-1 text-sm">Sign in to your account</p>
+    <AuthShell title="Welcome back" subtitle="Sign in to your Meridian City account">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelClass}>Email or username</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            autoFocus
+            className={inputClass}
+            placeholder="your@email.com"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Email or username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              autoFocus
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-              placeholder="your@email.com"
-            />
-          </div>
+        <div>
+          <label className={labelClass}>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className={inputClass}
+            placeholder="Enter password"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-              placeholder="Enter password"
-            />
-          </div>
+        {error && (
+          <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+        )}
 
-          {error && (
-            <p className="text-red-400 text-sm bg-red-900/30 border border-red-800 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
+        <Button type="submit" variant="primary" disabled={loading} className="w-full">
+          {loading ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors mt-2"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="mt-6 space-y-3">
-          <p className="text-center text-sm text-slate-400">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-indigo-400 hover:text-indigo-300">
-              Register
-            </Link>
+      <div className="mt-6 space-y-3">
+        <p className="text-center text-sm text-slate-500">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-meridian-blue hover:underline font-medium">Register</Link>
+        </p>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500 text-center space-y-1">
+          <p>
+            Registered? Sign in with your <span className="text-slate-700">email</span> and password.
           </p>
-          <div className="bg-slate-700/50 rounded-lg px-4 py-3 text-xs text-slate-400 text-center space-y-1">
-            <p>
-              Registered? Sign in with your <span className="text-slate-200">email</span> and password.
-            </p>
-            <p>
-              Demo operator: <span className="text-slate-200 font-mono">demo</span> /{' '}
-              <span className="text-slate-200 font-mono">dynatrace</span>
-            </p>
-          </div>
+          <p>
+            Demo operator: <span className="font-mono text-slate-700">demo</span> /{' '}
+            <span className="font-mono text-slate-700">dynatrace</span>
+          </p>
         </div>
       </div>
-    </div>
+    </AuthShell>
   )
 }
