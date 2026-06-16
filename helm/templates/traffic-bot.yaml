@@ -37,6 +37,8 @@ spec:
               value: {{ .Values.trafficBot.config.scenarios.accountCreation | quote }}
             - name: SCENARIO_BROWSING
               value: {{ .Values.trafficBot.config.scenarios.browsing | quote }}
+            - name: SCENARIO_STORE_PURCHASE
+              value: {{ .Values.trafficBot.config.scenarios.storePurchase | quote }}
             - name: SCENARIO_CHATBOT
               value: {{ .Values.trafficBot.config.scenarios.chatbot | quote }}
           livenessProbe:

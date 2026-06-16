@@ -14,6 +14,7 @@ module.exports = {
     citizenRequests: process.env.SCENARIO_CITIZEN_REQUESTS !== 'false',
     accountCreation: process.env.SCENARIO_ACCOUNT_CREATION !== 'false',
     browsing:        process.env.SCENARIO_BROWSING        !== 'false',
+    storePurchase:   process.env.SCENARIO_STORE_PURCHASE  !== 'false',
     chatbot:         process.env.SCENARIO_CHATBOT         === 'true',  // off by default
   },
 }

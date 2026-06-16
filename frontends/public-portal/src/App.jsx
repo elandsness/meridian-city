@@ -9,6 +9,8 @@ import Register from './pages/Register.jsx'
 import ServiceRequests from './pages/ServiceRequests.jsx'
 import NewRequest from './pages/NewRequest.jsx'
 import RequestDetail from './pages/RequestDetail.jsx'
+import Store from './pages/Store.jsx'
+import Orders from './pages/Orders.jsx'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -46,6 +48,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <RequestDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store"
+          element={
+            <ProtectedRoute>
+              <Store />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/orders"
+          element={
+            <ProtectedRoute>
+              <Orders />
             </ProtectedRoute>
           }
         />

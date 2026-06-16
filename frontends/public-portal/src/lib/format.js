@@ -21,6 +21,11 @@ export function displayName(user) {
   return n.split(' ')[0] || n || 'neighbor'
 }
 
+export function formatCents(cents) {
+  const n = (Number(cents) || 0) / 100
+  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' })
+}
+
 export function greeting(d = new Date()) {
   const h = d.getHours()
   if (h < 12) return 'Good morning'

@@ -94,13 +94,17 @@ No gateway/Helm change — `/api/v1/incidents` already routes to city-operations
 ---
 
 ## Stage 5 — City store (commerce)
-- [ ] `commerce-service` (products/cart/checkout/orders + `@Scheduled` fulfillment
-      state machine) + `commerce.events` topic + `/admin/fault`
-- [ ] Portal `Store` / `Cart` / `Orders` with order `Timeline`
-- [ ] gateway `/api/v1/store` route + Helm template + values block
-- [ ] traffic-bot `storePurchase` journey
-- [ ] `cart.item_added` / `checkout.completed` / `order.packed` / `order.shipped`
+- [x] `commerce-service` (products/cart/checkout/orders + `@Scheduled` fulfillment
+      state machine) + `commerce.events` topic + `/admin/fault` (29 Java files)
+- [x] Portal `Store` (grid + cart + Buy now) / `Orders` (live lifecycle Timeline);
+      nav + Home quick action + `formatCents`
+- [x] gateway `/api/v1/store` route + Helm template + values block + CI matrix
+- [x] traffic-bot `storePurchase` journey (+ SCENARIO_STORE_PURCHASE wiring)
+- [x] `cart.item_added` / `checkout.completed` / `order.packed` / `order.shipped`
       / `order.delivered` events; `store.add_to_cart` + `store.checkout` RUM actions
+- [ ] Pending (tenant/ops): add `purchase` to `analytics-service/funnels.py` so the
+      ops Business Analytics page renders Flow D; add Flow D detail to
+      `dynatrace-config-guide.md` §3 (funnel is configured in the Dynatrace UI)
 
 **Instrumentation:** Purchase funnel (Flow D) + Checkout Success SLO; commerce
 service-map node with DB + Kafka spans.

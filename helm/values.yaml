@@ -406,6 +406,7 @@ trafficBot:
       citizenRequests: true
       accountCreation: true
       browsing: true
+      storePurchase: true
       chatbot: false  # disable by default to avoid LLM API cost in steady-state
   resources:
     requests:
