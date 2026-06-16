@@ -21,6 +21,7 @@ const config = {
   NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8087',
   COMMERCE_SERVICE_URL: process.env.COMMERCE_SERVICE_URL || 'http://localhost:8090',
   BILLING_SERVICE_URL: process.env.BILLING_SERVICE_URL || 'http://localhost:8091',
+  TELEMETRY_PROCESSOR_URL: process.env.TELEMETRY_PROCESSOR_URL || 'http://localhost:8086',
   DEMO_CONTROL_API_URL: process.env.DEMO_CONTROL_API_URL || 'http://localhost:3001',
 }
 

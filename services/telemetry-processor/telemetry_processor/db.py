@@ -29,6 +29,28 @@ async def get_pool() -> asyncpg.Pool:
     return _pool
 
 
+async def fetch_open_incidents_by_asset(asset_ids: list) -> dict:
+    """Return {asset_id: [incident_id, ...]} for open incidents on the given assets.
+
+    Cross-schema read of incidents.incidents (owned by city-operations); the shared
+    meridian DB user can read it. Used by GET /api/v1/devices to link devices to
+    their open incidents.
+    """
+    if not asset_ids:
+        return {}
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, asset_id FROM incidents.incidents "
+            "WHERE asset_id = ANY($1::text[]) AND status <> 'resolved'",
+            asset_ids,
+        )
+    result: dict = {}
+    for r in rows:
+        result.setdefault(r["asset_id"], []).append(r["id"])
+    return result
+
+
 async def init_db() -> None:
     """Create the iot schema and tables if they don't exist."""
     pool = await get_pool()

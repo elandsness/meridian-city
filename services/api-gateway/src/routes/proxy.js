@@ -98,6 +98,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/devices',
+      target: config.TELEMETRY_PROCESSOR_URL,
+      serviceName: 'telemetry-processor',
+      requiresAuth: false,
+    },
+    {
       // demo-control strips /api/v1/demo-control and forwards as /api/v1/<remainder>
       prefix: '/api/v1/demo-control',
       target: config.DEMO_CONTROL_API_URL,

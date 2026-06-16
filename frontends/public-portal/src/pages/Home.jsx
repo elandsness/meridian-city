@@ -4,6 +4,7 @@ import { getIncidents } from '../api/incidents.js'
 import { getServiceRequests } from '../api/serviceRequests.js'
 import { getBills } from '../api/billing.js'
 import { getMessages } from '../api/messages.js'
+import { getDevices } from '../api/devices.js'
 import CityMap from '../components/CityMap.jsx'
 import Card from '../ui/Card.jsx'
 import StatTile from '../ui/StatTile.jsx'
@@ -75,6 +76,12 @@ export default function Home() {
   const { data: incData, isLoading, isError } = useQuery({
     queryKey: ['incidents', 'open'],
     queryFn: () => getIncidents({ status: 'open', limit: 50 }),
+    refetchInterval: 30000,
+  })
+
+  const { data: devicesData } = useQuery({
+    queryKey: ['devices'],
+    queryFn: getDevices,
     refetchInterval: 30000,
   })
 
@@ -206,7 +213,17 @@ export default function Home() {
       </div>
 
       {/* City map */}
-      <Card title="City map — IoT devices" bodyClassName="!p-2">
+      <Card
+        title="City map — IoT devices"
+        action={
+          devicesData?.summary ? (
+            <span className="text-xs text-slate-500">
+              {devicesData.summary.healthy} healthy · {devicesData.summary.warning} warning · {devicesData.summary.alert} alert
+            </span>
+          ) : null
+        }
+        bodyClassName="!p-2"
+      >
         <div className="rounded-xl overflow-hidden">
           <CityMap incidents={incidents} />
         </div>
