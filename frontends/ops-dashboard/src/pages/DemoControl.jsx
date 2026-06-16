@@ -17,6 +17,8 @@ import {
   stopTraffic,
   burstTraffic,
 } from '../api/demo.js';
+import { getIncidents } from '../api/incidents.js';
+import { DEMO_GUIDE } from '../data/demoGuide.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -687,6 +689,87 @@ function TrafficCard() {
 }
 
 // ---------------------------------------------------------------------------
+// Live activity counters
+// ---------------------------------------------------------------------------
+function LiveCounters() {
+  const { data: traffic } = useQuery({
+    queryKey: ['traffic-status'],
+    queryFn: getTrafficStatus,
+    refetchInterval: 5_000,
+    retry: false,
+  });
+  const { data: incData } = useQuery({
+    queryKey: ['incidents', 'open'],
+    queryFn: () => getIncidents({ status: 'open', limit: 100 }),
+    refetchInterval: 10_000,
+    retry: false,
+  });
+
+  const incidents = Array.isArray(incData) ? incData : incData?.incidents ?? [];
+  const running = traffic?.running ?? traffic?.status === 'running';
+  const rpm = traffic?.rpm_current ?? traffic?.rate_rpm ?? traffic?.rpm ?? 0;
+  const reqsSent = traffic?.requests_sent ?? traffic?.requestsSent ?? null;
+  const journeys = traffic?.active_journeys ?? traffic?.journeys ?? null;
+
+  const tiles = [
+    { label: 'Traffic', value: running ? 'Running' : 'Stopped', cls: running ? 'text-green-400' : 'text-gray-400' },
+    { label: 'Requests / min', value: Math.round(rpm), cls: 'text-cyan-400' },
+    { label: 'Requests sent', value: reqsSent != null ? Number(reqsSent).toLocaleString() : '—', cls: 'text-cyan-400' },
+    { label: 'Open incidents', value: incidents.length, cls: incidents.length > 0 ? 'text-rose-400' : 'text-gray-300' },
+  ];
+
+  return (
+    <div className="bg-gray-900 rounded-xl border border-gray-800 px-5 py-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Live activity</p>
+        <span className="flex items-center gap-1.5 text-xs text-green-400">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />Live
+        </span>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {tiles.map((t) => (
+          <div key={t.label} className="bg-gray-800 rounded-lg p-3">
+            <p className="text-xs text-gray-500">{t.label}</p>
+            <p className={`text-2xl font-bold mt-0.5 ${t.cls}`}>{t.value}</p>
+          </div>
+        ))}
+      </div>
+      {journeys && typeof journeys === 'object' && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
+          {Object.entries(journeys).map(([k, v]) => (
+            <span key={k}>{k}: <span className="text-gray-300">{v}</span></span>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-gray-600 mt-3">
+        Sessions, spans &amp; business events are visible in Dynatrace (RUM, Distributed traces, Business Analytics).
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline demo guide
+// ---------------------------------------------------------------------------
+function DemoGuideCard() {
+  return (
+    <SectionCard title="Demo Guide" defaultOpen={false}>
+      <div className="space-y-3">
+        {DEMO_GUIDE.map((g) => (
+          <div key={g.id} className="rounded-lg bg-gray-800 border border-gray-700 p-4">
+            <p className="text-sm font-semibold text-white">{g.id}. {g.title}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{g.shows}</p>
+            <ol className="list-decimal list-inside mt-2 space-y-1 text-xs text-gray-400">
+              {g.steps.map((s, i) => <li key={i}>{s}</li>)}
+            </ol>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main DemoControl page
 // ---------------------------------------------------------------------------
 export default function DemoControl() {
@@ -727,6 +810,8 @@ export default function DemoControl() {
         )}
       </div>
 
+      <LiveCounters />
+      <DemoGuideCard />
       <ScenariosCard activeScenarioId={activeScenarioId} />
       <FaultCard />
       <FleetCard />

@@ -32,6 +32,7 @@ jobs:
           - service-dispatch
           - city-operations
           - commerce-service
+          - billing-service
     steps:
       - uses: actions/checkout@v4
 

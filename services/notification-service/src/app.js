@@ -20,8 +20,10 @@
 
 const express = require('express')
 const { start: startKafka, stop: stopKafka } = require('./kafka')
+const { init: initDb } = require('./db')
 const healthRoutes = require('./routes/health')
 const notificationRoutes = require('./routes/notifications')
+const messageRoutes = require('./routes/messages')
 
 const PORT = parseInt(process.env.PORT || '8087', 10)
 
@@ -42,6 +44,7 @@ app.use((req, _res, next) => {
 // Routes
 app.use('/health', healthRoutes)
 app.use('/api/v1/notifications', notificationRoutes)
+app.use('/api/v1/messages', messageRoutes)
 
 // 404 handler
 app.use((_req, res) => {
@@ -55,6 +58,15 @@ app.use((err, _req, res, _next) => {
 })
 
 async function main () {
+  // Initialise the inbox DB schema — non-fatal, inbox calls no-op until ready
+  initDb().catch(err => {
+    console.error(JSON.stringify({
+      level: 'error',
+      msg: 'messages DB init failed (inbox disabled)',
+      error: err.message,
+    }))
+  })
+
   // Start Kafka consumer in background — failure does not block HTTP startup
   startKafka().catch(err => {
     console.error(JSON.stringify({

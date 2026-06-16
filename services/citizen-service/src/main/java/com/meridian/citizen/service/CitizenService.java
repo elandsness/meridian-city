@@ -4,6 +4,7 @@ import com.meridian.citizen.domain.Account;
 import com.meridian.citizen.domain.Citizen;
 import com.meridian.citizen.dto.CitizenResponse;
 import com.meridian.citizen.dto.CreateCitizenRequest;
+import com.meridian.citizen.messaging.CitizenEventPublisher;
 import com.meridian.citizen.repository.AccountRepository;
 import com.meridian.citizen.repository.CitizenRepository;
 import com.meridian.citizen.util.BusinessEventLogger;
@@ -24,15 +25,18 @@ public class CitizenService {
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final BusinessEventLogger businessEventLogger;
+    private final CitizenEventPublisher citizenEventPublisher;
 
     public CitizenService(CitizenRepository citizenRepository,
                           AccountRepository accountRepository,
                           PasswordEncoder passwordEncoder,
-                          BusinessEventLogger businessEventLogger) {
+                          BusinessEventLogger businessEventLogger,
+                          CitizenEventPublisher citizenEventPublisher) {
         this.citizenRepository = citizenRepository;
         this.accountRepository = accountRepository;
         this.passwordEncoder = passwordEncoder;
         this.businessEventLogger = businessEventLogger;
+        this.citizenEventPublisher = citizenEventPublisher;
     }
 
     @Transactional
@@ -73,6 +77,9 @@ public class CitizenService {
 
         log.info("Citizen created: citizenId={} email={}", citizen.getId(), citizen.getEmail());
         businessEventLogger.citizenRegistered(citizen.getId(), citizen.getEmail(), citizen.getZoneId());
+
+        // Async seam: billing-service consumes this to generate a tax-bill history.
+        citizenEventPublisher.publishCitizenRegistered(citizen);
 
         return CitizenResponse.from(citizen);
     }

@@ -2,14 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getIncidents } from '../api/incidents.js'
 import { getServiceRequests } from '../api/serviceRequests.js'
+import { getBills } from '../api/billing.js'
+import { getMessages } from '../api/messages.js'
+import { getDevices } from '../api/devices.js'
 import CityMap from '../components/CityMap.jsx'
 import Card from '../ui/Card.jsx'
 import StatTile from '../ui/StatTile.jsx'
 import Button from '../ui/Button.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { useNotifications } from '../context/NotificationContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
-import { timeAgo, displayName, greeting, severityMeta, severityRank } from '../lib/format.js'
+import { timeAgo, displayName, greeting, severityMeta, severityRank, formatCents } from '../lib/format.js'
 
 const OPEN_STATUSES = new Set(['submitted', 'dispatched', 'assigned', 'acknowledged', 'in_progress'])
 
@@ -45,6 +47,7 @@ function IncidentRow({ incident }) {
 
 const QA_ICONS = {
   store: <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />,
+  pay: <path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1zM9 9h6M9 13h6" />,
   report: <path d="M12 5v14M5 12h14" />,
   list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
   chat: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
@@ -68,7 +71,6 @@ function QuickAction({ icon, title, subtitle, to, onClick }) {
 
 export default function Home() {
   const { isAuthenticated, user } = useAuth()
-  const { notifications, unreadCount } = useNotifications()
   const { openChat } = useChat()
 
   const { data: incData, isLoading, isError } = useQuery({
@@ -77,11 +79,31 @@ export default function Home() {
     refetchInterval: 30000,
   })
 
+  const { data: devicesData } = useQuery({
+    queryKey: ['devices'],
+    queryFn: getDevices,
+    refetchInterval: 30000,
+  })
+
   const { data: reqData } = useQuery({
     queryKey: ['my-requests', user?.id],
     queryFn: () => getServiceRequests({ citizen_id: user?.id, limit: 50 }),
     enabled: isAuthenticated,
     refetchInterval: 60000,
+  })
+
+  const { data: billsData } = useQuery({
+    queryKey: ['bills', user?.id],
+    queryFn: () => getBills(user?.id, 'outstanding'),
+    enabled: isAuthenticated,
+    refetchInterval: 60000,
+  })
+
+  const { data: messagesData } = useQuery({
+    queryKey: ['messages', user?.id],
+    queryFn: () => getMessages(user?.id),
+    enabled: isAuthenticated,
+    refetchInterval: 20000,
   })
 
   const incidents = unwrap(incData, 'incidents', 'items')
@@ -96,7 +118,10 @@ export default function Home() {
 
   const myOpen = requests.filter((r) => OPEN_STATUSES.has((r.status || '').toLowerCase())).length
   const myResolved = requests.filter((r) => (r.status || '').toLowerCase() === 'resolved').length
-  const messages = notifications.slice(0, 4)
+  const bills = unwrap(billsData, 'items')
+  const balanceCents = bills.reduce((sum, b) => sum + (b.amount_cents || 0), 0)
+  const messages = (Array.isArray(messagesData?.messages) ? messagesData.messages : []).slice(0, 4)
+  const unreadCount = messagesData?.unread ?? 0
 
   return (
     <div className="space-y-6">
@@ -124,7 +149,13 @@ export default function Home() {
           valueClassName={incidents.length > 0 ? 'text-red-600' : 'text-slate-900'}
         />
         {isAuthenticated && <StatTile label="My open requests" value={myOpen} />}
-        {isAuthenticated && <StatTile label="Resolved for me" value={myResolved} />}
+        {isAuthenticated && (
+          <StatTile
+            label="Balance due"
+            value={formatCents(balanceCents)}
+            valueClassName={balanceCents > 0 ? 'text-red-600' : 'text-green-600'}
+          />
+        )}
         <StatTile label="Monitored zones" value="5" sub="north · south · east · west · central" />
       </div>
 
@@ -149,11 +180,9 @@ export default function Home() {
           <Card
             title="Messages"
             action={
-              unreadCount > 0 ? (
-                <span className="text-xs bg-meridian-tint text-meridian-blue px-2 py-0.5 rounded-full">
-                  {unreadCount} new
-                </span>
-              ) : null
+              <Link to="/messages" className="text-xs text-meridian-blue hover:underline font-medium">
+                {unreadCount > 0 ? `${unreadCount} new` : 'View all'}
+              </Link>
             }
           >
             {messages.length === 0 ? (
@@ -162,8 +191,8 @@ export default function Home() {
               <div className="-my-1">
                 {messages.map((m, i) => (
                   <div key={m.id || i} className="py-2.5 border-b border-slate-100 last:border-0">
-                    <p className="text-sm text-slate-900">{m.title || 'Notification'}</p>
-                    {m.message && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{m.message}</p>}
+                    <p className={`text-sm ${m.read ? 'text-slate-700' : 'font-medium text-slate-900'}`}>{m.title || 'Notification'}</p>
+                    {m.body && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{m.body}</p>}
                   </div>
                 ))}
               </div>
@@ -184,15 +213,26 @@ export default function Home() {
       </div>
 
       {/* City map */}
-      <Card title="City map — IoT devices" bodyClassName="!p-2">
+      <Card
+        title="City map — IoT devices"
+        action={
+          devicesData?.summary ? (
+            <span className="text-xs text-slate-500">
+              {devicesData.summary.healthy} healthy · {devicesData.summary.warning} warning · {devicesData.summary.alert} alert
+            </span>
+          ) : null
+        }
+        bodyClassName="!p-2"
+      >
         <div className="rounded-xl overflow-hidden">
           <CityMap incidents={incidents} />
         </div>
       </Card>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <QuickAction icon="store" title="City store" subtitle="Mugs, tees & more" to="/store" />
+        <QuickAction icon="pay" title="Pay bills" subtitle="Tax bills & history" to="/billing" />
         <QuickAction icon="report" title="Report an issue" subtitle="Submit a service request" to="/service-requests/new" />
         <QuickAction icon="list" title="My requests" subtitle="Track your submissions" to="/service-requests" />
         <QuickAction icon="chat" title="Ask Meri" subtitle="City AI assistant" onClick={openChat} />

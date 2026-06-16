@@ -163,6 +163,28 @@ commerceService:
       memory: "1Gi"
 
 # ---------------------------------------------------------------------------
+# Billing Service (Java / Spring Boot)
+# Tax bills: quarterly history generated at registration (consumes citizens.events),
+# pay a bill (simulated). Emits billing.events.
+# ---------------------------------------------------------------------------
+billingService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "billing-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8091
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# ---------------------------------------------------------------------------
 # Service Dispatch (Java / Spring Boot)
 # Routes and assigns service requests; emits Business Events at each step.
 # ---------------------------------------------------------------------------
@@ -407,6 +429,8 @@ trafficBot:
       accountCreation: true
       browsing: true
       storePurchase: true
+      payTax: true
+      handleOpenRequests: true
       chatbot: false  # disable by default to avoid LLM API cost in steady-state
   resources:
     requests:
@@ -557,6 +581,16 @@ kafka:
         retention.ms: "3600000"
     - name: commerce.events
       partitions: 2
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
+    - name: citizens.events
+      partitions: 2
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
+    - name: billing.events
+      partitions: 1
       replicationFactor: 1
       config:
         retention.ms: "604800000"

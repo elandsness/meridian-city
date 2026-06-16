@@ -102,9 +102,8 @@ No gateway/Helm change — `/api/v1/incidents` already routes to city-operations
 - [x] traffic-bot `storePurchase` journey (+ SCENARIO_STORE_PURCHASE wiring)
 - [x] `cart.item_added` / `checkout.completed` / `order.packed` / `order.shipped`
       / `order.delivered` events; `store.add_to_cart` + `store.checkout` RUM actions
-- [ ] Pending (tenant/ops): add `purchase` to `analytics-service/funnels.py` so the
-      ops Business Analytics page renders Flow D; add Flow D detail to
-      `dynatrace-config-guide.md` §3 (funnel is configured in the Dynatrace UI)
+- [x] `purchase` funnel in `analytics-service/funnels.py` + ops Business Analytics tile;
+      Flow D detail in `dynatrace-config-guide.md` §3
 
 **Instrumentation:** Purchase funnel (Flow D) + Checkout Success SLO; commerce
 service-map node with DB + Kafka spans.
@@ -112,28 +111,41 @@ service-map node with DB + Kafka spans.
 ---
 
 ## Stage 6 — Tax / billing
-- [ ] `billing-service` (bills + pay + quarterly history generation) +
-      `billing.events` topic
-- [ ] citizen-service publish hook → `citizens.events`; billing consumes it
-- [ ] Portal `Billing` page + Home balance-due tile
-- [ ] gateway `/api/v1/billing` route + Helm template + values block
-- [ ] traffic-bot `payTax` journey
-- [ ] `tax.bill_issued` / `tax.payment_completed` events; `tax.pay` RUM action
+- [x] `billing-service` (bills + pay + quarterly history generation; 12 Java files)
+      + `billing.events` topic + `citizens.events` consumer (idempotent generation)
+- [x] citizen-service publish hook → `citizens.events` (`CitizenEventPublisher`);
+      billing consumes `citizen.registered`
+- [x] Portal `Billing` page (outstanding + paid history + pay) + Home balance-due
+      tile + "Pay bills" nav/quick action; `api/billing.js`
+- [x] gateway `/api/v1/billing` route + Helm template + values block + CI matrix
+- [x] traffic-bot `payTax` journey (polls async-generated bills) + scenario wiring
+- [x] `tax.bill_issued` / `tax.payment_completed` events; `tax.pay` RUM action
 
 **Instrumentation:** Tax Payment funnel (Flow E) + Payment Availability SLO.
+- [x] `tax-payment` funnel in `analytics-service/funnels.py` + ops tile; Flow E
+      detail + SLO 5/6 + RUM tiles + log matcher in `dynatrace-config-guide.md`;
+      RUM enablement (§8 + values-custom.yaml.example `rum:` blocks)
 
 ---
 
 ## Stage 7 — Messages inbox + IoT status + demo-control upgrade
-- [ ] notification-service: Postgres + `messages` schema; consume
-      `commerce.events` / `billing.events` / `requests.events`; `/api/v1/messages`
-- [ ] Portal `Messages` inbox + IoT status map; "Your package has arrived" closes
-      the loop
-- [ ] telemetry-processor `GET /api/v1/devices` aggregation + gateway `/api/v1/devices`
-- [ ] Ops IoT fleet device → incident links
-- [ ] Demo control: live counters (sessions/spans/incidents/orders/requests) +
-      inline `docs/demo-scripts/*.md` rendering (`react-markdown`)
-- [ ] traffic-bot `handleOpenRequests` journey
+### 7a — Messages inbox (done)
+- [x] notification-service: Postgres (`pg`) + `messages` schema (runtime DDL);
+      consume `commerce.events` / `billing.events` / `requests.events`; `/api/v1/messages`
+      (list / read / read-all) + gateway route
+- [x] Portal `Messages` inbox page + Home preview wired to it + nav; `api/messages.js`.
+      "Your package has arrived" loop closed (order.delivered → inbox)
+### 7b — IoT status (done)
+- [x] telemetry-processor `GET /api/v1/devices` (live fleet + open-incident join) +
+      gateway `/api/v1/devices` + `IOT_SIMULATOR_URL`
+- [x] Citizen Home map device summary; Ops IoT page device table → incident links
+### 7c — Demo-control upgrade (done)
+- [x] Demo control: `LiveCounters` card (traffic rpm / requests sent / open incidents /
+      journeys; sessions+spans noted as Dynatrace-side) + inline `DemoGuideCard`
+      (concise summaries of the 5 demo scenarios)
+- [x] traffic-bot `handleOpenRequests` journey + scenario wiring
+- [x] Restored the 3 city-ops fault files (AdminController / FaultInjectionConfig /
+      CpuSpikeScheduler) to re-enable city-ops fault injection
 
 **Instrumentation:** live counters from analytics KPIs + incident/order counts;
 the full purchase → delivery → inbox loop is observable end-to-end.

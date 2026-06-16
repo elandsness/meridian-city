@@ -49,6 +49,19 @@ _FUNNELS: dict[str, list[str]] = {
         "workorder.acknowledged",
         "workorder.resolved",
     ],
+    # Flow D — City Store purchase funnel (derived from commerce.orders)
+    "purchase": [
+        "cart.item_added",
+        "checkout.completed",
+        "order.packed",
+        "order.shipped",
+        "order.delivered",
+    ],
+    # Flow E — Tax payment funnel (derived from billing.tax_bills)
+    "tax-payment": [
+        "tax.bill_issued",
+        "tax.payment_completed",
+    ],
 }
 
 FUNNEL_NAMES = list(_FUNNELS.keys())
@@ -69,6 +82,10 @@ async def get_funnel(funnel_name: str) -> List[dict]:
 
     if funnel_name in ("service-request", "account-creation"):
         return await _query_event_log(pool, stages)
+    elif funnel_name == "purchase":
+        return await _query_purchase_funnel(pool, stages)
+    elif funnel_name == "tax-payment":
+        return await _query_tax_funnel(pool, stages)
     else:
         return await _query_iot_incident_funnel(pool, stages)
 
@@ -122,6 +139,44 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
         """)
 
     counts = [anomalies, incidents, wo_total, wo_assigned, wo_acked, wo_resolved]
+    return [
+        {"stage": stage, "count": int(count)}
+        for stage, count in zip(stages, counts)
+    ]
+
+
+async def _query_purchase_funnel(pool, stages: list[str]) -> list[dict]:
+    """
+    City Store purchase funnel from commerce.carts / commerce.orders:
+      cart.item_added    → carts created (shopping sessions)
+      checkout.completed → orders placed
+      order.packed/shipped/delivered → orders with the matching *_at timestamp
+    """
+    async with pool.acquire() as conn:
+        carts     = await safe_fetchval(conn, "SELECT COUNT(*) FROM commerce.carts")
+        orders    = await safe_fetchval(conn, "SELECT COUNT(*) FROM commerce.orders")
+        packed    = await safe_fetchval(conn, "SELECT COUNT(*) FROM commerce.orders WHERE packed_at IS NOT NULL")
+        shipped   = await safe_fetchval(conn, "SELECT COUNT(*) FROM commerce.orders WHERE shipped_at IS NOT NULL")
+        delivered = await safe_fetchval(conn, "SELECT COUNT(*) FROM commerce.orders WHERE delivered_at IS NOT NULL")
+
+    counts = [carts, orders, packed, shipped, delivered]
+    return [
+        {"stage": stage, "count": int(count)}
+        for stage, count in zip(stages, counts)
+    ]
+
+
+async def _query_tax_funnel(pool, stages: list[str]) -> list[dict]:
+    """
+    Tax payment funnel from billing.tax_bills:
+      tax.bill_issued        → total bills
+      tax.payment_completed  → bills with status = 'paid'
+    """
+    async with pool.acquire() as conn:
+        issued = await safe_fetchval(conn, "SELECT COUNT(*) FROM billing.tax_bills")
+        paid   = await safe_fetchval(conn, "SELECT COUNT(*) FROM billing.tax_bills WHERE status = 'paid'")
+
+    counts = [issued, paid]
     return [
         {"stage": stage, "count": int(count)}
         for stage, count in zip(stages, counts)

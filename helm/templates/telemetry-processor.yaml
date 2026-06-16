@@ -29,6 +29,8 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "telemetry-processor"
+            - name: IOT_SIMULATOR_URL
+              value: "http://iot-simulator:8088"
             # Fault injection
             - name: FAULT_KAFKA_PAUSE_ENABLED
               value: {{ .Values.telemetryProcessor.faultInjection.kafkaPauseEnabled | quote }}

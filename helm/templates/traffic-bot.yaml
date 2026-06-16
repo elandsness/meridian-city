@@ -39,6 +39,10 @@ spec:
               value: {{ .Values.trafficBot.config.scenarios.browsing | quote }}
             - name: SCENARIO_STORE_PURCHASE
               value: {{ .Values.trafficBot.config.scenarios.storePurchase | quote }}
+            - name: SCENARIO_PAY_TAX
+              value: {{ .Values.trafficBot.config.scenarios.payTax | quote }}
+            - name: SCENARIO_HANDLE_OPEN_REQUESTS
+              value: {{ .Values.trafficBot.config.scenarios.handleOpenRequests | quote }}
             - name: SCENARIO_CHATBOT
               value: {{ .Values.trafficBot.config.scenarios.chatbot | quote }}
           livenessProbe:
