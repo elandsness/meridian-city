@@ -141,6 +141,28 @@ citizenService:
   env: {}
 
 # ---------------------------------------------------------------------------
+# Commerce Service (Java / Spring Boot)
+# City store: products, cart, one-click checkout, and the simulated order
+# lifecycle (placed -> packed -> shipped -> delivered). Emits commerce.events.
+# ---------------------------------------------------------------------------
+commerceService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "commerce-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8090
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "384Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# ---------------------------------------------------------------------------
 # Service Dispatch (Java / Spring Boot)
 # Routes and assigns service requests; emits Business Events at each step.
 # ---------------------------------------------------------------------------
@@ -532,6 +554,11 @@ kafka:
       replicationFactor: 1
       config:
         retention.ms: "3600000"
+    - name: commerce.events
+      partitions: 2
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
 
 # Strimzi operator sub-chart values
 strimzi-kafka-operator:

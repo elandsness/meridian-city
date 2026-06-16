@@ -48,6 +48,8 @@ spec:
               value: "http://ai-service:8085"
             - name: NOTIFICATION_SERVICE_URL
               value: "http://notification-service:8087"
+            - name: COMMERCE_SERVICE_URL
+              value: "http://commerce-service:8090"
             - name: DEMO_CONTROL_API_URL
               value: "http://demo-control-api:3001"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}

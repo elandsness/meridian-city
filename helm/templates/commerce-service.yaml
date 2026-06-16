@@ -1,0 +1,79 @@
+{{- if .Values.commerceService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: commerce-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: commerce-service
+spec:
+  replicas: {{ .Values.commerceService.replicaCount }}
+  selector:
+    matchLabels:
+      app: commerce-service
+  template:
+    metadata:
+      labels:
+        app: commerce-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: commerce-service
+    spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
+      containers:
+        - name: commerce-service
+          image: {{ include "meridian.image" (dict "repository" .Values.commerceService.image.repository "tag" .Values.commerceService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "commerce-service"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://meridian-db-rw:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-secrets
+                  key: db-password
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "meridian-kafka-bootstrap:9092"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8090
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8090
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.commerceService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: commerce-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: commerce-service
+spec:
+  type: ClusterIP
+  selector:
+    app: commerce-service
+  ports:
+    - name: http
+      port: {{ .Values.commerceService.service.port }}
+      targetPort: 8090
+{{- end }}
