@@ -284,16 +284,46 @@ install_or_upgrade() {
     echo ""
   fi
 
-  # OneAgent injection happens at pod creation, but app pods come up before the
-  # DynaKube (a post-install hook) is reconciled — so they need one restart to be
-  # instrumented. (We don't auto-restart: an injected init container can stall if
-  # it starts before the DynaKube is fully Running.)
+  # OneAgent injection happens at pod creation, but on a fresh install the app
+  # pods come up before the DynaKube (a post-install hook) has reconciled — so
+  # they start un-instrumented and need one restart. We wait for the DynaKube to
+  # be Running first (an injected init container can stall if it starts before the
+  # code module is ready), and we skip the restart when pods are already injected
+  # (e.g. a clean upgrade) to avoid needless churn.
   if [[ "$dt_enabled" == true ]]; then
     echo ""
-    info "Dynatrace Operator installed in '$DYNATRACE_NAMESPACE'. To instrument the app pods,"
-    info "wait for the DynaKube to be Running, then restart the workloads once:"
-    info "  kubectl get dynakube $RELEASE_NAME -n $DYNATRACE_NAMESPACE     # STATUS should be Running"
-    info "  kubectl -n $NAMESPACE rollout restart deploy"
+    info "Ensuring OneAgent instrumentation of the app pods..."
+    local _dk_phase="" _waited=0
+    while [[ $_waited -lt 300 ]]; do
+      _dk_phase=$(kubectl get dynakube "$RELEASE_NAME" -n "$DYNATRACE_NAMESPACE" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || true)
+      [[ "$_dk_phase" == "Running" ]] && break
+      sleep 10
+      _waited=$((_waited + 10))
+    done
+
+    if [[ "$_dk_phase" != "Running" ]]; then
+      warn "DynaKube did not reach Running within 5m (phase: ${_dk_phase:-unknown}) — skipping auto-restart."
+      warn "Once it is Running, instrument the app pods with:"
+      warn "  kubectl -n $NAMESPACE rollout restart deploy -l app.kubernetes.io/part-of=meridian-city-platform"
+    elif kubectl get pods -n "$NAMESPACE" \
+           -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+           -o jsonpath='{range .items[*].spec.initContainers[*]}{.name}{"\n"}{end}' 2>/dev/null \
+           | grep -qx 'dynatrace-operator'; then
+      success "App pods are already OneAgent-injected — no restart needed."
+    else
+      info "DynaKube is Running but the app pods predate it — restarting once so OneAgent injects..."
+      kubectl rollout restart deployment -n "$NAMESPACE" \
+        -l 'app.kubernetes.io/part-of=meridian-city-platform'
+      sleep 10  # let the rollout begin so we wait on the new pods, not the old ready ones
+      kubectl wait pods \
+        --for=condition=ready \
+        --selector='app.kubernetes.io/part-of=meridian-city-platform' \
+        -n "$NAMESPACE" \
+        --timeout=600s 2>/dev/null \
+        || warn "Pods still settling after the injection restart — check: ./scripts/deploy.sh status"
+      success "App workloads restarted — OneAgent instrumentation active."
+    fi
   fi
 
   port_forward background
