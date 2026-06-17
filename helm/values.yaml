@@ -458,7 +458,12 @@ publicPortal:
     enabled: false
     snippet: ""
   service:
-    type: ClusterIP
+    # LoadBalancer gives the SPA a stable external endpoint; its nginx also proxies
+    # /api → api-gateway, so one origin serves both UI and API. On clusters without a
+    # LoadBalancer controller (e.g. kind) the external IP stays <pending> and you fall
+    # back to `kubectl port-forward` — but note port-forward drops the SPA's burst of
+    # concurrent /api XHRs (browser sees status 0), so prefer the LB where available.
+    type: LoadBalancer
     port: 80
   ingress:
     enabled: false
@@ -491,7 +496,8 @@ opsDashboard:
     enabled: false
     snippet: ""
   service:
-    type: ClusterIP
+    # LoadBalancer for a stable external endpoint (see publicPortal.service note).
+    type: LoadBalancer
     port: 80
   ingress:
     enabled: false
