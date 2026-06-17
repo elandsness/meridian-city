@@ -29,6 +29,9 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "analytics-service"
+            # Exclude the k8s liveness/readiness probes from FastAPI server spans
+            - name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS
+              value: "^/health"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:

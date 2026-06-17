@@ -29,6 +29,9 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "ai-service"
+            # Exclude the k8s liveness/readiness probes from FastAPI server spans
+            - name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS
+              value: "^/health"
             # LLM provider selection and credentials
             - name: LLM_PROVIDER
               value: {{ .Values.llm.provider | quote }}

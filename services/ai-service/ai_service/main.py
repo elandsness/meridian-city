@@ -1,13 +1,15 @@
 """
 Entry point for ai-service.
 
-Startup sequence:
+Import-time setup (BEFORE uvicorn serves the app):
   1. Configure JSON-structured logging (python-json-logger)
-  2. Initialise OTel SDK (non-fatal if collector unreachable)
-  3. Instrument FastAPI with OTel (request spans)
-  4. Read initial fault injection config from env vars
-  5. Instantiate the LLM provider (driven by LLM_PROVIDER env var)
-  6. Wire up ChatService → FastAPI app
+  2. Initialise OpenLLMetry/OTel via Traceloop (non-fatal if collector unreachable)
+  3. Instrument FastAPI with OTel (HTTP server spans)
+
+Startup hook:
+  1. Read initial fault injection config from env vars
+  2. Instantiate the LLM provider (driven by LLM_PROVIDER env var)
+  3. Wire up ChatService → FastAPI app
 
 Shutdown:
   1. Close the httpx client in ChatService
@@ -53,6 +55,29 @@ def configure_logging() -> None:
     logging.getLogger("BusinessEvents").propagate = True
 
 
+# Configure logging + OpenTelemetry at import time — BEFORE uvicorn serves the app.
+# FastAPIInstrumentor must add its middleware before the ASGI app starts; doing it in
+# the startup hook is too late ("Cannot add middleware after an application has started"),
+# which silently dropped all HTTP server spans. ai-service uses Traceloop (OpenLLMetry)
+# for its gen_ai spans, so init_otel() runs here too — the FastAPI server spans share the
+# tracer provider Traceloop configures.
+configure_logging()
+
+# OTel / OpenLLMetry — non-fatal if the collector is not yet reachable
+try:
+    init_otel()
+except Exception as exc:
+    logger.warning("OTel init failed — observability disabled: %s", exc)
+
+# FastAPI auto-instrumentation (HTTP server spans)
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    FastAPIInstrumentor.instrument_app(app)
+    logger.info("FastAPI OTel instrumentation applied")
+except Exception as exc:
+    logger.warning("FastAPI OTel instrumentation failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # LLM provider factory
 # ---------------------------------------------------------------------------
@@ -81,22 +106,6 @@ _chat_service: ChatService | None = None
 @app.on_event("startup")
 async def startup() -> None:
     global _chat_service
-
-    configure_logging()
-
-    # OTel — non-fatal if the collector is not yet reachable
-    try:
-        init_otel()
-    except Exception as exc:
-        logger.warning("OTel init failed — observability disabled: %s", exc)
-
-    # FastAPI auto-instrumentation (HTTP request spans)
-    try:
-        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-        FastAPIInstrumentor.instrument_app(app)
-        logger.info("FastAPI OTel instrumentation applied")
-    except Exception as exc:
-        logger.warning("FastAPI OTel instrumentation failed: %s", exc)
 
     # Fault injection — seed from env vars (overridable at runtime via /admin/fault)
     fault_state.llm_latency_enabled = (
@@ -135,8 +144,11 @@ async def shutdown() -> None:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8085"))
+    # Pass the app object (not "module:app") so uvicorn does not re-import this
+    # module — the `python -m ...` entrypoint + an import string would load main
+    # twice and register the startup hook (ChatService, Traceloop.init) twice.
     uvicorn.run(
-        "ai_service.main:app",
+        app,
         host="0.0.0.0",
         port=port,
         log_config=None,  # JSON logging is configured above

@@ -29,6 +29,9 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "telemetry-processor"
+            # Exclude the k8s liveness/readiness probes from FastAPI server spans
+            - name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS
+              value: "^/health"
             - name: IOT_SIMULATOR_URL
               value: "http://iot-simulator:8088"
             # Fault injection
