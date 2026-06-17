@@ -35,6 +35,24 @@ spec:
   oneAgent:
     applicationMonitoring: {}
 
+  # Kubernetes Log Module: captures container stdout/stderr into Grail Logs.
+  # This is how the structured business-event JSON logs actually reach Dynatrace —
+  # applicationMonitoring (unlike full-stack) does NOT tail stdout itself, and
+  # full-stack OneAgent isn't an option on GKE Autopilot. The log module runs as an
+  # operator-managed DaemonSet needing no privileged/hostPath access, so it is
+  # Autopilot-compatible (and supersedes the opt-in hostPath logCollector DaemonSet).
+  # Requires the ActiveGate kubernetes-monitoring capability (below) + the token's
+  # logs.ingest scope. The image tag MUST be pinned (no 'latest'); keep it roughly
+  # in step with the OneAgent codeModules version.
+  {{- if .Values.dynatrace.logMonitoring.enabled }}
+  logMonitoring: {}
+  templates:
+    logMonitoring:
+      imageRef:
+        repository: {{ .Values.dynatrace.logMonitoring.image.repository | quote }}
+        tag: {{ .Values.dynatrace.logMonitoring.image.tag | quote }}
+  {{- end }}
+
   # ActiveGate: required for Kubernetes monitoring and routing telemetry
   activeGate:
     capabilities:

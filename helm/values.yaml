@@ -58,6 +58,18 @@ dynatrace:
   operator:
     enabled: true
 
+  # Dynatrace Kubernetes Log Module — captures container stdout into Grail Logs
+  # (this is what gets the business-event JSON logs in under applicationMonitoring).
+  # Operator-managed DaemonSet, no privileged/hostPath, so it works on GKE Autopilot.
+  # The tag MUST be pinned (no 'latest') and should track the OneAgent codeModules
+  # version (check: kubectl -n dynatrace get dynakube <name> -o jsonpath
+  # '{.status.codeModules.version}'). Tags: https://gallery.ecr.aws/dynatrace/dynatrace-logmodule
+  logMonitoring:
+    enabled: true
+    image:
+      repository: "public.ecr.aws/dynatrace/dynatrace-logmodule"
+      tag: "1.339.55.20260615-110349"
+
 # ---------------------------------------------------------------------------
 # LLM / AI configuration (for the citizen chatbot and ai-service)
 # ---------------------------------------------------------------------------
@@ -623,16 +635,20 @@ opentelemetry-collector:
       memory: "1Gi"
 
 # ---------------------------------------------------------------------------
-# Infrastructure: Meridian log collector (DaemonSet)
-# Tails the meridian namespace's container stdout off each node and ships it to
-# Dynatrace via OTLP/HTTP. Needed because OneAgent runs in applicationMonitoring
-# mode (no host agent tailing stdout) and the main OTel collector's logs pipeline
-# has no filelog source — so business-event JSON logs otherwise never reach Grail.
-# See helm/templates/log-collector.yaml. Only deploys when dynatrace.otlpEndpoint
-# is set.
+# Infrastructure: Meridian log collector (DaemonSet) — OPT-IN FALLBACK, default OFF
+# Tails the meridian namespace's container stdout off each node via a hostPath
+# mount and ships it to Dynatrace over OTLP/HTTP. It was the original way to get
+# business-event logs into Grail under applicationMonitoring (no host OneAgent).
+#
+# PREFER the Dynatrace Kubernetes Log Module instead (spec.logMonitoring in the
+# DynaKube — see helm/templates/dynakube.yaml): it captures stdout natively, needs
+# no hostPath/root, and works on GKE Autopilot — which this DaemonSet does NOT
+# (Autopilot blocks hostPath volumes and root containers). Keep this disabled when
+# the Log Module is enabled, or logs get ingested twice. Only enable on a
+# hostPath-capable cluster (e.g. plain kind) that isn't running the Log Module.
 # ---------------------------------------------------------------------------
 logCollector:
-  enabled: true
+  enabled: false
   image: "otel/opentelemetry-collector-contrib:0.114.0"
   resources:
     requests:
