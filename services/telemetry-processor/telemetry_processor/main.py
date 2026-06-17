@@ -46,6 +46,17 @@ def configure_logging() -> None:
     biz.propagate = True  # inherits the root handler
 
 
+# Configure logging + OpenTelemetry at import time — BEFORE uvicorn serves the app.
+# FastAPIInstrumentor must add its middleware before the ASGI app starts (the startup
+# hook is too late), and aiokafka must be instrumented before the consumer is created
+# in the startup hook below.
+configure_logging()
+try:
+    init_otel(app)
+except Exception as exc:
+    logging.getLogger(__name__).warning("OTel init failed — tracing disabled: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # FastAPI lifecycle hooks
 # ---------------------------------------------------------------------------
@@ -58,16 +69,8 @@ _consumer_task: asyncio.Task = None  # type: ignore
 async def startup() -> None:
     global _consumer_instance, _consumer_task
 
-    configure_logging()
     logger = logging.getLogger(__name__)
     logger.info("telemetry-processor starting")
-
-    # OTel — non-fatal. Must run before the Kafka consumer is created so the
-    # aiokafka instrumentation can patch AIOKafkaConsumer before it's used.
-    try:
-        init_otel(app)
-    except Exception as exc:
-        logger.warning("OTel init failed — tracing disabled: %s", exc)
 
     # Init PostgreSQL schema
     try:
@@ -112,8 +115,11 @@ async def shutdown() -> None:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8086"))
+    # Pass the app object (not "module:app") so uvicorn does not re-import this
+    # module — the `python -m ...` entrypoint + an import string would load main
+    # twice and register the startup hook (DB init, Kafka consumer) twice.
     uvicorn.run(
-        "telemetry_processor.main:app",
+        app,
         host="0.0.0.0",
         port=port,
         log_config=None,  # We configure logging ourselves above
