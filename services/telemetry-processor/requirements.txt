@@ -6,3 +6,16 @@ httpx==0.27.2
 python-json-logger==2.0.7
 pydantic==2.9.2
 python-dotenv==1.0.1
+
+# Observability — OpenTelemetry. OneAgent applicationMonitoring does not trace
+# this Python app, so it self-instruments and exports OTLP/HTTP to the in-cluster
+# collector via OTEL_EXPORTER_OTLP_ENDPOINT (same pattern as ai-service and
+# iot-ingestion). aiokafka instrumentation traces the Kafka consume loop (the
+# service's main workload). Pinned to a mutually-compatible 1.28 / 0.49b0 train
+# (opentelemetry-instrumentation-aiokafka was first published at 0.49b0).
+opentelemetry-sdk==1.28.0
+opentelemetry-exporter-otlp-proto-http==1.28.0
+opentelemetry-instrumentation-fastapi==0.49b0
+opentelemetry-instrumentation-asyncpg==0.49b0
+opentelemetry-instrumentation-httpx==0.49b0
+opentelemetry-instrumentation-aiokafka==0.49b0
