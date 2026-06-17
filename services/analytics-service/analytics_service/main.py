@@ -52,6 +52,17 @@ def configure_logging() -> None:
     root.addHandler(handler)
 
 
+# Configure logging + OpenTelemetry at import time — BEFORE uvicorn serves the app.
+# FastAPIInstrumentor must add its middleware before the ASGI app starts; doing it in
+# the startup hook is too late ("Cannot add middleware after an application has started"),
+# which silently dropped all HTTP server spans.
+configure_logging()
+try:
+    init_otel(app)
+except Exception as exc:
+    logger.warning("OTel init failed — tracing disabled: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Background KPI snapshot task
 # ---------------------------------------------------------------------------
@@ -85,13 +96,6 @@ async def _snapshot_loop() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     global _snapshot_task
-    configure_logging()
-
-    # OTel — non-fatal if the collector is not yet reachable
-    try:
-        init_otel(app)
-    except Exception as exc:
-        logger.warning("OTel init failed — tracing disabled: %s", exc)
 
     # DB pool + schema
     try:
@@ -143,8 +147,11 @@ async def shutdown() -> None:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8084"))
+    # Pass the app object (not "module:app") so uvicorn does not re-import this
+    # module — the `python -m ...` entrypoint + an import string would load main
+    # twice and register the startup hook (DB init, Kafka consumer) twice.
     uvicorn.run(
-        "analytics_service.main:app",
+        app,
         host="0.0.0.0",
         port=port,
         log_config=None,
