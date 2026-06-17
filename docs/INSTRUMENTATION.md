@@ -21,8 +21,8 @@ The four pillars and where they come from:
 
 | Pillar | Source |
 | --- | --- |
-| **Traces** | OneAgent auto-instrumentation (Java/Node/Python services) + OTel SDK (Go services, ai-service) → OTel collector → Dynatrace OTLP |
-| **Logs** | Structured JSON to stdout, ingested by OneAgent log monitoring. A dedicated `BusinessEvents` logger emits the canonical business-event shape |
+| **Traces** | OneAgent auto-instrumentation (Java/Node services) + OTel SDK (Go services + the Python services ai-service, analytics-service, telemetry-processor) → OTel collector → Dynatrace OTLP. NOTE: OneAgent `applicationMonitoring` does **not** produce PurePath traces for Python apps, so every Python service instruments itself with OpenTelemetry and exports OTLP to the collector. |
+| **Logs** | Structured JSON to stdout, tailed off each node by the `meridian-log-collector` DaemonSet (`helm/templates/log-collector.yaml`) and shipped to Dynatrace via OTLP/HTTP. A dedicated `BusinessEvents` logger emits the canonical business-event shape. NOTE: OneAgent runs in `applicationMonitoring` mode (no host agent), so it does **not** capture container stdout — the DaemonSet is what gets logs into Grail. |
 | **RUM** | Dynatrace agentless RUM JS in both SPAs (this effort — see below) |
 | **AI** | OpenLLMetry (Traceloop) auto-instrumented `gen_ai.*` spans from ai-service (this effort) |
 

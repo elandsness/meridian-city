@@ -26,6 +26,7 @@ from .api import app, set_snapshot_cache
 from .db import close as close_db, init_db
 from .fault import fault_state
 from .kpis import compute_kpis
+from .otel import init_otel
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,12 @@ async def _snapshot_loop() -> None:
 async def startup() -> None:
     global _snapshot_task
     configure_logging()
+
+    # OTel — non-fatal if the collector is not yet reachable
+    try:
+        init_otel(app)
+    except Exception as exc:
+        logger.warning("OTel init failed — tracing disabled: %s", exc)
 
     # DB pool + schema
     try:

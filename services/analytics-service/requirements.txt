@@ -4,3 +4,12 @@ asyncpg==0.29.0
 python-json-logger==2.0.7
 pydantic==2.9.2
 python-dotenv==1.0.1
+
+# Observability — OpenTelemetry. OneAgent applicationMonitoring does not trace
+# this Python/FastAPI app, so it self-instruments and exports OTLP/HTTP to the
+# in-cluster collector via OTEL_EXPORTER_OTLP_ENDPOINT (same pattern as ai-service
+# and iot-ingestion). Pinned to a mutually-compatible 1.27 / 0.48b0 release train.
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0
+opentelemetry-instrumentation-fastapi==0.48b0
+opentelemetry-instrumentation-asyncpg==0.48b0

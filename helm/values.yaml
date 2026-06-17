@@ -623,6 +623,26 @@ opentelemetry-collector:
       memory: "1Gi"
 
 # ---------------------------------------------------------------------------
+# Infrastructure: Meridian log collector (DaemonSet)
+# Tails the meridian namespace's container stdout off each node and ships it to
+# Dynatrace via OTLP/HTTP. Needed because OneAgent runs in applicationMonitoring
+# mode (no host agent tailing stdout) and the main OTel collector's logs pipeline
+# has no filelog source — so business-event JSON logs otherwise never reach Grail.
+# See helm/templates/log-collector.yaml. Only deploys when dynatrace.otlpEndpoint
+# is set.
+# ---------------------------------------------------------------------------
+logCollector:
+  enabled: true
+  image: "otel/opentelemetry-collector-contrib:0.114.0"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# ---------------------------------------------------------------------------
 # Infrastructure: Dynatrace Operator
 # The operator is installed as its OWN Helm release in the 'dynatrace'
 # namespace by scripts/deploy.sh (NOT as a sub-chart — a sub-chart would land

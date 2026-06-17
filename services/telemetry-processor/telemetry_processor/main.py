@@ -18,6 +18,7 @@ from pythonjsonlogger import jsonlogger
 from .api import app, set_consumer
 from .consumer import TelemetryConsumer
 from .db import init_db, close
+from .otel import init_otel
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,13 @@ async def startup() -> None:
     configure_logging()
     logger = logging.getLogger(__name__)
     logger.info("telemetry-processor starting")
+
+    # OTel — non-fatal. Must run before the Kafka consumer is created so the
+    # aiokafka instrumentation can patch AIOKafkaConsumer before it's used.
+    try:
+        init_otel(app)
+    except Exception as exc:
+        logger.warning("OTel init failed — tracing disabled: %s", exc)
 
     # Init PostgreSQL schema
     try:
