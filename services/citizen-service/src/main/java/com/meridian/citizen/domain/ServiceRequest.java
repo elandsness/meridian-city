@@ -58,6 +58,9 @@ public class ServiceRequest {
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
 
+    @Column(name = "next_transition_at")
+    private OffsetDateTime nextTransitionAt;
+
     @PrePersist
     protected void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();

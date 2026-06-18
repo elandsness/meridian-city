@@ -15,13 +15,15 @@
 
 const config = require('../config')
 
+// NOTE: service-request advancement is now driven server-side by citizen-service's
+// RequestLifecycleScheduler, so the bot only SUBMITS requests — the old
+// handleOpenRequests journey has been retired to avoid double-driving the lifecycle.
 const REGISTRY = [
-  { name: 'citizenRequest', key: 'citizenRequests', weight: 40, journey: require('./citizenRequest') },
-  { name: 'accountCreation', key: 'accountCreation', weight: 25, journey: require('./accountCreation') },
-  { name: 'browsing',        key: 'browsing',        weight: 30, journey: require('./browsing') },
-  { name: 'storePurchase',   key: 'storePurchase',   weight: 15, journey: require('./storePurchase') },
-  { name: 'payTax',          key: 'payTax',          weight: 10, journey: require('./payTax') },
-  { name: 'handleOpenRequests', key: 'handleOpenRequests', weight: 10, journey: require('./handleOpenRequests') },
+  { name: 'citizenRequest', key: 'citizenRequests', weight: 25, journey: require('./citizenRequest') },
+  { name: 'accountCreation', key: 'accountCreation', weight: 20, journey: require('./accountCreation') },
+  { name: 'browsing',        key: 'browsing',        weight: 25, journey: require('./browsing') },
+  { name: 'storePurchase',   key: 'storePurchase',   weight: 20, journey: require('./storePurchase') },
+  { name: 'payTax',          key: 'payTax',          weight: 15, journey: require('./payTax') },
   { name: 'chatbot',         key: 'chatbot',         weight:  5, journey: require('./chatbot') },
 ]
 

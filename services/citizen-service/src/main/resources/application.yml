@@ -49,3 +49,13 @@ management:
 
 service-dispatch:
   url: ${SERVICE_DISPATCH_URL:http://localhost:8082}
+
+# Server-side simulation of the service-request lifecycle (submitted -> in_progress
+# -> resolved) so the Business Analytics funnel fills in realistically without relying
+# on the traffic-bot. completion-probability < 1 intentionally leaves some requests
+# unresolved for investigation in Dynatrace.
+request-lifecycle:
+  enabled: ${REQUEST_LIFECYCLE_ENABLED:true}
+  in-progress-after-seconds: ${REQUEST_LIFECYCLE_IN_PROGRESS_AFTER_SECONDS:20}
+  resolved-after-seconds: ${REQUEST_LIFECYCLE_RESOLVED_AFTER_SECONDS:40}
+  completion-probability: ${REQUEST_LIFECYCLE_COMPLETION_PROBABILITY:0.88}

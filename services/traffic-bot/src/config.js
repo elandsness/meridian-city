@@ -6,8 +6,9 @@ module.exports = {
   // API gateway (all journey HTTP calls go through here)
   TARGET_URL: process.env.TARGET_URL || 'http://localhost:3000',
 
-  // Base load level — journeys per minute in normal mode
-  REQUESTS_PER_MINUTE: parseInt(process.env.REQUESTS_PER_MINUTE || '60', 10),
+  // Base load level — journeys per minute in normal mode. Kept low so only a
+  // handful of flows are in-flight at once; server-side schedulers complete them.
+  REQUESTS_PER_MINUTE: parseInt(process.env.REQUESTS_PER_MINUTE || '8', 10),
 
   // Which journey types are enabled (matches Helm config values)
   SCENARIOS: {
@@ -16,7 +17,6 @@ module.exports = {
     browsing:        process.env.SCENARIO_BROWSING        !== 'false',
     storePurchase:   process.env.SCENARIO_STORE_PURCHASE  !== 'false',
     payTax:          process.env.SCENARIO_PAY_TAX         !== 'false',
-    handleOpenRequests: process.env.SCENARIO_HANDLE_OPEN_REQUESTS !== 'false',
     chatbot:         process.env.SCENARIO_CHATBOT         === 'true',  // off by default
   },
 }
