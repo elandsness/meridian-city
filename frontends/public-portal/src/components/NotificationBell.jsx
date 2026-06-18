@@ -87,8 +87,8 @@ export default function NotificationBell() {
                       {formatTime(n.timestamp || n.created_at)}
                     </span>
                   </div>
-                  {n.message && (
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                  {n.body && (
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.body}</p>
                   )}
                 </div>
               ))

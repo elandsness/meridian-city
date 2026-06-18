@@ -1,57 +1,38 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { createContext, useContext, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './AuthContext.jsx'
+import { getMessages, markAllRead as apiMarkAllRead } from '../api/messages.js'
 
 const NotificationContext = createContext(null)
 
-const MAX_NOTIFICATIONS = 20
-
+/**
+ * Notifications are the logged-in citizen's per-citizen inbox (messages.messages),
+ * scoped by citizen_id — NOT the global notification firehose. The demo operator has
+ * no citizen id, so the bell is simply empty for them.
+ */
 export function NotificationProvider({ children }) {
-  const { token } = useAuth()
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const eventSourceRef = useRef(null)
+  const { user } = useAuth()
+  const qc = useQueryClient()
+  const citizenId = user?.id
 
-  useEffect(() => {
-    if (!token) {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
-      }
-      return
+  const { data } = useQuery({
+    queryKey: ['messages', citizenId],
+    queryFn: () => getMessages(citizenId),
+    enabled: !!citizenId,
+    refetchInterval: 30_000,
+  })
+
+  const notifications = Array.isArray(data?.messages) ? data.messages : []
+  const unreadCount = data?.unread ?? 0
+
+  const markAllRead = useCallback(async () => {
+    if (!citizenId) return
+    try {
+      await apiMarkAllRead(citizenId)
+    } finally {
+      qc.invalidateQueries({ queryKey: ['messages', citizenId] })
     }
-
-    const base = import.meta.env.VITE_API_BASE_URL || ''
-    const url = `${base}/api/v1/notifications/stream`
-
-    const es = new EventSource(url)
-    eventSourceRef.current = es
-
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        setNotifications((prev) => {
-          const updated = [data, ...prev]
-          return updated.slice(0, MAX_NOTIFICATIONS)
-        })
-        setUnreadCount((prev) => prev + 1)
-      } catch {
-        // ignore parse errors
-      }
-    }
-
-    es.onerror = () => {
-      es.close()
-    }
-
-    return () => {
-      es.close()
-      eventSourceRef.current = null
-    }
-  }, [token])
-
-  const markAllRead = useCallback(() => {
-    setUnreadCount(0)
-  }, [])
+  }, [citizenId, qc])
 
   const value = {
     notifications,

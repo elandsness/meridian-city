@@ -73,7 +73,17 @@ async function mapCommerceToInbox (payload) {
   const eventType = payload.eventType || payload.event_type
   const citizenId = payload.citizenId || payload.citizen_id
   const orderId = payload.orderId || payload.order_id
-  if (eventType === 'order.delivered' && citizenId) {
+  if (!citizenId) return
+  // Key milestones only: order placed + delivered.
+  if (eventType === 'checkout.completed') {
+    await insert({
+      citizenId,
+      type: 'order_placed',
+      title: 'Order placed',
+      body: `Your order ${orderId} has been placed. We'll let you know when it ships.`,
+      metadata: payload,
+    })
+  } else if (eventType === 'order.delivered') {
     await insert({
       citizenId,
       type: 'order_delivered',
@@ -114,7 +124,16 @@ async function mapRequestToInbox (payload) {
   const status = (payload.status || payload.new_status || '').toLowerCase()
   const requestId = payload.requestId || payload.request_id || ''
   if (!citizenId) return
-  if (status === 'resolved' || eventType.includes('resolved')) {
+  // Key milestones only: request received (submitted) + resolved.
+  if (status === 'submitted' || eventType.endsWith('.submitted')) {
+    await insert({
+      citizenId,
+      type: 'request_received',
+      title: 'Service request received',
+      body: `We've received your request ${requestId} and will get it assigned.`,
+      metadata: payload,
+    })
+  } else if (status === 'resolved' || eventType.endsWith('.resolved')) {
     await insert({
       citizenId,
       type: 'request_resolved',
