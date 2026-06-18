@@ -64,6 +64,32 @@ func (p *Publisher) Publish(ctx context.Context, reading *TelemetryReading) erro
 	return nil
 }
 
+// PublishBatch writes many readings in a single WriteMessages call. The OTLP receiver
+// emits one reading per device per export, so writing them one-at-a-time (each a
+// synchronous, batch-timeout-bounded write) blew past the export request's context
+// deadline once there were dozens of devices. Batching them into one call keeps the
+// whole export well within the deadline.
+func (p *Publisher) PublishBatch(ctx context.Context, readings []*TelemetryReading) error {
+	if len(readings) == 0 {
+		return nil
+	}
+	msgs := make([]kafka.Message, 0, len(readings))
+	for _, reading := range readings {
+		data, err := json.Marshal(reading)
+		if err != nil {
+			return fmt.Errorf("marshal telemetry: %w", err)
+		}
+		msgs = append(msgs, kafka.Message{
+			Key:   []byte(reading.DeviceID),
+			Value: data,
+		})
+	}
+	if err := p.writer.WriteMessages(ctx, msgs...); err != nil {
+		return fmt.Errorf("write kafka batch (%d msgs): %w", len(msgs), err)
+	}
+	return nil
+}
+
 // Close flushes and closes the underlying Kafka writer.
 func (p *Publisher) Close() error {
 	return p.writer.Close()
