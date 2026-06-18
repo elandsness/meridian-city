@@ -34,6 +34,18 @@ public class BusinessEventLogger {
     }
 
     /**
+     * Emit an account-creation lifecycle business event
+     * (account.registration_started / details_submitted / verification_sent /
+     * verified / activated).
+     */
+    public void accountLifecycle(String eventType, String citizenId, String email) {
+        BUSINESS_EVENTS.info(eventType,
+                StructuredArguments.keyValue("event.type", eventType),
+                StructuredArguments.keyValue("citizen.id", citizenId),
+                StructuredArguments.keyValue("citizen.email", email));
+    }
+
+    /**
      * Emit a service_request.submitted business event.
      */
     public void requestSubmitted(String requestId, String citizenId, String category,

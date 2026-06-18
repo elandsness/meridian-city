@@ -32,6 +32,9 @@ spec:
             # Exclude the k8s liveness/readiness probes from FastAPI server spans
             - name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS
               value: "^/health"
+            # Recent-activity window (hours) for the Business Analytics funnels.
+            - name: FUNNEL_WINDOW_HOURS
+              value: "24"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:
