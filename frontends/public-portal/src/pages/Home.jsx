@@ -93,7 +93,7 @@ export default function Home() {
   })
 
   const { data: billsData } = useQuery({
-    queryKey: ['bills', user?.id],
+    queryKey: ['bills', user?.id, 'outstanding'],
     queryFn: () => getBills(user?.id, 'outstanding'),
     enabled: isAuthenticated,
     refetchInterval: 60000,
@@ -119,7 +119,10 @@ export default function Home() {
   const myOpen = requests.filter((r) => OPEN_STATUSES.has((r.status || '').toLowerCase())).length
   const myResolved = requests.filter((r) => (r.status || '').toLowerCase() === 'resolved').length
   const bills = unwrap(billsData, 'items')
-  const balanceCents = bills.reduce((sum, b) => sum + (b.amount_cents || 0), 0)
+  // Defensive: only outstanding bills count toward the balance, regardless of payload.
+  const balanceCents = bills
+    .filter((b) => (b.status || '').toLowerCase() === 'outstanding')
+    .reduce((sum, b) => sum + (b.amount_cents || 0), 0)
   const messages = (Array.isArray(messagesData?.messages) ? messagesData.messages : []).slice(0, 4)
   const unreadCount = messagesData?.unread ?? 0
 

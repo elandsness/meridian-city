@@ -50,3 +50,15 @@ management:
       probes:
         enabled: true
       show-details: always
+
+# Quarterly tax-bill issuance: at the start of each quarter, issue one outstanding
+# bill to every citizen who doesn't yet have one for the current period. Idempotent,
+# so it's safe to run on any cadence (checked hourly by default).
+billing:
+  quarterly:
+    enabled: ${BILLING_QUARTERLY_ENABLED:true}
+    interval-ms: ${BILLING_QUARTERLY_INTERVAL_MS:3600000}
+    initial-delay-ms: ${BILLING_QUARTERLY_INITIAL_DELAY_MS:60000}
+    min-amount-cents: ${BILLING_QUARTERLY_MIN_AMOUNT_CENTS:15000}
+    max-amount-cents: ${BILLING_QUARTERLY_MAX_AMOUNT_CENTS:45000}
+    due-days: ${BILLING_QUARTERLY_DUE_DAYS:45}

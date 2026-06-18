@@ -26,7 +26,9 @@ export default function Billing() {
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['bills', citizenId],
+    // Distinct key from Home's outstanding-only query so the two don't collide in
+    // the react-query cache (this page needs the full bill list incl. paid history).
+    queryKey: ['bills', citizenId, 'all'],
     queryFn: () => getBills(citizenId),
     enabled: !!citizenId,
     refetchInterval: 30000,
