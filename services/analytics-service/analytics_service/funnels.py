@@ -113,29 +113,34 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
     """
     Derive IoT incident resolution funnel from iot.anomalies, incidents tables.
 
-    Maps funnel stages to direct table counts:
+    Maps funnel stages to direct table counts. Work-order stages are scoped to
+    incident-linked work orders (incident_id IS NOT NULL) so the funnel reads as a
+    proper IoT funnel and excludes service-request work orders:
       iot.anomaly_detected → iot.anomalies total
       incident.created     → incidents.incidents total
-      workorder.created    → incidents.work_orders total
-      workorder.assigned   → work_orders WHERE status != 'pending'
-      workorder.acknowledged → work_orders WHERE status IN ('acknowledged','in_progress','resolved')
-      workorder.resolved   → work_orders WHERE status = 'resolved'
+      workorder.created    → incident-linked work_orders total
+      workorder.assigned   → incident-linked work_orders WHERE status NOT IN ('pending','created')
+      workorder.acknowledged → incident-linked work_orders WHERE status IN ('acknowledged','in_progress','resolved')
+      workorder.resolved   → incident-linked work_orders WHERE status = 'resolved'
     """
     async with pool.acquire() as conn:
         anomalies   = await safe_fetchval(conn, "SELECT COUNT(*) FROM iot.anomalies")
         incidents   = await safe_fetchval(conn, "SELECT COUNT(*) FROM incidents.incidents")
-        wo_total    = await safe_fetchval(conn, "SELECT COUNT(*) FROM incidents.work_orders")
+        wo_total    = await safe_fetchval(conn, """
+            SELECT COUNT(*) FROM incidents.work_orders
+            WHERE incident_id IS NOT NULL
+        """)
         wo_assigned = await safe_fetchval(conn, """
             SELECT COUNT(*) FROM incidents.work_orders
-            WHERE status NOT IN ('pending', 'created')
+            WHERE incident_id IS NOT NULL AND status NOT IN ('pending', 'created')
         """)
         wo_acked    = await safe_fetchval(conn, """
             SELECT COUNT(*) FROM incidents.work_orders
-            WHERE status IN ('acknowledged', 'in_progress', 'resolved')
+            WHERE incident_id IS NOT NULL AND status IN ('acknowledged', 'in_progress', 'resolved')
         """)
         wo_resolved = await safe_fetchval(conn, """
             SELECT COUNT(*) FROM incidents.work_orders
-            WHERE status = 'resolved'
+            WHERE incident_id IS NOT NULL AND status = 'resolved'
         """)
 
     counts = [anomalies, incidents, wo_total, wo_assigned, wo_acked, wo_resolved]

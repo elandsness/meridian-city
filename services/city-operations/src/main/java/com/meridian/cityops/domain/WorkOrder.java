@@ -53,6 +53,15 @@ public class WorkOrder {
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
 
+    @Column(name = "assigned_at")
+    private OffsetDateTime assignedAt;
+
+    @Column(name = "acknowledged_at")
+    private OffsetDateTime acknowledgedAt;
+
+    @Column(name = "next_transition_at")
+    private OffsetDateTime nextTransitionAt;
+
     /**
      * Factory method — generates id like "wo-a1b2c".
      */
@@ -63,6 +72,25 @@ public class WorkOrder {
         return WorkOrder.builder()
                 .id("wo-" + shortId)
                 .requestId(requestId)
+                .title(title)
+                .assignedDepartment(department)
+                .status("created")
+                .priority(priority != null ? priority : "normal")
+                .zoneId(zoneId)
+                .createdAt(OffsetDateTime.now())
+                .build();
+    }
+
+    /**
+     * Factory for a work order opened from an IoT incident (incident-linked, no request).
+     */
+    public static WorkOrder createFromIncident(String incidentId, String title,
+                                               String department, String priority,
+                                               String zoneId) {
+        String shortId = UUID.randomUUID().toString().replace("-", "").substring(0, 5);
+        return WorkOrder.builder()
+                .id("wo-" + shortId)
+                .incidentId(incidentId)
                 .title(title)
                 .assignedDepartment(department)
                 .status("created")

@@ -24,6 +24,28 @@ public class BusinessEventLogger {
         );
     }
 
+    public void workOrderAssigned(String workOrderId, String assignedDepartment) {
+        BUSINESS_EVENTS.info("workorder.assigned",
+                StructuredArguments.keyValue("event.type", "workorder.assigned"),
+                StructuredArguments.keyValue("work_order.id", workOrderId),
+                StructuredArguments.keyValue("assigned_department", assignedDepartment)
+        );
+    }
+
+    public void workOrderAcknowledged(String workOrderId) {
+        BUSINESS_EVENTS.info("workorder.acknowledged",
+                StructuredArguments.keyValue("event.type", "workorder.acknowledged"),
+                StructuredArguments.keyValue("work_order.id", workOrderId)
+        );
+    }
+
+    public void workOrderResolved(String workOrderId) {
+        BUSINESS_EVENTS.info("workorder.resolved",
+                StructuredArguments.keyValue("event.type", "workorder.resolved"),
+                StructuredArguments.keyValue("work_order.id", workOrderId)
+        );
+    }
+
     public void incidentCreated(String incidentId, String assetId, String severity) {
         BUSINESS_EVENTS.info("incident.created",
                 StructuredArguments.keyValue("event.type", "incident.created"),
