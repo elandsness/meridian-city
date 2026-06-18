@@ -443,6 +443,7 @@ trafficBot:
       browsing: true
       storePurchase: true
       payTax: true
+      injectAnomaly: true  # auto-inject/clear IoT anomalies so incidents flow without an operator
       chatbot: false  # disable by default to avoid LLM API cost in steady-state
   resources:
     requests:
