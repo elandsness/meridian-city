@@ -18,7 +18,24 @@ import {
   burstTraffic,
 } from '../api/demo.js';
 import { getIncidents } from '../api/incidents.js';
+import { getDevices } from '../api/devices.js';
 import { DEMO_GUIDE } from '../data/demoGuide.js';
+
+// Simulator-supported anomaly types per device category (matches the iot-simulator
+// device.AnomalyType vocabulary), so the injected type maps 1:1 with no fallback.
+const ANOMALY_TYPES = {
+  vehicle: [
+    { value: 'engine_overtemp', label: 'Engine overtemp' },
+    { value: 'high_speed', label: 'High speed' },
+  ],
+  building: [
+    { value: 'hvac_overtemp', label: 'HVAC overtemp' },
+  ],
+  machine: [
+    { value: 'high_vibration', label: 'High vibration' },
+    { value: 'high_error_rate', label: 'High error rate' },
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -366,6 +383,16 @@ function FleetCard() {
     queryFn: getFleetStatus,
     refetchInterval: 10_000,
   });
+  const { data: devicesData } = useQuery({
+    queryKey: ['devices'],
+    queryFn: getDevices,
+    refetchInterval: 15_000,
+  });
+  const devices = Array.isArray(devicesData?.items)
+    ? devicesData.items
+    : Array.isArray(devicesData)
+    ? devicesData
+    : [];
 
   const [vehicles, setVehicles] = useState(30);
   const [buildings, setBuildings] = useState(15);
@@ -373,13 +400,22 @@ function FleetCard() {
   const [resizeResult, setResizeResult] = useState(null);
   const [resizeLoading, setResizeLoading] = useState(false);
 
-  const [anomalyCategory, setAnomalyCategory] = useState('vehicle');
   const [anomalyDeviceId, setAnomalyDeviceId] = useState('');
-  const [anomalyType, setAnomalyType] = useState('generic');
+  const [anomalyType, setAnomalyType] = useState('');
   const [anomalyResult, setAnomalyResult] = useState(null);
   const [anomalyLoading, setAnomalyLoading] = useState(false);
   const [clearResult, setClearResult] = useState(null);
   const [clearLoading, setClearLoading] = useState(false);
+
+  const selectedDevice = devices.find((d) => d.device_id === anomalyDeviceId) || null;
+  const typeOptions = ANOMALY_TYPES[selectedDevice?.category] || [];
+
+  function handleDeviceChange(id) {
+    setAnomalyDeviceId(id);
+    const dev = devices.find((d) => d.device_id === id);
+    const opts = ANOMALY_TYPES[dev?.category] || [];
+    setAnomalyType(opts.length ? opts[0].value : '');
+  }
 
   useEffect(() => {
     if (fleetStatus) {
@@ -404,13 +440,13 @@ function FleetCard() {
   }
 
   async function handleInjectAnomaly() {
-    if (!anomalyDeviceId.trim()) return;
+    if (!selectedDevice || !anomalyType) return;
     setAnomalyLoading(true);
     setAnomalyResult(null);
     try {
       await injectAnomaly({
-        category: anomalyCategory,
-        device_id: anomalyDeviceId.trim(),
+        category: selectedDevice.category,
+        device_id: selectedDevice.device_id,
         anomaly_type: anomalyType,
       });
       setAnomalyResult({ ok: true });
@@ -501,44 +537,49 @@ function FleetCard() {
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Category</label>
+            <label className="text-xs text-gray-500">Device</label>
             <select
-              value={anomalyCategory}
-              onChange={(e) => setAnomalyCategory(e.target.value)}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-cyan-500"
-            >
-              <option value="vehicle">Vehicle</option>
-              <option value="building">Building</option>
-              <option value="machine">Machine</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Device ID</label>
-            <input
-              type="text"
-              placeholder="e.g. vehicle-07"
               value={anomalyDeviceId}
-              onChange={(e) => setAnomalyDeviceId(e.target.value)}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm w-36 focus:outline-none focus:border-cyan-500 placeholder-gray-600"
-            />
+              onChange={(e) => handleDeviceChange(e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm w-44 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="">Select a device…</option>
+              {['vehicle', 'building', 'machine'].map((cat) => {
+                const inCat = devices.filter((d) => d.category === cat);
+                if (inCat.length === 0) return null;
+                return (
+                  <optgroup key={cat} label={`${cat[0].toUpperCase()}${cat.slice(1)}s`}>
+                    {inCat.map((d) => (
+                      <option key={d.device_id} value={d.device_id}>
+                        {d.device_id}
+                        {d.status && d.status !== 'ok' ? ` — ${d.status}` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Anomaly Type</label>
             <select
               value={anomalyType}
               onChange={(e) => setAnomalyType(e.target.value)}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-cyan-500"
+              disabled={!selectedDevice}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-cyan-500 disabled:opacity-50"
             >
-              <option value="engine_temp_spike">Engine Temp Spike</option>
-              <option value="hvac_failure">HVAC Failure</option>
-              <option value="high_vibration">High Vibration</option>
-              <option value="battery_low">Battery Low</option>
-              <option value="generic">Generic</option>
+              {typeOptions.length === 0 ? (
+                <option value="">Select a device first</option>
+              ) : (
+                typeOptions.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))
+              )}
             </select>
           </div>
           <button
             onClick={handleInjectAnomaly}
-            disabled={anomalyLoading || !anomalyDeviceId.trim()}
+            disabled={anomalyLoading || !selectedDevice || !anomalyType}
             className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
           >
             {anomalyLoading ? '…' : 'Inject Anomaly'}

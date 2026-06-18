@@ -26,28 +26,30 @@ const proxy = require('./proxy')
  * Simulator types: hvac_overtemp, engine_overtemp, high_vibration,
  * high_error_rate, high_speed.
  */
-const ANOMALY_TYPE_BY_CATEGORY = {
-  vehicle: {
-    engine_temp_spike: 'engine_overtemp',
-    engine_overtemp: 'engine_overtemp',
-    high_speed: 'high_speed',
-    _default: 'engine_overtemp',
-  },
-  building: {
-    hvac_failure: 'hvac_overtemp',
-    hvac_overtemp: 'hvac_overtemp',
-    _default: 'hvac_overtemp',
-  },
-  machine: {
-    high_vibration: 'high_vibration',
-    high_error_rate: 'high_error_rate',
-    _default: 'high_vibration',
-  },
+// Canonical simulator anomaly types per category (device.AnomalyType vocabulary).
+const SIMULATOR_TYPES_BY_CATEGORY = {
+  vehicle: ['engine_overtemp', 'high_speed'],
+  building: ['hvac_overtemp'],
+  machine: ['high_vibration', 'high_error_rate'],
 }
 
+// Back-compat aliases for the old UI's friendly names → simulator types.
+const ANOMALY_TYPE_ALIASES = {
+  engine_temp_spike: 'engine_overtemp',
+  hvac_failure: 'hvac_overtemp',
+}
+
+/**
+ * Resolve a (category, anomalyType) pair to the simulator's vocabulary, or null if
+ * the type isn't valid for that category. Returning null instead of silently
+ * defaulting lets the route reject bad input rather than inject the wrong fault
+ * (which is what made every injection look like `engine_overtemp`).
+ */
 function resolveAnomalyType (category, anomalyType) {
-  const map = ANOMALY_TYPE_BY_CATEGORY[category] || {}
-  return map[anomalyType] || map._default || 'high_vibration'
+  const valid = SIMULATOR_TYPES_BY_CATEGORY[category]
+  if (!valid) return null
+  const resolved = ANOMALY_TYPE_ALIASES[anomalyType] || anomalyType
+  return valid.includes(resolved) ? resolved : null
 }
 
 /**
