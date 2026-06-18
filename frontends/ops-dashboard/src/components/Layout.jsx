@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import BrandMark from './BrandMark.jsx';
 
 const navItems = [
   { to: '/overview', label: 'Overview', icon: '📊' },
@@ -20,8 +21,9 @@ export default function Layout() {
       <aside className="w-64 bg-gray-900 flex flex-col flex-shrink-0 fixed top-0 left-0 h-full z-10">
         {/* Logo */}
         <div className="px-6 py-5 border-b border-gray-800">
-          <span className="text-xl font-bold text-white tracking-tight">
-            🏙 Meridian Ops
+          <span className="flex items-center gap-2 text-xl font-bold text-white tracking-tight">
+            <BrandMark className="w-7 h-7" />
+            Meridian Ops
           </span>
           <p className="text-xs text-gray-500 mt-1">Operations Dashboard</p>
         </div>
