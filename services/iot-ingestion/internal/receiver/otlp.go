@@ -93,12 +93,12 @@ func (r *MetricsReceiver) Export(ctx context.Context, req *metricsv1.ExportMetri
 		}
 	}
 
+	batch := make([]*publisher.TelemetryReading, 0, len(readings))
 	for deviceID, dr := range readings {
 		if !r.validator.IsKnown(deviceID) {
 			log.Printf("[receiver] warning: unknown device %q — processing anyway (fail-open)", deviceID)
 		}
-
-		reading := &publisher.TelemetryReading{
+		batch = append(batch, &publisher.TelemetryReading{
 			DeviceID:       deviceID,
 			DeviceType:     dr.deviceType,
 			DeviceCategory: dr.deviceCategory,
@@ -107,11 +107,12 @@ func (r *MetricsReceiver) Export(ctx context.Context, req *metricsv1.ExportMetri
 			Timestamp:      time.Now().UTC(),
 			Metrics:        dr.metrics,
 			TraceID:        traceID,
-		}
+		})
+	}
 
-		if err := r.publisher.Publish(ctx, reading); err != nil {
-			log.Printf("[receiver] error publishing telemetry for device %q: %v", deviceID, err)
-		}
+	// One batched write per export — see Publisher.PublishBatch for why.
+	if err := r.publisher.PublishBatch(ctx, batch); err != nil {
+		log.Printf("[receiver] error publishing telemetry batch (%d devices): %v", len(batch), err)
 	}
 
 	return &metricsv1.ExportMetricsServiceResponse{}, nil
