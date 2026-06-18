@@ -5,7 +5,8 @@ import { getServiceRequests } from '../api/serviceRequests.js'
 import { getBills } from '../api/billing.js'
 import { getMessages } from '../api/messages.js'
 import { getDevices } from '../api/devices.js'
-import CityMap from '../components/CityMap.jsx'
+import TransitMap from '../components/TransitMap.jsx'
+import TransitStatus from '../components/TransitStatus.jsx'
 import Card from '../ui/Card.jsx'
 import StatTile from '../ui/StatTile.jsx'
 import Button from '../ui/Button.jsx'
@@ -164,19 +165,8 @@ export default function Home() {
 
       {/* Incidents + side column */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2" title="Live incidents" action={<LiveBadge />}>
-          {isLoading && <p className="text-slate-400 text-sm">Loading…</p>}
-          {isError && <p className="text-red-500 text-sm">Failed to load incidents.</p>}
-          {!isLoading && !isError && feed.length === 0 && (
-            <p className="text-slate-500 text-sm py-4 text-center">No active incidents — all clear.</p>
-          )}
-          {feed.length > 0 && (
-            <div className="-my-1">
-              {feed.map((inc) => (
-                <IncidentRow key={inc.id} incident={inc} />
-              ))}
-            </div>
-          )}
+        <Card className="lg:col-span-2" title="Live transit status" action={<LiveBadge />}>
+          <TransitStatus />
         </Card>
 
         {isAuthenticated ? (
@@ -215,20 +205,10 @@ export default function Home() {
         )}
       </div>
 
-      {/* City map */}
-      <Card
-        title="City map — IoT devices"
-        action={
-          devicesData?.summary ? (
-            <span className="text-xs text-slate-500">
-              {devicesData.summary.healthy} healthy · {devicesData.summary.warning} warning · {devicesData.summary.alert} alert
-            </span>
-          ) : null
-        }
-        bodyClassName="!p-2"
-      >
-        <div className="rounded-xl overflow-hidden">
-          <CityMap incidents={incidents} />
+      {/* Transit map */}
+      <Card title="Meridian City transit" bodyClassName="!p-2">
+        <div className="rounded-xl overflow-hidden p-2">
+          <TransitMap />
         </div>
       </Card>
 
