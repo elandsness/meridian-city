@@ -51,3 +51,13 @@ management:
       probes:
         enabled: true
       show-details: always
+
+# Server-side simulation of the work-order lifecycle (created -> assigned ->
+# acknowledged -> resolved) so the iot-incident funnel fills in and incidents get
+# resolved. completion-probability < 1 leaves some work orders unresolved for investigation.
+workorder-lifecycle:
+  enabled: ${WORKORDER_LIFECYCLE_ENABLED:true}
+  assigned-after-seconds: ${WORKORDER_LIFECYCLE_ASSIGNED_AFTER_SECONDS:15}
+  acknowledged-after-seconds: ${WORKORDER_LIFECYCLE_ACKNOWLEDGED_AFTER_SECONDS:20}
+  resolved-after-seconds: ${WORKORDER_LIFECYCLE_RESOLVED_AFTER_SECONDS:30}
+  completion-probability: ${WORKORDER_LIFECYCLE_COMPLETION_PROBABILITY:0.85}

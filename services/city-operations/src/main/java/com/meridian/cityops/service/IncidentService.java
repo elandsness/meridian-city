@@ -3,6 +3,7 @@ package com.meridian.cityops.service;
 import com.meridian.cityops.domain.CityAsset;
 import com.meridian.cityops.domain.Incident;
 import com.meridian.cityops.domain.IncidentComment;
+import com.meridian.cityops.config.WorkOrderLifecycleProperties;
 import com.meridian.cityops.domain.WorkOrder;
 import com.meridian.cityops.domain.Zone;
 import com.meridian.cityops.dto.IncidentCommentResponse;
@@ -38,6 +39,7 @@ public class IncidentService {
     private final ZoneRepository zoneRepository;
     private final WorkOrderRepository workOrderRepository;
     private final BusinessEventLogger businessEventLogger;
+    private final WorkOrderLifecycleProperties workOrderProps;
 
     /**
      * Stubbed map coordinates per seeded zone. The schema has no real geo data
@@ -103,7 +105,27 @@ public class IncidentService {
         incident = incidentRepository.save(incident);
         log.info("Created incident id={} from IoT anomaly on assetId={}", incident.getId(), assetId);
         businessEventLogger.incidentCreated(incident.getId(), assetId, severity);
+
+        // Open a work order for the incident so it flows through the iot-incident funnel
+        // (workorder.created -> assigned -> acknowledged -> resolved via the scheduler).
+        WorkOrder workOrder = WorkOrder.createFromIncident(
+                incident.getId(), title, "Field Operations", priorityForSeverity(severity), null);
+        if (workOrderProps.isEnabled()) {
+            workOrder.setNextTransitionAt(
+                    OffsetDateTime.now().plusSeconds(workOrderProps.getAssignedAfterSeconds()));
+        }
+        workOrderRepository.save(workOrder);
+        businessEventLogger.workOrderCreated(workOrder.getId(), null, workOrder.getAssignedDepartment());
+
         return enrich(incident);
+    }
+
+    private static String priorityForSeverity(String severity) {
+        return switch (severity == null ? "" : severity.toLowerCase()) {
+            case "critical" -> "urgent";
+            case "high" -> "high";
+            default -> "normal";
+        };
     }
 
     @Transactional
