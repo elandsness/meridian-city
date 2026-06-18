@@ -87,6 +87,11 @@ async function fleetRoutes (fastify) {
     }
 
     const type = resolveAnomalyType(category, anomaly_type)
+    if (!type) {
+      return reply.status(400).send({
+        error: `unsupported anomaly_type '${anomaly_type}' for category '${category}'`,
+      })
+    }
     const result = await proxy.post(`${config.IOT_SIMULATOR_URL}/admin/anomaly`, {
       device_id,
       type,
