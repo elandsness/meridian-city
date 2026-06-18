@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import IoTMap from '../components/IoTMap.jsx';
 import { getFleetStatus } from '../api/demo.js';
 import { getDevices } from '../api/devices.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -161,18 +160,6 @@ export default function IoTPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Map */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-            Device Map
-          </h2>
-        </div>
-        <div className="p-4">
-          <IoTMap />
         </div>
       </div>
 

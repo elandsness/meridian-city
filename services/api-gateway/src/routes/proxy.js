@@ -104,6 +104,14 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      // Public transit map data (lives in demo-control-api, but unauthenticated and
+      // forwarded verbatim — the portal home page renders it for logged-out visitors).
+      prefix: '/api/v1/transit',
+      target: config.DEMO_CONTROL_API_URL,
+      serviceName: 'demo-control',
+      requiresAuth: false,
+    },
+    {
       // demo-control strips /api/v1/demo-control and forwards as /api/v1/<remainder>
       prefix: '/api/v1/demo-control',
       target: config.DEMO_CONTROL_API_URL,

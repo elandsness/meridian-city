@@ -25,6 +25,8 @@ const faultRoutes     = require('./routes/fault')
 const fleetRoutes     = require('./routes/fleet')
 const trafficRoutes   = require('./routes/traffic')
 const scenarioRoutes  = require('./routes/scenarios')
+const transitRoutes   = require('./routes/transit')
+const { startTransitSimulation } = require('./transit')
 
 async function build () {
   const app = fastify({
@@ -47,6 +49,10 @@ async function build () {
   await app.register(fleetRoutes)
   await app.register(trafficRoutes)
   await app.register(scenarioRoutes)
+  await app.register(transitRoutes)
+
+  // Start the in-memory transit simulation (vehicles + statuses for the public map).
+  startTransitSimulation()
 
   // Log each request
   app.addHook('onRequest', async (request) => {
