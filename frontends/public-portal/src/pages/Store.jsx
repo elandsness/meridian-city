@@ -6,15 +6,7 @@ import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
 import { formatCents } from '../lib/format.js'
 import { startAction, addActionProperties, endAction, reportError } from '../lib/rum.js'
-
-function GiftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#BA7517" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="8" width="18" height="4" rx="1" />
-      <path d="M12 8v13M5 12v9h14v-9M12 8S11 3 8.5 3 6 6 6 6s2 2 6 2zM12 8s1-5 3.5-5S18 6 18 6s-2 2-6 2z" />
-    </svg>
-  )
-}
+import ProductImage from '../components/ProductImage.jsx'
 
 function unwrapArray(d) {
   return Array.isArray(d) ? d : d?.items ?? []
@@ -88,8 +80,8 @@ export default function Store() {
           {productsQ.isLoading && <p className="text-slate-500">Loading products…</p>}
           {products.map((p) => (
             <Card key={p.id} bodyClassName="!p-4">
-              <div className="h-20 rounded-lg bg-amber-50 flex items-center justify-center mb-3">
-                <GiftIcon />
+              <div className="h-20 rounded-lg bg-slate-50 flex items-center justify-center mb-3">
+                <ProductImage imageKey={p.image_key} />
               </div>
               <div className="font-medium text-slate-900">{p.name}</div>
               <div className="text-sm text-slate-500 mb-3">{formatCents(p.price_cents)}</div>

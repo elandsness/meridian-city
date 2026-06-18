@@ -2,15 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import ChatWidget from './ChatWidget.jsx'
-
-function BrandSun() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#412402" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
-    </svg>
-  )
-}
+import BrandMark from './BrandMark.jsx'
 
 function initials(user) {
   const src = user?.name || user?.username || ''
@@ -38,9 +30,7 @@ export default function Layout() {
       <nav className="bg-meridian-blue sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-noon-sun flex items-center justify-center">
-              <BrandSun />
-            </span>
+            <BrandMark className="w-9 h-9" />
             <span className="text-base font-semibold text-white tracking-tight">Meridian City</span>
           </Link>
 
