@@ -18,6 +18,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
@@ -97,11 +99,7 @@ public class ServiceRequestService {
         );
         recordEvent(request.getId(), "service_request.submitted");
 
-        // 3. Synchronous call to service-dispatch (creates the multi-hop distributed
-        //    trace). service-dispatch records the dispatched/assigned events.
-        dispatchClient.dispatchRequest(request);
-
-        // 4. Emit Business Event: validated (after dispatch, regardless of dispatch outcome)
+        // 3. Emit Business Event: validated.
         businessEventLogger.requestValidated(
                 request.getId(),
                 request.getCitizenId(),
@@ -110,8 +108,27 @@ public class ServiceRequestService {
         );
         recordEvent(request.getId(), "service_request.validated");
 
-        // 5. Publish to Kafka
+        // 4. Publish to Kafka
         requestEventPublisher.publishRequestSubmitted(request);
+
+        // 5. Dispatch to service-dispatch — but only AFTER this transaction commits.
+        //    service-dispatch records request_events rows with an FK to service_requests
+        //    on a separate DB connection, so the service_request must be committed and
+        //    visible first. Calling it mid-transaction makes every dispatch 500 on the FK
+        //    (the real cause of dispatched/assigned never being recorded). Running in
+        //    afterCommit keeps the call on the request thread, preserving the
+        //    api-gateway -> citizen-service -> service-dispatch distributed trace.
+        final ServiceRequest dispatchTarget = request;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatchClient.dispatchRequest(dispatchTarget);
+                }
+            });
+        } else {
+            dispatchClient.dispatchRequest(request);
+        }
 
         return ServiceRequestResponse.from(request);
     }
