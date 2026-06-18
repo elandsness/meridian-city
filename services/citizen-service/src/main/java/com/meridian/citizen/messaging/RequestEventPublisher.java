@@ -42,4 +42,29 @@ public class RequestEventPublisher {
                     }
                 });
     }
+
+    /**
+     * Publish a service-request status change (e.g. service_request.in_progress,
+     * service_request.resolved) so downstream consumers — notably the per-citizen
+     * notification inbox — can react. Carries citizenId for user scoping.
+     */
+    public void publishRequestStatusChanged(ServiceRequest request) {
+        Map<String, Object> event = Map.of(
+                "eventType", "service_request." + request.getStatus(),
+                "requestId", request.getId(),
+                "citizenId", request.getCitizenId(),
+                "category", request.getCategory() != null ? request.getCategory() : "",
+                "priority", request.getPriority() != null ? request.getPriority() : "",
+                "status", request.getStatus(),
+                "zoneId", request.getZoneId() != null ? request.getZoneId() : ""
+        );
+
+        kafkaTemplate.send(TOPIC, request.getId(), event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.warn("Failed to publish status event for requestId={}: {}",
+                                request.getId(), ex.getMessage());
+                    }
+                });
+    }
 }

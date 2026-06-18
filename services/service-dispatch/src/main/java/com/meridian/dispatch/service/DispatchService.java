@@ -52,7 +52,11 @@ public class DispatchService {
                 .build();
         dispatchLogRepository.save(dispatchLog);
 
-        // 4. Call city-operations to create work order
+        // 4. Call city-operations to create the work order, then record the
+        //    assignment. The dispatched event (step 2) is already persisted; if the
+        //    downstream work-order call fails we must NOT lose it, so we catch here
+        //    instead of letting the exception roll back the whole transaction. The
+        //    request stays "dispatched" and the lifecycle scheduler still advances it.
         CreateWorkOrderDto workOrderDto = CreateWorkOrderDto.builder()
                 .requestId(dto.getRequestId())
                 .citizenId(dto.getCitizenId())
@@ -62,19 +66,30 @@ public class DispatchService {
                 .zoneId(dto.getZoneId())
                 .build();
 
-        DispatchResultDto result = cityOperationsClient.createWorkOrder(workOrderDto);
+        try {
+            DispatchResultDto result = cityOperationsClient.createWorkOrder(workOrderDto);
 
-        // 5. Log Business Event: service_request.assigned (+ request_events row)
-        businessEventLogger.logAssigned(dto.getRequestId(), assignedDepartment);
-        recordEvent(dto.getRequestId(), "service_request.assigned");
+            // 5. Log Business Event: service_request.assigned (+ request_events row)
+            businessEventLogger.logAssigned(dto.getRequestId(), assignedDepartment);
+            recordEvent(dto.getRequestId(), "service_request.assigned");
 
-        // 6. Return result with consistent assigned department
-        return DispatchResultDto.builder()
-                .requestId(dto.getRequestId())
-                .assignedDepartment(assignedDepartment)
-                .status(result.getStatus() != null ? result.getStatus() : "dispatched")
-                .dispatchedAt(result.getDispatchedAt() != null ? result.getDispatchedAt() : dispatchLog.getDispatchedAt())
-                .build();
+            // 6. Return result with consistent assigned department
+            return DispatchResultDto.builder()
+                    .requestId(dto.getRequestId())
+                    .assignedDepartment(assignedDepartment)
+                    .status(result.getStatus() != null ? result.getStatus() : "dispatched")
+                    .dispatchedAt(result.getDispatchedAt() != null ? result.getDispatchedAt() : dispatchLog.getDispatchedAt())
+                    .build();
+        } catch (RuntimeException ex) {
+            log.error("Work-order creation failed for requestId={}: {} — dispatched recorded, assignment deferred",
+                    dto.getRequestId(), ex.getMessage());
+            return DispatchResultDto.builder()
+                    .requestId(dto.getRequestId())
+                    .assignedDepartment(assignedDepartment)
+                    .status("dispatched")
+                    .dispatchedAt(dispatchLog.getDispatchedAt())
+                    .build();
+        }
     }
 
     /** Persist a request lifecycle event for the Business Analytics funnel. */

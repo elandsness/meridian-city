@@ -431,8 +431,9 @@ trafficBot:
     repository: "traffic-bot"
     tag: ""
   config:
-    # Average HTTP requests per minute sent to the API gateway
-    requestsPerMinute: 60
+    # Average HTTP requests per minute sent to the API gateway. Kept low so only a
+    # handful of flows are in-flight at once; server-side schedulers complete them.
+    requestsPerMinute: 8
     # Target URL for the API gateway
     targetUrl: "http://api-gateway:3000"
     # Which journey types to simulate
@@ -442,7 +443,6 @@ trafficBot:
       browsing: true
       storePurchase: true
       payTax: true
-      handleOpenRequests: true
       chatbot: false  # disable by default to avoid LLM API cost in steady-state
   resources:
     requests:

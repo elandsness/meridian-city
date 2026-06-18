@@ -1,6 +1,7 @@
 package com.meridian.citizen.service;
 
 import com.meridian.citizen.config.FaultState;
+import com.meridian.citizen.config.RequestLifecycleProperties;
 import com.meridian.citizen.domain.RequestEvent;
 import com.meridian.citizen.domain.ServiceRequest;
 import com.meridian.citizen.dto.CreateServiceRequestDto;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
@@ -32,19 +34,22 @@ public class ServiceRequestService {
     private final DispatchClient dispatchClient;
     private final RequestEventPublisher requestEventPublisher;
     private final FaultState faultState;
+    private final RequestLifecycleProperties lifecycleProps;
 
     public ServiceRequestService(ServiceRequestRepository serviceRequestRepository,
                                   RequestEventRepository requestEventRepository,
                                   BusinessEventLogger businessEventLogger,
                                   DispatchClient dispatchClient,
                                   RequestEventPublisher requestEventPublisher,
-                                  FaultState faultState) {
+                                  FaultState faultState,
+                                  RequestLifecycleProperties lifecycleProps) {
         this.serviceRequestRepository = serviceRequestRepository;
         this.requestEventRepository = requestEventRepository;
         this.businessEventLogger = businessEventLogger;
         this.dispatchClient = dispatchClient;
         this.requestEventPublisher = requestEventPublisher;
         this.faultState = faultState;
+        this.lifecycleProps = lifecycleProps;
     }
 
     @Transactional
@@ -67,6 +72,13 @@ public class ServiceRequestService {
                 dto.zoneId(),
                 dto.priority()
         );
+        // Schedule the first lifecycle transition (submitted -> in_progress); the
+        // RequestLifecycleScheduler advances it from here. Null when disabled.
+        if (lifecycleProps.isEnabled()) {
+            request.setNextTransitionAt(
+                    OffsetDateTime.now().plusSeconds(lifecycleProps.getInProgressAfterSeconds()));
+        }
+
         faultState.maybeDelay();
         // saveAndFlush so the request row exists before the request_events FK insert below.
         request = serviceRequestRepository.saveAndFlush(request);
@@ -132,6 +144,10 @@ public class ServiceRequestService {
         // Per-status lifecycle event (e.g. service_request.in_progress,
         // service_request.resolved) for the Business Analytics funnel.
         recordEvent(request.getId(), "service_request." + request.getStatus());
+
+        // Publish the status change to Kafka so the per-citizen notification inbox
+        // can surface it (notification-service keys off service_request.resolved, etc.).
+        requestEventPublisher.publishRequestStatusChanged(request);
 
         return ServiceRequestResponse.from(request);
     }
