@@ -1,17 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getIncidents } from '../api/incidents.js'
 import { getServiceRequests } from '../api/serviceRequests.js'
 import { getBills } from '../api/billing.js'
 import { getMessages } from '../api/messages.js'
 import { getDevices } from '../api/devices.js'
 import TransitPanel from '../components/TransitPanel.jsx'
+import WeatherTile from '../components/WeatherTile.jsx'
+import NewsTicker from '../components/NewsTicker.jsx'
 import Card from '../ui/Card.jsx'
 import StatTile from '../ui/StatTile.jsx'
 import Button from '../ui/Button.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
-import { timeAgo, displayName, greeting, severityMeta, severityRank, formatCents } from '../lib/format.js'
+import { displayName, greeting, formatCents } from '../lib/format.js'
 
 const OPEN_STATUSES = new Set(['submitted', 'dispatched', 'assigned', 'acknowledged', 'in_progress'])
 
@@ -27,21 +28,6 @@ function LiveBadge() {
       <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
       Live
     </span>
-  )
-}
-
-function IncidentRow({ incident }) {
-  const meta = severityMeta(incident.severity)
-  const sub = [incident.location_name, incident.status].filter(Boolean).join(' · ')
-  return (
-    <div className="flex gap-3 py-2.5 border-b border-slate-100 last:border-0">
-      <span className={`mt-1.5 w-2 h-2 rounded-full flex-none ${meta.dot}`} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-900 truncate">{incident.title}</p>
-        {sub && <p className="text-xs text-slate-500 mt-0.5 capitalize">{sub}</p>}
-      </div>
-      <span className="text-xs text-slate-400 whitespace-nowrap">{timeAgo(incident.created_at)}</span>
-    </div>
   )
 }
 
@@ -73,12 +59,6 @@ export default function Home() {
   const { isAuthenticated, user } = useAuth()
   const { openChat } = useChat()
 
-  const { data: incData, isLoading, isError } = useQuery({
-    queryKey: ['incidents', 'open'],
-    queryFn: () => getIncidents({ status: 'open', limit: 50 }),
-    refetchInterval: 30000,
-  })
-
   const { data: devicesData } = useQuery({
     queryKey: ['devices'],
     queryFn: getDevices,
@@ -106,15 +86,7 @@ export default function Home() {
     refetchInterval: 20000,
   })
 
-  const incidents = unwrap(incData, 'incidents', 'items')
   const requests = unwrap(reqData, 'items', 'service_requests', 'requests')
-  const feed = [...incidents]
-    .sort(
-      (a, b) =>
-        severityRank(b.severity) - severityRank(a.severity) ||
-        new Date(b.created_at || 0) - new Date(a.created_at || 0)
-    )
-    .slice(0, 5)
 
   const myOpen = requests.filter((r) => OPEN_STATUSES.has((r.status || '').toLowerCase())).length
   const myResolved = requests.filter((r) => (r.status || '').toLowerCase() === 'resolved').length
@@ -146,11 +118,7 @@ export default function Home() {
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <StatTile
-          label="Open incidents"
-          value={isLoading ? '—' : incidents.length}
-          valueClassName={incidents.length > 0 ? 'text-red-600' : 'text-slate-900'}
-        />
+        <WeatherTile />
         {isAuthenticated && <StatTile label="My open requests" value={myOpen} />}
         {isAuthenticated && (
           <StatTile
@@ -159,7 +127,7 @@ export default function Home() {
             valueClassName={balanceCents > 0 ? 'text-red-600' : 'text-green-600'}
           />
         )}
-        <StatTile label="Monitored zones" value="5" sub="north · south · east · west · central" />
+        <NewsTicker />
       </div>
 
       {/* Incidents + side column */}
