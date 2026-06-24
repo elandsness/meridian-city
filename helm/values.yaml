@@ -540,6 +540,11 @@ opsDashboard:
 # ---------------------------------------------------------------------------
 postgresql:
   enabled: true
+  # CloudNativePG auto-creates a minAvailable:1 PodDisruptionBudget for the primary.
+  # On a single-instance cluster that means 0 evictions allowed, which blocks GKE
+  # node drains during maintenance ("A Pod Disruption Budget exists that allows for
+  # 0 Pod evictions"). false disables CNPG's managed PDB so GKE can drain the node.
+  enablePDB: false
   auth:
     username: "meridian"
     # REQUIRED: change this before deploying
