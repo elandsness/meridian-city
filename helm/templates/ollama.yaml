@@ -1,0 +1,107 @@
+{{- if eq .Values.llm.provider "local" }}
+# -----------------------------------------------------------------------------
+# Ollama — in-cluster LLM runtime, deployed ONLY when llm.provider == "local".
+# ai-service reaches it at llm.local.endpoint (http://ollama:11434, the Service
+# below). The chart only provisions the runtime; Ollama starts with no models,
+# so scripts/deploy.sh pulls llm.local.model into it after the rollout (the
+# model name is stamped on this Deployment's annotations for the script to read).
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+  annotations:
+    # Read by scripts/deploy.sh to pull the right model after the rollout.
+    # The Deployment (and thus these annotations) only exist for provider=local.
+    meridian.city/llm-provider: {{ .Values.llm.provider | quote }}
+    meridian.city/ollama-model: {{ .Values.llm.local.model | quote }}
+spec:
+  replicas: 1
+  strategy:
+    # Single PVC writer (RWO) — never let an old and new pod mount it at once.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: {{ .Values.llm.local.ollama.image | quote }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 11434
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+          readinessProbe:
+            tcpSocket:
+              port: 11434
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.llm.local.ollama.resources | nindent 12 }}
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      volumes:
+        - name: models
+        {{- if .Values.llm.local.ollama.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: ollama-models
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  type: ClusterIP
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
+{{- if .Values.llm.local.ollama.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.llm.local.ollama.persistence.size | quote }}
+  {{- with .Values.llm.local.ollama.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

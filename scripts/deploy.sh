@@ -86,6 +86,37 @@ restart_app_workloads() {
     || warn "Pods still settling after restart — check: ./scripts/deploy.sh status"
 }
 
+# When llm.provider == "local", the chart deploys an in-cluster Ollama
+# (helm/templates/ollama.yaml). Ollama starts with no models, so pull the
+# configured model into it once it is ready. We discover the provider/model by
+# reading the annotation the chart stamps on the ollama Deployment — that
+# Deployment (and thus the annotation) only exists when provider is "local", so
+# this is a clean no-op for every other provider. `ollama pull` is idempotent —
+# a no-op when the model is already present (e.g. served from the persistent
+# volume on a re-deploy).
+ensure_local_llm_model() {
+  local model
+  model=$(kubectl get deployment ollama -n "$NAMESPACE" \
+    -o jsonpath='{.metadata.annotations.meridian\.city/ollama-model}' 2>/dev/null || true)
+  [[ -n "$model" ]] || return 0  # provider is not "local" — no ollama deployment
+
+  echo ""
+  info "LLM provider is 'local' — ensuring Ollama has model '$model'..."
+  if ! kubectl rollout status deployment/ollama -n "$NAMESPACE" --timeout=600s; then
+    warn "Ollama did not become ready in time — skipping model pull. Pull it later with:"
+    warn "  kubectl exec -n $NAMESPACE deploy/ollama -- ollama pull $model"
+    return 0
+  fi
+
+  info "Pulling '$model' into Ollama (first pull downloads several GB — this can take a while)..."
+  if kubectl exec -n "$NAMESPACE" deploy/ollama -- ollama pull "$model"; then
+    success "Ollama model '$model' is ready."
+  else
+    warn "Could not pull '$model' into Ollama. Retry with:"
+    warn "  kubectl exec -n $NAMESPACE deploy/ollama -- ollama pull $model"
+  fi
+}
+
 install_or_upgrade() {
   local cmd="$1"
   shift
@@ -350,6 +381,10 @@ install_or_upgrade() {
     fi
   fi
 
+  # If the local LLM provider is selected, the chart deployed Ollama above —
+  # pull the configured model into it now that the pods have settled.
+  ensure_local_llm_model
+
   port_forward background
 }
 
@@ -367,16 +402,57 @@ show_status() {
 
 _PF_PIDS_FILE="/tmp/meridian-pf-pids"
 
+# Echo a Service's LoadBalancer ingress address (IP or hostname), or nothing if
+# it is not a LoadBalancer or has no external address assigned yet. (Only one of
+# ip/hostname is ever set, so concatenating them yields just the address.)
+lb_address() {
+  kubectl get svc "$1" -n "$NAMESPACE" \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}' \
+    2>/dev/null
+}
+
 port_forward() {
   # mode: "background" (after install — return the shell prompt)
   #        "foreground" (standalone port-forward command — block until Ctrl+C)
   local mode="${1:-foreground}"
 
-  info "  Public Portal   → http://localhost:8080"
-  info "  Ops Dashboard   → http://localhost:8081  (login: demo / dynatrace)"
-  info "  API Gateway     → http://localhost:3000"
-  info "  Demo Control    → http://localhost:3001"
-  info "Port-forwards restart automatically when pods are replaced."
+  # The frontends are LoadBalancer Services. When the cluster has assigned an
+  # external IP, that is the address to use: kubectl port-forward drops
+  # concurrent XHRs and makes the SPA look broken (status-0 on every /api call).
+  # So we print the LB address when present and only port-forward a frontend
+  # when it has NO external IP (e.g. kind / other bare clusters). The API
+  # services are ClusterIP and are always port-forwarded for direct local access
+  # (the SPAs reach them via the frontends' nginx /api proxy, so these forwards
+  # are not needed just to load the UI).
+  local portal_lb ops_lb
+  portal_lb=$(lb_address public-portal)
+  ops_lb=$(lb_address ops-dashboard)
+
+  echo ""
+  info "Access URLs:"
+  if [[ -n "$portal_lb" ]]; then
+    info "  Public Portal   → http://${portal_lb}"
+  else
+    info "  Public Portal   → http://localhost:8080  (port-forward)"
+  fi
+  if [[ -n "$ops_lb" ]]; then
+    info "  Ops Dashboard   → http://${ops_lb}  (login: demo / dynatrace)"
+  else
+    info "  Ops Dashboard   → http://localhost:8081  (port-forward; login: demo / dynatrace)"
+  fi
+  info "  API Gateway     → http://localhost:3000  (port-forward)"
+  info "  Demo Control    → http://localhost:3001  (port-forward)"
+  if [[ -z "$portal_lb" || -z "$ops_lb" ]]; then
+    info "Port-forwards restart automatically when pods are replaced."
+  fi
+
+  # Build the set of port-forwards to run: the ClusterIP API services always,
+  # plus any frontend that lacks an external LoadBalancer IP.
+  local -a targets=()
+  [[ -z "$portal_lb" ]] && targets+=("svc/public-portal 8080:80")
+  [[ -z "$ops_lb"    ]] && targets+=("svc/ops-dashboard 8081:80")
+  targets+=("svc/api-gateway 3000:3000")
+  targets+=("svc/demo-control-api 3001:3001")
 
   # Each port-forward runs inside a restart loop so that kubectl reconnects
   # after a pod is replaced (e.g. after 'rollout restart').  We bind to
@@ -398,28 +474,29 @@ port_forward() {
     done
   }
 
+  local entry svc ports
   if [[ "$mode" == "background" ]]; then
     # Redirect stdio to /dev/null before disowning: without this the loops
     # inherit the terminal's file descriptors and kubectl's "Forwarding from..."
     # / "Handling connection for..." output bleeds onto the user's prompt after
     # the deploy script exits.
-    _pf_loop svc/public-portal    8080:80   </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
-    _pf_loop svc/ops-dashboard    8081:80   </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
-    _pf_loop svc/api-gateway      3000:3000 </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
-    _pf_loop svc/demo-control-api 3001:3001 </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
+    for entry in "${targets[@]}"; do
+      read -r svc ports <<< "$entry"
+      _pf_loop "$svc" "$ports" </dev/null >/dev/null 2>&1 & pf_loop_pids+=($!)
+    done
     # Save loop PIDs so teardown.sh can stop them cleanly, then detach
     # so the loops survive after this script exits.
     printf '%s\n' "${pf_loop_pids[@]}" > "$_PF_PIDS_FILE"
     disown "${pf_loop_pids[@]}" 2>/dev/null || true
     success "Port-forwards running in the background."
-    info "  Stop with: ./scripts/teardown.sh"
+    info "  Stop forwards only: ./scripts/teardown.sh --pf   (full teardown: ./scripts/teardown.sh)"
   else
     # Foreground / interactive mode: keep kubectl output visible so the user
     # can see connection activity, then block until Ctrl+C.
-    _pf_loop svc/public-portal    8080:80   & pf_loop_pids+=($!)
-    _pf_loop svc/ops-dashboard    8081:80   & pf_loop_pids+=($!)
-    _pf_loop svc/api-gateway      3000:3000 & pf_loop_pids+=($!)
-    _pf_loop svc/demo-control-api 3001:3001 & pf_loop_pids+=($!)
+    for entry in "${targets[@]}"; do
+      read -r svc ports <<< "$entry"
+      _pf_loop "$svc" "$ports" & pf_loop_pids+=($!)
+    done
     info "Press Ctrl+C to stop."
     _stop_pf() {
       trap - EXIT INT TERM  # prevent re-entrant calls
