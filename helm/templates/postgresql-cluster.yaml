@@ -13,6 +13,10 @@ metadata:
     "helm.sh/hook-delete-policy": hook-failed
 spec:
   instances: 1
+  # CNPG auto-creates a minAvailable:1 PDB for the primary; on a single-instance
+  # cluster that allows 0 evictions and blocks GKE node drains during maintenance.
+  # Disabling lets the pod be evicted/rescheduled in maintenance windows.
+  enablePDB: {{ .Values.postgresql.enablePDB }}
   bootstrap:
     initdb:
       database: {{ .Values.postgresql.auth.database }}
