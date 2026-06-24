@@ -5,8 +5,7 @@ import { getServiceRequests } from '../api/serviceRequests.js'
 import { getBills } from '../api/billing.js'
 import { getMessages } from '../api/messages.js'
 import { getDevices } from '../api/devices.js'
-import TransitMap from '../components/TransitMap.jsx'
-import TransitStatus from '../components/TransitStatus.jsx'
+import TransitPanel from '../components/TransitPanel.jsx'
 import Card from '../ui/Card.jsx'
 import StatTile from '../ui/StatTile.jsx'
 import Button from '../ui/Button.jsx'
@@ -165,8 +164,8 @@ export default function Home() {
 
       {/* Incidents + side column */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2" title="Live transit status" action={<LiveBadge />}>
-          <TransitStatus />
+        <Card className="lg:col-span-2" title="Meridian City transit" action={<LiveBadge />}>
+          <TransitPanel />
         </Card>
 
         {isAuthenticated ? (
@@ -204,13 +203,6 @@ export default function Home() {
           </Card>
         )}
       </div>
-
-      {/* Transit map */}
-      <Card title="Meridian City transit" bodyClassName="!p-2">
-        <div className="rounded-xl overflow-hidden p-2">
-          <TransitMap />
-        </div>
-      </Card>
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
