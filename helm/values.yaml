@@ -146,10 +146,12 @@ citizenService:
   resources:
     requests:
       cpu: "200m"
-      memory: "384Mi"
+      # Right-sized to observed working set (~550 MiB) + headroom; the old 384Mi
+      # request ran at ~143% memory-request saturation (Dynatrace OOM/saturation problem).
+      memory: "768Mi"
     limits:
       cpu: "1000m"
-      memory: "1Gi"
+      memory: "1536Mi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -169,10 +171,11 @@ commerceService:
   resources:
     requests:
       cpu: "200m"
-      memory: "384Mi"
+      # Right-sized to observed working set (~520 MiB) + headroom (was 384Mi → ~134% sat).
+      memory: "768Mi"
     limits:
       cpu: "1000m"
-      memory: "1Gi"
+      memory: "1536Mi"
 
 # ---------------------------------------------------------------------------
 # Billing Service (Java / Spring Boot)
@@ -191,10 +194,11 @@ billingService:
   resources:
     requests:
       cpu: "200m"
-      memory: "384Mi"
+      # Right-sized to observed working set (~600 MiB) + headroom (was 384Mi → ~157% sat).
+      memory: "768Mi"
     limits:
       cpu: "1000m"
-      memory: "1Gi"
+      memory: "1536Mi"
 
 # ---------------------------------------------------------------------------
 # Service Dispatch (Java / Spring Boot)
@@ -212,10 +216,11 @@ serviceDispatch:
   resources:
     requests:
       cpu: "200m"
-      memory: "384Mi"
+      # Right-sized to observed working set (~495 MiB) + headroom (was 384Mi → ~129% sat).
+      memory: "768Mi"
     limits:
       cpu: "1000m"
-      memory: "1Gi"
+      memory: "1536Mi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -234,10 +239,11 @@ cityOperations:
   resources:
     requests:
       cpu: "200m"
-      memory: "384Mi"
+      # Right-sized to observed working set (~575 MiB) + headroom (was 384Mi → ~150% sat).
+      memory: "768Mi"
     limits:
       cpu: "1000m"
-      memory: "1Gi"
+      memory: "1536Mi"
   # Fault injection flags — set by demo-control-api at runtime
   faultInjection:
     dbSlowdownEnabled: false
