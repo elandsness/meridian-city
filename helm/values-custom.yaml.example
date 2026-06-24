@@ -92,7 +92,10 @@ llm:
     model: "claude-sonnet-4-6"
 
   local:
-    # Used when provider=local; assumes Ollama running in-cluster
+    # When provider=local, the chart auto-deploys an in-cluster Ollama and
+    # scripts/deploy.sh pulls `model` into it after the rollout. `endpoint`
+    # must point at that in-cluster Service (default: http://ollama:11434).
+    # Ollama tuning (image/resources/persistence) lives in values.yaml.
     endpoint: "http://ollama:11434"
     model: "llama3"
 

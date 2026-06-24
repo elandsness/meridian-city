@@ -14,6 +14,12 @@
 #                                      still stopped, but namespaces and PVCs
 #                                      are preserved (useful for iterating on
 #                                      Helm chart changes without losing data).
+#
+#   ./scripts/teardown.sh --pf         Stop ALL Meridian port-forwards and exit.
+#                                      Non-destructive (touches no cluster
+#                                      resources) — use it to clear stale or
+#                                      orphaned forwards that accumulate across
+#                                      repeated deploys.
 # =============================================================================
 set -euo pipefail
 
@@ -31,8 +37,78 @@ info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 
+_PF_PIDS_FILE="/tmp/meridian-pf-pids"
+# Matches the kubectl port-forward processes deploy.sh starts for this
+# namespace's services (see scripts/deploy.sh _pf_loop). Anchored on
+# "port-forward ... -n <ns>" rather than on "kubectl": kuberlr runs the real
+# binary as e.g. "kubectl1.36.2 port-forward ...", so a literal "kubectl
+# port-forward" match (the old fallback) silently missed every kuberlr forward.
+_PF_KUBECTL_PATTERN="port-forward .*-n ${NAMESPACE}"
+
+# Durably stop EVERY Meridian port-forward: the loops tracked by the most recent
+# deploy run AND orphans from earlier runs.
+#
+# Why the PID file alone is not enough: deploy.sh runs each port-forward inside a
+# restart loop (it relaunches kubectl whenever a pod is replaced) and writes only
+# the CURRENT run's loop PIDs to $_PF_PIDS_FILE, overwriting it each run. Repeated
+# `deploy.sh upgrade`s (which never teardown in between) therefore leave the prior
+# runs' loops untracked, and they pile up — each respawning kubectl and fighting
+# over ports 8080/8081/3000/3001. Killing only the kubectl children is futile: the
+# loops respawn them after a 3s sleep.
+#
+# So we kill the restart-loop PARENTS first (they stop respawning), then the
+# kubectl children. Orphaned loops are found by walking up from every live kubectl
+# port-forward to its parent — adopting it only when that parent is itself a
+# deploy.sh process and not PID 1, so we never kill init or an unrelated shell.
+stop_port_forwards() {
+  local stopped=false pid ppid pcmd p
+  local -a loop_pids=()
+
+  # (a) Loops tracked by the most recent deploy run.
+  if [[ -f "$_PF_PIDS_FILE" ]]; then
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] && loop_pids+=("$pid")
+    done < "$_PF_PIDS_FILE"
+  fi
+
+  # (b) Orphaned loops from earlier runs: the deploy.sh parent of each live
+  #     kubectl port-forward child (the PID file no longer references them).
+  while IFS= read -r pid; do
+    [[ -z "$pid" ]] && continue
+    ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+    [[ -z "$ppid" || "$ppid" == "1" ]] && continue
+    pcmd=$(ps -o command= -p "$ppid" 2>/dev/null || true)
+    [[ "$pcmd" == *deploy.sh* ]] && loop_pids+=("$ppid")
+  done < <(pgrep -f "$_PF_KUBECTL_PATTERN" 2>/dev/null || true)
+
+  # Kill loop parents first (stops respawning), then any kubectl still up
+  # (covers a bare kubectl left by a Ctrl+C'd manual `deploy.sh port-forward`).
+  if [[ ${#loop_pids[@]} -gt 0 ]]; then
+    for p in "${loop_pids[@]}"; do
+      if kill "$p" 2>/dev/null; then stopped=true; fi
+      pkill -P "$p" 2>/dev/null || true  # reap its kubectl child
+    done
+  fi
+  if pkill -f "$_PF_KUBECTL_PATTERN" 2>/dev/null; then stopped=true; fi
+
+  rm -f "$_PF_PIDS_FILE"
+  $stopped && success "Port-forwards stopped." || info "No port-forwards were running."
+}
+
 SOFT=false
-[[ "${1:-}" == "--soft" ]] && SOFT=true
+PF_ONLY=false
+case "${1:-}" in
+  --soft) SOFT=true ;;
+  --pf)   PF_ONLY=true ;;
+esac
+
+# Port-forward-only mode changes no cluster state, so it runs immediately
+# without the teardown confirmation prompt.
+if $PF_ONLY; then
+  info "Stopping all Meridian port-forwards (no cluster changes)..."
+  stop_port_forwards
+  exit 0
+fi
 
 if $SOFT; then
   warn "Soft teardown: port-forwards will be stopped and the Helm release will"
@@ -46,26 +122,10 @@ read -rp "Continue? [y/N] " confirm
 [[ "${confirm:-N}" =~ ^[Yy]$ ]] || { info "Aborted."; exit 0; }
 
 # ---------------------------------------------------------------------------
-# 1. Kill port-forwards
+# 1. Kill port-forwards (loops + orphans — see stop_port_forwards above)
 # ---------------------------------------------------------------------------
 info "Stopping port-forwards..."
-_pf_stopped=false
-# Kill the restart loops first (so they don't respawn kubectl after pkill).
-_PF_PIDS_FILE="/tmp/meridian-pf-pids"
-if [[ -f "$_PF_PIDS_FILE" ]]; then
-  while IFS= read -r pid; do
-    kill   "$pid"   2>/dev/null || true
-    pkill -P "$pid" 2>/dev/null || true  # also kill the kubectl child
-  done < "$_PF_PIDS_FILE"
-  rm -f "$_PF_PIDS_FILE"
-  _pf_stopped=true
-fi
-# Fallback: catch any kubectl port-forward processes not tracked via PID file
-# (e.g. from a manual ./scripts/deploy.sh port-forward run).
-if pkill -f "kubectl port-forward" 2>/dev/null; then
-  _pf_stopped=true
-fi
-$_pf_stopped && success "Port-forwards stopped." || info "No port-forwards were running."
+stop_port_forwards
 
 # ---------------------------------------------------------------------------
 # 1b. (Full teardown only) Delete operator-managed CRs BEFORE uninstalling the

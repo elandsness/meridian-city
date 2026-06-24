@@ -89,9 +89,28 @@ llm:
     model: "claude-sonnet-4-6"
 
   local:
-    # Used when provider=local; assumes Ollama running in-cluster
+    # Used when provider=local. When llm.provider == "local" the chart deploys
+    # an in-cluster Ollama (helm/templates/ollama.yaml) reachable at `endpoint`,
+    # and scripts/deploy.sh pulls `model` into it after the rollout (Ollama
+    # starts with no models). For any other provider none of this renders.
     endpoint: "http://ollama:11434"
     model: "llama3"
+    ollama:
+      # Pinned to :latest so each (re)deploy gets the current Ollama runtime.
+      image: "ollama/ollama:latest"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "2Gi"
+        limits:
+          cpu: "4"
+          memory: "8Gi"
+      # Persist pulled models across pod restarts via a PVC. Disable to use an
+      # emptyDir (models are re-pulled whenever the pod is recreated).
+      persistence:
+        enabled: true
+        size: "20Gi"
+        storageClass: ""   # "" = cluster default StorageClass
 
 # ---------------------------------------------------------------------------
 # Mock authentication (ops dashboard login)
