@@ -5,3 +5,23 @@
 html, body {
   @apply bg-slate-900;
 }
+
+/* News-ticker animations (see NewsTicker.jsx): each headline fades/slides in, and
+   a thin progress bar fills over the rotation interval so the box reads as "live"
+   even between swaps. --ticker-ms is set inline to match the JS rotation timer. */
+@keyframes ticker-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-ticker-in {
+  animation: ticker-in 500ms ease-out both;
+}
+
+@keyframes ticker-progress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.animate-ticker-progress {
+  transform-origin: left;
+  animation: ticker-progress var(--ticker-ms, 90000ms) linear both;
+}
