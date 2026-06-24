@@ -6,8 +6,10 @@
 #   ./scripts/deploy.sh repos                          Add all required Helm repos
 #   ./scripts/deploy.sh install [helm flags...]        Full install (infra + app +
 #                                                      seed data + port-forwards)
-#   ./scripts/deploy.sh upgrade [helm flags...]        Upgrade existing release
-#                                                      (restarts port-forwards when done)
+#   ./scripts/deploy.sh upgrade [helm flags...]        Upgrade existing release, then
+#                                                      restart app workloads so the
+#                                                      floating :latest images are
+#                                                      re-pulled (restarts port-forwards too)
 #   ./scripts/deploy.sh seed [--reset] [--check]      Seed / re-seed demo data
 #   ./scripts/deploy.sh status                         Show pod status
 #   ./scripts/deploy.sh port-forward                   Start port-forwards only
@@ -66,6 +68,22 @@ add_repos() {
   info "Resolving Helm dependencies..."
   helm dependency update "$CHART_DIR"
   success "Dependencies resolved."
+}
+
+# Recreate the app Deployments and wait for them to come back ready. Targets only
+# our app workloads via the part-of selector — never the DB/Kafka CRs or the
+# CNPG/Strimzi/OTel operator Deployments. Used to pull fresh :latest images on
+# upgrade and to (re)trigger OneAgent injection.
+restart_app_workloads() {
+  kubectl rollout restart deployment -n "$NAMESPACE" \
+    -l 'app.kubernetes.io/part-of=meridian-city-platform'
+  sleep 10  # let the rollout begin so we wait on the new pods, not the old ready ones
+  kubectl wait pods \
+    --for=condition=ready \
+    --selector='app.kubernetes.io/part-of=meridian-city-platform' \
+    -n "$NAMESPACE" \
+    --timeout=600s 2>/dev/null \
+    || warn "Pods still settling after restart — check: ./scripts/deploy.sh status"
 }
 
 install_or_upgrade() {
@@ -284,6 +302,20 @@ install_or_upgrade() {
     echo ""
   fi
 
+  # On upgrade, force the app workloads onto fresh images. Images use the floating
+  # :latest tag (imagePullPolicy: Always), so a code-only change is invisible to
+  # Helm — it sees no manifest diff and leaves the old pods running, and 'Always'
+  # only pulls when a pod starts, never into a live pod. A rollout restart recreates
+  # them so they pull the new :latest. (Install pods are already fresh, so this is
+  # upgrade-only. When Dynatrace is enabled the new pods also get OneAgent-injected,
+  # making the block below a no-op on a normal upgrade.)
+  if [[ "$cmd" == "upgrade" ]]; then
+    echo ""
+    info "Restarting app workloads to pull fresh :latest images..."
+    restart_app_workloads
+    success "App workloads restarted on fresh images."
+  fi
+
   # OneAgent injection happens at pod creation, but on a fresh install the app
   # pods come up before the DynaKube (a post-install hook) has reconciled — so
   # they start un-instrumented and need one restart. We wait for the DynaKube to
@@ -313,15 +345,7 @@ install_or_upgrade() {
       success "App pods are already OneAgent-injected — no restart needed."
     else
       info "DynaKube is Running but the app pods predate it — restarting once so OneAgent injects..."
-      kubectl rollout restart deployment -n "$NAMESPACE" \
-        -l 'app.kubernetes.io/part-of=meridian-city-platform'
-      sleep 10  # let the rollout begin so we wait on the new pods, not the old ready ones
-      kubectl wait pods \
-        --for=condition=ready \
-        --selector='app.kubernetes.io/part-of=meridian-city-platform' \
-        -n "$NAMESPACE" \
-        --timeout=600s 2>/dev/null \
-        || warn "Pods still settling after the injection restart — check: ./scripts/deploy.sh status"
+      restart_app_workloads
       success "App workloads restarted — OneAgent instrumentation active."
     fi
   fi
