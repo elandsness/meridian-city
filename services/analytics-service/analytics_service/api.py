@@ -45,8 +45,10 @@ class FaultRequest(BaseModel):
     db_slowdown_enabled: Optional[bool] = None
     db_slowdown_seconds: Optional[float] = Field(default=None, ge=0, le=60)
     memory_pressure_enabled: Optional[bool] = None
-    # Total-allocation ceiling for the memory leak, in MB. Adjustable at runtime.
+    # How high the leak grows (MB) and how long it takes to get there (seconds).
+    # Both adjustable at runtime.
     memory_pressure_cap_mb: Optional[int] = Field(default=None, ge=64, le=4096)
+    memory_pressure_ramp_seconds: Optional[int] = Field(default=None, ge=10, le=3600)
 
 
 class FaultResponse(BaseModel):
@@ -54,6 +56,7 @@ class FaultResponse(BaseModel):
     db_slowdown_seconds: float
     memory_pressure_enabled: bool
     memory_pressure_cap_mb: int
+    memory_pressure_ramp_seconds: int
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +72,7 @@ async def health():
             "db_slowdown_enabled": fault_state.db_slowdown_enabled,
             "memory_pressure_enabled": fault_state.memory_pressure_enabled,
             "memory_pressure_cap_mb": fault_state.memory_pressure_cap_mb,
+            "memory_pressure_ramp_seconds": fault_state.memory_pressure_ramp_seconds,
         },
     }
 
@@ -131,9 +135,11 @@ async def inject_fault(request: FaultRequest):
     if request.db_slowdown_seconds is not None:
         fault_state.db_slowdown_seconds = request.db_slowdown_seconds
 
-    # Apply the cap before (re)starting the leak so the new ceiling takes effect.
+    # Apply cap/ramp before (re)starting the leak so the new pacing takes effect.
     if request.memory_pressure_cap_mb is not None:
         fault_state.memory_pressure_cap_mb = request.memory_pressure_cap_mb
+    if request.memory_pressure_ramp_seconds is not None:
+        fault_state.memory_pressure_ramp_seconds = request.memory_pressure_ramp_seconds
 
     if request.memory_pressure_enabled is not None:
         fault_state.memory_pressure_enabled = request.memory_pressure_enabled
@@ -143,9 +149,12 @@ async def inject_fault(request: FaultRequest):
             fault_state.start_memory_leak()
         else:
             fault_state.release_memory_pressure()
-    elif request.memory_pressure_cap_mb is not None and fault_state.memory_pressure_enabled:
-        # Cap was raised while the leak is already on (and its loop may have
-        # finished at the old ceiling) — resume growth toward the new cap.
+    elif (
+        request.memory_pressure_cap_mb is not None
+        or request.memory_pressure_ramp_seconds is not None
+    ) and fault_state.memory_pressure_enabled:
+        # Cap/ramp changed while the leak is already on (and its loop may have
+        # finished at the old ceiling) — resume growth with the new pacing.
         fault_state.start_memory_leak()
 
     return FaultResponse(
@@ -153,4 +162,5 @@ async def inject_fault(request: FaultRequest):
         db_slowdown_seconds=fault_state.db_slowdown_seconds,
         memory_pressure_enabled=fault_state.memory_pressure_enabled,
         memory_pressure_cap_mb=fault_state.memory_pressure_cap_mb,
+        memory_pressure_ramp_seconds=fault_state.memory_pressure_ramp_seconds,
     )

@@ -3,32 +3,35 @@
 /**
  * Scenario definitions for demo-control-api.
  *
- * Each scenario describes a named demo story that orchestrates one or more
- * fault injections and/or IoT anomalies. Scenarios can auto-reset after a
- * configured duration.
+ * Each scenario describes a named demo story that orchestrates one or more fault
+ * injections. Scenarios expose:
+ *   - `params`: tunable fault knobs the UI renders as sliders and passes back on
+ *      start. activate(opts) reads opts[param.name] (falling back to the default).
+ *   - `clear`: how the scenario ends — a default mode ('auto' | 'manual') and,
+ *      when auto, a default duration in minutes (plus the allowed min/max). The
+ *      operator can override both on start via clear_mode / clear_minutes;
+ *      activation schedules the auto-reset timer from that choice.
  *
- * Demo scenarios (from the project plan):
- *   db-slowdown      — citizen-service DB latency, tunable (auto-reset 5 min)
- *   llm-latency      — ai-service LLM latency, tunable (manual reset)
- *   memory-pressure  — analytics-service growing leak, tunable cap (manual reset)
- *   cascade-failure  — db-slowdown + llm-latency simultaneously (manual reset)
+ * Demo scenarios:
+ *   db-slowdown      — citizen-service DB latency, tunable (default auto-clear 5m)
+ *   llm-latency      — ai-service LLM latency, tunable (default manual)
+ *   memory-pressure  — analytics-service leak: tunable cap + ramp (default manual)
+ *   cascade-failure  — db-slowdown + llm-latency simultaneously (default manual)
  */
 
 const config = require('./config')
 const proxy = require('./proxy')
 const state = require('./state')
 
-/**
- * Each scenario may declare `params`: tunable knobs the UI renders as sliders and
- * passes back on start. activate(opts) reads opts[param.name] (falling back to the
- * param default), so a scenario works with or without a body.
- * @type {Record<string, ScenarioDef>}
- */
+const CLEAR_MIN = 1
+const CLEAR_MAX = 30
+
+/** @type {Record<string, ScenarioDef>} */
 const SCENARIOS = {
   'db-slowdown': {
     name: 'Database Slowdown',
-    description: 'Injects DB query latency into citizen-service, so submit-request PurePaths show a clear slow span. Auto-resets after 5 minutes.',
-    duration_seconds: 300,
+    description: 'Injects DB query latency into citizen-service, so submit-request PurePaths show a clear slow span.',
+    clear: { mode: 'auto', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [
       { name: 'seconds', label: 'DB latency', min: 1, max: 10, step: 1, default: 2, unit: 's' },
     ],
@@ -51,8 +54,8 @@ const SCENARIOS = {
 
   'llm-latency': {
     name: 'LLM Latency Spike',
-    description: 'Injects latency before every ai-service LLM call, visible as long meridian.chat spans in AI observability. Needs chat traffic (enable the Chat-traffic toggle, or chat in the portal). Manual reset required.',
-    duration_seconds: null,
+    description: 'Injects latency before every ai-service LLM call, visible as long meridian.chat spans in AI observability. Needs chat traffic (enable the Chat-traffic toggle, or chat in the portal).',
+    clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [
       { name: 'seconds', label: 'LLM latency', min: 1, max: 30, step: 1, default: 10, unit: 's' },
     ],
@@ -75,15 +78,19 @@ const SCENARIOS = {
 
   'memory-pressure': {
     name: 'Memory Pressure',
-    description: 'Grows analytics-service heap ~32 MB every 20s (a rising leak curve) up to a configurable cap. With the cap above the 512 MiB container limit it overshoots and triggers an OOMKill. Manual reset required.',
-    duration_seconds: null,
+    description: 'Leaks analytics-service heap up to a cap over a ramp time. With the cap above the 512 MiB container limit it overshoots and triggers an OOMKill partway up the ramp; below the limit it plateaus (stress without a kill).',
+    clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [
-      { name: 'cap_mb', label: 'Memory cap', min: 128, max: 1024, step: 64, default: 512, unit: 'MB' },
+      { name: 'cap_mb', label: 'Cap', min: 128, max: 1024, step: 64, default: 512, unit: 'MB' },
+      { name: 'ramp_minutes', label: 'Ramp time', min: 1, max: 15, step: 1, default: 3, unit: ' min' },
     ],
     async activate (opts = {}) {
       const cap = Number(opts.cap_mb) > 0 ? Number(opts.cap_mb) : 512
+      const rampMin = Number(opts.ramp_minutes) > 0 ? Number(opts.ramp_minutes) : 3
       const r = await proxy.post(`${config.ANALYTICS_SERVICE_URL}/admin/fault`, {
-        memory_pressure_enabled: true, memory_pressure_cap_mb: cap,
+        memory_pressure_enabled: true,
+        memory_pressure_cap_mb: cap,
+        memory_pressure_ramp_seconds: Math.round(rampMin * 60),
       })
       state.setFault('analytics-service', { memory_pressure_enabled: true })
       return r
@@ -99,8 +106,9 @@ const SCENARIOS = {
 
   'cascade-failure': {
     name: 'Cascade Failure',
-    description: 'Triggers Database Slowdown + LLM Latency Spike simultaneously for a multi-signal incident. Manual reset required.',
-    duration_seconds: null,
+    description: 'Triggers Database Slowdown + LLM Latency Spike simultaneously for a multi-signal incident.',
+    clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [],
     async activate (opts = {}) {
       await SCENARIOS['db-slowdown'].activate(opts)
       await SCENARIOS['llm-latency'].activate(opts)
@@ -122,15 +130,18 @@ function listScenarios () {
     id,
     name: s.name,
     description: s.description,
-    duration_seconds: s.duration_seconds,
+    clear: s.clear,
     params: s.params ?? [],
   }))
 }
 
 /**
- * Activate a scenario by ID, register it as active, and schedule auto-reset.
+ * Activate a scenario by ID, register it as active, and schedule auto-reset
+ * based on the chosen clear mode/duration.
  * @param {string} id
- * @param {object} [opts] tunable param overrides (e.g. { seconds }, { cap_mb })
+ * @param {object} [opts] fault param overrides (e.g. seconds, cap_mb,
+ *   ramp_minutes) plus clear_mode ('auto'|'manual') and clear_minutes; the clear
+ *   fields fall back to the scenario's defaults when absent.
  * @returns {{ ok: boolean, scenario?: object, error?: string }}
  */
 async function activateScenario (id, opts = {}) {
@@ -139,15 +150,23 @@ async function activateScenario (id, opts = {}) {
 
   const result = await scenario.activate(opts)
 
-  const autoResetMs = scenario.duration_seconds ? scenario.duration_seconds * 1000 : null
-  state.setActiveScenario(id, scenario.name, autoResetMs, () => scenario.reset(), opts)
+  const clearDefault = scenario.clear || { mode: 'manual', minutes: 5 }
+  const mode = (opts.clear_mode === 'auto' || opts.clear_mode === 'manual')
+    ? opts.clear_mode
+    : clearDefault.mode
+  const minutes = Number(opts.clear_minutes) > 0 ? Number(opts.clear_minutes) : clearDefault.minutes
+  const autoResetMs = mode === 'auto' ? minutes * 60 * 1000 : null
+
+  state.setActiveScenario(id, scenario.name, autoResetMs, () => scenario.reset(), {
+    ...opts, clear_mode: mode, clear_minutes: minutes,
+  })
 
   return {
     ok: result.ok !== false,
     scenario: {
       id,
       name: scenario.name,
-      duration_seconds: scenario.duration_seconds,
+      clear: { mode, minutes },
       params: opts,
       started_at: state.getActiveScenario()?.started_at,
     },
