@@ -10,8 +10,8 @@ export async function getScenarios() {
   return res.data;
 }
 
-export async function startScenario(id) {
-  const res = await client.post(`/api/v1/demo-control/scenarios/${id}/start`);
+export async function startScenario(id, params = {}) {
+  const res = await client.post(`/api/v1/demo-control/scenarios/${id}/start`, params);
   return res.data;
 }
 

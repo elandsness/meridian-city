@@ -2,9 +2,10 @@
 Fault injection state for analytics-service.
 
 Supports:
-  db_slowdown_enabled   — inject artificial sleep before DB queries
-  db_slowdown_seconds   — duration of the sleep (default: 2s when enabled)
+  db_slowdown_enabled     — inject artificial sleep before DB queries
+  db_slowdown_seconds     — duration of the sleep (default: 2s when enabled)
   memory_pressure_enabled — leak memory over time (simulated memory leak)
+  memory_pressure_cap_mb  — total-allocation ceiling for the leak (default: 768)
 
 Toggled at runtime via POST /admin/fault.
 Seeded from env vars at startup.
@@ -42,6 +43,10 @@ class FaultState:
     db_slowdown_enabled: bool = False
     db_slowdown_seconds: float = 0.0
     memory_pressure_enabled: bool = False
+    # Total-allocation ceiling (MB) for the leak. Seeded from MEMORY_LEAK_MAX_MB
+    # but adjustable at runtime via POST /admin/fault (memory_pressure_cap_mb), so
+    # the demo can dial the leak to approach or overshoot the container limit.
+    memory_pressure_cap_mb: int = MEMORY_LEAK_MAX_MB
 
     # Internal buffer — holds onto memory while memory_pressure is on.
     _memory_hog: List[bytearray] = field(default_factory=list, repr=False)
@@ -50,7 +55,7 @@ class FaultState:
 
     @property
     def _max_blocks(self) -> int:
-        return max(1, MEMORY_LEAK_MAX_MB // MEMORY_LEAK_BLOCK_MB)
+        return max(1, self.memory_pressure_cap_mb // MEMORY_LEAK_BLOCK_MB)
 
     async def maybe_delay(self) -> None:
         """Sleep before a DB query if slowdown injection is active."""
