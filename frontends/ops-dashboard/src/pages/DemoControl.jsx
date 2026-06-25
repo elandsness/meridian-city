@@ -163,9 +163,10 @@ function filterParams(params, active) {
 
 function ScenarioRow({ sc, isActive, blocked, loading, result, activeParams, onStart, onStop }) {
   const params = Array.isArray(sc.params) ? sc.params : [];
+  const clearCfg = sc.clear || { mode: 'manual', minutes: 5, min: 1, max: 30 };
 
-  // Local slider values, keyed by param name; seeded from the active run's
-  // applied values (when this scenario is active) or each param's default.
+  // Local control values; seeded from the active run's applied values (when this
+  // scenario is active) or the scenario / param defaults.
   const [values, setValues] = useState(() =>
     Object.fromEntries(
       params.map((p) => [
@@ -174,17 +175,23 @@ function ScenarioRow({ sc, isActive, blocked, loading, result, activeParams, onS
       ])
     )
   );
+  const [clearMode, setClearMode] = useState(activeParams?.clear_mode ?? clearCfg.mode);
+  const [clearMinutes, setClearMinutes] = useState(activeParams?.clear_minutes ?? clearCfg.minutes);
 
-  // Re-sync sliders to the applied values whenever the active params change.
+  // Re-sync controls to the applied values whenever the active params change.
   useEffect(() => {
-    if (activeParams) setValues((v) => ({ ...v, ...filterParams(params, activeParams) }));
+    if (!activeParams) return;
+    setValues((v) => ({ ...v, ...filterParams(params, activeParams) }));
+    if (activeParams.clear_mode) setClearMode(activeParams.clear_mode);
+    if (activeParams.clear_minutes != null) setClearMinutes(activeParams.clear_minutes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(activeParams)]);
 
-  const durationLabel = sc.duration_seconds
-    ? `Auto-reset ${Math.round(sc.duration_seconds / 60)}m`
-    : 'Manual reset';
-  const slidersDisabled = isActive || blocked;
+  const disabled = isActive || blocked;
+
+  function stepMinutes(delta) {
+    setClearMinutes((m) => Math.min(clearCfg.max ?? 30, Math.max(clearCfg.min ?? 1, m + delta)));
+  }
 
   return (
     <div
@@ -201,9 +208,6 @@ function ScenarioRow({ sc, isActive, blocked, loading, result, activeParams, onS
                 Active
               </span>
             )}
-            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-400">
-              {durationLabel}
-            </span>
           </div>
           <p className="text-xs text-gray-400 mt-1">{sc.description}</p>
         </div>
@@ -218,7 +222,9 @@ function ScenarioRow({ sc, isActive, blocked, loading, result, activeParams, onS
             </button>
           ) : (
             <button
-              onClick={() => onStart(sc.id, values)}
+              onClick={() =>
+                onStart(sc.id, { ...values, clear_mode: clearMode, clear_minutes: clearMinutes })
+              }
               disabled={loading || blocked}
               title={blocked ? 'Stop the active scenario first' : undefined}
               className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
@@ -230,28 +236,69 @@ function ScenarioRow({ sc, isActive, blocked, loading, result, activeParams, onS
         </div>
       </div>
 
-      {params.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 pt-3 border-t border-gray-800">
-          {params.map((p) => (
-            <div key={p.name} className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">{p.label}</label>
-              <input
-                type="range"
-                min={p.min}
-                max={p.max}
-                step={p.step ?? 1}
-                value={values[p.name] ?? p.default}
-                disabled={slidersDisabled}
-                onChange={(e) => setValues((v) => ({ ...v, [p.name]: Number(e.target.value) }))}
-                className="w-32 accent-cyan-400 disabled:opacity-50"
-              />
-              <span className="text-xs text-gray-400 tabular-nums">
-                {values[p.name] ?? p.default}{p.unit}
+      <div className="mt-3 pt-3 border-t border-gray-800 space-y-2.5">
+        {params.map((p) => (
+          <div key={p.name} className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 w-20">{p.label}</label>
+            <input
+              type="range"
+              min={p.min}
+              max={p.max}
+              step={p.step ?? 1}
+              value={values[p.name] ?? p.default}
+              disabled={disabled}
+              onChange={(e) => setValues((v) => ({ ...v, [p.name]: Number(e.target.value) }))}
+              className="w-36 accent-cyan-400 disabled:opacity-50"
+            />
+            <span className="text-xs text-gray-400 tabular-nums">
+              {values[p.name] ?? p.default}{p.unit}
+            </span>
+          </div>
+        ))}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-xs text-gray-500 w-20">Clear</label>
+          <div className="inline-flex rounded-md overflow-hidden border border-gray-700">
+            {['manual', 'auto'].map((m) => (
+              <button
+                key={m}
+                onClick={() => setClearMode(m)}
+                disabled={disabled}
+                className={`px-2.5 py-1 text-xs capitalize transition-colors disabled:opacity-50 ${
+                  clearMode === m
+                    ? 'bg-cyan-600 text-white'
+                    : 'bg-transparent text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          {clearMode === 'auto' && (
+            <div className="inline-flex items-center gap-1.5">
+              <button
+                onClick={() => stepMinutes(-1)}
+                disabled={disabled || clearMinutes <= (clearCfg.min ?? 1)}
+                className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-gray-300 text-sm leading-none"
+                aria-label="Decrease auto-clear minutes"
+              >
+                −
+              </button>
+              <span className="text-xs text-gray-300 tabular-nums w-12 text-center">
+                {clearMinutes} min
               </span>
+              <button
+                onClick={() => stepMinutes(1)}
+                disabled={disabled || clearMinutes >= (clearCfg.max ?? 30)}
+                className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-gray-300 text-sm leading-none"
+                aria-label="Increase auto-clear minutes"
+              >
+                +
+              </button>
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
