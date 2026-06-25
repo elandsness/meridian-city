@@ -17,6 +17,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from .db import record_chat
 from .fault import fault_state
 
 app = FastAPI(title="Meridian City AI Service", version="1.0.0")
@@ -107,6 +108,15 @@ async def chat(request: ChatRequest):
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail="LLM request failed") from exc
+
+    # Best-effort: persist the chat so analytics can count "AI chats today".
+    # Never raises — chat succeeds even if the DB write fails.
+    await record_chat(
+        session_id=request.session_id,
+        model=result.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+    )
 
     return ChatResponse(
         response=result.content,
