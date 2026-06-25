@@ -12,6 +12,7 @@
  *   POST /api/v1/stop      — stop the journey loop
  *   POST /api/v1/burst     — 10× load burst  { duration_minutes? }
  *   POST /api/v1/scenario  — run one journey  { scenario }
+ *   POST /api/v1/journey   — enable/disable a journey at runtime  { name, enabled }
  */
 
 const express = require('express')
@@ -63,6 +64,19 @@ app.post('/api/v1/scenario', async (req, res) => {
   } catch (err) {
     res.status(422).json({ ok: false, error: err.message })
   }
+})
+
+app.post('/api/v1/journey', (req, res) => {
+  const { name, enabled } = req.body || {}
+  if (!name || typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'name (string) and enabled (boolean) are required' })
+  }
+  const journey = runner.setJourneyEnabled(name, enabled)
+  if (!journey) {
+    return res.status(404).json({ ok: false, error: `Unknown journey: "${name}"` })
+  }
+  console.log(`[traffic-bot] journey "${journey.name}" ${journey.enabled ? 'enabled' : 'disabled'} via control API`)
+  res.json({ ok: true, journey, ...runner.getStatus() })
 })
 
 // 404 catch-all

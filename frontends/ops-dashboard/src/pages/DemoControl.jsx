@@ -16,6 +16,7 @@ import {
   startTraffic,
   stopTraffic,
   burstTraffic,
+  setJourneyEnabled,
 } from '../api/demo.js';
 import { getIncidents } from '../api/incidents.js';
 import { getDevices } from '../api/devices.js';
@@ -619,6 +620,18 @@ function TrafficCard() {
   const [loading, setLoading] = useState(null); // 'start' | 'stop' | 'burst'
   const [countdown, setCountdown] = useState(null);
 
+  // Chat-traffic toggle — drives the 'chatbot' journey so the LLM-latency scenario
+  // has a steady `meridian.chat` baseline. Effective state comes from traffic-bot.
+  const journeys = Array.isArray(trafficStatus?.journeys) ? trafficStatus.journeys : [];
+  const chatJourney = journeys.find((j) => j.name === 'chatbot');
+  const [chatEnabled, setChatEnabled] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatResult, setChatResult] = useState(null);
+
+  useEffect(() => {
+    if (chatJourney) setChatEnabled(Boolean(chatJourney.enabled));
+  }, [chatJourney?.enabled]);
+
   useEffect(() => {
     if (countdown === null || countdown <= 0) return;
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
@@ -665,6 +678,22 @@ function TrafficCard() {
       setBurstResult({ ok: false, error: err.response?.data?.message ?? err.message });
     } finally {
       setLoading(null);
+    }
+  }
+
+  async function handleChatToggle(val) {
+    setChatEnabled(val); // optimistic
+    setChatLoading(true);
+    setChatResult(null);
+    try {
+      await setJourneyEnabled('chatbot', val);
+      setChatResult({ ok: true });
+      qc.invalidateQueries({ queryKey: ['traffic-status'] });
+    } catch (err) {
+      setChatEnabled(!val); // revert on failure
+      setChatResult({ ok: false, error: err.response?.data?.message ?? err.message });
+    } finally {
+      setChatLoading(false);
     }
   }
 
@@ -724,6 +753,19 @@ function TrafficCard() {
           </span>
         )}
         <StatusMsg result={burstResult} />
+      </div>
+
+      <div className="flex items-center gap-3 pt-3 border-t border-gray-800">
+        <Toggle
+          checked={chatEnabled}
+          onChange={handleChatToggle}
+          label="Chat traffic (feeds the LLM-Latency scenario)"
+        />
+        {chatLoading && <span className="text-gray-500 text-xs">…</span>}
+        <StatusMsg result={chatResult} />
+        <span className="text-xs text-gray-600 ml-auto">
+          Generates a steady <code className="text-gray-500">meridian.chat</code> baseline; real LLM calls.
+        </span>
       </div>
     </SectionCard>
   );

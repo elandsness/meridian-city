@@ -142,6 +142,14 @@ async function runScenario(scenarioName) {
   return { scenario: scenarioName, completed: true }
 }
 
+/**
+ * Enable/disable a journey in the running pool (e.g. chat traffic). Affects the
+ * normal loop's journey mix immediately; returns the toggled entry or null.
+ */
+function setJourneyEnabled(nameOrKey, enabled) {
+  return journeys.setJourneyEnabled(nameOrKey, enabled)
+}
+
 function getStatus() {
   return {
     running:            _state.running,
@@ -157,4 +165,4 @@ function getStatus() {
   }
 }
 
-module.exports = { start, stop, burst, runScenario, getStatus }
+module.exports = { start, stop, burst, runScenario, setJourneyEnabled, getStatus }

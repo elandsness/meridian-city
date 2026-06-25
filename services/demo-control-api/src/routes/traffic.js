@@ -8,6 +8,7 @@
  * POST /api/v1/traffic/stop           — stop the traffic bot
  * POST /api/v1/traffic/burst          — 10× load burst for N minutes (?duration_minutes=2)
  * POST /api/v1/traffic/scenario       — run a specific citizen journey pattern
+ * POST /api/v1/traffic/journey        — enable/disable a journey at runtime { name, enabled }
  *
  * All commands forward to the traffic-bot service.
  */
@@ -69,6 +70,16 @@ async function trafficRoutes (fastify) {
     }
     const result = await proxy.post(`${config.TRAFFIC_BOT_URL}/api/v1/scenario`, { scenario })
     return reply.status(result.ok ? 200 : 502).send({ ok: result.ok, scenario, result: result.data, error: result.error })
+  })
+
+  // POST /api/v1/traffic/journey — enable/disable a journey at runtime (e.g. chat traffic)
+  fastify.post('/api/v1/traffic/journey', async (request, reply) => {
+    const { name, enabled } = request.body || {}
+    if (!name || typeof enabled !== 'boolean') {
+      return reply.status(400).send({ error: 'name (string) and enabled (boolean) are required' })
+    }
+    const result = await proxy.post(`${config.TRAFFIC_BOT_URL}/api/v1/journey`, { name, enabled })
+    return reply.status(result.ok ? 200 : 502).send({ ok: result.ok, name, enabled, result: result.data, error: result.error })
   })
 }
 
