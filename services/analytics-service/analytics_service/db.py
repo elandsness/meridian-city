@@ -4,12 +4,12 @@ PostgreSQL access for analytics-service.
 Owns the `analytics` schema:
   - kpi_snapshots   — periodic KPI snapshots (5-min intervals)
 
-Also reads (with safe fallbacks) from other schemas created by the Java services:
+Also reads (with safe fallbacks) from other schemas created by other services:
   - requests.service_requests
   - requests.request_events
-  - incidents.incidents
+  - incidents.incidents      (IoT anomalies = rows with source='iot')
   - incidents.work_orders
-  - iot.anomalies
+  - ai.chat_messages          (written by ai-service)
   - citizens.accounts
 """
 from __future__ import annotations

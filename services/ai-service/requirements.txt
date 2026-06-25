@@ -5,6 +5,9 @@ pydantic==2.9.2
 python-dotenv==1.0.1
 python-json-logger==2.0.7
 
+# DB — persists chat interactions to ai.chat_messages (for "AI chats today" KPI)
+asyncpg==0.29.0
+
 # LLM clients
 openai==1.51.0
 anthropic==0.34.2

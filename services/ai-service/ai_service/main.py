@@ -16,6 +16,7 @@ Shutdown:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sys
@@ -25,6 +26,7 @@ from pythonjsonlogger import jsonlogger
 
 from .api import app, set_chat_service
 from .chat import ChatService
+from .db import close as db_close, init_db
 from .fault import fault_state
 from .otel import init_otel
 
@@ -120,6 +122,10 @@ async def startup() -> None:
     _chat_service = ChatService(provider)
     set_chat_service(_chat_service)
 
+    # Initialise chat persistence in the background — never block (or fail) chat
+    # startup on the DB being reachable; chat recording is best-effort.
+    asyncio.create_task(init_db())
+
     logger.info(
         "ai-service started",
         extra={
@@ -135,6 +141,7 @@ async def shutdown() -> None:
     logger.info("ai-service shutting down")
     if _chat_service is not None:
         await _chat_service.close()
+    await db_close()
     logger.info("shutdown complete")
 
 

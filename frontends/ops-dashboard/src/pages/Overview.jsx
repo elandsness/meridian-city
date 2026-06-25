@@ -59,7 +59,7 @@ export default function Overview() {
       {kpisError ? (
         <p className="text-rose-400 text-sm">Failed to load KPIs: {kpisError.message}</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           <KpiTile
             label="Requests Today"
             value={kpisLoading ? '…' : kpis?.requests_today}
@@ -87,9 +87,14 @@ export default function Overview() {
           />
           <KpiTile
             label="Avg Resolution"
-            value={kpisLoading ? '…' : kpis?.avg_resolution_hours?.toFixed(1)}
-            unit="hrs"
+            value={kpisLoading ? '…' : kpis?.avg_resolution_minutes?.toFixed(1)}
+            unit="min"
             color="cyan"
+          />
+          <KpiTile
+            label="AI Chats Today"
+            value={kpisLoading ? '…' : kpis?.ai_chats_today}
+            color="green"
           />
         </div>
       )}
