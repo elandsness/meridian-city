@@ -114,6 +114,10 @@ async def startup() -> None:
     fault_state.memory_pressure_enabled = (
         os.getenv("FAULT_MEMORY_PRESSURE_ENABLED", "false").lower() == "true"
     )
+    # If seeded on at startup, kick off the background growth loop now (we're
+    # inside the running event loop here, so create_task is safe).
+    if fault_state.memory_pressure_enabled:
+        fault_state.start_memory_leak()
 
     # Initial snapshot (synchronous, so /kpis is ready immediately)
     try:
@@ -131,6 +135,8 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     logger.info("analytics-service shutting down")
+    # Stop the memory-leak loop so it doesn't outlive the app / log a pending-task warning.
+    fault_state.stop_memory_leak()
     if _snapshot_task is not None:
         _snapshot_task.cancel()
         try:

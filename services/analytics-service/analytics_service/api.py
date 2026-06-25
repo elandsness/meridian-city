@@ -130,7 +130,9 @@ async def inject_fault(request: FaultRequest):
     if request.memory_pressure_enabled is not None:
         fault_state.memory_pressure_enabled = request.memory_pressure_enabled
         if fault_state.memory_pressure_enabled:
-            fault_state.apply_memory_pressure()
+            # Start a background loop that grows memory over time (rising curve),
+            # not a one-shot allocation that leaves the working set flat.
+            fault_state.start_memory_leak()
         else:
             fault_state.release_memory_pressure()
 

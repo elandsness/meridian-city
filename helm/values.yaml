@@ -283,10 +283,14 @@ analyticsService:
   service:
     type: ClusterIP
     port: 8084
+  # The memory-pressure fault grows the working set ~32Mi every 20s toward this
+  # 512Mi limit (baseline is ~55Mi). Sustained growth approaches saturation and
+  # then OOMKills, firing Dynatrace "Memory usage close to limits" / OOM problems.
+  # Request is set well below the limit so the rising curve is clearly visible.
   resources:
     requests:
       cpu: "100m"
-      memory: "128Mi"
+      memory: "256Mi"
     limits:
       cpu: "500m"
       memory: "512Mi"
