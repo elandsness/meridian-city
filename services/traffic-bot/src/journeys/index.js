@@ -30,10 +30,22 @@ const REGISTRY = [
   { name: 'chatbot',         key: 'chatbot',         weight:  5, journey: require('./chatbot') },
 ]
 
+// Runtime enable/disable overrides set via the control API (POST /api/v1/journey).
+// Keyed by journey key; when present, takes precedence over the config default so an
+// operator can toggle e.g. chat traffic live without a redeploy. In-memory only:
+// resets to the config/env defaults on pod restart (same as start/stop and faults).
+const _overrides = {}
+
+function isEnabled(entry) {
+  return entry.key in _overrides
+    ? _overrides[entry.key]
+    : Boolean(config.SCENARIOS[entry.key])
+}
+
 // Build weighted pool from enabled journeys
 function buildPool() {
   return REGISTRY
-    .filter(e => config.SCENARIOS[e.key])
+    .filter(isEnabled)
     .flatMap(e => Array(e.weight).fill({ name: e.name, run: e.journey.run }))
 }
 
@@ -59,14 +71,27 @@ function getJourney(nameOrKey) {
 }
 
 /**
+ * Enable or disable a journey at runtime and rebuild the weighted pool.
+ * Returns the updated { name, key, enabled } entry, or null for an unknown journey.
+ */
+function setJourneyEnabled(nameOrKey, enabled) {
+  const entry = REGISTRY.find(e => e.name === nameOrKey || e.key === nameOrKey)
+  if (!entry) return null
+  _overrides[entry.key] = Boolean(enabled)
+  _pool = buildPool()
+  return { name: entry.name, key: entry.key, enabled: _overrides[entry.key] }
+}
+
+/**
  * Return summary of all journeys (enabled + disabled) for status reporting.
+ * `enabled` reflects the effective state (runtime override if set, else config).
  */
 function listJourneys() {
   return REGISTRY.map(e => ({
     name:    e.name,
     weight:  e.weight,
-    enabled: Boolean(config.SCENARIOS[e.key]),
+    enabled: isEnabled(e),
   }))
 }
 
-module.exports = { pickJourney, getJourney, listJourneys }
+module.exports = { pickJourney, getJourney, setJourneyEnabled, listJourneys }

@@ -74,3 +74,9 @@ export async function burstTraffic(duration_minutes = 2) {
   const res = await client.post('/api/v1/demo-control/traffic/burst', { duration_minutes });
   return res.data;
 }
+
+// Enable/disable a single traffic-bot journey at runtime (e.g. 'chatbot' chat traffic).
+export async function setJourneyEnabled(name, enabled) {
+  const res = await client.post('/api/v1/demo-control/traffic/journey', { name, enabled });
+  return res.data;
+}
