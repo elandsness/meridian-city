@@ -44,6 +44,7 @@ function hasActiveFaults () {
 
 let _activeScenarioId = null
 let _activeScenarioName = null
+let _activeScenarioParams = {}
 let _scenarioStartedAt = null
 /** @type {NodeJS.Timeout | null} */
 let _scenarioTimer = null
@@ -53,13 +54,15 @@ function getActiveScenario () {
   return {
     id: _activeScenarioId,
     name: _activeScenarioName,
+    params: _activeScenarioParams,
     started_at: _scenarioStartedAt,
   }
 }
 
-function setActiveScenario (id, name, autoResetMs, onReset) {
+function setActiveScenario (id, name, autoResetMs, onReset, params = {}) {
   _activeScenarioId = id
   _activeScenarioName = name
+  _activeScenarioParams = params || {}
   _scenarioStartedAt = new Date().toISOString()
 
   if (_scenarioTimer) clearTimeout(_scenarioTimer)
@@ -74,6 +77,7 @@ function setActiveScenario (id, name, autoResetMs, onReset) {
 function clearActiveScenario () {
   _activeScenarioId = null
   _activeScenarioName = null
+  _activeScenarioParams = {}
   _scenarioStartedAt = null
   if (_scenarioTimer) {
     clearTimeout(_scenarioTimer)

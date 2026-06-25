@@ -17,7 +17,7 @@ export const DEMO_GUIDE = [
     title: 'Davis AI root cause',
     shows: 'Davis detects an injected fault and pinpoints the root cause.',
     steps: [
-      'Enable a fault below (e.g. Citizen Service DB slowdown).',
+      'Activate a scenario below (e.g. Database Slowdown).',
       'Run a traffic burst to amplify load.',
       'Dynatrace → Problems: watch Davis raise a problem and identify the slow service.',
       'Disable the fault to recover.',
@@ -40,7 +40,7 @@ export const DEMO_GUIDE = [
     steps: [
       'Chat with Meri in the portal (or enable the chatbot traffic journey).',
       'Dynatrace → AI Observability: show model, token usage, and latency.',
-      'Optionally enable AI Service LLM latency below to demo a degradation.',
+      'Optionally activate the LLM Latency Spike scenario below to demo a degradation.',
     ],
   },
   {

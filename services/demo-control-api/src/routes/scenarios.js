@@ -31,9 +31,11 @@ async function scenarioRoutes (fastify) {
   })
 
   // POST /api/v1/scenarios/:id/start
+  // Optional JSON body carries tunable param overrides (e.g. { seconds } or
+  // { cap_mb }); absent/unknown keys fall back to each scenario's defaults.
   fastify.post('/api/v1/scenarios/:id/start', async (request, reply) => {
     const { id } = request.params
-    const result = await activateScenario(id)
+    const result = await activateScenario(id, request.body || {})
     if (!result.ok && result.error) {
       return reply.status(404).send({ error: result.error })
     }

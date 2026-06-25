@@ -6,8 +6,6 @@ import {
   startScenario,
   resetActiveScenario,
   resetAll,
-  getFaultStatus,
-  injectFault,
   getFleetStatus,
   resizeFleet,
   injectAnomaly,
@@ -88,16 +86,6 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
-function FaultIndicator({ active }) {
-  return (
-    <span
-      className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-        active ? 'bg-rose-400 shadow-[0_0_6px_#f87171]' : 'bg-green-500'
-      }`}
-    />
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Section 1: System Status
 // ---------------------------------------------------------------------------
@@ -159,9 +147,116 @@ function SystemStatus({ status, onResetAll }) {
 }
 
 // ---------------------------------------------------------------------------
-// Section 2: Scenarios
+// Section 2: Scenario Control
+// Named fault scenarios + their tunable options, all in one place. Replaces the
+// former duplicate "Demo Scenarios" + "Failure Injection" sections: each row is
+// a scenario (description, auto-reset, Activate/Stop) with inline sliders for
+// whatever it exposes (DB/LLM latency seconds, memory-leak cap).
 // ---------------------------------------------------------------------------
-function ScenariosCard({ activeScenarioId }) {
+
+// Pick only the known param keys out of an active-scenario params payload.
+function filterParams(params, active) {
+  const out = {};
+  for (const p of params) if (active[p.name] != null) out[p.name] = active[p.name];
+  return out;
+}
+
+function ScenarioRow({ sc, isActive, blocked, loading, result, activeParams, onStart, onStop }) {
+  const params = Array.isArray(sc.params) ? sc.params : [];
+
+  // Local slider values, keyed by param name; seeded from the active run's
+  // applied values (when this scenario is active) or each param's default.
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(
+      params.map((p) => [
+        p.name,
+        activeParams && activeParams[p.name] != null ? activeParams[p.name] : p.default,
+      ])
+    )
+  );
+
+  // Re-sync sliders to the applied values whenever the active params change.
+  useEffect(() => {
+    if (activeParams) setValues((v) => ({ ...v, ...filterParams(params, activeParams) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(activeParams)]);
+
+  const durationLabel = sc.duration_seconds
+    ? `Auto-reset ${Math.round(sc.duration_seconds / 60)}m`
+    : 'Manual reset';
+  const slidersDisabled = isActive || blocked;
+
+  return (
+    <div
+      className={`rounded-lg p-4 border transition-colors ${
+        isActive ? 'bg-orange-500/10 border-orange-500/30' : 'bg-gray-800 border-gray-700'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-white">{sc.name}</p>
+            {isActive && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                Active
+              </span>
+            )}
+            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-400">
+              {durationLabel}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">{sc.description}</p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isActive ? (
+            <button
+              onClick={() => onStop(sc.id)}
+              disabled={loading}
+              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+            >
+              {loading ? '…' : '■ Stop'}
+            </button>
+          ) : (
+            <button
+              onClick={() => onStart(sc.id, values)}
+              disabled={loading || blocked}
+              title={blocked ? 'Stop the active scenario first' : undefined}
+              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+            >
+              {loading ? '…' : '▶ Activate'}
+            </button>
+          )}
+          <StatusMsg result={result} />
+        </div>
+      </div>
+
+      {params.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 pt-3 border-t border-gray-800">
+          {params.map((p) => (
+            <div key={p.name} className="flex items-center gap-2">
+              <label className="text-xs text-gray-500">{p.label}</label>
+              <input
+                type="range"
+                min={p.min}
+                max={p.max}
+                step={p.step ?? 1}
+                value={values[p.name] ?? p.default}
+                disabled={slidersDisabled}
+                onChange={(e) => setValues((v) => ({ ...v, [p.name]: Number(e.target.value) }))}
+                className="w-32 accent-cyan-400 disabled:opacity-50"
+              />
+              <span className="text-xs text-gray-400 tabular-nums">
+                {values[p.name] ?? p.default}{p.unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScenarioControlCard({ activeScenario }) {
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ['scenarios'],
@@ -170,14 +265,15 @@ function ScenariosCard({ activeScenarioId }) {
   });
 
   const scenarios = data?.scenarios ?? [];
+  const activeId = activeScenario?.id ?? null;
   const [loadingId, setLoadingId] = useState(null);
   const [results, setResults] = useState({});
 
-  async function handleStart(id) {
+  async function run(id, fn) {
     setLoadingId(id);
     setResults((r) => ({ ...r, [id]: null }));
     try {
-      await startScenario(id);
+      await fn();
       setResults((r) => ({ ...r, [id]: { ok: true } }));
       qc.invalidateQueries({ queryKey: ['demo-status'] });
     } catch (err) {
@@ -191,179 +287,31 @@ function ScenariosCard({ activeScenarioId }) {
   }
 
   return (
-    <SectionCard title="Demo Scenarios">
+    <SectionCard title="Scenario Control">
+      <p className="text-xs text-gray-500 -mt-1">
+        One-click fault scenarios. Only one runs at a time — stop it (or use Reset All) before
+        starting another. Adjust a scenario's options before activating.
+      </p>
       {isLoading && <p className="text-gray-500 text-sm">Loading scenarios…</p>}
       {error && <p className="text-rose-400 text-sm">Failed to load scenarios</p>}
       <div className="space-y-3">
-        {scenarios.map((sc) => {
-          const isActive = activeScenarioId === sc.id;
-          const loading = loadingId === sc.id;
-          const result = results[sc.id];
-          const durationLabel =
-            sc.duration_seconds
-              ? `Auto-reset: ${Math.round(sc.duration_seconds / 60)}m`
-              : 'Manual reset';
-
-          return (
-            <div
-              key={sc.id}
-              className={`flex items-start justify-between gap-4 rounded-lg p-4 border transition-colors ${
-                isActive
-                  ? 'bg-orange-500/10 border-orange-500/30'
-                  : 'bg-gray-800 border-gray-700'
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-white">{sc.name}</p>
-                  {isActive && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                      Active
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">{sc.description}</p>
-                <p className="text-xs text-gray-600 mt-1">{durationLabel}</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {!isActive && (
-                  <button
-                    onClick={() => handleStart(sc.id)}
-                    disabled={loading || !!loadingId}
-                    className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
-                  >
-                    {loading ? '…' : '▶ Activate'}
-                  </button>
-                )}
-                <StatusMsg result={result} />
-              </div>
-            </div>
-          );
-        })}
+        {scenarios.map((sc) => (
+          <ScenarioRow
+            key={sc.id}
+            sc={sc}
+            isActive={activeId === sc.id}
+            blocked={activeId !== null && activeId !== sc.id}
+            loading={loadingId === sc.id}
+            result={results[sc.id]}
+            activeParams={activeId === sc.id ? activeScenario?.params ?? null : null}
+            onStart={(id, params) => run(id, () => startScenario(id, params))}
+            onStop={(id) => run(id, () => resetActiveScenario())}
+          />
+        ))}
         {!isLoading && scenarios.length === 0 && (
           <p className="text-gray-500 text-sm">No scenarios available</p>
         )}
       </div>
-    </SectionCard>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Section 3: Fault Injection
-// ---------------------------------------------------------------------------
-const FAULT_DEFS = [
-  {
-    id: 'ai-service',
-    label: 'AI Service — LLM Latency',
-    enableKey: 'llm_latency_enabled',
-    secKey: 'llm_latency_seconds',
-    secMin: 1,
-    secMax: 30,
-    secDefault: 10,
-  },
-  {
-    id: 'citizen-service',
-    label: 'Citizen Service — DB Slowdown',
-    enableKey: 'db_slowdown_enabled',
-    secKey: 'db_slowdown_seconds',
-    secMin: 1,
-    secMax: 10,
-    secDefault: 3,
-  },
-  {
-    id: 'analytics-service',
-    label: 'Analytics Service — Memory Pressure',
-    enableKey: 'memory_pressure_enabled',
-    secKey: null,
-  },
-];
-
-function FaultRow({ def, faultStatus }) {
-  const svcStatus = faultStatus?.faults?.[def.id] ?? {};
-  const currentEnabled = svcStatus[def.enableKey] ?? false;
-  const currentSecs = svcStatus[def.secKey] ?? def.secDefault ?? 5;
-
-  const [enabled, setEnabled] = useState(currentEnabled);
-  const [secs, setSecs] = useState(currentSecs);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setEnabled(svcStatus[def.enableKey] ?? false);
-    if (def.secKey) setSecs(svcStatus[def.secKey] ?? def.secDefault ?? 5);
-  }, [faultStatus]);
-
-  async function apply(newEnabled, newSecs) {
-    setLoading(true);
-    setResult(null);
-    const body = { [def.enableKey]: newEnabled };
-    if (def.secKey) body[def.secKey] = newSecs;
-    try {
-      await injectFault(def.id, body);
-      setResult({ ok: true });
-    } catch (err) {
-      setResult({ ok: false, error: err.response?.data?.message ?? err.message });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-4 py-3 border-b border-gray-800 last:border-0">
-      <FaultIndicator active={enabled} />
-      <Toggle
-        checked={enabled}
-        label={def.label}
-        onChange={(val) => {
-          setEnabled(val);
-          apply(val, secs);
-        }}
-      />
-      {def.secKey && (
-        <div className="flex items-center gap-2 ml-auto">
-          <label className="text-xs text-gray-500">{secs}s</label>
-          <input
-            type="range"
-            min={def.secMin}
-            max={def.secMax}
-            value={secs}
-            onChange={(e) => setSecs(Number(e.target.value))}
-            onMouseUp={() => enabled && apply(enabled, secs)}
-            className="w-28 accent-cyan-400"
-          />
-          <button
-            onClick={() => apply(enabled, secs)}
-            disabled={loading}
-            className="text-xs text-gray-500 hover:text-cyan-400 transition-colors"
-          >
-            Apply
-          </button>
-        </div>
-      )}
-      {loading && <span className="text-gray-500 text-xs">…</span>}
-      <StatusMsg result={result} />
-    </div>
-  );
-}
-
-function FaultCard() {
-  const { data: faultStatus, isLoading } = useQuery({
-    queryKey: ['fault-status'],
-    queryFn: getFaultStatus,
-    refetchInterval: 10_000,
-  });
-
-  return (
-    <SectionCard title="Failure Injection">
-      {isLoading ? (
-        <p className="text-gray-500 text-sm">Loading fault state…</p>
-      ) : (
-        <div>
-          {FAULT_DEFS.map((def) => (
-            <FaultRow key={def.id} def={def} faultStatus={faultStatus} />
-          ))}
-        </div>
-      )}
     </SectionCard>
   );
 }
@@ -874,8 +822,6 @@ export default function DemoControl() {
     qc.invalidateQueries({ queryKey: ['traffic-status'] });
   }
 
-  const activeScenarioId = demoStatus?.active_scenario?.id;
-
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -897,8 +843,7 @@ export default function DemoControl() {
 
       <LiveCounters />
       <DemoGuideCard />
-      <ScenariosCard activeScenarioId={activeScenarioId} />
-      <FaultCard />
+      <ScenarioControlCard activeScenario={demoStatus?.active_scenario} />
       <FleetCard />
       <TrafficCard />
     </div>
