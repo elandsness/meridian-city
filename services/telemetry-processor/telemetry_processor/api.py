@@ -49,7 +49,7 @@ async def health():
     return {
         "status": "ok",
         "service": "telemetry-processor",
-        "kafka_paused": fault_state.kafka_pause_enabled,
+        "memory_pressure": fault_state.memory_pressure_enabled,
     }
 
 
@@ -124,10 +124,7 @@ async def devices():
 
 class FaultRequest(BaseModel):
     # Field names follow the platform fault convention (<name>_enabled), matching
-    # analytics-service / ai-service and what demo-control-api + the dashboard
-    # send. (Previously these were kafka_pause / memory_pressure, so the
-    # _enabled keys demo-control sent were silently ignored.)
-    kafka_pause_enabled: Optional[bool] = None
+    # analytics-service / ai-service and what demo-control-api + the dashboard send.
     memory_pressure_enabled: Optional[bool] = None
 
 
@@ -137,13 +134,9 @@ async def inject_fault(req: FaultRequest):
     Toggle fault injection flags at runtime.
 
     Examples:
-      {"kafka_pause_enabled": true}      → pause Kafka consumption (simulates lag)
-      {"memory_pressure_enabled": true}  → allocate large in-memory buffers
-      {"kafka_pause_enabled": false, "memory_pressure_enabled": false}  → reset all
+      {"memory_pressure_enabled": true}   → allocate large in-memory buffers
+      {"memory_pressure_enabled": false}  → reset
     """
-    if req.kafka_pause_enabled is not None:
-        fault_state.kafka_pause_enabled = req.kafka_pause_enabled
-
     if req.memory_pressure_enabled is not None:
         fault_state.memory_pressure_enabled = req.memory_pressure_enabled
         if req.memory_pressure_enabled:
@@ -154,7 +147,6 @@ async def inject_fault(req: FaultRequest):
     return {
         "ok": True,
         "faults": {
-            "kafka_pause_enabled": fault_state.kafka_pause_enabled,
             "memory_pressure_enabled": fault_state.memory_pressure_enabled,
         },
     }

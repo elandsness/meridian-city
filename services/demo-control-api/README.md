@@ -28,7 +28,7 @@ Deployments or ConfigMaps and needs no RBAC.
 - `POST /api/v1/fault/:service` — inject a fault into a specific service; body varies by service:
   - `citizen-service` / `city-operations` — `{ "db_slowdown_enabled": true, "db_slowdown_seconds": 2 }`
   - `analytics-service` — `{ "db_slowdown_enabled": true, "db_slowdown_seconds": 2, "memory_pressure_enabled": true }`
-  - `telemetry-processor` — `{ "kafka_pause_enabled": true, "memory_pressure_enabled": true }`
+  - `telemetry-processor` — `{ "memory_pressure_enabled": true }`
   - `ai-service` — `{ "llm_latency_enabled": true, "llm_latency_seconds": 10 }`
 - `POST /api/v1/fault/reset-all` — clear all active faults
 

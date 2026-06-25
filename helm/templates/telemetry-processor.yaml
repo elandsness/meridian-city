@@ -35,8 +35,6 @@ spec:
             - name: IOT_SIMULATOR_URL
               value: "http://iot-simulator:8088"
             # Fault injection
-            - name: FAULT_KAFKA_PAUSE_ENABLED
-              value: {{ .Values.telemetryProcessor.faultInjection.kafkaPauseEnabled | quote }}
             - name: FAULT_MEMORY_PRESSURE_ENABLED
               value: {{ .Values.telemetryProcessor.faultInjection.memoryPressureEnabled | quote }}
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}

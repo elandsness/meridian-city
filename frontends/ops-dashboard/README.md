@@ -34,7 +34,6 @@ Per-service toggles (each calls demo-control-api's `POST /api/v1/fault/:service`
 - AI Service — LLM Latency (with seconds slider, 1–30s)
 - Citizen Service — DB Slowdown (with seconds slider, 1–10s)
 - Analytics Service — Memory Pressure
-- Telemetry Processor — Kafka Pause
 
 ### IoT Fleet Management
 - Per-category counts: Vehicles (1–100), Buildings (1–50), Machines (1–30) with an Apply button

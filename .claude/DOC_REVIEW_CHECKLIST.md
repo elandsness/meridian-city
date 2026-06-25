@@ -70,7 +70,7 @@ and should land **with or after** that PR. Everything else can be done now.
 - [ ] api-gateway: route table missing `dispatch, assets, incidents, work-orders, kpis, funnels`; note the demo-control prefix rewrite + auth.
 - [ ] traffic-bot: admin paths are `/api/v1/{status,start,stop,burst,scenario}` (not `/admin/{status,pause,resume,burst}`).
 - [ ] citizen-service: auth is email-lookup (not "mock session"); document `GET /api/v1/service-requests?citizen_id=&limit=` and `/admin/fault`. 🔐 update auth once `feat/citizen-auth` lands.
-- [ ] telemetry-processor: faults are runtime `POST /admin/fault {kafka_pause_enabled, memory_pressure_enabled}`, not env vars.
+- [ ] telemetry-processor: faults are runtime `POST /admin/fault {memory_pressure_enabled}`, not env vars.
 - [ ] city-operations: `GET /api/v1/city/buildings` (not `/api/v1/buildings`); document `/admin/fault` body `{type, enabled, delayMs}`.
 - [ ] iot-ingestion: "HTTP 4318" → health 8089.
 - [ ] public-portal: routes are `/`, `/login`, `/register`, `/service-requests`, `/service-requests/new` (not `/requests`, `/map`, `/account`); drop Chart.js + markdown claims.
