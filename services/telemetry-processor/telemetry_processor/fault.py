@@ -9,9 +9,6 @@ from typing import List
 
 @dataclass
 class FaultState:
-    # Pause Kafka consumption — simulates consumer group lag
-    kafka_pause_enabled: bool = False
-
     # Allocate large in-memory buffers — simulates a memory leak
     memory_pressure_enabled: bool = False
 

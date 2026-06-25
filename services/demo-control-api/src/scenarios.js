@@ -10,9 +10,8 @@
  * Demo scenarios (from the project plan):
  *   db-slowdown      — citizen-service DB 2s latency (auto-reset 5 min)
  *   llm-latency      — ai-service LLM 10s latency (manual reset)
- *   kafka-lag        — telemetry-processor Kafka pause (manual reset)
  *   memory-pressure  — analytics-service memory pressure (manual reset)
- *   cascade-failure  — db-slowdown + kafka-lag simultaneously (manual reset)
+ *   cascade-failure  — db-slowdown + llm-latency simultaneously (manual reset)
  */
 
 const config = require('./config')
@@ -61,26 +60,6 @@ const SCENARIOS = {
     },
   },
 
-  'kafka-lag': {
-    name: 'Kafka Consumer Lag',
-    description: 'Pauses the telemetry-processor Kafka consumer, causing IoT telemetry to back up. Manual reset required.',
-    duration_seconds: null,
-    async activate () {
-      const r = await proxy.post(`${config.TELEMETRY_PROCESSOR_URL}/admin/fault`, {
-        kafka_pause_enabled: true,
-      })
-      state.setFault('telemetry-processor', { kafka_pause_enabled: true })
-      return r
-    },
-    async reset () {
-      const r = await proxy.post(`${config.TELEMETRY_PROCESSOR_URL}/admin/fault`, {
-        kafka_pause_enabled: false,
-      })
-      state.setFault('telemetry-processor', { kafka_pause_enabled: false })
-      return r
-    },
-  },
-
   'memory-pressure': {
     name: 'Memory Pressure',
     description: 'Allocates large buffers in analytics-service to simulate a memory leak. Manual reset required.',
@@ -103,16 +82,16 @@ const SCENARIOS = {
 
   'cascade-failure': {
     name: 'Cascade Failure',
-    description: 'Triggers db-slowdown + kafka-lag simultaneously. Manual reset required.',
+    description: 'Triggers db-slowdown + llm-latency simultaneously. Manual reset required.',
     duration_seconds: null,
     async activate () {
       await SCENARIOS['db-slowdown'].activate()
-      await SCENARIOS['kafka-lag'].activate()
+      await SCENARIOS['llm-latency'].activate()
       return { ok: true, data: { message: 'cascade-failure activated' } }
     },
     async reset () {
       await SCENARIOS['db-slowdown'].reset()
-      await SCENARIOS['kafka-lag'].reset()
+      await SCENARIOS['llm-latency'].reset()
       return { ok: true, data: { message: 'cascade-failure reset' } }
     },
   },

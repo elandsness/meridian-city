@@ -8,7 +8,7 @@ A fictional smart city operations platform built to demonstrate [Dynatrace](http
 |---|---|
 | **Full-stack APM** | 12 microservices across Java, Node.js, Python, and Go auto-instrumented by OneAgent |
 | **OpenTelemetry ingestion** | IoT device simulators (Go) and AI service (Python) instrument with OTel SDK; all data flows through an OTel Collector to Dynatrace |
-| **Davis AI / anomaly detection** | Demo control panel injects failures (DB slowdown, memory pressure, Kafka lag, LLM latency); Davis AI detects and explains root cause |
+| **Davis AI / anomaly detection** | Demo control panel injects failures (DB slowdown, memory pressure, LLM latency); Davis AI detects and explains root cause |
 | **AI Observability** | Citizen chatbot backed by configurable LLM; Dynatrace captures token usage, latency, and model metadata per call |
 | **Business Events / Analytics** | JSON-structured logs from all Java services are extracted as Business Events; three complete business process funnels are visible in Dynatrace Business Analytics |
 | **Log Management** | All services emit structured JSON logs ingested and indexed by Dynatrace |

@@ -12,7 +12,7 @@
  *   citizen-service      { db_slowdown_enabled, db_slowdown_seconds }
  *   city-operations      { db_slowdown_enabled, db_slowdown_seconds }
  *   analytics-service    { db_slowdown_enabled, db_slowdown_seconds, memory_pressure_enabled }
- *   telemetry-processor  { kafka_pause_enabled, memory_pressure_enabled }
+ *   telemetry-processor  { memory_pressure_enabled }
  */
 
 const config = require('../config')
@@ -66,7 +66,7 @@ async function faultRoutes (fastify) {
       proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`,     { db_slowdown_enabled: false }),
       proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`,     { db_slowdown_enabled: false }),
       proxy.post(`${config.ANALYTICS_SERVICE_URL}/admin/fault`,   { db_slowdown_enabled: false, memory_pressure_enabled: false }),
-      proxy.post(`${config.TELEMETRY_PROCESSOR_URL}/admin/fault`, { kafka_pause_enabled: false, memory_pressure_enabled: false }),
+      proxy.post(`${config.TELEMETRY_PROCESSOR_URL}/admin/fault`, { memory_pressure_enabled: false }),
     ])
 
     // Update local state
@@ -74,7 +74,7 @@ async function faultRoutes (fastify) {
     setFault('citizen-service',     { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
     setFault('city-operations',     { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
     setFault('analytics-service',   { db_slowdown_enabled: false, db_slowdown_seconds: 0, memory_pressure_enabled: false })
-    setFault('telemetry-processor', { kafka_pause_enabled: false, memory_pressure_enabled: false })
+    setFault('telemetry-processor', { memory_pressure_enabled: false })
 
     const results = resets.map((r, i) => ({
       service: Object.keys(SERVICE_URLS)[i],

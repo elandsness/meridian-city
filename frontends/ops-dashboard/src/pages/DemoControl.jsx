@@ -276,12 +276,6 @@ const FAULT_DEFS = [
     enableKey: 'memory_pressure_enabled',
     secKey: null,
   },
-  {
-    id: 'telemetry-processor',
-    label: 'Telemetry Processor — Kafka Pause',
-    enableKey: 'kafka_pause_enabled',
-    secKey: null,
-  },
 ];
 
 function FaultRow({ def, faultStatus }) {

@@ -69,10 +69,6 @@ class TelemetryConsumer:
             async for msg in self._consumer:
                 if not self._running:
                     break
-                if fault_state.kafka_pause_enabled:
-                    # Simulate consumer lag — pause processing without committing
-                    await asyncio.sleep(1)
-                    continue
                 if fault_state.memory_pressure_enabled:
                     fault_state.apply_memory_pressure()
                 try:
@@ -245,7 +241,6 @@ class TelemetryConsumer:
             "active_anomalies": self.detector.active_anomaly_count(),
             "consumer_lag": lag,
             "faults": {
-                "kafka_pause": fault_state.kafka_pause_enabled,
                 "memory_pressure": fault_state.memory_pressure_enabled,
             },
         }

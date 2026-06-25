@@ -133,7 +133,7 @@ Meridian is a polyglot microservices application deliberately built across four 
 ### Telemetry Processor
 - **Language**: Python 3.12 / FastAPI
 - **Port**: 8086 (health/status endpoint)
-- **Role**: Kafka consumer on `iot.telemetry.raw`. Aggregates device readings into 1-minute windows, stores in PostgreSQL `iot` schema. Runs simple threshold-based anomaly detection; publishes detected anomalies to `iot.anomalies`. **Fault injection**: Kafka pause and memory pressure are injectable.
+- **Role**: Kafka consumer on `iot.telemetry.raw`. Aggregates device readings into 1-minute windows, stores in PostgreSQL `iot` schema. Runs simple threshold-based anomaly detection; publishes detected anomalies to `iot.anomalies`. **Fault injection**: memory pressure is injectable.
 - **Instrumentation**: OneAgent (auto) for the FastAPI component; OTel SDK for Kafka consumer spans
 
 ### Notification Service

@@ -359,9 +359,8 @@ telemetryProcessor:
     limits:
       cpu: "1000m"
       memory: "1Gi"
-  # Fault injection: pause Kafka consumption to simulate consumer lag
+  # Fault injection: allocate large in-memory buffers to simulate memory pressure
   faultInjection:
-    kafkaPauseEnabled: false
     memoryPressureEnabled: false
   env: {}
 
