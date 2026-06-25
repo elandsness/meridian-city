@@ -12,6 +12,9 @@ secrets/
 **/secrets.yaml
 **/secret.yaml
 
+# Claude Code per-user local config (machine-specific; not shared)
+.claude/settings.local.json
+
 # Build artifacts
 **/target/
 **/dist/
