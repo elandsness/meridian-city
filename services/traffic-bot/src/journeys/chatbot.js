@@ -4,11 +4,12 @@
  * Chatbot Journey
  *
  * Simulates a citizen using the "Ask the City Assistant" AI chatbot.
- * Each run sends one message — creates an LLM span visible in
+ * Each run sends one message — creates a `meridian.chat` LLM span visible in
  * Dynatrace AI Observability.
  *
- * Disabled by default (SCENARIO_CHATBOT=true to enable) to avoid
- * unexpected LLM API costs during steady-state demos.
+ * Enabled by default at the lowest journey weight (see journeys/index.js) so a
+ * steady `meridian.chat` baseline exists for the `llm-latency` demo scenario to
+ * deviate from. Set SCENARIO_CHATBOT=false to disable if real LLM cost is a concern.
  *
  * Step:
  *   1. Send chat message  (POST /api/v1/chat)

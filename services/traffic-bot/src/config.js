@@ -18,6 +18,9 @@ module.exports = {
     storePurchase:   process.env.SCENARIO_STORE_PURCHASE  !== 'false',
     payTax:          process.env.SCENARIO_PAY_TAX         !== 'false',
     injectAnomaly:   process.env.SCENARIO_INJECT_ANOMALY  !== 'false',
-    chatbot:         process.env.SCENARIO_CHATBOT         === 'true',  // off by default
+    // On by default (low weight, see journeys/index.js) so a steady `meridian.chat`
+    // baseline exists for the llm-latency demo scenario to deviate from.
+    // Set SCENARIO_CHATBOT=false to disable if real LLM cost is a concern.
+    chatbot:         process.env.SCENARIO_CHATBOT         !== 'false',
   },
 }

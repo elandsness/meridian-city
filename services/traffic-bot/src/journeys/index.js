@@ -25,6 +25,8 @@ const REGISTRY = [
   { name: 'storePurchase',   key: 'storePurchase',   weight: 20, journey: require('./storePurchase') },
   { name: 'payTax',          key: 'payTax',          weight: 15, journey: require('./payTax') },
   { name: 'injectAnomaly',   key: 'injectAnomaly',   weight:  8, journey: require('./injectAnomaly') },
+  // Lowest weight on purpose: keeps a thin, steady `meridian.chat` baseline (so the
+  // llm-latency scenario has a baseline to deviate from) while keeping real LLM cost modest.
   { name: 'chatbot',         key: 'chatbot',         weight:  5, journey: require('./chatbot') },
 ]
 
