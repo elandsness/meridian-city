@@ -26,7 +26,9 @@ trafficBot:
   config:
     requestsPerMinute: 10
     scenarios:
-      chatbot: false
+      # On for local dev too: local typically targets in-cluster Ollama (no API
+      # cost), and it lets the llm-latency scenario be tested end-to-end locally.
+      chatbot: true
 
 # Smaller resource footprints for local clusters
 postgresql:

@@ -469,7 +469,7 @@ trafficBot:
       storePurchase: true
       payTax: true
       injectAnomaly: true  # auto-inject/clear IoT anomalies so incidents flow without an operator
-      chatbot: false  # disable by default to avoid LLM API cost in steady-state
+      chatbot: true   # low-weight (lowest journey weight) steady chat traffic so the llm-latency scenario has a `meridian.chat` baseline to deviate from; set false to avoid real LLM API cost
   resources:
     requests:
       cpu: "100m"
