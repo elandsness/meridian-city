@@ -46,10 +46,21 @@ export default function Overview() {
     refetchInterval: 60_000,
   });
 
-  const chartData = (Array.isArray(history) ? history : []).map((snap) => ({
-    time: formatHHmm(snap.snapshot_at ?? snap.timestamp),
-    requests: snap.requests_today ?? 0,
-  }));
+  // The history endpoint returns snapshots newest-first (ORDER BY snapshot_at
+  // DESC, to keep the most-recent N via LIMIT), so sort ascending by the raw
+  // timestamp before charting — otherwise the X-axis runs newest→oldest. Sort on
+  // snapshot_at, not the formatted "hh:mm AM" label, which can't order across
+  // AM/PM or the midnight boundary.
+  const chartData = (Array.isArray(history) ? history : [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.snapshot_at ?? a.timestamp) - new Date(b.snapshot_at ?? b.timestamp)
+    )
+    .map((snap) => ({
+      time: formatHHmm(snap.snapshot_at ?? snap.timestamp),
+      requests: snap.requests_today ?? 0,
+    }));
 
   return (
     <div className="space-y-6">
