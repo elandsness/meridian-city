@@ -17,13 +17,18 @@ public class WorkOrderLifecycleProperties {
     private boolean enabled = true;
 
     /** Seconds after creation before a work order is assigned. */
-    private long assignedAfterSeconds = 15;
+    private long assignedAfterSeconds = 60;
 
     /** Seconds after assignment before a work order is acknowledged. */
-    private long acknowledgedAfterSeconds = 20;
+    private long acknowledgedAfterSeconds = 120;
 
-    /** Seconds after acknowledgement before a work order resolves. */
-    private long resolvedAfterSeconds = 30;
+    /**
+     * Seconds after acknowledgement before a work order resolves. Kept on the
+     * order of minutes (total ~6 min) so IoT incidents stay open long enough to
+     * be visible on the Incidents page and overlap with the live device anomaly
+     * on the Fleet page, instead of resolving before anyone refreshes.
+     */
+    private long resolvedAfterSeconds = 180;
 
     /**
      * Probability (0..1) that an acknowledged work order resolves rather than being

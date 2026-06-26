@@ -289,23 +289,12 @@ WHERE sr.id LIKE 'req-0000%'
 success "Request lifecycle events seeded."
 
 # ---------------------------------------------------------------------------
-# Sample incidents so the incident UIs (public-portal Home + map, ops Incidents
-# page) show data before any IoT anomaly is injected. asset_ids reference the
-# seeded assets above (bldg-000/mach-000/veh-000), so each resolves to a zone →
-# map coordinates (see city-operations IncidentService). status is open/
-# in_progress so they appear in GET /api/v1/incidents (listActive excludes
-# 'resolved'). At runtime, injecting an anomaly via Demo Control adds more.
-info "Seeding sample incidents..."
-run_sql "
-INSERT INTO incidents.incidents
-  (id, asset_id, source, severity, status, title, description, created_at)
-VALUES
-  ('inc-00001','mach-000','iot',   'high',     'open',        'High vibration on Industrial Unit 000', 'Vibration exceeded 8 mm/s threshold across multiple windows.', NOW() - INTERVAL '2 hours'),
-  ('inc-00002','bldg-000','iot',   'critical', 'in_progress', 'HVAC overtemperature in Meridian Building 000', 'HVAC temperature sustained above 85C.',                     NOW() - INTERVAL '40 minutes'),
-  ('inc-00003','veh-000', 'iot',   'medium',   'open',        'Engine overtemperature on Vehicle 000', 'Engine temperature reading above 110C.',                       NOW() - INTERVAL '15 minutes'),
-  ('inc-00004','bldg-003','manual','low',      'open',        'Routine HVAC inspection flagged', 'Operator-raised follow-up from a scheduled inspection.',              NOW() - INTERVAL '1 day')
-ON CONFLICT (id) DO NOTHING;"
-success "Sample incidents seeded."
+# NOTE: We intentionally do NOT seed sample incidents. The IoT anomaly → incident
+# pipeline (telemetry-processor → iot.anomalies → city-operations) creates real
+# incidents during baseline traffic, and the work-order lifecycle ages them out,
+# so the incident UIs (public-portal Home + map, ops Incidents page) populate
+# organically. Hardcoded seeds previously never aged (they had no work orders) and
+# so permanently dominated the active-incident views, masking the live flow.
 
 # ---------------------------------------------------------------------------
 check_counts

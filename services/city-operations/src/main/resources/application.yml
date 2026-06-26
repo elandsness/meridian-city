@@ -57,7 +57,12 @@ management:
 # resolved. completion-probability < 1 leaves some work orders unresolved for investigation.
 workorder-lifecycle:
   enabled: ${WORKORDER_LIFECYCLE_ENABLED:true}
-  assigned-after-seconds: ${WORKORDER_LIFECYCLE_ASSIGNED_AFTER_SECONDS:15}
-  acknowledged-after-seconds: ${WORKORDER_LIFECYCLE_ACKNOWLEDGED_AFTER_SECONDS:20}
-  resolved-after-seconds: ${WORKORDER_LIFECYCLE_RESOLVED_AFTER_SECONDS:30}
+  # Timings are deliberately on the order of minutes so IoT incidents stay open
+  # long enough to be visible on the ops Incidents page and to overlap with the
+  # live device anomaly on the IoT Fleet page. With the old ~65s total, real
+  # incidents resolved before anyone refreshed and the views looked static.
+  # (~6 min total: 60 + 120 + 180.)
+  assigned-after-seconds: ${WORKORDER_LIFECYCLE_ASSIGNED_AFTER_SECONDS:60}
+  acknowledged-after-seconds: ${WORKORDER_LIFECYCLE_ACKNOWLEDGED_AFTER_SECONDS:120}
+  resolved-after-seconds: ${WORKORDER_LIFECYCLE_RESOLVED_AFTER_SECONDS:180}
   completion-probability: ${WORKORDER_LIFECYCLE_COMPLETION_PROBABILITY:0.85}
