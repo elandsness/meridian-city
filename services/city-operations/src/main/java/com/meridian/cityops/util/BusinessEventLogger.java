@@ -15,34 +15,39 @@ public class BusinessEventLogger {
 
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
 
-    public void workOrderCreated(String workOrderId, String requestId, String assignedDepartment) {
+    public void workOrderCreated(String workOrderId, String incidentId, String requestId,
+                                 String assignedDepartment) {
         BUSINESS_EVENTS.info("workorder.created",
                 StructuredArguments.keyValue("event.type", "workorder.created"),
                 StructuredArguments.keyValue("work_order.id", workOrderId),
+                StructuredArguments.keyValue("incident.id", incidentId),
                 StructuredArguments.keyValue("request.id", requestId),
                 StructuredArguments.keyValue("assigned_department", assignedDepartment)
         );
     }
 
-    public void workOrderAssigned(String workOrderId, String assignedDepartment) {
+    public void workOrderAssigned(String workOrderId, String incidentId, String assignedDepartment) {
         BUSINESS_EVENTS.info("workorder.assigned",
                 StructuredArguments.keyValue("event.type", "workorder.assigned"),
                 StructuredArguments.keyValue("work_order.id", workOrderId),
+                StructuredArguments.keyValue("incident.id", incidentId),
                 StructuredArguments.keyValue("assigned_department", assignedDepartment)
         );
     }
 
-    public void workOrderAcknowledged(String workOrderId) {
+    public void workOrderAcknowledged(String workOrderId, String incidentId) {
         BUSINESS_EVENTS.info("workorder.acknowledged",
                 StructuredArguments.keyValue("event.type", "workorder.acknowledged"),
-                StructuredArguments.keyValue("work_order.id", workOrderId)
+                StructuredArguments.keyValue("work_order.id", workOrderId),
+                StructuredArguments.keyValue("incident.id", incidentId)
         );
     }
 
-    public void workOrderResolved(String workOrderId) {
+    public void workOrderResolved(String workOrderId, String incidentId) {
         BUSINESS_EVENTS.info("workorder.resolved",
                 StructuredArguments.keyValue("event.type", "workorder.resolved"),
-                StructuredArguments.keyValue("work_order.id", workOrderId)
+                StructuredArguments.keyValue("work_order.id", workOrderId),
+                StructuredArguments.keyValue("incident.id", incidentId)
         );
     }
 
@@ -71,11 +76,12 @@ public class BusinessEventLogger {
         );
     }
 
-    public void iotAnomalyDetected(String assetId, String anomalyType) {
+    public void iotAnomalyDetected(String assetId, String anomalyType, String incidentId) {
         BUSINESS_EVENTS.info("iot.anomaly_detected",
                 StructuredArguments.keyValue("event.type", "iot.anomaly_detected"),
                 StructuredArguments.keyValue("asset.id", assetId),
-                StructuredArguments.keyValue("anomaly.type", anomalyType)
+                StructuredArguments.keyValue("anomaly.type", anomalyType),
+                StructuredArguments.keyValue("incident.id", incidentId)
         );
     }
 }

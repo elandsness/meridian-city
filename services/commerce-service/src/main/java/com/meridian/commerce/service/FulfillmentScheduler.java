@@ -68,15 +68,15 @@ public class FulfillmentScheduler {
 
         switch (order.getStatus()) {
             case "packed" -> {
-                businessEventLogger.orderPacked(order.getId(), order.getCitizenId());
+                businessEventLogger.orderPacked(order.getId(), order.getCartId(), order.getCitizenId());
                 orderEventPublisher.publishOrderEvent("order.packed", order);
             }
             case "shipped" -> {
-                businessEventLogger.orderShipped(order.getId(), order.getCitizenId(), CARRIER);
+                businessEventLogger.orderShipped(order.getId(), order.getCartId(), order.getCitizenId(), CARRIER);
                 orderEventPublisher.publishOrderEvent("order.shipped", order);
             }
             case "delivered" -> {
-                businessEventLogger.orderDelivered(order.getId(), order.getCitizenId());
+                businessEventLogger.orderDelivered(order.getId(), order.getCartId(), order.getCitizenId());
                 orderEventPublisher.publishOrderEvent("order.delivered", order);
             }
         }

@@ -60,14 +60,14 @@ public class WorkOrderLifecycleScheduler {
                 wo.setAssignedAt(now);
                 wo.setNextTransitionAt(now.plusSeconds(jitter(props.getAcknowledgedAfterSeconds())));
                 workOrderRepository.save(wo);
-                businessEventLogger.workOrderAssigned(wo.getId(), wo.getAssignedDepartment());
+                businessEventLogger.workOrderAssigned(wo.getId(), wo.getIncidentId(), wo.getAssignedDepartment());
             }
             case "assigned" -> {
                 wo.setStatus("acknowledged");
                 wo.setAcknowledgedAt(now);
                 wo.setNextTransitionAt(now.plusSeconds(jitter(props.getResolvedAfterSeconds())));
                 workOrderRepository.save(wo);
-                businessEventLogger.workOrderAcknowledged(wo.getId());
+                businessEventLogger.workOrderAcknowledged(wo.getId(), wo.getIncidentId());
             }
             case "acknowledged" -> {
                 if (ThreadLocalRandom.current().nextDouble() <= props.getCompletionProbability()) {
@@ -75,7 +75,7 @@ public class WorkOrderLifecycleScheduler {
                     wo.setResolvedAt(now);
                     wo.setNextTransitionAt(null);
                     workOrderRepository.save(wo);
-                    businessEventLogger.workOrderResolved(wo.getId());
+                    businessEventLogger.workOrderResolved(wo.getId(), wo.getIncidentId());
                     resolveIncident(wo.getIncidentId(), now);
                 } else {
                     // Leave acknowledged but never resolved (funnel drop-off).

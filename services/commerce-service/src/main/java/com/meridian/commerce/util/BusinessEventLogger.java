@@ -25,37 +25,42 @@ public class BusinessEventLogger {
         );
     }
 
-    public void checkoutCompleted(String orderId, String citizenId, int totalCents, int itemCount) {
+    public void checkoutCompleted(String orderId, String cartId, String citizenId,
+                                  int totalCents, int itemCount) {
         BUSINESS_EVENTS.info("checkout.completed",
                 StructuredArguments.keyValue("event.type", "checkout.completed"),
                 StructuredArguments.keyValue("order.id", orderId),
+                StructuredArguments.keyValue("cart.id", cartId),
                 StructuredArguments.keyValue("citizen.id", citizenId),
                 StructuredArguments.keyValue("order.total_cents", totalCents),
                 StructuredArguments.keyValue("order.item_count", itemCount)
         );
     }
 
-    public void orderPacked(String orderId, String citizenId) {
+    public void orderPacked(String orderId, String cartId, String citizenId) {
         BUSINESS_EVENTS.info("order.packed",
                 StructuredArguments.keyValue("event.type", "order.packed"),
                 StructuredArguments.keyValue("order.id", orderId),
+                StructuredArguments.keyValue("cart.id", cartId),
                 StructuredArguments.keyValue("citizen.id", citizenId)
         );
     }
 
-    public void orderShipped(String orderId, String citizenId, String carrier) {
+    public void orderShipped(String orderId, String cartId, String citizenId, String carrier) {
         BUSINESS_EVENTS.info("order.shipped",
                 StructuredArguments.keyValue("event.type", "order.shipped"),
                 StructuredArguments.keyValue("order.id", orderId),
+                StructuredArguments.keyValue("cart.id", cartId),
                 StructuredArguments.keyValue("citizen.id", citizenId),
                 StructuredArguments.keyValue("carrier", carrier)
         );
     }
 
-    public void orderDelivered(String orderId, String citizenId) {
+    public void orderDelivered(String orderId, String cartId, String citizenId) {
         BUSINESS_EVENTS.info("order.delivered",
                 StructuredArguments.keyValue("event.type", "order.delivered"),
                 StructuredArguments.keyValue("order.id", orderId),
+                StructuredArguments.keyValue("cart.id", cartId),
                 StructuredArguments.keyValue("citizen.id", citizenId)
         );
     }

@@ -26,6 +26,10 @@ public class Order {
     @Column(name = "citizen_id")
     private String citizenId;
 
+    /** The cart this order was checked out from; correlation key for the purchase flow. */
+    @Column(name = "cart_id")
+    private String cartId;
+
     @Builder.Default
     private String status = "placed";
 
@@ -57,12 +61,13 @@ public class Order {
     private OffsetDateTime updatedAt;
 
     /** Factory — generates id like "ord-a1b2c". */
-    public static Order create(String citizenId, int totalCents, int itemCount) {
+    public static Order create(String citizenId, String cartId, int totalCents, int itemCount) {
         String shortId = UUID.randomUUID().toString().replace("-", "").substring(0, 5);
         OffsetDateTime now = OffsetDateTime.now();
         return Order.builder()
                 .id("ord-" + shortId)
                 .citizenId(citizenId)
+                .cartId(cartId)
                 .status("placed")
                 .totalCents(totalCents)
                 .itemCount(itemCount)

@@ -60,7 +60,7 @@ public class OrderService {
         int total = items.stream().mapToInt(it -> it.getUnitPriceCents() * it.getQuantity()).sum();
         int count = items.stream().mapToInt(CartItem::getQuantity).sum();
 
-        Order order = Order.create(citizenId, total, count);
+        Order order = Order.create(citizenId, cart.getId(), total, count);
         order.setNextTransitionAt(OffsetDateTime.now().plusSeconds(fulfillment.getPackedAfterSeconds()));
         order = orderRepository.save(order);
 
@@ -84,7 +84,7 @@ public class OrderService {
         cartItemRepository.deleteByCartId(cart.getId());
 
         log.info("Checkout complete order={} citizen={} total_cents={}", order.getId(), citizenId, total);
-        businessEventLogger.checkoutCompleted(order.getId(), citizenId, total, count);
+        businessEventLogger.checkoutCompleted(order.getId(), order.getCartId(), citizenId, total, count);
         orderEventPublisher.publishOrderEvent("checkout.completed", order);
 
         return toOrderResponse(order);

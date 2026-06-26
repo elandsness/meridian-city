@@ -49,124 +49,75 @@ The Java services emit JSON logs. Configure Dynatrace to parse them correctly.
   pipeline rather than host log monitoring. If logs are missing, confirm the
   collector is exporting (see the setup-guide troubleshooting section).
 
-### 2.2 Create a Log Processing Rule
+### 2.2 Business-event extraction — AUTO-PROVISIONED
 
-**Settings → Log Monitoring → Processing rules → Add processing rule**
-
-**Name**: `Meridian Business Event Extraction`
-
-**Matcher**: `log.source matches "citizen-service" OR log.source matches "service-dispatch" OR log.source matches "city-operations" OR log.source matches "commerce-service" OR log.source matches "billing-service"`
-
-> commerce-service and billing-service emit the same `event.type` business-event
-> log shape (see §3 Flow D/E), so they must be included for the purchase and tax
-> funnels to populate.
-
-**Processor definition** (DQL):
-```
-PARSE(content, "JSON:parsed")
-| FIELDS_ADD(
-    event_type: parsed["event.type"],
-    request_id: parsed["request.id"],
-    citizen_id: parsed["citizen.id"],
-    request_category: parsed["request.category"]
-  )
-```
-
-This makes the structured fields available for Business Events and log queries.
+> **You no longer create this by hand.** The deploy provisions an OpenPipeline
+> custom logs pipeline that parses the `BusinessEvents` JSON log lines and
+> extracts them as business events. See §3.
 
 ---
 
-## 3. Business Events Configuration
+## 3. Business Events & Business Flows — AUTO-PROVISIONED
 
-Business Events let Dynatrace model your application's business processes as funnels and KPI metrics. We configure three flows.
+The `BusinessEvents` JSON log lines emitted by the services are turned into
+bizevents, and a Business Flow is created per `/analytics` process — **all
+automatically on deploy**, so the tenant shows the finished result without any
+manual instrumentation steps.
 
-### 3.1 Navigate to Business Events
+### 3.1 How it works
 
-**Settings → Business Analytics → Business Events**
+A post-install/post-upgrade Helm hook Job runs
+`helm/files/provision-dynatrace-business-config.py` against the Settings API
+(modern platform endpoint). It is **idempotent** (match-by-name/customId →
+update in place) and creates:
 
-### Flow A: Citizen Service Request Lifecycle
+1. **OpenPipeline pipeline** `Meridian City — Business Events`
+   (`builtin:openpipeline.logs.pipelines`, customId `meridian-business-events`):
+   - a `dql` processor parses `content` as JSON and surfaces the correlation
+     fields plus `meridian.event_type` (the business `event.type` is otherwise
+     shadowed by Grail's reserved `event.type`, which is always `LOG`);
+   - a `bizevent` processor emits a bizevent with `event.provider = meridian.city`,
+     `event.type` from `meridian.event_type`, and `includeAll` field extraction.
+2. **A logs routing entry** (merged into the single
+   `builtin:openpipeline.logs.routing` object — never overwritten) sending
+   `k8s.namespace.name == "meridian"` + `BusinessEvents` logger lines into that
+   pipeline.
+3. **Five Business Flows** (`app:dynatrace.biz.flow:biz-flow-settings`), one per
+   process, each correlated on a single id (see table below).
 
-Create a new Business Events source with these settings:
+### 3.2 Enable it
 
-| Field | Value |
-|---|---|
-| **Source** | Logs |
-| **Event type field** | `event_type` |
-| **Event provider** | `citizen-service, service-dispatch, city-operations` |
+In `helm/values.yaml` under `dynatrace.businessConfig` (defaults shown):
 
-**Event mappings** (create one for each step):
+```yaml
+dynatrace:
+  businessConfig:
+    enabled: true
+    appsBaseUrl: ""          # defaults to https://<environmentId>.apps.dynatrace.com
+    platformToken: ""        # REQUIRED — dt0s16... platform token (see scopes below)
+    eventProvider: "meridian.city"
+```
 
-| Business Event Name | Log event.type value | Attributes to extract |
+The Job renders only when a **platform token** is present (so it's a no-op until
+configured). The token is a **platform token (`dt0s16…`)**, distinct from the
+classic `dynatrace.apiToken`, with scopes:
+`settings:objects:read`, `settings:objects:write`, `settings:schemas:read`.
+
+### 3.3 What gets created (reference)
+
+| Business Flow | Steps (`event.type`) | Correlation id |
 |---|---|---|
-| `service_request.submitted` | `service_request.submitted` | `request.id`, `citizen.id`, `request.category`, `request.priority` |
-| `service_request.validated` | `service_request.validated` | `request.id` |
-| `service_request.dispatched` | `service_request.dispatched` | `request.id`, `assigned_department` |
-| `service_request.assigned` | `service_request.assigned` | `request.id`, `assigned_to` |
-| `service_request.status_updated` | `service_request.status_updated` | `request.id`, `previous_status`, `new_status` |
+| **Service Request Lifecycle** | `service_request.submitted` → `.validated` → `.dispatched` → `.assigned` → `.in_progress` → `.resolved` | `request.id` |
+| **Account Creation** | `account.registration_started` → `.details_submitted` → `.verification_sent` → `.verified` → `.activated` | `citizen.id` |
+| **IoT Incident Resolution** | `iot.anomaly_detected` → `incident.created` → `workorder.created` → `.assigned` → `.acknowledged` → `.resolved` | `incident.id` |
+| **City Store Purchase** | `cart.item_added` → `checkout.completed` → `order.packed` → `.shipped` → `.delivered` | `cart.id` |
+| **Tax Payment** | `tax.bill_issued` → `tax.payment_completed` | `bill.id` |
 
-> The app emits one `service_request.status_updated` event per status change
-> (carrying `previous_status`/`new_status`) — there are no separate
-> `in_progress`/`resolved` events. Derive those stages from the status fields.
-
-**Funnel configuration** (in Business Analytics):
-- Create a funnel with steps in the order above
-- Correlation key: `request.id`
-- Funnel name: `Service Request Journey`
-
-### Flow B: Citizen Registration
-
-Registration is a single step today — citizen-service emits one
-`citizen.registered` event per `POST /api/v1/citizens`. There is no multi-stage
-verification/activation flow in the app, so there's no abandonment funnel to
-build unless the app is extended to emit intermediate `account.*` events.
-
-| Business Event Name | Log event.type value | Attributes |
-|---|---|---|
-| `citizen.registered` | `citizen.registered` | `citizen.id`, `email`, `zone.id` |
-
-### Flow C: IoT Incident Resolution
-
-| Business Event Name | Log event.type value |
-|---|---|
-| `iot.anomaly_detected` | `iot.anomaly_detected` |
-| `incident.created` | `incident.created` |
-| `workorder.created` | `workorder.created` |
-
-> Only these three events are emitted today. `workorder.assigned` /
-> `acknowledged` / `resolved` don't exist as business events — work-order status
-> lives in the DB. Add app events to extend the funnel.
-
-- Correlation key: `incident.id`
-- Funnel name: `IoT Incident Resolution`
-
-### Flow D: City Store Purchase
-
-Emitted by commerce-service (`event.type` in the JSON business-event log).
-
-| Business Event Name | Log event.type value | Attributes |
-|---|---|---|
-| `cart.item_added` | `cart.item_added` | `cart.id`, `citizen.id`, `product.id`, `quantity` |
-| `checkout.completed` | `checkout.completed` | `order.id`, `citizen.id`, `order.total_cents`, `order.item_count` |
-| `order.packed` | `order.packed` | `order.id`, `citizen.id` |
-| `order.shipped` | `order.shipped` | `order.id`, `citizen.id`, `carrier` |
-| `order.delivered` | `order.delivered` | `order.id`, `citizen.id` |
-
-- Correlation key: `order.id` (the open cart converts to an order at checkout).
-- Funnel name: `City Store Purchase`. The `store.add_to_cart` / `store.checkout` RUM
-  actions carry `product.id` / `order.id`, so a user session joins this funnel on `order.id`.
-- The ops Business Analytics page renders it from `commerce.orders` (analytics-service `funnels.py` → `purchase`).
-
-### Flow E: Tax Payment
-
-Emitted by billing-service.
-
-| Business Event Name | Log event.type value | Attributes |
-|---|---|---|
-| `tax.bill_issued` | `tax.bill_issued` | `bill.id`, `citizen.id`, `bill.period`, `bill.amount_cents` |
-| `tax.payment_completed` | `tax.payment_completed` | `bill.id`, `citizen.id`, `bill.amount_cents` |
-
-- Correlation key: `bill.id`. The `tax.pay` RUM action carries `bill.id` for session↔funnel join.
-- Funnel name: `Tax Payment`. Rendered from `billing.tax_bills` (funnels.py → `tax-payment`).
+All correlation ids are carried on every step's event by the services'
+`BusinessEventLogger` (e.g. work-order events carry `incident.id`; order events
+carry `cart.id`). To change the taxonomy, edit `FLOW_SPECS` / `DQL_SCRIPT` in the
+provisioner — it is the single source of truth for both the extraction and the
+flows.
 
 ---
 

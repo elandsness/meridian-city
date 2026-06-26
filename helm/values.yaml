@@ -70,6 +70,25 @@ dynatrace:
       repository: "public.ecr.aws/dynatrace/dynatrace-logmodule"
       tag: "1.339.55.20260615-110349"
 
+  # Auto-provision business-observability config into the tenant on deploy:
+  # an OpenPipeline pipeline that extracts the BusinessEvents JSON logs as
+  # bizevents, plus a Business Flow per /analytics process. Idempotent hook Job.
+  # Renders only when a platformToken (and an apps URL, derived from
+  # environmentId if unset) are present — so it's a no-op until configured.
+  businessConfig:
+    enabled: true
+    # Modern platform endpoint base. Optional: defaults to
+    # https://<environmentId>.apps.dynatrace.com when environmentId is set.
+    appsBaseUrl: ""
+    # Platform token (dt0s16...) — required scopes:
+    #   settings:objects:read, settings:objects:write, settings:schemas:read
+    # NOTE: this is a PLATFORM token, distinct from dynatrace.apiToken (classic).
+    platformToken: ""
+    # bizevent provider stamped on every extracted Meridian business event
+    eventProvider: "meridian.city"
+    # Image used by the provisioning Job (needs Python 3 + CA certs)
+    image: "python:3.12-slim"
+
 # ---------------------------------------------------------------------------
 # LLM / AI configuration (for the citizen chatbot and ai-service)
 # ---------------------------------------------------------------------------
