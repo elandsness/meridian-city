@@ -1,0 +1,91 @@
+{{- /*
+Auto-provisions the Dynatrace business-observability configuration on deploy:
+  - an OpenPipeline custom logs pipeline that extracts the BusinessEvents JSON
+    log lines as bizevents (provider=meridian.city), and a routing entry for it
+  - five Business Flows (one per /analytics business process)
+Runs as a post-install/post-upgrade hook Job that calls the Settings API
+(modern platform endpoint) with a platform token. The provisioner is idempotent.
+Renders only when enabled AND a platform token + apps base URL are available.
+*/}}
+{{- $bc := .Values.dynatrace.businessConfig }}
+{{- $appsUrl := $bc.appsBaseUrl }}
+{{- if and (not $appsUrl) .Values.dynatrace.environmentId }}
+{{- $appsUrl = printf "https://%s.apps.dynatrace.com" .Values.dynatrace.environmentId }}
+{{- end }}
+{{- if and $bc.enabled $bc.platformToken $appsUrl }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: meridian-dt-business-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+type: Opaque
+stringData:
+  platform-token: {{ $bc.platformToken | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meridian-dt-business-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  provision.py: |
+{{ .Files.Get "files/provision-dynatrace-business-config.py" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: meridian-dt-business-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    # Runs after wait-for-operators (weight 0-1); only talks to the Dynatrace API.
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "meridian.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: provision
+          image: {{ $bc.image | default "python:3.12-slim" | quote }}
+          command: ["python3", "/scripts/provision.py"]
+          env:
+            - name: DT_APPS_URL
+              value: {{ $appsUrl | quote }}
+            - name: DT_PLATFORM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-dt-business-config
+                  key: platform-token
+            - name: DT_EVENT_PROVIDER
+              value: {{ $bc.eventProvider | default "meridian.city" | quote }}
+            - name: DT_LOG_NAMESPACE
+              value: {{ include "meridian.namespace" . | quote }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: meridian-dt-business-config
+{{- end }}

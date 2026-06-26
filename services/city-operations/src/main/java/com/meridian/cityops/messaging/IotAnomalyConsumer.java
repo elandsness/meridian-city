@@ -1,7 +1,6 @@
 package com.meridian.cityops.messaging;
 
 import com.meridian.cityops.service.IncidentService;
-import com.meridian.cityops.util.BusinessEventLogger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -19,7 +18,6 @@ import java.util.Map;
 public class IotAnomalyConsumer {
 
     private final IncidentService incidentService;
-    private final BusinessEventLogger businessEventLogger;
 
     @KafkaListener(
             topics = "iot.anomalies",
@@ -39,9 +37,9 @@ public class IotAnomalyConsumer {
         log.info("Received IoT anomaly event: assetId={}, anomalyType={}, severity={}",
                 assetId, anomalyType, severity);
 
-        businessEventLogger.iotAnomalyDetected(assetId, anomalyType);
-
-        incidentService.createFromIot(assetId, severity, title);
+        // The anomaly business event is emitted inside createFromIot so it can carry the
+        // incident.id (the correlation key for the IoT Incident business flow).
+        incidentService.createFromIot(assetId, anomalyType, severity, title);
     }
 
     private String extractString(Map<String, Object> map, String key, String defaultValue) {

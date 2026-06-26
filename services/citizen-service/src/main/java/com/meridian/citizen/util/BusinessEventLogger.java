@@ -85,4 +85,19 @@ public class BusinessEventLogger {
                 StructuredArguments.keyValue("request.status.new", newStatus),
                 StructuredArguments.keyValue("request.assigned_department", assignedDepartment));
     }
+
+    /**
+     * Emit a per-status lifecycle business event (e.g. service_request.in_progress,
+     * service_request.resolved). These are the funnel steps the generic status_updated
+     * event does not name explicitly; carries request.id so the Service Request
+     * business flow correlates end to end.
+     */
+    public void requestLifecycle(String requestId, String citizenId, String status) {
+        String eventType = "service_request." + status;
+        BUSINESS_EVENTS.info(eventType,
+                StructuredArguments.keyValue("event.type", eventType),
+                StructuredArguments.keyValue("request.id", requestId),
+                StructuredArguments.keyValue("citizen.id", citizenId),
+                StructuredArguments.keyValue("request.status", status));
+    }
 }

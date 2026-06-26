@@ -100,8 +100,13 @@ public class IncidentService {
     }
 
     @Transactional
-    public IncidentResponse createFromIot(String assetId, String severity, String title) {
+    public IncidentResponse createFromIot(String assetId, String anomalyType, String severity, String title) {
         Incident incident = Incident.create(assetId, "iot", severity, title, null);
+        // Emit the anomaly first, carrying the incident id so the IoT Incident business
+        // flow correlates anomaly_detected -> incident.created -> workorder.* on a single
+        // key (incident.id). The id is assigned by Incident.create() before persistence,
+        // so the anomaly event also timestamps just ahead of incident.created.
+        businessEventLogger.iotAnomalyDetected(assetId, anomalyType, incident.getId());
         incident = incidentRepository.save(incident);
         log.info("Created incident id={} from IoT anomaly on assetId={}", incident.getId(), assetId);
         businessEventLogger.incidentCreated(incident.getId(), assetId, severity);
@@ -115,7 +120,8 @@ public class IncidentService {
                     OffsetDateTime.now().plusSeconds(workOrderProps.getAssignedAfterSeconds()));
         }
         workOrderRepository.save(workOrder);
-        businessEventLogger.workOrderCreated(workOrder.getId(), null, workOrder.getAssignedDepartment());
+        businessEventLogger.workOrderCreated(
+                workOrder.getId(), incident.getId(), null, workOrder.getAssignedDepartment());
 
         return enrich(incident);
     }

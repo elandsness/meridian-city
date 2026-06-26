@@ -159,8 +159,12 @@ public class ServiceRequestService {
                 request.getAssignedDepartment()
         );
         // Per-status lifecycle event (e.g. service_request.in_progress,
-        // service_request.resolved) for the Business Analytics funnel.
+        // service_request.resolved) for the Business Analytics funnel...
         recordEvent(request.getId(), "service_request." + request.getStatus());
+        // ...and as a Business Event log line so the same step lands in Dynatrace as a
+        // bizevent (carrying request.id) for the Service Request business flow.
+        businessEventLogger.requestLifecycle(
+                request.getId(), request.getCitizenId(), request.getStatus());
 
         // Publish the status change to Kafka so the per-citizen notification inbox
         // can surface it (notification-service keys off service_request.resolved, etc.).

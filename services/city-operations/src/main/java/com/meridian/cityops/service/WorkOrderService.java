@@ -38,9 +38,10 @@ public class WorkOrderService {
 
         log.info("Created work order id={} for requestId={}", workOrder.getId(), workOrder.getRequestId());
 
-        // Business Event
+        // Business Event — request-path work orders have no parent incident.
         businessEventLogger.workOrderCreated(
                 workOrder.getId(),
+                workOrder.getIncidentId(),
                 workOrder.getRequestId(),
                 workOrder.getAssignedDepartment()
         );
