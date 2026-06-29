@@ -72,6 +72,19 @@ Provides OTel service name, OTLP exporter endpoint, and DB/Kafka coordinates.
 {{- end }}
 
 {{/*
+Render a service's optional extra env map (.Values.<svc>.env) as container env entries.
+Lets operators tune per-service knobs (e.g. the lifecycle delay bands) from values.yaml
+without editing templates. Usage (after the commonEnv include):
+  {{- include "meridian.extraEnv" .Values.citizenService.env | nindent 12 }}
+*/}}
+{{- define "meridian.extraEnv" -}}
+{{- range $k, $v := . }}
+- name: {{ $k }}
+  value: {{ $v | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
 Namespace — all app resources go into the configured namespace.
 */}}
 {{- define "meridian.namespace" -}}

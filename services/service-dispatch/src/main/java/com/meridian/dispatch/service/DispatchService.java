@@ -32,31 +32,39 @@ public class DispatchService {
         String assignedDepartment = routingEngine.assignDepartment(dto.getCategory());
         String routingReason = routingEngine.buildRoutingReason(dto.getCategory(), dto.getZoneId());
 
-        // 2. Log Business Event: service_request.dispatched (+ request_events row
-        //    for the ops-dashboard Business Analytics funnel)
-        businessEventLogger.logDispatched(
-                dto.getRequestId(),
-                dto.getCitizenId(),
-                assignedDepartment,
-                dto.getZoneId()
-        );
-        recordEvent(dto.getRequestId(), "service_request.dispatched");
+        // 2. The dispatched/assigned business events are no longer emitted here. citizen-service
+        //    (the Service Request flow's timeline owner) hands us absolute target times so these
+        //    two steps land realistically spaced and strictly after 'validated'. We persist a
+        //    DispatchLog with that schedule and the DispatchLifecycleScheduler emits each event
+        //    when due. When the lifecycle is disabled upstream the targets are null, so we fall
+        //    back to emitting both synchronously (legacy behaviour).
+        boolean deferred = dto.getDispatchedAt() != null && dto.getAssignedAt() != null;
 
-        // 3. Save DispatchLog entry
         DispatchLog dispatchLog = DispatchLog.builder()
                 .requestId(dto.getRequestId())
+                .citizenId(dto.getCitizenId())
                 .category(dto.getCategory())
                 .zoneId(dto.getZoneId())
                 .assignedDepartment(assignedDepartment)
                 .routingReason(routingReason)
+                .status(deferred ? "dispatch_pending" : "done")
+                .dispatchedTargetAt(dto.getDispatchedAt())
+                .assignedTargetAt(dto.getAssignedAt())
+                .nextTransitionAt(deferred ? dto.getDispatchedAt() : null)
                 .build();
         dispatchLogRepository.save(dispatchLog);
 
-        // 4. Call city-operations to create the work order, then record the
-        //    assignment. The dispatched event (step 2) is already persisted; if the
-        //    downstream work-order call fails we must NOT lose it, so we catch here
-        //    instead of letting the exception roll back the whole transaction. The
-        //    request stays "dispatched" and the lifecycle scheduler still advances it.
+        if (!deferred) {
+            // Legacy synchronous path (lifecycle disabled upstream).
+            businessEventLogger.logDispatched(
+                    dto.getRequestId(), dto.getCitizenId(), assignedDepartment, dto.getZoneId());
+            recordEvent(dto.getRequestId(), "service_request.dispatched");
+        }
+
+        // 3. Call city-operations to create the work order. This is the real dispatch action and
+        //    forms the api-gateway -> citizen-service -> service-dispatch -> city-operations trace.
+        //    Catch here so a downstream failure doesn't roll back the DispatchLog/cursor; the
+        //    deferred dispatched/assigned emissions still fire on schedule.
         CreateWorkOrderDto workOrderDto = CreateWorkOrderDto.builder()
                 .requestId(dto.getRequestId())
                 .citizenId(dto.getCitizenId())
@@ -69,11 +77,11 @@ public class DispatchService {
         try {
             DispatchResultDto result = cityOperationsClient.createWorkOrder(workOrderDto);
 
-            // 5. Log Business Event: service_request.assigned (+ request_events row)
-            businessEventLogger.logAssigned(dto.getRequestId(), assignedDepartment);
-            recordEvent(dto.getRequestId(), "service_request.assigned");
+            if (!deferred) {
+                businessEventLogger.logAssigned(dto.getRequestId(), assignedDepartment);
+                recordEvent(dto.getRequestId(), "service_request.assigned");
+            }
 
-            // 6. Return result with consistent assigned department
             return DispatchResultDto.builder()
                     .requestId(dto.getRequestId())
                     .assignedDepartment(assignedDepartment)
@@ -81,7 +89,7 @@ public class DispatchService {
                     .dispatchedAt(result.getDispatchedAt() != null ? result.getDispatchedAt() : dispatchLog.getDispatchedAt())
                     .build();
         } catch (RuntimeException ex) {
-            log.error("Work-order creation failed for requestId={}: {} — dispatched recorded, assignment deferred",
+            log.error("Work-order creation failed for requestId={}: {} — dispatch logged, events scheduled",
                     dto.getRequestId(), ex.getMessage());
             return DispatchResultDto.builder()
                     .requestId(dto.getRequestId())

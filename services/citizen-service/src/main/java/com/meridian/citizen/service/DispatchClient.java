@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,10 +38,18 @@ public class DispatchClient {
      * If dispatch fails, the error is logged and the method returns false
      * so the caller can continue — the request was already persisted.
      *
+     * <p>{@code dispatchedAt}/{@code assignedAt} are the absolute target times at which
+     * service-dispatch should emit the dispatched/assigned business events. citizen-service
+     * computes the full timeline so the steps stay strictly ordered; they are sent as
+     * ISO-8601 strings (independent of the RestTemplate's JSON time config) and parsed back
+     * into OffsetDateTime by service-dispatch's Jackson (jsr310). May be null when the
+     * lifecycle is disabled.
+     *
      * @param request the service request to dispatch
      * @return true if dispatch succeeded, false otherwise
      */
-    public boolean dispatchRequest(ServiceRequest request) {
+    public boolean dispatchRequest(ServiceRequest request,
+                                   OffsetDateTime dispatchedAt, OffsetDateTime assignedAt) {
         String url = serviceDispatchUrl + "/api/v1/dispatch";
 
         Map<String, Object> body = new HashMap<>();
@@ -49,6 +58,12 @@ public class DispatchClient {
         body.put("category", request.getCategory());
         body.put("priority", request.getPriority());
         body.put("zoneId", request.getZoneId());
+        if (dispatchedAt != null) {
+            body.put("dispatchedAt", dispatchedAt.toString());
+        }
+        if (assignedAt != null) {
+            body.put("assignedAt", assignedAt.toString());
+        }
 
         try {
             log.debug("Dispatching requestId={} to service-dispatch at {}", request.getId(), url);

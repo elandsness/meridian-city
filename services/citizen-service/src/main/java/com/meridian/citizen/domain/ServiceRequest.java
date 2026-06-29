@@ -61,6 +61,22 @@ public class ServiceRequest {
     @Column(name = "next_transition_at")
     private OffsetDateTime nextTransitionAt;
 
+    /**
+     * Internal cursor for the deferred business-flow emission (submitted -> validated
+     * -> in_progress -> resolved), kept separate from the user-facing {@link #status}
+     * so the portal still shows submitted/in_progress/resolved unchanged.
+     */
+    @Column(name = "lifecycle_stage", length = 30)
+    private String lifecycleStage;
+
+    /**
+     * Absolute time the 'assigned' step is scheduled to fire in service-dispatch.
+     * citizen-service computes the whole timeline at submit and uses this to schedule
+     * in_progress strictly after assigned.
+     */
+    @Column(name = "assigned_target_at")
+    private OffsetDateTime assignedTargetAt;
+
     @PrePersist
     protected void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();

@@ -61,7 +61,7 @@ public class OrderService {
         int count = items.stream().mapToInt(CartItem::getQuantity).sum();
 
         Order order = Order.create(citizenId, cart.getId(), total, count);
-        order.setNextTransitionAt(OffsetDateTime.now().plusSeconds(fulfillment.getPackedAfterSeconds()));
+        order.setNextTransitionAt(OffsetDateTime.now().plusSeconds(fulfillment.nextPackedDelaySeconds()));
         order = orderRepository.save(order);
 
         Set<String> productIds = items.stream().map(CartItem::getProductId).collect(Collectors.toSet());

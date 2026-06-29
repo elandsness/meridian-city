@@ -190,6 +190,13 @@ citizenService:
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+  # Business-flow step durations default to a ~5 min – 2 hr band per transition (see
+  # request-lifecycle / account-lifecycle in citizen-service application.yml). Override the
+  # bands here to tune, e.g. for a live demo:
+  #   env:
+  #     REQUEST_LIFECYCLE_VALIDATED_MIN_SECONDS: "30"
+  #     REQUEST_LIFECYCLE_VALIDATED_MAX_SECONDS: "120"
+  #     ACCOUNT_LIFECYCLE_VERIFIED_MAX_SECONDS: "120"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -214,6 +221,13 @@ commerceService:
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+  # Order fulfillment delays (placed -> packed -> shipped -> delivered) default to a
+  # ~5 min – 2 hr band per transition (see fulfillment in commerce-service application.yml).
+  # Override here to tune, e.g.:
+  #   env:
+  #     FULFILLMENT_PACKED_MIN_SECONDS: "30"
+  #     FULFILLMENT_PACKED_MAX_SECONDS: "120"
+  env: {}
 
 # ---------------------------------------------------------------------------
 # Billing Service (Java / Spring Boot)
@@ -259,6 +273,10 @@ serviceDispatch:
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+  # service-dispatch emits the deferred dispatched/assigned business events at the absolute
+  # targets citizen-service supplies (no delay band here). Toggle the scheduler if needed:
+  #   env:
+  #     DISPATCH_LIFECYCLE_ENABLED: "true"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -287,6 +305,12 @@ cityOperations:
     dbSlowdownEnabled: false
     dbSlowdownDelayMs: 0
     cpuSpikeEnabled: false
+  # IoT Incident flow timing (anomaly -> incident.created -> workorder.created -> assigned
+  # -> acknowledged -> resolved) defaults to a ~5 min – 2 hr band per transition (see
+  # workorder-lifecycle in city-operations application.yml). Override here to tune, e.g.:
+  #   env:
+  #     WORKORDER_LIFECYCLE_INCIDENT_CREATED_MIN_SECONDS: "30"
+  #     WORKORDER_LIFECYCLE_INCIDENT_CREATED_MAX_SECONDS: "120"
   env: {}
 
 # ---------------------------------------------------------------------------

@@ -102,26 +102,35 @@ public class IncidentService {
     @Transactional
     public IncidentResponse createFromIot(String assetId, String anomalyType, String severity, String title) {
         Incident incident = Incident.create(assetId, "iot", severity, title, null);
-        // Emit the anomaly first, carrying the incident id so the IoT Incident business
-        // flow correlates anomaly_detected -> incident.created -> workorder.* on a single
-        // key (incident.id). The id is assigned by Incident.create() before persistence,
-        // so the anomaly event also timestamps just ahead of incident.created.
+        // Emit the anomaly synchronously (it is detected now), carrying the incident id so the
+        // IoT Incident business flow correlates anomaly_detected -> incident.created ->
+        // workorder.* on a single key (incident.id). The id is assigned by Incident.create()
+        // before persistence. The incident and work-order entities are created now so their ids
+        // exist and the analytics funnel (which reads entity status) populates, but the
+        // incident.created and workorder.created *business events* are deferred by the
+        // WorkOrderLifecycleScheduler so the bizevent steps land realistically spaced instead
+        // of all three firing within milliseconds.
         businessEventLogger.iotAnomalyDetected(assetId, anomalyType, incident.getId());
         incident = incidentRepository.save(incident);
         log.info("Created incident id={} from IoT anomaly on assetId={}", incident.getId(), assetId);
-        businessEventLogger.incidentCreated(incident.getId(), assetId, severity);
 
         // Open a work order for the incident so it flows through the iot-incident funnel
-        // (workorder.created -> assigned -> acknowledged -> resolved via the scheduler).
+        // (incident.created -> workorder.created -> assigned -> acknowledged -> resolved via the
+        // scheduler). It starts in the pre-created stage 'awaiting_incident' so the scheduler
+        // emits incident.created first, then workorder.created, before the normal lifecycle.
         WorkOrder workOrder = WorkOrder.createFromIncident(
                 incident.getId(), title, "Field Operations", priorityForSeverity(severity), null);
         if (workOrderProps.isEnabled()) {
+            workOrder.setStatus("awaiting_incident");
             workOrder.setNextTransitionAt(
-                    OffsetDateTime.now().plusSeconds(workOrderProps.getAssignedAfterSeconds()));
+                    OffsetDateTime.now().plusSeconds(workOrderProps.nextIncidentCreatedDelaySeconds()));
+        } else {
+            // Lifecycle disabled — emit the created events synchronously (legacy behaviour).
+            businessEventLogger.incidentCreated(incident.getId(), assetId, severity);
+            businessEventLogger.workOrderCreated(
+                    workOrder.getId(), incident.getId(), null, workOrder.getAssignedDepartment());
         }
         workOrderRepository.save(workOrder);
-        businessEventLogger.workOrderCreated(
-                workOrder.getId(), incident.getId(), null, workOrder.getAssignedDepartment());
 
         return enrich(incident);
     }

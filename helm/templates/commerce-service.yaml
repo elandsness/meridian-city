@@ -43,6 +43,9 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "meridian-kafka-bootstrap:9092"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.commerceService.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

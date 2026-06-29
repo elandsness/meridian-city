@@ -13,6 +13,6 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
 
     List<ServiceRequest> findByCitizenIdOrderByCreatedAtDesc(String citizenId);
 
-    List<ServiceRequest> findByStatusInAndNextTransitionAtLessThanEqual(
-            Collection<String> statuses, OffsetDateTime cutoff);
+    List<ServiceRequest> findByLifecycleStageInAndNextTransitionAtLessThanEqual(
+            Collection<String> lifecycleStages, OffsetDateTime cutoff);
 }

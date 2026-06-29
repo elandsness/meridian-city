@@ -40,6 +40,17 @@ public class Citizen {
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 
+    /**
+     * Cursor for the deferred account-creation flow (verification_sent -> verified ->
+     * activated, or the abandoned/verified_only drop-off terminals). The signup burst is
+     * emitted synchronously at registration; the AccountLifecycleScheduler advances from here.
+     */
+    @Column(name = "account_lifecycle_stage", length = 30)
+    private String accountLifecycleStage;
+
+    @Column(name = "account_next_transition_at")
+    private OffsetDateTime accountNextTransitionAt;
+
     @PrePersist
     protected void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();

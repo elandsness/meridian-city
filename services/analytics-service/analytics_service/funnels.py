@@ -145,9 +145,14 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
       iot.anomaly_detected → iot.anomalies total
       incident.created     → incidents.incidents total
       workorder.created    → incident-linked work_orders total
-      workorder.assigned   → incident-linked work_orders WHERE status NOT IN ('pending','created')
+      workorder.assigned   → incident-linked work_orders past the pre-assignment stages
       workorder.acknowledged → incident-linked work_orders WHERE status IN ('acknowledged','in_progress','resolved')
       workorder.resolved   → incident-linked work_orders WHERE status = 'resolved'
+
+    Work orders are created up-front (so ids exist and incident.id correlates) but sit in the
+    pre-'created' stages 'awaiting_incident'/'awaiting_workorder' while their incident.created /
+    workorder.created business events are deferred for realistic timing — those, plus 'created',
+    are excluded from the assigned count below.
     """
     async with pool.acquire() as conn:
         anomalies   = await safe_fetchval(conn, """
@@ -165,7 +170,8 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
         """, WINDOW_HOURS)
         wo_assigned = await safe_fetchval(conn, """
             SELECT COUNT(*) FROM incidents.work_orders
-            WHERE incident_id IS NOT NULL AND status NOT IN ('pending', 'created')
+            WHERE incident_id IS NOT NULL
+              AND status NOT IN ('awaiting_incident', 'awaiting_workorder', 'created')
               AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         wo_acked    = await safe_fetchval(conn, """
