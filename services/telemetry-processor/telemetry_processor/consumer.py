@@ -45,6 +45,11 @@ class TelemetryConsumer:
     # Lifecycle
     # ------------------------------------------------------------------
 
+    @property
+    def running(self) -> bool:
+        """Whether the consume loop is currently active (cheap, sync)."""
+        return self._running
+
     async def start(self) -> None:
         await self.publisher.start()
         self._consumer = AIOKafkaConsumer(

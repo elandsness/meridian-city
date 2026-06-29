@@ -46,9 +46,13 @@ def set_consumer(consumer) -> None:
 
 @app.get("/health")
 async def health():
+    # consumer_running is surfaced for observability — a dead consumer is now
+    # self-healed by the supervisor (see main.py), so /health stays 200 (process
+    # liveness) rather than flapping the shared liveness/readiness probe.
     return {
         "status": "ok",
         "service": "telemetry-processor",
+        "consumer_running": bool(_consumer is not None and _consumer.running),
         "memory_pressure": fault_state.memory_pressure_enabled,
     }
 

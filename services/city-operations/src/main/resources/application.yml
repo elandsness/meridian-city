@@ -58,7 +58,10 @@ management:
 # work-order lifecycle are each spaced by a uniform random delay in their [min, max] band
 # (default ~5 min – 2 hr) so the bizevent steps look realistic instead of firing within
 # milliseconds. completion-probability < 1 leaves some work orders unresolved. Shrink the
-# bands (e.g. *_MIN_SECONDS=30, *_MAX_SECONDS=120) for a live demo.
+# bands (e.g. *_MIN_SECONDS=30, *_MAX_SECONDS=120) for a live demo — but keep the total
+# comfortably above ~1 min so IoT incidents stay open long enough to be visible on the ops
+# Incidents page and overlap the live device anomaly on the Fleet page (the old ~65s total
+# resolved them before anyone refreshed; see fix in commit 33e4965).
 workorder-lifecycle:
   enabled: ${WORKORDER_LIFECYCLE_ENABLED:true}
   completion-probability: ${WORKORDER_LIFECYCLE_COMPLETION_PROBABILITY:0.85}
