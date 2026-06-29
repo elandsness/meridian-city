@@ -74,11 +74,24 @@ public class ServiceRequestService {
                 dto.zoneId(),
                 dto.priority()
         );
-        // Schedule the first lifecycle transition (submitted -> in_progress); the
-        // RequestLifecycleScheduler advances it from here. Null when disabled.
+
+        // citizen-service owns the whole Service Request timeline. Compute the full,
+        // strictly-increasing schedule once so every business-flow step is spaced by a
+        // realistic randomized delay instead of all firing within milliseconds:
+        //   submitted(now) < validated < dispatched < assigned < in_progress < resolved
+        // We persist only the first hop (validated) and the assigned target; the
+        // RequestLifecycleScheduler advances from there, and service-dispatch is handed
+        // the dispatched/assigned absolute targets so its deferred emissions stay ordered.
+        OffsetDateTime tDispatched = null;
+        OffsetDateTime tAssigned = null;
         if (lifecycleProps.isEnabled()) {
-            request.setNextTransitionAt(
-                    OffsetDateTime.now().plusSeconds(lifecycleProps.getInProgressAfterSeconds()));
+            OffsetDateTime now = OffsetDateTime.now();
+            OffsetDateTime tValidated = now.plusSeconds(lifecycleProps.nextValidatedDelaySeconds());
+            tDispatched = tValidated.plusSeconds(lifecycleProps.nextDispatchedDelaySeconds());
+            tAssigned = tDispatched.plusSeconds(lifecycleProps.nextAssignedDelaySeconds());
+            request.setLifecycleStage("submitted");
+            request.setNextTransitionAt(tValidated);
+            request.setAssignedTargetAt(tAssigned);
         }
 
         faultState.maybeDelay();
@@ -99,14 +112,12 @@ public class ServiceRequestService {
         );
         recordEvent(request.getId(), "service_request.submitted");
 
-        // 3. Emit Business Event: validated.
-        businessEventLogger.requestValidated(
-                request.getId(),
-                request.getCitizenId(),
-                request.getCategory(),
-                request.getPriority()
-        );
-        recordEvent(request.getId(), "service_request.validated");
+        // 3. When the lifecycle is enabled, 'validated' is deferred to the
+        //    RequestLifecycleScheduler (validated band) so the bizevent flow shows a realistic
+        //    gap. When disabled, emit it synchronously to preserve the legacy behaviour.
+        if (!lifecycleProps.isEnabled()) {
+            emitValidated(request);
+        }
 
         // 4. Publish to Kafka
         requestEventPublisher.publishRequestSubmitted(request);
@@ -118,16 +129,20 @@ public class ServiceRequestService {
         //    (the real cause of dispatched/assigned never being recorded). Running in
         //    afterCommit keeps the call on the request thread, preserving the
         //    api-gateway -> citizen-service -> service-dispatch distributed trace.
+        //    We hand service-dispatch the dispatched/assigned absolute targets so it can
+        //    defer those two emissions while keeping them strictly ordered after validated.
         final ServiceRequest dispatchTarget = request;
+        final OffsetDateTime dispatchedTarget = tDispatched;
+        final OffsetDateTime assignedTarget = tAssigned;
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    dispatchClient.dispatchRequest(dispatchTarget);
+                    dispatchClient.dispatchRequest(dispatchTarget, dispatchedTarget, assignedTarget);
                 }
             });
         } else {
-            dispatchClient.dispatchRequest(request);
+            dispatchClient.dispatchRequest(request, dispatchedTarget, assignedTarget);
         }
 
         return ServiceRequestResponse.from(request);
@@ -196,6 +211,23 @@ public class ServiceRequestService {
                     .getContent();
         }
         return results.stream().map(ServiceRequestResponse::from).toList();
+    }
+
+    /**
+     * Emit the deferred 'validated' business event — both a JSON log (for Dynatrace) and a
+     * request_events row (for the funnel). No status change: validated is a flow step, not a
+     * user-facing status. Called by the RequestLifecycleScheduler once the validated delay
+     * elapses.
+     */
+    @Transactional
+    public void emitValidated(ServiceRequest request) {
+        businessEventLogger.requestValidated(
+                request.getId(),
+                request.getCitizenId(),
+                request.getCategory(),
+                request.getPriority()
+        );
+        recordEvent(request.getId(), "service_request.validated");
     }
 
     /** Persist a request lifecycle event for the Business Analytics funnel. */

@@ -15,17 +15,16 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Advances service requests through the simulated lifecycle on a timer:
- * submitted -> in_progress -> resolved (mirrors the commerce FulfillmentScheduler).
+ * Advances service requests through the simulated business flow on a timer, spacing each
+ * step by a realistic randomized delay (see {@link RequestLifecycleProperties}):
+ * submitted -> validated -> in_progress -> resolved. The dispatched/assigned steps in the
+ * middle are emitted by service-dispatch at the absolute targets citizen-service computed
+ * at submit time, so the whole flow stays strictly ordered.
  *
- * <p>This replaces the old traffic-bot {@code handleOpenRequests} PATCH loop so the
- * Business Analytics funnel fills in reliably and isn't bottlenecked by bot traffic.
- * {@code completion-probability < 1} intentionally leaves a slice of requests stuck
- * in_progress, producing a realistic funnel drop-off to investigate in Dynatrace.
- *
- * <p>dispatched/assigned come from service-dispatch at submit time; this scheduler
- * only drives the later steps. Requests are picked up via {@code next_transition_at}
- * (set on submit), so the pre-existing backlog with a NULL value is left untouched.
+ * <p>The cursor is {@code lifecycle_stage} (separate from the user-facing {@code status});
+ * requests are picked up via {@code next_transition_at}, so the pre-existing backlog with a
+ * NULL value is left untouched. {@code completion-probability < 1} intentionally leaves a
+ * slice of requests unresolved, producing a realistic funnel drop-off.
  */
 @Component
 @RequiredArgsConstructor
@@ -44,7 +43,8 @@ public class RequestLifecycleScheduler {
         }
         OffsetDateTime now = OffsetDateTime.now();
         List<ServiceRequest> due = serviceRequestRepository
-                .findByStatusInAndNextTransitionAtLessThanEqual(List.of("submitted", "in_progress"), now);
+                .findByLifecycleStageInAndNextTransitionAtLessThanEqual(
+                        List.of("submitted", "validated", "in_progress"), now);
         for (ServiceRequest request : due) {
             try {
                 advance(request, now);
@@ -55,11 +55,24 @@ public class RequestLifecycleScheduler {
     }
 
     private void advance(ServiceRequest request, OffsetDateTime now) {
-        switch (request.getStatus()) {
+        switch (request.getLifecycleStage()) {
             case "submitted" -> {
+                // Emit the deferred 'validated' step (no status change), then schedule
+                // in_progress strictly after the assigned target so the cross-service
+                // ordering holds even if assigned fires later than expected.
+                serviceRequestService.emitValidated(request);
+                OffsetDateTime assignedTarget = request.getAssignedTargetAt();
+                OffsetDateTime anchor = (assignedTarget != null && assignedTarget.isAfter(now))
+                        ? assignedTarget : now;
+                request.setLifecycleStage("validated");
+                request.setNextTransitionAt(anchor.plusSeconds(props.nextInProgressDelaySeconds()));
+                serviceRequestRepository.save(request);
+            }
+            case "validated" -> {
                 serviceRequestService.updateStatus(request.getId(),
                         new UpdateRequestStatusDto("in_progress", null, null));
-                request.setNextTransitionAt(now.plusSeconds(jitter(props.getResolvedAfterSeconds())));
+                request.setLifecycleStage("in_progress");
+                request.setNextTransitionAt(now.plusSeconds(props.nextResolvedDelaySeconds()));
                 serviceRequestRepository.save(request);
             }
             case "in_progress" -> {
@@ -67,17 +80,15 @@ public class RequestLifecycleScheduler {
                     serviceRequestService.updateStatus(request.getId(),
                             new UpdateRequestStatusDto("resolved", null, null));
                     request.setResolvedAt(now);
-                } // else: leave it unresolved on purpose (funnel drop-off)
+                    request.setLifecycleStage("resolved");
+                } else {
+                    // Leave it unresolved on purpose (funnel drop-off).
+                    request.setLifecycleStage("abandoned");
+                }
                 request.setNextTransitionAt(null);
                 serviceRequestRepository.save(request);
             }
-            default -> { /* terminal or unknown status — nothing to do */ }
+            default -> { /* terminal or unknown stage — nothing to do */ }
         }
-    }
-
-    /** ±20% jitter so transitions don't all fire on the same tick. */
-    private long jitter(long base) {
-        double factor = 0.8 + ThreadLocalRandom.current().nextDouble() * 0.4;
-        return Math.max(1L, Math.round(base * factor));
     }
 }

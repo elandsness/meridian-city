@@ -2,12 +2,10 @@ package com.meridian.citizen.service;
 
 import com.meridian.citizen.config.AccountLifecycleProperties;
 import com.meridian.citizen.domain.Account;
-import com.meridian.citizen.domain.AccountEvent;
 import com.meridian.citizen.domain.Citizen;
 import com.meridian.citizen.dto.CitizenResponse;
 import com.meridian.citizen.dto.CreateCitizenRequest;
 import com.meridian.citizen.messaging.CitizenEventPublisher;
-import com.meridian.citizen.repository.AccountEventRepository;
 import com.meridian.citizen.repository.AccountRepository;
 import com.meridian.citizen.repository.CitizenRepository;
 import com.meridian.citizen.util.BusinessEventLogger;
@@ -19,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.time.OffsetDateTime;
 
 @Service
 public class CitizenService {
@@ -31,7 +29,7 @@ public class CitizenService {
     private final PasswordEncoder passwordEncoder;
     private final BusinessEventLogger businessEventLogger;
     private final CitizenEventPublisher citizenEventPublisher;
-    private final AccountEventRepository accountEventRepository;
+    private final AccountEventRecorder accountEventRecorder;
     private final AccountLifecycleProperties accountProps;
 
     public CitizenService(CitizenRepository citizenRepository,
@@ -39,14 +37,14 @@ public class CitizenService {
                           PasswordEncoder passwordEncoder,
                           BusinessEventLogger businessEventLogger,
                           CitizenEventPublisher citizenEventPublisher,
-                          AccountEventRepository accountEventRepository,
+                          AccountEventRecorder accountEventRecorder,
                           AccountLifecycleProperties accountProps) {
         this.citizenRepository = citizenRepository;
         this.accountRepository = accountRepository;
         this.passwordEncoder = passwordEncoder;
         this.businessEventLogger = businessEventLogger;
         this.citizenEventPublisher = citizenEventPublisher;
-        this.accountEventRepository = accountEventRepository;
+        this.accountEventRecorder = accountEventRecorder;
         this.accountProps = accountProps;
     }
 
@@ -108,10 +106,13 @@ public class CitizenService {
     }
 
     /**
-     * Record the account-creation lifecycle (registration_started -> details_submitted
-     * -> verification_sent -> verified -> activated) as both account_events rows (for
-     * the funnel) and business-event logs (for Dynatrace). A configurable share of
-     * accounts intentionally never verify/activate, giving the funnel a realistic drop-off.
+     * Start the account-creation lifecycle. The signup burst (registration_started ->
+     * details_submitted -> verification_sent) is emitted synchronously here — these happen
+     * within seconds in real life (fill form, submit, system sends the verification email).
+     * verified and activated are then deferred over realistic, randomized delays by the
+     * {@link AccountLifecycleScheduler}, which also applies the verify/activate probabilities
+     * so the funnel keeps its drop-off. Each step writes both an account_events row and a
+     * business-event log carrying citizen.id.
      */
     private void emitAccountLifecycle(Citizen citizen) {
         if (!accountProps.isEnabled()) {
@@ -119,20 +120,15 @@ public class CitizenService {
         }
         String cid = citizen.getId();
         String email = citizen.getEmail();
-        recordAccountEvent(cid, email, "account.registration_started");
-        recordAccountEvent(cid, email, "account.details_submitted");
-        recordAccountEvent(cid, email, "account.verification_sent");
-        if (ThreadLocalRandom.current().nextDouble() <= accountProps.getVerifyProbability()) {
-            recordAccountEvent(cid, email, "account.verified");
-            if (ThreadLocalRandom.current().nextDouble() <= accountProps.getActivateProbability()) {
-                recordAccountEvent(cid, email, "account.activated");
-            }
-        }
-    }
+        accountEventRecorder.record(cid, email, "account.registration_started");
+        accountEventRecorder.record(cid, email, "account.details_submitted");
+        accountEventRecorder.record(cid, email, "account.verification_sent");
 
-    private void recordAccountEvent(String citizenId, String email, String eventType) {
-        accountEventRepository.save(AccountEvent.of(citizenId, eventType));
-        businessEventLogger.accountLifecycle(eventType, citizenId, email);
+        // Hand off to the scheduler: verified fires after the verified band elapses.
+        citizen.setAccountLifecycleStage("verification_sent");
+        citizen.setAccountNextTransitionAt(
+                OffsetDateTime.now().plusSeconds(accountProps.nextVerifiedDelaySeconds()));
+        citizenRepository.save(citizen);
     }
 
     private static void requireField(String value, String name) {

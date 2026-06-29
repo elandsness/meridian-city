@@ -53,6 +53,9 @@ spec:
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "none"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.serviceDispatch.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

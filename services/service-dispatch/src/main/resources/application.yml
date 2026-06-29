@@ -47,3 +47,8 @@ management:
 
 city-operations:
   url: ${CITY_OPERATIONS_URL:http://localhost:8083}
+
+# Emits the deferred dispatched/assigned business events at the absolute target times
+# citizen-service supplies (it owns the Service Request timeline). No delay band here.
+dispatch-lifecycle:
+  enabled: ${DISPATCH_LIFECYCLE_ENABLED:true}

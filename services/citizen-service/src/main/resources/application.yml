@@ -50,12 +50,36 @@ management:
 service-dispatch:
   url: ${SERVICE_DISPATCH_URL:http://localhost:8082}
 
-# Server-side simulation of the service-request lifecycle (submitted -> in_progress
-# -> resolved) so the Business Analytics funnel fills in realistically without relying
-# on the traffic-bot. completion-probability < 1 intentionally leaves some requests
-# unresolved for investigation in Dynatrace.
+# Server-side simulation of the Service Request business flow (submitted -> validated
+# -> dispatched -> assigned -> in_progress -> resolved). citizen-service owns the whole
+# timeline: each transition is spaced by a uniform random delay in its [min, max] band
+# (default ~5 min – 2 hr) so the bizevent steps look realistic instead of firing within
+# milliseconds. The dispatched/assigned bands are passed to service-dispatch as absolute
+# targets. completion-probability < 1 intentionally leaves some requests unresolved.
+# Shrink the bands (e.g. *_MIN_SECONDS=30, *_MAX_SECONDS=120) for a live demo.
 request-lifecycle:
   enabled: ${REQUEST_LIFECYCLE_ENABLED:true}
-  in-progress-after-seconds: ${REQUEST_LIFECYCLE_IN_PROGRESS_AFTER_SECONDS:20}
-  resolved-after-seconds: ${REQUEST_LIFECYCLE_RESOLVED_AFTER_SECONDS:40}
   completion-probability: ${REQUEST_LIFECYCLE_COMPLETION_PROBABILITY:0.88}
+  validated-min-seconds: ${REQUEST_LIFECYCLE_VALIDATED_MIN_SECONDS:300}
+  validated-max-seconds: ${REQUEST_LIFECYCLE_VALIDATED_MAX_SECONDS:7200}
+  dispatched-min-seconds: ${REQUEST_LIFECYCLE_DISPATCHED_MIN_SECONDS:300}
+  dispatched-max-seconds: ${REQUEST_LIFECYCLE_DISPATCHED_MAX_SECONDS:7200}
+  assigned-min-seconds: ${REQUEST_LIFECYCLE_ASSIGNED_MIN_SECONDS:300}
+  assigned-max-seconds: ${REQUEST_LIFECYCLE_ASSIGNED_MAX_SECONDS:7200}
+  in-progress-min-seconds: ${REQUEST_LIFECYCLE_IN_PROGRESS_MIN_SECONDS:300}
+  in-progress-max-seconds: ${REQUEST_LIFECYCLE_IN_PROGRESS_MAX_SECONDS:7200}
+  resolved-min-seconds: ${REQUEST_LIFECYCLE_RESOLVED_MIN_SECONDS:300}
+  resolved-max-seconds: ${REQUEST_LIFECYCLE_RESOLVED_MAX_SECONDS:7200}
+
+# Server-side simulation of the Account Creation business flow. The signup burst
+# (registration_started -> details_submitted -> verification_sent) stays synchronous at
+# registration; verified/activated are deferred by the bands below (default ~5 min – 2 hr)
+# so the funnel shows realistic gaps. verify/activate probabilities keep the drop-off.
+account-lifecycle:
+  enabled: ${ACCOUNT_LIFECYCLE_ENABLED:true}
+  verify-probability: ${ACCOUNT_LIFECYCLE_VERIFY_PROBABILITY:0.85}
+  activate-probability: ${ACCOUNT_LIFECYCLE_ACTIVATE_PROBABILITY:0.92}
+  verified-min-seconds: ${ACCOUNT_LIFECYCLE_VERIFIED_MIN_SECONDS:300}
+  verified-max-seconds: ${ACCOUNT_LIFECYCLE_VERIFIED_MAX_SECONDS:7200}
+  activated-min-seconds: ${ACCOUNT_LIFECYCLE_ACTIVATED_MIN_SECONDS:300}
+  activated-max-seconds: ${ACCOUNT_LIFECYCLE_ACTIVATED_MAX_SECONDS:7200}

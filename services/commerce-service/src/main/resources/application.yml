@@ -45,12 +45,17 @@ management:
         enabled: true
       show-details: always
 
-# Fulfillment timer delays (seconds) — placed -> packed -> shipped -> delivered.
-# Short for demo purposes; the @Scheduled FulfillmentScheduler advances orders.
+# Fulfillment delay bands — placed -> packed -> shipped -> delivered. Each transition
+# draws a uniform random delay in its [min, max] band (default ~5 min – 2 hr) so the
+# order.packed/shipped/delivered bizevent steps look realistic. The @Scheduled
+# FulfillmentScheduler advances orders. Shrink the bands for a live demo.
 fulfillment:
-  packed-after-seconds: ${FULFILLMENT_PACKED_AFTER_SECONDS:20}
-  shipped-after-seconds: ${FULFILLMENT_SHIPPED_AFTER_SECONDS:30}
-  delivered-after-seconds: ${FULFILLMENT_DELIVERED_AFTER_SECONDS:40}
+  packed-min-seconds: ${FULFILLMENT_PACKED_MIN_SECONDS:300}
+  packed-max-seconds: ${FULFILLMENT_PACKED_MAX_SECONDS:7200}
+  shipped-min-seconds: ${FULFILLMENT_SHIPPED_MIN_SECONDS:300}
+  shipped-max-seconds: ${FULFILLMENT_SHIPPED_MAX_SECONDS:7200}
+  delivered-min-seconds: ${FULFILLMENT_DELIVERED_MIN_SECONDS:300}
+  delivered-max-seconds: ${FULFILLMENT_DELIVERED_MAX_SECONDS:7200}
 
 # Fault injection flags — set by demo-control-api at runtime (db-slowdown on checkout).
 fault:

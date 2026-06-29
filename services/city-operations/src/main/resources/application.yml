@@ -52,12 +52,23 @@ management:
         enabled: true
       show-details: always
 
-# Server-side simulation of the work-order lifecycle (created -> assigned ->
-# acknowledged -> resolved) so the iot-incident funnel fills in and incidents get
-# resolved. completion-probability < 1 leaves some work orders unresolved for investigation.
+# Server-side simulation of the IoT Incident business flow (anomaly_detected ->
+# incident.created -> workorder.created -> assigned -> acknowledged -> resolved). The anomaly
+# is detected synchronously; the incident.created/workorder.created emissions and the
+# work-order lifecycle are each spaced by a uniform random delay in their [min, max] band
+# (default ~5 min – 2 hr) so the bizevent steps look realistic instead of firing within
+# milliseconds. completion-probability < 1 leaves some work orders unresolved. Shrink the
+# bands (e.g. *_MIN_SECONDS=30, *_MAX_SECONDS=120) for a live demo.
 workorder-lifecycle:
   enabled: ${WORKORDER_LIFECYCLE_ENABLED:true}
-  assigned-after-seconds: ${WORKORDER_LIFECYCLE_ASSIGNED_AFTER_SECONDS:15}
-  acknowledged-after-seconds: ${WORKORDER_LIFECYCLE_ACKNOWLEDGED_AFTER_SECONDS:20}
-  resolved-after-seconds: ${WORKORDER_LIFECYCLE_RESOLVED_AFTER_SECONDS:30}
   completion-probability: ${WORKORDER_LIFECYCLE_COMPLETION_PROBABILITY:0.85}
+  incident-created-min-seconds: ${WORKORDER_LIFECYCLE_INCIDENT_CREATED_MIN_SECONDS:300}
+  incident-created-max-seconds: ${WORKORDER_LIFECYCLE_INCIDENT_CREATED_MAX_SECONDS:7200}
+  workorder-created-min-seconds: ${WORKORDER_LIFECYCLE_WORKORDER_CREATED_MIN_SECONDS:300}
+  workorder-created-max-seconds: ${WORKORDER_LIFECYCLE_WORKORDER_CREATED_MAX_SECONDS:7200}
+  assigned-min-seconds: ${WORKORDER_LIFECYCLE_ASSIGNED_MIN_SECONDS:300}
+  assigned-max-seconds: ${WORKORDER_LIFECYCLE_ASSIGNED_MAX_SECONDS:7200}
+  acknowledged-min-seconds: ${WORKORDER_LIFECYCLE_ACKNOWLEDGED_MIN_SECONDS:300}
+  acknowledged-max-seconds: ${WORKORDER_LIFECYCLE_ACKNOWLEDGED_MAX_SECONDS:7200}
+  resolved-min-seconds: ${WORKORDER_LIFECYCLE_RESOLVED_MIN_SECONDS:300}
+  resolved-max-seconds: ${WORKORDER_LIFECYCLE_RESOLVED_MAX_SECONDS:7200}

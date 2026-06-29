@@ -47,12 +47,12 @@ public class FulfillmentScheduler {
             case "placed" -> {
                 order.setStatus("packed");
                 order.setPackedAt(now);
-                order.setNextTransitionAt(now.plusSeconds(fulfillment.getShippedAfterSeconds()));
+                order.setNextTransitionAt(now.plusSeconds(fulfillment.nextShippedDelaySeconds()));
             }
             case "packed" -> {
                 order.setStatus("shipped");
                 order.setShippedAt(now);
-                order.setNextTransitionAt(now.plusSeconds(fulfillment.getDeliveredAfterSeconds()));
+                order.setNextTransitionAt(now.plusSeconds(fulfillment.nextDeliveredDelaySeconds()));
             }
             case "shipped" -> {
                 order.setStatus("delivered");
