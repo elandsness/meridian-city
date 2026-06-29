@@ -1,6 +1,7 @@
 package com.meridian.citizen.service;
 
 import com.meridian.citizen.config.AccountLifecycleProperties;
+import com.meridian.citizen.config.FaultState;
 import com.meridian.citizen.domain.Citizen;
 import com.meridian.citizen.repository.CitizenRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class AccountLifecycleScheduler {
     private final CitizenRepository citizenRepository;
     private final AccountEventRecorder accountEventRecorder;
     private final AccountLifecycleProperties props;
+    private final FaultState faultState;
 
     @Scheduled(fixedDelay = 5_000)
     @Transactional
@@ -54,7 +56,14 @@ public class AccountLifecycleScheduler {
     private void advance(Citizen citizen, OffsetDateTime now) {
         switch (citizen.getAccountLifecycleStage()) {
             case "verification_sent" -> {
-                if (ThreadLocalRandom.current().nextDouble() <= props.getVerifyProbability()) {
+                if (failNow()) {
+                    // Business-exception (gated): explicit verification failure (e.g. KYC /
+                    // email check) — an error branch + drop-off at the Verified step.
+                    accountEventRecorder.record(
+                            citizen.getId(), citizen.getEmail(), "account.verification_failed");
+                    citizen.setAccountLifecycleStage("verification_failed");
+                    citizen.setAccountNextTransitionAt(null);
+                } else if (ThreadLocalRandom.current().nextDouble() <= props.getVerifyProbability()) {
                     accountEventRecorder.record(citizen.getId(), citizen.getEmail(), "account.verified");
                     citizen.setAccountLifecycleStage("verified");
                     citizen.setAccountNextTransitionAt(now.plusSeconds(props.nextActivatedDelaySeconds()));
@@ -66,7 +75,13 @@ public class AccountLifecycleScheduler {
                 citizenRepository.save(citizen);
             }
             case "verified" -> {
-                if (ThreadLocalRandom.current().nextDouble() <= props.getActivateProbability()) {
+                if (failNow()) {
+                    // Business-exception (gated): activation failure (e.g. failed fraud
+                    // check) — an error branch + drop-off at the Activated step.
+                    accountEventRecorder.record(
+                            citizen.getId(), citizen.getEmail(), "account.activation_failed");
+                    citizen.setAccountLifecycleStage("activation_failed");
+                } else if (ThreadLocalRandom.current().nextDouble() <= props.getActivateProbability()) {
                     accountEventRecorder.record(citizen.getId(), citizen.getEmail(), "account.activated");
                     citizen.setAccountLifecycleStage("activated");
                 } else {
@@ -78,5 +93,11 @@ public class AccountLifecycleScheduler {
             }
             default -> { /* terminal or unknown stage — nothing to do */ }
         }
+    }
+
+    /** True when the account-failure fault is on and this transition draws a failure. */
+    private boolean failNow() {
+        return faultState.isAccountFailEnabled()
+                && ThreadLocalRandom.current().nextDouble() < faultState.getAccountFailRate();
     }
 }

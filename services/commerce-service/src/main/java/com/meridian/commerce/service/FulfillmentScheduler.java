@@ -1,5 +1,6 @@
 package com.meridian.commerce.service;
 
+import com.meridian.commerce.config.FaultInjectionConfig;
 import com.meridian.commerce.config.FulfillmentProperties;
 import com.meridian.commerce.domain.Order;
 import com.meridian.commerce.messaging.OrderEventPublisher;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Advances orders through the simulated lifecycle on a timer:
@@ -30,6 +32,7 @@ public class FulfillmentScheduler {
     private final BusinessEventLogger businessEventLogger;
     private final OrderEventPublisher orderEventPublisher;
     private final FulfillmentProperties fulfillment;
+    private final FaultInjectionConfig faultConfig;
 
     @Scheduled(fixedDelay = 10_000)
     @Transactional
@@ -55,9 +58,17 @@ public class FulfillmentScheduler {
                 order.setNextTransitionAt(now.plusSeconds(fulfillment.nextDeliveredDelaySeconds()));
             }
             case "shipped" -> {
-                order.setStatus("delivered");
-                order.setDeliveredAt(now);
-                order.setNextTransitionAt(null);
+                FaultInjectionConfig.DeliveryFailure df = faultConfig.getDeliveryFailure();
+                if (df.isEnabled() && ThreadLocalRandom.current().nextDouble() < df.getRate()) {
+                    // Business-exception (gated): delivery fails instead of completing — an
+                    // error branch + drop-off at the Delivered step.
+                    order.setStatus("delivery_failed");
+                    order.setNextTransitionAt(null);
+                } else {
+                    order.setStatus("delivered");
+                    order.setDeliveredAt(now);
+                    order.setNextTransitionAt(null);
+                }
             }
             default -> {
                 return;
@@ -78,6 +89,10 @@ public class FulfillmentScheduler {
             case "delivered" -> {
                 businessEventLogger.orderDelivered(order.getId(), order.getCartId(), order.getCitizenId());
                 orderEventPublisher.publishOrderEvent("order.delivered", order);
+            }
+            case "delivery_failed" -> {
+                businessEventLogger.orderDeliveryFailed(order.getId(), order.getCartId(), order.getCitizenId());
+                orderEventPublisher.publishOrderEvent("order.delivery_failed", order);
             }
         }
     }

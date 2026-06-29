@@ -17,9 +17,15 @@
 /** @type {Record<string, object>} */
 const _faults = {
   'ai-service':           { llm_latency_enabled: false, llm_latency_seconds: 0 },
-  'citizen-service':      { db_slowdown_enabled: false, db_slowdown_seconds: 0 },
+  'citizen-service':      { db_slowdown_enabled: false, db_slowdown_seconds: 0,
+                            request_reject_enabled: false, request_reject_rate: 0,
+                            account_fail_enabled: false, account_fail_rate: 0 },
   'analytics-service':    { memory_pressure_enabled: false },
   'telemetry-processor':  { memory_pressure_enabled: false },
+  // Business-exception toggles (default off) — see scenarios.js *-failures scenarios.
+  'city-operations':      { workorder_escalation_enabled: false, workorder_escalation_rate: 0 },
+  'commerce-service':     { checkout_failures_enabled: false, checkout_failures_rate: 0 },
+  'billing-service':      { payment_fail_enabled: false, payment_fail_rate: 0 },
 }
 
 function getFaults () {

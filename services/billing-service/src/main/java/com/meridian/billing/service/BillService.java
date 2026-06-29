@@ -1,5 +1,6 @@
 package com.meridian.billing.service;
 
+import com.meridian.billing.config.FaultState;
 import com.meridian.billing.domain.TaxBill;
 import com.meridian.billing.dto.BillResponse;
 import com.meridian.billing.messaging.BillingEventPublisher;
@@ -14,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ public class BillService {
     private final TaxBillRepository taxBillRepository;
     private final BusinessEventLogger businessEventLogger;
     private final BillingEventPublisher billingEventPublisher;
+    private final FaultState faultState;
 
     @Transactional(readOnly = true)
     public List<BillResponse> listBills(String citizenId, String status) {
@@ -45,6 +48,17 @@ public class BillService {
         TaxBill bill = getOrThrow(id);
         if ("paid".equalsIgnoreCase(bill.getStatus())) {
             return toResponse(bill); // idempotent — already paid
+        }
+        // Business-exception (gated, default off): fail a share of payments at the gateway.
+        // Emits tax.payment_failed on the same bill.id and rejects with 402 — the bill stays
+        // outstanding — so the Tax Payment flow shows an error branch + drop-off at the
+        // Payment step.
+        if (faultState.isPaymentFailEnabled()
+                && ThreadLocalRandom.current().nextDouble() < faultState.getPaymentFailRate()) {
+            businessEventLogger.taxPaymentFailed(bill.getId(), bill.getCitizenId(), bill.getAmountCents());
+            billingEventPublisher.publish("tax.payment_failed", bill);
+            log.warn("Tax payment failed (fault) bill={} citizen={}", bill.getId(), bill.getCitizenId());
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "payment failed");
         }
         bill.setStatus("paid");
         bill.setPaidAt(OffsetDateTime.now());

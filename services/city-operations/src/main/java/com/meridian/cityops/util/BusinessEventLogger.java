@@ -51,6 +51,20 @@ public class BusinessEventLogger {
         );
     }
 
+    /**
+     * Emit a workorder.escalated business event — the error branch at the resolution step
+     * (gated demo fault). Carries incident.id so the IoT Incident Resolution business flow
+     * shows the escalation as a drop-off on the same in-flight incident.
+     */
+    public void workOrderEscalated(String workOrderId, String incidentId, String assignedDepartment) {
+        BUSINESS_EVENTS.warn("workorder.escalated",
+                StructuredArguments.keyValue("event.type", "workorder.escalated"),
+                StructuredArguments.keyValue("work_order.id", workOrderId),
+                StructuredArguments.keyValue("incident.id", incidentId),
+                StructuredArguments.keyValue("assigned_department", assignedDepartment)
+        );
+    }
+
     public void incidentCreated(String incidentId, String assetId, String severity) {
         BUSINESS_EVENTS.info("incident.created",
                 StructuredArguments.keyValue("event.type", "incident.created"),

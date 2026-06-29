@@ -32,4 +32,18 @@ public class BusinessEventLogger {
                 StructuredArguments.keyValue("bill.amount_cents", amountCents)
         );
     }
+
+    /**
+     * Emit a tax.payment_failed business event — the error branch at the Payment step
+     * (gated demo fault). Carries bill.id so the Tax Payment business flow shows the failed
+     * payment as a drop-off on the same in-flight bill.
+     */
+    public void taxPaymentFailed(String billId, String citizenId, int amountCents) {
+        BUSINESS_EVENTS.warn("tax.payment_failed",
+                StructuredArguments.keyValue("event.type", "tax.payment_failed"),
+                StructuredArguments.keyValue("bill.id", billId),
+                StructuredArguments.keyValue("citizen.id", citizenId),
+                StructuredArguments.keyValue("bill.amount_cents", amountCents)
+        );
+    }
 }
