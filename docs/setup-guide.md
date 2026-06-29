@@ -121,6 +121,12 @@ apiGateway:
 ./scripts/deploy.sh install -f helm/values-custom.yaml
 ```
 
+This generates a fresh **per-instance hash** and installs into release & namespace
+`meridian-<hash>` (e.g. `meridian-a1b2`), so **multiple SEs can run concurrent
+installs on the same cluster and the same Dynatrace tenant** without colliding.
+Pin the hash with `INSTANCE_HASH=<hash>` (or the full `RELEASE_NAME=meridian-<hash>`).
+The deploy prints the instance's namespace, cluster name, and bizevent provider.
+
 For local development (smaller resources, no DT Operator):
 
 ```bash
@@ -130,15 +136,22 @@ For local development (smaller resources, no DT Operator):
 ```
 
 This will:
-1. Create the `meridian` and `dynatrace` namespaces
-2. Deploy PostgreSQL (CloudNativePG) and Kafka (Strimzi)
-3. Deploy the OTel Collector
-4. Install the Dynatrace Operator as its own release in the `dynatrace` namespace
-   and create the DynaKube CR there — only when `dynatrace.operator.enabled=true`
-   **and** `dynatrace.apiUrl` is set
-5. Deploy all 12 application services + the two frontends, IoT simulator, and traffic bot
+1. Install the **shared** cluster-singleton operators **once** (idempotent, reused by
+   every instance): CloudNativePG (`cnpg-system`), Strimzi with
+   `watchAnyNamespace=true` (`strimzi-system`), and — when `dynatrace.operator.enabled`
+   and `dynatrace.apiUrl` are set — the Dynatrace Operator (`dynatrace`)
+2. Create this instance's namespace `meridian-<hash>`
+3. Create this instance's PostgreSQL (`meridian-<hash>-db`) and Kafka
+   (`meridian-<hash>`) CRs, reconciled by the shared operators, plus a per-instance
+   OTel Collector and DynaKube (`meridian-<hash>`, scoped to inject only this namespace)
+4. Deploy all application services + the two frontends, IoT simulator, and traffic bot
+5. Auto-provision this instance's Dynatrace OpenPipeline + five Business Flows
+   (provider `meridian-<hash>.city`)
 6. **Seed demo data** and start **background port-forwards** automatically (Steps
    5–6 below are only needed to re-run those independently)
+
+> Note: `deploy.sh upgrade`/`seed`/`status`/`port-forward` auto-detect the sole
+> instance; with more than one present, set `RELEASE_NAME=meridian-<hash>` to pick one.
 
 `deploy.sh` does not pass `helm --wait` (Java services crash-loop until the DB is
 ready, which would deadlock the post-install hooks). It submits the release with
@@ -150,17 +163,20 @@ Once the DynaKube reaches `Running`, restart the app workloads once so OneAgent
 injects them (deploy.sh prints this reminder):
 
 ```bash
-kubectl -n meridian rollout restart deploy
+kubectl -n meridian-<hash> rollout restart deploy
 ```
 
 ---
 
 ## Step 5: Validate
 
+> In the commands below, `meridian-<hash>` is **your instance's** namespace (the
+> deploy printed it; `helm list -A | grep meridian-` lists instances).
+
 ### Check all pods are running
 
 ```bash
-kubectl get pods -n meridian
+kubectl get pods -n meridian-<hash>
 ```
 
 Expected output: all pods `Running` with `1/1` or `2/2` Ready (the `2/2` means OneAgent injected).

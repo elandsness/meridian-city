@@ -28,7 +28,9 @@ spec:
               containerPort: 8085
           env:
             - name: OTEL_SERVICE_NAME
-              value: "ai-service"
+              # Per-instance service.name so each instance's AI-observability service
+              # is a distinct entity on the shared tenant (e.g. ai-service-a1b2).
+              value: "ai-service{{- with (include "meridian.instanceHash" .) }}-{{ . }}{{- end }}"
             # Exclude the k8s liveness/readiness probes from FastAPI server spans
             - name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS
               value: "^/health"
@@ -43,14 +45,14 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: meridian-secrets
+                  name: {{ include "meridian.appSecret" . }}
                   key: llm-openai-api-key
             {{- end }}
             {{- if eq .Values.llm.provider "anthropic" }}
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: meridian-secrets
+                  name: {{ include "meridian.appSecret" . }}
                   key: llm-anthropic-api-key
             {{- end }}
             {{- if eq .Values.llm.provider "local" }}

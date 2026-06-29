@@ -19,30 +19,25 @@ keywords:
   - iot
   - opentelemetry
 
-# External chart dependencies for infrastructure components.
+# External chart dependencies.
 # Run `helm dependency update ./helm` before first install.
 # Pin to specific versions for reproducibility; update deliberately.
+#
+# Only the OpenTelemetry Collector is a sub-chart — it is a per-INSTANCE,
+# namespaced workload, so each Meridian install gets its own collector.
 dependencies:
-  - name: cloudnative-pg
-    version: ">=0.20.0 <2.0.0"
-    repository: https://cloudnative-pg.github.io/charts
-    condition: postgresql.enabled
-    alias: cloudnative-pg
-
-  - name: strimzi-kafka-operator
-    version: ">=0.40.0 <2.0.0"
-    repository: https://strimzi.io/charts/
-    condition: kafka.enabled
-    alias: strimzi-kafka-operator
-
   - name: opentelemetry-collector
     version: ">=0.100.0 <1.0.0"
     repository: https://open-telemetry.github.io/opentelemetry-helm-charts
     condition: opentelemetry-collector.enabled
     alias: opentelemetry-collector
 
-  # NOTE: the Dynatrace Operator is intentionally NOT a sub-chart. A Helm
-  # sub-chart always deploys into the parent release namespace (meridian), but
-  # the operator must live in the same namespace as the DynaKube it reconciles
-  # (dynatrace). scripts/deploy.sh therefore installs it as its own release in
-  # the 'dynatrace' namespace when Dynatrace is configured.
+  # MULTI-TENANCY: the cluster-singleton operators are intentionally NOT sub-charts.
+  # CloudNativePG and Strimzi each install CLUSTER-SCOPED resources (CRDs, webhooks,
+  # ClusterRoles); installing them per-release would collide the moment a second
+  # instance is deployed. They (and the Dynatrace Operator, which must live beside
+  # its DynaKube in the 'dynatrace' namespace) are therefore installed ONCE as their
+  # own shared releases by scripts/deploy.sh (ensure_shared_operators), and each
+  # per-instance Meridian release only creates the namespaced CRs the operators
+  # reconcile (Cluster, Kafka/KafkaTopic, DynaKube). Strimzi is installed with
+  # watchAnyNamespace=true so the single operator reconciles every instance's Kafka.

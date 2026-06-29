@@ -28,7 +28,7 @@ spec:
               containerPort: 8084
           env:
             - name: OTEL_SERVICE_NAME
-              value: "analytics-service"
+              value: "analytics-service{{- with (include "meridian.instanceHash" .) }}-{{ . }}{{- end }}"
             # Exclude the k8s liveness/readiness probes from FastAPI server spans
             - name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS
               value: "^/health"

@@ -32,7 +32,7 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: "iot-ingestion"
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "meridian-kafka-bootstrap:9092"
+              value: "{{ include "meridian.kafkaBootstrap" . }}:9092"
             - name: KAFKA_TOPIC
               value: "iot.telemetry.raw"
             - name: HEALTH_PORT
@@ -41,10 +41,10 @@ spec:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "{{ include "meridian.fullname" . }}-opentelemetry-collector:4317"
             - name: OTEL_RESOURCE_ATTRIBUTES
-              value: "deployment.environment={{ .Values.dynatrace.deploymentEnvironment }},k8s.cluster.name={{ .Values.dynatrace.clusterName }}"
+              value: "deployment.environment={{ include "meridian.dynatrace.deploymentEnvironment" . }},k8s.cluster.name={{ include "meridian.dynatrace.clusterName" . }},service.namespace={{ include "meridian.namespace" . }}"
             # DB credentials for device validator (queries city.assets for known device IDs)
             - name: DB_HOST
-              value: "meridian-db-rw"
+              value: "{{ include "meridian.dbRwService" . }}"
             - name: DB_PORT
               value: "5432"
             - name: DB_NAME
@@ -54,7 +54,7 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: meridian-secrets
+                  name: {{ include "meridian.appSecret" . }}
                   key: db-password
           livenessProbe:
             tcpSocket:

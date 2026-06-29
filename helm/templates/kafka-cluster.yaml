@@ -6,7 +6,7 @@ metadata:
   name: combined
   namespace: {{ include "meridian.namespace" . }}
   labels:
-    strimzi.io/cluster: meridian
+    strimzi.io/cluster: {{ include "meridian.kafkaCluster" . }}
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
     strimzi.io/next-node-ids: "[0]"
@@ -25,7 +25,7 @@ spec:
 apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
-  name: meridian
+  name: {{ include "meridian.kafkaCluster" . }}
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}

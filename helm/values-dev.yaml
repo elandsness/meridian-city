@@ -2,7 +2,10 @@
 # Meridian City Platform — Development / Local Overrides
 # =============================================================================
 # Apply on top of values.yaml for local development (kind / Docker Desktop):
-#   helm install meridian ./helm -f helm/values.yaml -f helm/values-dev.yaml -f helm/values-custom.yaml
+#   ./scripts/deploy.sh install -f helm/values-dev.yaml -f helm/values-custom.yaml
+# deploy.sh generates a per-instance hash (release/namespace meridian-<hash>) and
+# installs the shared operators once. For a fixed local name, pin INSTANCE_HASH=dev.
+# (A bare `helm install meridian ./helm ...` still works as a single legacy instance.)
 # =============================================================================
 
 global:

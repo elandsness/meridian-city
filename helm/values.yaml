@@ -16,7 +16,18 @@ appImageRegistry: "ghcr.io/your-org/meridian-city-platform"
 
 global:
   imageTag: "latest"
-  namespace: "meridian"
+  # Namespace the instance's app resources deploy into. Leave empty to follow the
+  # Helm release namespace (the `-n` flag) — scripts/deploy.sh installs each
+  # instance into `meridian-<hash>`, so every install lands in its own namespace.
+  # Set explicitly only to pin a namespace that differs from the release namespace.
+  namespace: ""
+  # Per-instance hash (e.g. "a1b2") — the SINGLE source of truth for multi-tenancy.
+  # scripts/deploy.sh generates it once and passes it here (and bakes it into the
+  # release name `meridian-<hash>`). It is fanned out via helm/templates/_helpers.tpl
+  # to the Dynatrace identity (deployment.environment suffix). Helm template
+  # randomness is not stable across upgrades, so this is a seeded value, never
+  # generated at render time. Leave empty for a legacy single-instance install.
+  instanceHash: ""
   # Always pull so that a fresh CI build of the floating ":latest" tag is
   # actually fetched on each (re)deploy.  With IfNotPresent, a kind node that
   # already cached ":latest" will keep serving the stale image after CI
@@ -47,15 +58,35 @@ dynatrace:
   # e.g., abc12345 from https://abc12345.live.dynatrace.com
   environmentId: ""
 
-  # Deployment environment label (visible in Dynatrace entity properties)
+  # Deployment environment label (visible in Dynatrace entity properties).
+  # This is the BASE label; the per-instance hash is suffixed automatically
+  # (e.g. "demo" -> "demo-a1b2") so every concurrent instance is filterable by a
+  # unique deployment.environment. Override the base here if "demo" is not wanted.
   deploymentEnvironment: "demo"
 
-  # Kubernetes cluster name (visible in Dynatrace k8s monitoring)
-  clusterName: "meridian-cluster"
+  # Kubernetes cluster name (visible in Dynatrace k8s monitoring).
+  # Empty -> derived per-instance as "<release>-cluster" (e.g. meridian-a1b2-cluster)
+  # so each instance is a distinct cluster entity on the shared tenant. Set a value
+  # to pin a shared cluster name across instances (not recommended for multi-tenancy).
+  clusterName: ""
 
   # Whether to deploy the Dynatrace Operator for OneAgent auto-instrumentation.
   # When enabled, the operator and a DynaKube CR are created in the 'dynatrace' namespace.
   operator:
+    enabled: true
+
+  # MULTI-TENANCY — cluster-monitoring ownership.
+  # Every instance's DynaKube does per-namespace OneAgent applicationMonitoring
+  # (code-module injection), which is safe to run many-at-once. But the Log Module
+  # (logMonitoring) and the ActiveGate are NODE/CLUSTER-level singletons — the
+  # Dynatrace admission webhook rejects a second DynaKube that also runs them
+  # ("Only one Agent per node"). So exactly ONE instance per cluster owns them, and
+  # because the Log Module captures EVERY namespace's stdout, that single owner's
+  # logs feed all instances (each instance's OpenPipeline routing then extracts only
+  # its own by namespace). scripts/deploy.sh sets this automatically: true for the
+  # first instance on a cluster, false for the rest (detected by an existing
+  # logMonitoring DynaKube). Leave true for a standalone/legacy single install.
+  clusterMonitoring:
     enabled: true
 
   # Dynatrace Kubernetes Log Module — captures container stdout into Grail Logs
@@ -84,8 +115,11 @@ dynatrace:
     #   settings:objects:read, settings:objects:write, settings:schemas:read
     # NOTE: this is a PLATFORM token, distinct from dynatrace.apiToken (classic).
     platformToken: ""
-    # bizevent provider stamped on every extracted Meridian business event
-    eventProvider: "meridian.city"
+    # bizevent provider stamped on every extracted Meridian business event.
+    # Empty -> derived per-instance as "<release>.city" (e.g. meridian-a1b2.city)
+    # so each instance's bizevents, OpenPipeline, and Business Flows are isolated
+    # on the shared tenant. Set a value only to pin a shared provider.
+    eventProvider: ""
     # Image used by the provisioning Job (needs Python 3 + CA certs)
     image: "python:3.12-slim"
 
@@ -600,8 +634,11 @@ opsDashboard:
 # ---------------------------------------------------------------------------
 # Infrastructure: PostgreSQL (CloudNativePG operator)
 # Images: ghcr.io/cloudnative-pg/* — public, no auth required.
-# The operator creates a single-instance Postgres cluster named meridian-db.
-# Services: meridian-db-rw (read-write), meridian-db-r (read-only)
+# The CNPG operator is a SHARED, cluster-scoped singleton installed once by
+# scripts/deploy.sh (not per-instance). Each Meridian instance gets its own
+# Cluster CR named "<release>-db" (e.g. meridian-a1b2-db) in its own namespace,
+# with services <release>-db-rw (read-write) / <release>-db-r (read-only).
+# The database name itself stays "meridian" — it is isolated per cluster/namespace.
 # ---------------------------------------------------------------------------
 postgresql:
   enabled: true
@@ -625,23 +662,24 @@ postgresql:
       cpu: "1000m"
       memory: "1Gi"
 
-# CloudNativePG operator sub-chart values
-cloudnative-pg:
-  crds:
-    create: true
+# CloudNativePG operator: SHARED cluster-singleton, NOT a sub-chart of this release.
+# scripts/deploy.sh installs it once (release "cnpg" in namespace "cnpg-system",
+# crds.create=true). See ensure_shared_operators in scripts/deploy.sh.
 
 # ---------------------------------------------------------------------------
 # Infrastructure: Kafka (Strimzi operator)
 # Images: quay.io/strimzi/* — public, no auth required.
-# Runs a single-node KRaft cluster named meridian. Topics managed via
-# KafkaTopic CRDs. Bootstrap: meridian-kafka-bootstrap:9092
+# The Strimzi operator is a SHARED singleton installed once by scripts/deploy.sh
+# with watchAnyNamespace=true (not per-instance). Each Meridian instance gets its
+# own single-node KRaft Kafka CR named "<release>" (e.g. meridian-a1b2) in its own
+# namespace, with bootstrap <release>-kafka-bootstrap:9092. Topics via KafkaTopic CRDs.
 # ---------------------------------------------------------------------------
 kafka:
   enabled: true
   # Kafka broker version — MUST be supported by the installed Strimzi operator.
   # If this version is wrong, the Kafka CR will go NotReady with an
   # UnsupportedKafkaVersionException and no broker pod will be created.
-  # Check supported versions: kubectl describe kafka meridian -n meridian | grep -A3 Conditions
+  # Check supported versions: kubectl describe kafka <release> -n <release-ns> | grep -A3 Conditions
   # Strimzi chart >=1.0.0 supports: 4.1.0, 4.1.1, 4.1.2, 4.2.0
   version: "4.2.0"
   storage:
@@ -690,9 +728,10 @@ kafka:
       config:
         retention.ms: "604800000"
 
-# Strimzi operator sub-chart values
-strimzi-kafka-operator:
-  watchAnyNamespace: false
+# Strimzi operator: SHARED cluster-singleton, NOT a sub-chart of this release.
+# scripts/deploy.sh installs it once (release "strimzi" in namespace "strimzi-system")
+# with watchAnyNamespace=true so the single operator reconciles every instance's
+# Kafka CR. See ensure_shared_operators in scripts/deploy.sh.
 
 # ---------------------------------------------------------------------------
 # Infrastructure: OpenTelemetry Collector (OTEL Helm chart dependency)

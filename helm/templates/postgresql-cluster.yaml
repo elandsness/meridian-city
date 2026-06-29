@@ -3,7 +3,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: meridian-db
+  name: {{ include "meridian.dbCluster" . }}
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -22,7 +22,7 @@ spec:
       database: {{ .Values.postgresql.auth.database }}
       owner: {{ .Values.postgresql.auth.username }}
       secret:
-        name: meridian-db-credentials
+        name: {{ include "meridian.dbCredentialsSecret" . }}
   storage:
     size: {{ .Values.postgresql.storage.size }}
   resources:

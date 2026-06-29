@@ -43,16 +43,20 @@ data:
         send_batch_max_size: 2048
 
       # Enrich every resource with deployment metadata
+      # Per-instance identity: these attributes are what distinguish this instance's
+      # collector-routed telemetry (Go iot-*, Python ai/analytics) from another
+      # concurrent Meridian instance's on the shared tenant. (There is no
+      # k8sattributes processor here, so service.namespace is the grouping key.)
       resource:
         attributes:
           - key: deployment.environment
-            value: "{{ .Values.dynatrace.deploymentEnvironment }}"
+            value: "{{ include "meridian.dynatrace.deploymentEnvironment" . }}"
             action: upsert
           - key: k8s.cluster.name
-            value: "{{ .Values.dynatrace.clusterName }}"
+            value: "{{ include "meridian.dynatrace.clusterName" . }}"
             action: upsert
           - key: service.namespace
-            value: "meridian"
+            value: "{{ include "meridian.namespace" . }}"
             action: upsert
 
     exporters:

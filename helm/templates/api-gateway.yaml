@@ -34,7 +34,7 @@ spec:
             - name: AUTH_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: meridian-secrets
+                  name: {{ include "meridian.appSecret" . }}
                   key: auth-password
             - name: CITIZEN_SERVICE_URL
               value: "http://citizen-service:8081"
