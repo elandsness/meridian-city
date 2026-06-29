@@ -195,6 +195,8 @@ async function proxyRoutes (fastify, opts) {
       // accepts string/Buffer/stream, so re-serialize objects to JSON. Passing
       // the raw object straight through makes undici throw, which surfaced as a
       // 502 on every proxied POST (chat, create service request, etc.).
+      // Non-JSON / bodyless requests arrive as a Buffer (see the catch-all
+      // content-type parser in app.js) and are forwarded verbatim below.
       let upstreamBody
       if (sendBody && request.body != null) {
         if (typeof request.body === 'string' || Buffer.isBuffer(request.body)) {

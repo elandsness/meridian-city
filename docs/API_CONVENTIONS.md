@@ -94,6 +94,14 @@ passthrough. Two things bite repeatedly:
   undici needs a string/Buffer. The handler re-serializes objects to JSON and
   drops the inbound `content-length`. Don't undo this — any proxied POST/PUT/PATCH
   will 502 if the body is forwarded as a raw object.
+- **Bodyless / non-JSON POSTs.** Fastify only parses `application/json` and
+  `text/plain`; anything else used to 415 **before** reaching the proxy. A
+  bodyless action POST (e.g. `POST /api/v1/billing/bills/:id/pay`) trips this,
+  because axios labels a no-body POST `application/x-www-form-urlencoded`. Since
+  415 < 500 the callers never threw, so the failure was silent — the Tax Payment
+  funnel stalled (bills issued, never paid). A catch-all content-type parser in
+  `app.js` now buffers any non-JSON body raw so the proxy forwards it verbatim.
+  Don't remove it; a reverse proxy must forward these, not reject them.
 - **Prefix rewrites.** Only `/api/v1/demo-control/*` is rewritten (→ `/api/v1/*`
   upstream). Every other prefix is forwarded **unchanged**. So a frontend path
   must match the upstream route exactly *including the prefix*. Calling

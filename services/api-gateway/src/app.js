@@ -32,6 +32,21 @@ async function build () {
     },
   })
 
+  // Transparent-proxy body handling. Fastify only parses application/json (and
+  // text/plain) out of the box and replies 415 to any other content type *before*
+  // the request reaches the proxy handler. That silently broke bodyless action
+  // POSTs — most visibly POST /api/v1/billing/bills/:id/pay — because axios labels
+  // a no-body POST `application/x-www-form-urlencoded`, which Fastify rejected with
+  // 415. Since 415 < 500 the callers (traffic-bot, public-portal "Pay now") never
+  // threw, so the Tax Payment funnel just stalled: bills issued, never paid, no
+  // tax.payment_completed. A reverse proxy must forward these, not reject them, so
+  // buffer any non-JSON body raw and let the proxy pass it through verbatim (it
+  // already forwards string/Buffer bodies as-is). application/json still uses the
+  // built-in parser, so JSON re-serialization in proxy.js is unaffected.
+  app.addContentTypeParser('*', { parseAs: 'buffer' }, (req, body, done) => {
+    done(null, body)
+  })
+
   // Plugins
   await app.register(cors, {
     origin: '*',
