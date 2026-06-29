@@ -45,7 +45,7 @@ spec:
             - name: ADMIN_PORT
               value: "8088"
             - name: OTEL_RESOURCE_ATTRIBUTES
-              value: "deployment.environment={{ .Values.dynatrace.deploymentEnvironment }},k8s.cluster.name={{ .Values.dynatrace.clusterName }}"
+              value: "deployment.environment={{ include "meridian.dynatrace.deploymentEnvironment" . }},k8s.cluster.name={{ include "meridian.dynatrace.clusterName" . }},service.namespace={{ include "meridian.namespace" . }}"
           livenessProbe:
             httpGet:
               path: /health

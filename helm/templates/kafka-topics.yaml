@@ -7,7 +7,7 @@ metadata:
   name: {{ .name | replace "." "-" }}
   namespace: {{ include "meridian.namespace" $ }}
   labels:
-    strimzi.io/cluster: meridian
+    strimzi.io/cluster: {{ include "meridian.kafkaCluster" $ }}
     {{- include "meridian.labels" $ | nindent 4 }}
 spec:
   partitions: {{ .partitions }}

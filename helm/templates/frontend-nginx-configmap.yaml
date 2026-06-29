@@ -8,8 +8,8 @@
 #  2. Inject the Dynatrace agentless RUM snippet into served HTML via sub_filter,
 #     when <app>.rum.enabled is true. The RUM application id / agent URL is shipped
 #     to every browser and is NOT a secret, so it lives in values.yaml (unlike the
-#     Dynatrace API token, which stays in the meridian-secrets Secret). Each SPA
-#     has its own ConfigMap so it can register as its own Dynatrace web application.
+#     Dynatrace API token, which stays in the per-instance application Secret). Each
+#     SPA has its own ConfigMap so it can register as its own Dynatrace web application.
 {{- define "meridian.frontendNginxConf" -}}
 server {
     listen 80;

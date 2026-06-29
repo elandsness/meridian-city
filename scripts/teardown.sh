@@ -1,31 +1,44 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Meridian City Platform — Teardown Script
+# Meridian City Platform — Teardown Script (per-instance, multi-tenancy safe)
 # =============================================================================
+# Tears down ONE Meridian instance without disturbing other concurrent instances
+# or the SHARED cluster-singleton operators (CloudNativePG, Strimzi, Dynatrace).
+#
+# Instance selection: set RELEASE_NAME=meridian-<hash> (or pass it as the first
+# positional arg). If omitted, the sole meridian-* release is auto-detected; with
+# more than one present you must name which to remove.
+#
 # Usage:
-#   ./scripts/teardown.sh              Full teardown — kills port-forwards,
-#                                      uninstalls Helm release, deletes PVCs
-#                                      and namespaces.  This is the default
-#                                      because a stale PostgreSQL PVC causes
-#                                      Flyway / schema problems on the next
-#                                      fresh install.
+#   ./scripts/teardown.sh [meridian-<hash>]   Full teardown of ONE instance — stops
+#                                             its port-forwards, deletes its operator
+#                                             CRs, `helm uninstall` (which deprovisions
+#                                             its Dynatrace pipeline/flows/routing via
+#                                             the pre-delete hook), deletes its DynaKube,
+#                                             PVCs, and namespace. Shared operators stay.
 #
-#   ./scripts/teardown.sh --soft       Helm uninstall only.  Port-forwards are
-#                                      still stopped, but namespaces and PVCs
-#                                      are preserved (useful for iterating on
-#                                      Helm chart changes without losing data).
+#   ./scripts/teardown.sh --soft              Helm uninstall only (still deprovisions the
+#                                             tenant objects); namespace + PVCs preserved.
 #
-#   ./scripts/teardown.sh --pf         Stop ALL Meridian port-forwards and exit.
-#                                      Non-destructive (touches no cluster
-#                                      resources) — use it to clear stale or
-#                                      orphaned forwards that accumulate across
-#                                      repeated deploys.
+#   ./scripts/teardown.sh --pf                Stop this instance's port-forwards only
+#                                             (no cluster changes).
+#
+#   ./scripts/teardown.sh --with-shared-operators
+#                                             After removing the instance, ALSO remove the
+#                                             SHARED operators (CNPG/Strimzi/Dynatrace), their
+#                                             namespaces, and the CNPG CRDs. DESTRUCTIVE TO
+#                                             ALL INSTANCES — only run when none remain.
 # =============================================================================
 set -euo pipefail
 
-RELEASE_NAME="${RELEASE_NAME:-meridian}"
-NAMESPACE="${NAMESPACE:-meridian}"
 DYNATRACE_NAMESPACE="dynatrace"
+CNPG_NAMESPACE="${CNPG_NAMESPACE:-cnpg-system}"
+CNPG_RELEASE="${CNPG_RELEASE:-cnpg}"
+STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
+STRIMZI_RELEASE="${STRIMZI_RELEASE:-strimzi}"
+
+RELEASE_NAME="${RELEASE_NAME:-}"
+NAMESPACE="${NAMESPACE:-}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -36,121 +49,128 @@ NC='\033[0m'
 info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+
+# Resolve which instance to tear down: explicit RELEASE_NAME / positional arg, else
+# auto-detect the sole meridian-* release (error on 0 or >1).
+resolve_instance() {
+  if [[ -z "$RELEASE_NAME" ]]; then
+    local found n
+    found=$(helm list -A -q --filter '^meridian-' 2>/dev/null || true)
+    n=$(printf '%s' "$found" | grep -c . || true)
+    if [[ "$n" -eq 1 ]]; then
+      RELEASE_NAME="$found"
+    elif [[ "$n" -eq 0 ]]; then
+      error "No Meridian instance found. Pass the release name: $0 meridian-<hash>"
+      exit 1
+    else
+      error "Multiple Meridian instances found — name the one to remove:"
+      printf '%s\n' "$found" | sed 's/^/    /' >&2
+      error "e.g. RELEASE_NAME=meridian-a1b2 $0   (or: $0 meridian-a1b2)"
+      exit 1
+    fi
+  fi
+  NAMESPACE="${NAMESPACE:-$RELEASE_NAME}"
+  info "Target instance: release=${RELEASE_NAME}  namespace=${NAMESPACE}"
+}
 
 _PF_PIDS_FILE="/tmp/meridian-pf-pids"
-# Matches the kubectl port-forward processes deploy.sh starts for this
-# namespace's services (see scripts/deploy.sh _pf_loop). Anchored on
-# "port-forward ... -n <ns>" rather than on "kubectl": kuberlr runs the real
-# binary as e.g. "kubectl1.36.2 port-forward ...", so a literal "kubectl
-# port-forward" match (the old fallback) silently missed every kuberlr forward.
-_PF_KUBECTL_PATTERN="port-forward .*-n ${NAMESPACE}"
 
-# Durably stop EVERY Meridian port-forward: the loops tracked by the most recent
-# deploy run AND orphans from earlier runs.
-#
-# Why the PID file alone is not enough: deploy.sh runs each port-forward inside a
-# restart loop (it relaunches kubectl whenever a pod is replaced) and writes only
-# the CURRENT run's loop PIDs to $_PF_PIDS_FILE, overwriting it each run. Repeated
-# `deploy.sh upgrade`s (which never teardown in between) therefore leave the prior
-# runs' loops untracked, and they pile up — each respawning kubectl and fighting
-# over ports 8080/8081/3000/3001. Killing only the kubectl children is futile: the
-# loops respawn them after a 3s sleep.
-#
-# So we kill the restart-loop PARENTS first (they stop respawning), then the
-# kubectl children. Orphaned loops are found by walking up from every live kubectl
-# port-forward to its parent — adopting it only when that parent is itself a
-# deploy.sh process and not PID 1, so we never kill init or an unrelated shell.
+# Stop the port-forwards for THIS instance's namespace. Anchored on
+# "port-forward ... -n <ns>" so it never touches another instance's forwards.
 stop_port_forwards() {
   local stopped=false pid ppid pcmd p
   local -a loop_pids=()
+  local pattern="port-forward .*-n ${NAMESPACE}"
 
-  # (a) Loops tracked by the most recent deploy run.
   if [[ -f "$_PF_PIDS_FILE" ]]; then
     while IFS= read -r pid; do
       [[ -n "$pid" ]] && loop_pids+=("$pid")
     done < "$_PF_PIDS_FILE"
   fi
 
-  # (b) Orphaned loops from earlier runs: the deploy.sh parent of each live
-  #     kubectl port-forward child (the PID file no longer references them).
+  # Orphaned restart-loops: the deploy.sh parent of each live kubectl port-forward
+  # for this namespace (adopting only deploy.sh parents, never init/unrelated shells).
   while IFS= read -r pid; do
     [[ -z "$pid" ]] && continue
     ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
     [[ -z "$ppid" || "$ppid" == "1" ]] && continue
     pcmd=$(ps -o command= -p "$ppid" 2>/dev/null || true)
     [[ "$pcmd" == *deploy.sh* ]] && loop_pids+=("$ppid")
-  done < <(pgrep -f "$_PF_KUBECTL_PATTERN" 2>/dev/null || true)
+  done < <(pgrep -f "$pattern" 2>/dev/null || true)
 
-  # Kill loop parents first (stops respawning), then any kubectl still up
-  # (covers a bare kubectl left by a Ctrl+C'd manual `deploy.sh port-forward`).
   if [[ ${#loop_pids[@]} -gt 0 ]]; then
     for p in "${loop_pids[@]}"; do
       if kill "$p" 2>/dev/null; then stopped=true; fi
-      pkill -P "$p" 2>/dev/null || true  # reap its kubectl child
+      pkill -P "$p" 2>/dev/null || true
     done
   fi
-  if pkill -f "$_PF_KUBECTL_PATTERN" 2>/dev/null; then stopped=true; fi
+  if pkill -f "$pattern" 2>/dev/null; then stopped=true; fi
 
-  rm -f "$_PF_PIDS_FILE"
-  $stopped && success "Port-forwards stopped." || info "No port-forwards were running."
+  # The PID file is last-deploy-run only; remove it (best effort) so it doesn't go stale.
+  rm -f "$_PF_PIDS_FILE" 2>/dev/null || true
+  $stopped && success "Port-forwards stopped." || info "No port-forwards were running for $NAMESPACE."
 }
 
 SOFT=false
 PF_ONLY=false
-case "${1:-}" in
-  --soft) SOFT=true ;;
-  --pf)   PF_ONLY=true ;;
-esac
+WITH_SHARED=false
+for arg in "$@"; do
+  case "$arg" in
+    --soft) SOFT=true ;;
+    --pf)   PF_ONLY=true ;;
+    --with-shared-operators) WITH_SHARED=true ;;
+    -*)     warn "Unknown flag: $arg" ;;
+    *)      RELEASE_NAME="$arg" ;;  # positional: the release to remove
+  esac
+done
 
-# Port-forward-only mode changes no cluster state, so it runs immediately
-# without the teardown confirmation prompt.
+resolve_instance
+
+# Port-forward-only mode changes no cluster state — run immediately, no prompt.
 if $PF_ONLY; then
-  info "Stopping all Meridian port-forwards (no cluster changes)..."
+  info "Stopping port-forwards for $NAMESPACE (no cluster changes)..."
   stop_port_forwards
   exit 0
 fi
 
 if $SOFT; then
-  warn "Soft teardown: port-forwards will be stopped and the Helm release will"
-  warn "be uninstalled, but namespaces and PVCs are preserved."
+  warn "Soft teardown of '$RELEASE_NAME': port-forwards stopped and the Helm release"
+  warn "uninstalled (its Dynatrace objects are deprovisioned), but namespace + PVCs kept."
 else
-  warn "Full teardown: port-forwards, Helm release, ALL persistent data"
-  warn "(PostgreSQL PVCs, Kafka PVCs), and namespaces will be permanently deleted."
+  warn "Full teardown of instance '$RELEASE_NAME': port-forwards, Helm release, its"
+  warn "Dynatrace pipeline/flows/routing, DynaKube, ALL its persistent data (PVCs), and"
+  warn "its namespace '$NAMESPACE' will be permanently deleted."
+fi
+if $WITH_SHARED; then
+  warn ""
+  warn "PLUS --with-shared-operators: the SHARED CloudNativePG, Strimzi, and Dynatrace"
+  warn "operators, their namespaces, and the CNPG CRDs will ALSO be removed. This BREAKS"
+  warn "every OTHER Meridian instance on this cluster — only proceed if none remain."
 fi
 
 read -rp "Continue? [y/N] " confirm
 [[ "${confirm:-N}" =~ ^[Yy]$ ]] || { info "Aborted."; exit 0; }
 
 # ---------------------------------------------------------------------------
-# 1. Kill port-forwards (loops + orphans — see stop_port_forwards above)
+# 1. Stop this instance's port-forwards.
 # ---------------------------------------------------------------------------
 info "Stopping port-forwards..."
 stop_port_forwards
 
 # ---------------------------------------------------------------------------
-# 1b. (Full teardown only) Delete operator-managed CRs BEFORE uninstalling the
-#     operators.
-#     The CNPG Cluster (created as a post-install hook with
-#     hook-delete-policy: hook-failed, so 'helm uninstall' leaves it behind)
-#     and the Strimzi Kafka CRs carry finalizers (e.g. cnpg.io/cluster) that
-#     ONLY their operators can clear. 'helm uninstall' removes those operators.
-#     If the CRs are still present when that happens, their finalizers can
-#     never be processed: the CRs hang in Terminating, the postgres pod is
-#     left 'Completed', and the whole namespace is stuck Terminating forever
-#     (this was the teardown bug).
-#     So while the operators are still running, delete the CRs and give them a
-#     bounded window to finalize cleanly. If that window elapses — e.g. the
-#     operator is already gone from a previous half-finished teardown — strip
-#     the finalizers directly so an already-stuck namespace can recover.
+# 1b. (Full teardown) Delete operator-managed CRs in THIS namespace BEFORE helm
+#     uninstall. The CNPG Cluster + Strimzi Kafka CRs carry finalizers only their
+#     operators can clear. The operators are now SHARED and stay running, so they
+#     finalize cleanly; we still delete the CRs first (and strip finalizers if the
+#     bounded window elapses) so the namespace never hangs in Terminating.
 # ---------------------------------------------------------------------------
 if ! $SOFT; then
   delete_operator_crs() {  # <fully-qualified resource type> <human label>
     local kind="$1" label="$2" existing res
-    # -o name returns nothing (and errors) when the CRD/operator is already
-    # gone; treat that as "nothing to do".
     existing="$(kubectl get "$kind" -n "$NAMESPACE" -o name 2>/dev/null)" || true
     [[ -z "$existing" ]] && return 0
-    info "Deleting $label before operator removal (lets finalizers clear cleanly)..."
+    info "Deleting $label before namespace removal (lets finalizers clear cleanly)..."
     if kubectl delete "$kind" --all -n "$NAMESPACE" --timeout=120s 2>/dev/null; then
       success "$label deleted."
     else
@@ -159,122 +179,113 @@ if ! $SOFT; then
         kubectl patch "$res" -n "$NAMESPACE" --type=merge \
           -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
       done
-      # Reap any leftover completed/succeeded pods the operator can no longer collect.
       kubectl delete pods --all -n "$NAMESPACE" \
         --field-selector=status.phase=Succeeded --force --grace-period=0 2>/dev/null || true
     fi
   }
 
-  delete_operator_crs "clusters.postgresql.cnpg.io"   "CNPG PostgreSQL cluster(s)"
-  delete_operator_crs "kafkatopics.kafka.strimzi.io"  "Strimzi Kafka topic(s)"
-  delete_operator_crs "kafkas.kafka.strimzi.io"       "Strimzi Kafka cluster(s)"
+  delete_operator_crs "clusters.postgresql.cnpg.io"     "CNPG PostgreSQL cluster(s)"
+  delete_operator_crs "kafkatopics.kafka.strimzi.io"    "Strimzi Kafka topic(s)"
+  delete_operator_crs "kafkas.kafka.strimzi.io"         "Strimzi Kafka cluster(s)"
   delete_operator_crs "kafkanodepools.kafka.strimzi.io" "Strimzi Kafka node pool(s)"
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Helm uninstall
+# 2. Helm uninstall. The chart's pre-delete hook Job runs first and removes THIS
+#    instance's Dynatrace pipeline, routing entry, and 5 Business Flows from the
+#    shared tenant (other instances' objects are untouched).
 # ---------------------------------------------------------------------------
 if helm status "$RELEASE_NAME" -n "$NAMESPACE" &>/dev/null; then
-  info "Uninstalling Helm release: $RELEASE_NAME..."
+  info "Uninstalling Helm release: $RELEASE_NAME (deprovisions its Dynatrace objects)..."
   helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --timeout 5m
   success "Helm release removed."
 else
   warn "Helm release '$RELEASE_NAME' not found in namespace '$NAMESPACE'. Skipping."
 fi
 
+# ---------------------------------------------------------------------------
+# 2b. Delete this instance's DynaKube from the SHARED dynatrace namespace. It is a
+#     post-install hook (delete-policy hook-failed), so `helm uninstall` leaves it
+#     behind. The shared Dynatrace Operator is still running and clears its
+#     finalizers, tearing down this instance's ActiveGate/injection only. Other
+#     instances' DynaKubes (named meridian-<their-hash>) are untouched.
+# ---------------------------------------------------------------------------
+if kubectl get dynakube "$RELEASE_NAME" -n "$DYNATRACE_NAMESPACE" &>/dev/null 2>&1; then
+  info "Deleting DynaKube '$RELEASE_NAME' from '$DYNATRACE_NAMESPACE'..."
+  kubectl delete dynakube "$RELEASE_NAME" -n "$DYNATRACE_NAMESPACE" --timeout=120s 2>/dev/null \
+    || warn "DynaKube deletion did not complete — check: kubectl get dynakube -n $DYNATRACE_NAMESPACE"
+fi
+# The per-instance token secret (<release>-dynatrace-tokens) is a regular release
+# resource, so helm uninstall already removed it; clean it up defensively in case
+# of a half-finished uninstall.
+kubectl delete secret "${RELEASE_NAME}-dynatrace-tokens" -n "$DYNATRACE_NAMESPACE" 2>/dev/null || true
+
 if $SOFT; then
-  success "Soft teardown complete."
+  success "Soft teardown of '$RELEASE_NAME' complete (Dynatrace objects deprovisioned)."
   exit 0
 fi
 
 # ---------------------------------------------------------------------------
-# 2b. Uninstall the Dynatrace Operator — it is its own Helm release in the
-#     dynatrace namespace (see scripts/deploy.sh), not part of the meridian
-#     release. Uninstall it before deleting the namespace so it can clean up
-#     its webhook configuration and finalizers, and so its cluster-scoped CRDs
-#     are removed rather than orphaned.
+# 3. Force-delete leftover pods, then PVCs, in THIS namespace before deleting it.
+#    CNPG/Strimzi PVCs are created outside Helm's ownership, so helm uninstall does
+#    not remove them; a leftover terminal pod keeps a pvc-protection finalizer that
+#    would hold the namespace in Terminating. Reap pods first, then PVCs.
 # ---------------------------------------------------------------------------
-if helm status dynatrace-operator -n "$DYNATRACE_NAMESPACE" &>/dev/null; then
-  info "Uninstalling Dynatrace Operator..."
-  helm uninstall dynatrace-operator -n "$DYNATRACE_NAMESPACE" --timeout 5m 2>/dev/null || true
-  success "Dynatrace Operator removed."
+if kubectl get namespace "$NAMESPACE" &>/dev/null 2>&1; then
+  pod_count=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$pod_count" -gt 0 ]]; then
+    info "Force-deleting $pod_count leftover pod(s) in namespace $NAMESPACE..."
+    kubectl delete pods --all -n "$NAMESPACE" --force --grace-period=0 2>/dev/null || true
+  fi
+  pvc_count=$(kubectl get pvc -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$pvc_count" -gt 0 ]]; then
+    info "Deleting $pvc_count PVC(s) in namespace $NAMESPACE..."
+    kubectl delete pvc --all -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
+  fi
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Force-delete leftover pods, then PVCs, before namespace deletion.
-#    CNPG and Strimzi operators create PVCs outside of Helm's ownership, so
-#    helm uninstall does not remove them.  Leaving them behind causes Flyway
-#    schema-history conflicts and Kafka offset conflicts on the next fresh
-#    install.  Namespace deletion normally cascades to PVCs, but we delete
-#    them explicitly first so the namespace is not held in Terminating state
-#    by PVC finalizers.
-#
-#    Pods must be reaped FIRST.  A pod left in a terminal (Completed) phase —
-#    e.g. the CNPG instance pod the operator shut down but didn't delete
-#    before 'helm uninstall' removed the operator — keeps the
-#    kubernetes.io/pvc-protection finalizer on its PVC.  That finalizer blocks
-#    PVC deletion AND holds the whole namespace in Terminating indefinitely
-#    (kubectl confirms: "pvc-protection in 1 resource instances").  Nothing
-#    else collects such a pod once its operator is gone, so we force-delete
-#    it; the PVC's finalizer then releases and both the PVC and the namespace
-#    can finish terminating.
+# 4. Delete THIS instance's namespace only (never the shared dynatrace namespace).
 # ---------------------------------------------------------------------------
-for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
-  if kubectl get namespace "$ns" &>/dev/null 2>&1; then
-    pod_count=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$pod_count" -gt 0 ]]; then
-      info "Force-deleting $pod_count leftover pod(s) in namespace $ns..."
-      kubectl delete pods --all -n "$ns" --force --grace-period=0 2>/dev/null || true
-    fi
-    pvc_count=$(kubectl get pvc -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$pvc_count" -gt 0 ]]; then
-      info "Deleting $pvc_count PVC(s) in namespace $ns..."
-      kubectl delete pvc --all -n "$ns" --timeout=60s 2>/dev/null || true
-    fi
-  fi
-done
-
-# ---------------------------------------------------------------------------
-# 4. Delete namespaces
-#    Submit with --wait=false so we don't block on CNPG/Strimzi CRD
-#    finalizers.  We then poll for up to 60 s; if the namespace is still
-#    terminating after that, we exit cleanly — 'deploy.sh install' already
-#    handles Terminating namespaces by waiting for them to clear.
-# ---------------------------------------------------------------------------
-for ns in "$NAMESPACE" "$DYNATRACE_NAMESPACE"; do
-  if kubectl get namespace "$ns" &>/dev/null 2>&1; then
-    info "Deleting namespace: $ns..."
-    kubectl delete namespace "$ns" --wait=false 2>/dev/null || true
-    # Poll briefly so a fast delete prints a clean success message.
-    if kubectl wait --for=delete namespace/"$ns" --timeout=60s 2>/dev/null; then
-      success "Namespace $ns deleted."
-    else
-      warn "Namespace $ns is still terminating (common with CNPG/Strimzi finalizers)."
-      warn "It will finish in the background.  If you re-deploy immediately,"
-      warn "'deploy.sh install' will wait for it to clear automatically."
-    fi
-  fi
-done
-
-# ---------------------------------------------------------------------------
-# 5. Remove the orphaned CNPG CRDs.
-#    The cloudnative-pg sub-chart ships its CRDs with
-#    helm.sh/resource-policy: keep, so 'helm uninstall' deliberately leaves
-#    every *.postgresql.cnpg.io CRD behind ("kept due to the resource policy").
-#    They are cluster-scoped — they don't block namespace deletion — but they
-#    accumulate across teardowns. The CNPG Cluster CR was already deleted in
-#    step 1b, so no custom resources remain and the CRDs delete immediately.
-# ---------------------------------------------------------------------------
-cnpg_crds="$(kubectl get crd -o name 2>/dev/null | grep '\.postgresql\.cnpg\.io$' || true)"
-if [[ -n "$cnpg_crds" ]]; then
-  info "Removing orphaned CNPG CRDs..."
-  # shellcheck disable=SC2086  # intentional word-splitting: one delete per CRD name
-  if kubectl delete $cnpg_crds --timeout=60s 2>/dev/null; then
-    success "CNPG CRDs removed."
+if kubectl get namespace "$NAMESPACE" &>/dev/null 2>&1; then
+  info "Deleting namespace: $NAMESPACE..."
+  kubectl delete namespace "$NAMESPACE" --wait=false 2>/dev/null || true
+  if kubectl wait --for=delete namespace/"$NAMESPACE" --timeout=60s 2>/dev/null; then
+    success "Namespace $NAMESPACE deleted."
   else
-    warn "Some CNPG CRDs did not delete — a lingering CNPG resource may still hold a finalizer."
-    warn "Check: kubectl get clusters.postgresql.cnpg.io -A"
+    warn "Namespace $NAMESPACE is still terminating (common with CNPG/Strimzi finalizers)."
+    warn "It will finish in the background; 'deploy.sh install' waits for a clearing namespace."
   fi
 fi
 
-success "Teardown complete."
+# ---------------------------------------------------------------------------
+# 5. (opt-in) Remove the SHARED operators + their namespaces + CNPG CRDs.
+#    DESTRUCTIVE to every other instance — only when none remain.
+# ---------------------------------------------------------------------------
+if $WITH_SHARED; then
+  remaining=$(helm list -A -q --filter '^meridian-' 2>/dev/null | grep -c . || true)
+  if [[ "$remaining" -gt 0 ]]; then
+    warn "$remaining Meridian instance(s) still present — refusing to remove shared operators."
+    warn "Tear those down first, then re-run with --with-shared-operators."
+  else
+    info "Removing shared operators (no Meridian instances remain)..."
+    helm uninstall "$STRIMZI_RELEASE" -n "$STRIMZI_NAMESPACE" --timeout 5m 2>/dev/null || true
+    helm uninstall "$CNPG_RELEASE" -n "$CNPG_NAMESPACE" --timeout 5m 2>/dev/null || true
+    if helm status dynatrace-operator -n "$DYNATRACE_NAMESPACE" &>/dev/null; then
+      helm uninstall dynatrace-operator -n "$DYNATRACE_NAMESPACE" --timeout 5m 2>/dev/null || true
+    fi
+    for ns in "$STRIMZI_NAMESPACE" "$CNPG_NAMESPACE" "$DYNATRACE_NAMESPACE"; do
+      kubectl delete namespace "$ns" --wait=false 2>/dev/null || true
+    done
+    # CNPG ships its CRDs with resource-policy: keep, so helm leaves them behind.
+    cnpg_crds="$(kubectl get crd -o name 2>/dev/null | grep '\.postgresql\.cnpg\.io$' || true)"
+    if [[ -n "$cnpg_crds" ]]; then
+      info "Removing CNPG CRDs..."
+      # shellcheck disable=SC2086
+      kubectl delete $cnpg_crds --timeout=60s 2>/dev/null || true
+    fi
+    success "Shared operators removed."
+  fi
+fi
+
+success "Teardown of '$RELEASE_NAME' complete."

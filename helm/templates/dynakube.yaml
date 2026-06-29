@@ -18,8 +18,8 @@ metadata:
 spec:
   apiUrl: {{ .Values.dynatrace.apiUrl | quote }}
 
-  # Reference to the secret containing the Dynatrace API token
-  tokens: meridian-dynatrace-tokens
+  # Reference to the (per-instance) secret containing the Dynatrace API token.
+  tokens: {{ include "meridian.dynatraceTokensSecret" . }}
 
   # applicationMonitoring: inject the OneAgent code module into pods in
   # namespaces labeled dynatrace.com/inject=true (see namespace.yaml), via the
@@ -33,7 +33,23 @@ spec:
   # On a real-host cluster you can switch this to cloudNativeFullStack (and add
   # an env block setting DT_DEPLOYMENT_ENVIRONMENT from .Values.dynatrace.deploymentEnvironment).
   oneAgent:
-    applicationMonitoring: {}
+    applicationMonitoring:
+      # MULTI-TENANCY: scope OneAgent code-module injection to THIS instance's
+      # namespace only. Multiple DynaKubes share the 'dynatrace' namespace; without
+      # a per-instance selector they would all try to inject into every namespace
+      # labeled dynatrace.com/inject=true, double-injecting and conflicting.
+      # kubernetes.io/metadata.name is the well-known label k8s stamps on every
+      # namespace, so this matches exactly one namespace: this instance's.
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ include "meridian.namespace" . }}
+
+  # Metadata enrichment (adds dt.* labels to pods) — likewise scoped to this
+  # instance's namespace so instances don't enrich each other's workloads.
+  metadataEnrichment:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ include "meridian.namespace" . }}
 
   # Kubernetes Log Module: captures container stdout/stderr into Grail Logs.
   # This is how the structured business-event JSON logs actually reach Dynatrace —
@@ -44,6 +60,16 @@ spec:
   # Requires the ActiveGate kubernetes-monitoring capability (below) + the token's
   # logs.ingest scope. The image tag MUST be pinned (no 'latest'); keep it roughly
   # in step with the OneAgent codeModules version.
+  #
+  # MULTI-TENANCY: the Log Module is a NODE-level singleton — the Dynatrace webhook
+  # rejects a second DynaKube that also runs it ("Only one Agent per node"). So it
+  # (and the ActiveGate) render only on the ONE cluster-monitoring owner instance
+  # (dynatrace.clusterMonitoring.enabled — set by scripts/deploy.sh). That single
+  # Log Module captures EVERY namespace's stdout, so all instances' business-event
+  # logs reach Grail; each instance's OpenPipeline routing then extracts only its
+  # own (matched by k8s.namespace.name). Non-owner instances do applicationMonitoring
+  # only and egress through this owner's ActiveGate (routing) / the tenant directly.
+  {{- if .Values.dynatrace.clusterMonitoring.enabled }}
   {{- if .Values.dynatrace.logMonitoring.enabled }}
   logMonitoring: {}
   templates:
@@ -53,7 +79,9 @@ spec:
         tag: {{ .Values.dynatrace.logMonitoring.image.tag | quote }}
   {{- end }}
 
-  # ActiveGate: required for Kubernetes monitoring and routing telemetry
+  # ActiveGate: Kubernetes monitoring + routing telemetry. One per cluster (lives on
+  # the clusterMonitoring owner); it monitors all namespaces and routes all instances'
+  # OneAgent traffic, so non-owner instances don't need their own.
   activeGate:
     capabilities:
       - routing
@@ -66,4 +94,5 @@ spec:
       limits:
         cpu: "1000m"
         memory: "1.5Gi"
+  {{- end }}
 {{- end }}

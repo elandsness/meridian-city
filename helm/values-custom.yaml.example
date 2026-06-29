@@ -11,8 +11,12 @@
 #   # Edit values-custom.yaml and fill in your credentials.
 #   # values-custom.yaml is git-ignored (it contains secrets).
 #
-# Deploy:
+# Deploy (generates a fresh per-instance hash → release & namespace meridian-<hash>):
 #   ./scripts/deploy.sh install -f helm/values-custom.yaml
+#
+# Multi-tenancy: a second concurrent install is just another `deploy.sh install`
+# (it gets a new hash); the cluster-singleton operators are installed once and
+# reused. Pin a hash with INSTANCE_HASH=<hash>. See docs/dynatrace-config-guide.md.
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -44,11 +48,16 @@ dynatrace:
   # e.g., abc12345 from https://abc12345.live.dynatrace.com
   environmentId: ""
 
-  # Deployment environment label (visible in Dynatrace entity properties)
+  # Deployment environment BASE label (visible in Dynatrace entity properties).
+  # The per-instance hash is appended automatically (e.g. "demo" -> "demo-a1b2"),
+  # so every concurrent install is filterable by a unique deployment.environment.
   deploymentEnvironment: "demo"
 
-  # Kubernetes cluster name (visible in Dynatrace k8s monitoring)
-  clusterName: "meridian-cluster"
+  # Kubernetes cluster name (visible in Dynatrace k8s monitoring). Leave EMPTY to
+  # derive per-instance as "<release>-cluster" (e.g. meridian-a1b2-cluster) so each
+  # install is a distinct cluster entity on the shared tenant. Pin a value only to
+  # deliberately share one cluster name across instances (not recommended).
+  clusterName: ""
 
   # Whether to deploy the Dynatrace Operator for OneAgent auto-instrumentation.
   # When enabled, the operator and a DynaKube CR are created in the 'dynatrace' namespace.

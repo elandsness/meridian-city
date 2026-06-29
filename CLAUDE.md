@@ -59,6 +59,33 @@ When adding/changing an endpoint, use the checklist in `docs/API_CONVENTIONS.md`
   `scripts/seed-data.sh`. Verify a rebuild took by checking the Vite bundle hash
   changed in the browser.
 
+## Multi-tenancy — READ BEFORE TOUCHING NAMES OR THE PROVISIONER
+
+Many SEs run **concurrent** installs on the **same** cluster and the **same**
+shared tenant (kyw96254). `scripts/deploy.sh install` generates a per-instance
+**hash** and bakes it into the Helm release name `meridian-<hash>`, which is the
+namespace and the single source of truth (`global.instanceHash`, fanned out via
+`helm/templates/_helpers.tpl`). Rules:
+
+- **Never hardcode `meridian-…` infra/observability identifiers.** Use the helpers
+  (`meridian.fullname`, `meridian.namespace`, `meridian.kafkaBootstrap`,
+  `meridian.dbRwService`, `meridian.appSecret`, `meridian.dynatraceTokensSecret`,
+  `meridian.dynatrace.{clusterName,deploymentEnvironment,eventProvider}`). App
+  workload names (`api-gateway`, `citizen-service`, …) stay plain — they're
+  namespace-isolated; only infra/identity names carry the hash.
+- **App user-facing branding stays "Meridian City"** — never hash anything an end
+  user sees (titles, store name, copy, logo).
+- **Cluster-singleton operators are SHARED** (installed once by deploy.sh:
+  CloudNativePG/`cnpg-system`, Strimzi/`strimzi-system` watchAnyNamespace, Dynatrace
+  Operator/`dynatrace`). They are NOT chart sub-charts. Per-instance releases create
+  only namespaced CRs. Teardown must never remove shared operators/CRDs/the
+  `dynatrace` namespace (only `teardown.sh --with-shared-operators` does, when none remain).
+- **The Dynatrace provisioner** (`helm/files/provision-dynatrace-business-config.py`)
+  is per-instance (provider/pipeline/flows/routing keyed by hash + namespace) and has
+  a `DT_ACTION=delete` path run by a pre-delete hook so `helm uninstall` removes only
+  that instance's tenant objects. The shared `…logs.routing` object is merged, never
+  overwritten. See `docs/dynatrace-config-guide.md` §3.5.
+
 ## Working agreements
 
 - PRs are created via the GitHub web UI — do not run `gh pr create`. Push a fresh

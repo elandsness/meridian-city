@@ -20,6 +20,12 @@
 set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-meridian}"
+# Per-instance: the release name doubles as the namespace (meridian-<hash>), and the
+# CloudNativePG cluster is named <release>-db. deploy.sh passes RELEASE_NAME+NAMESPACE;
+# standalone, RELEASE_NAME falls back to NAMESPACE so a single export is enough.
+RELEASE_NAME="${RELEASE_NAME:-$NAMESPACE}"
+CNPG_CLUSTER="${CNPG_CLUSTER:-${RELEASE_NAME}-db}"
+# The database name itself is NOT hashed — it is isolated per cluster/namespace.
 PG_DB="${PG_DB:-meridian}"
 # CNPG's pg_hba.conf uses peer auth on the Unix socket, which requires the
 # OS user to match the PG user.  The container runs as OS user "postgres", so
@@ -56,7 +62,7 @@ done
 # ---------------------------------------------------------------------------
 if [[ -z "$DB_POD" ]]; then
   DB_POD=$(kubectl get pods -n "$NAMESPACE" \
-    -l "cnpg.io/cluster=meridian-db" \
+    -l "cnpg.io/cluster=${CNPG_CLUSTER}" \
     --field-selector=status.phase=Running \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 fi

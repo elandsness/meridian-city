@@ -71,19 +71,25 @@ A post-install/post-upgrade Helm hook Job runs
 (modern platform endpoint). It is **idempotent** (match-by-name/customId →
 update in place) and creates:
 
-1. **OpenPipeline pipeline** `Meridian City — Business Events`
-   (`builtin:openpipeline.logs.pipelines`, customId `meridian-business-events`):
+1. **OpenPipeline pipeline** `Meridian City — Business Events (<hash>)`
+   (`builtin:openpipeline.logs.pipelines`, customId `meridian-<hash>-business-events`):
    - a `dql` processor parses `content` as JSON and surfaces the correlation
      fields plus `meridian.event_type` (the business `event.type` is otherwise
      shadowed by Grail's reserved `event.type`, which is always `LOG`);
-   - a `bizevent` processor emits a bizevent with `event.provider = meridian.city`,
+   - a `bizevent` processor emits a bizevent with `event.provider = meridian-<hash>.city`,
      `event.type` from `meridian.event_type`, and `includeAll` field extraction.
 2. **A logs routing entry** (merged into the single
    `builtin:openpipeline.logs.routing` object — never overwritten) sending
-   `k8s.namespace.name == "meridian"` + `BusinessEvents` logger lines into that
-   pipeline.
-3. **Five Business Flows** (`app:dynatrace.biz.flow:biz-flow-settings`), one per
-   process, each correlated on a single id (see table below).
+   `k8s.namespace.name == "meridian-<hash>"` + `BusinessEvents` logger lines into
+   that pipeline. The matcher keys on **this instance's** namespace, so it only
+   routes this instance's logs.
+3. **Five Business Flows** (`app:dynatrace.biz.flow:biz-flow-settings`), titled
+   `[Meridian <hash>] …`, one per process, each correlated on a single id (table below).
+
+> **`<hash>` is the per-instance hash** (e.g. `a1b2`) that `scripts/deploy.sh`
+> generates — see §3.5. For a legacy single-instance install (release named
+> exactly `meridian`, no hash) the names fall back to `meridian-business-events`,
+> provider `meridian.city`, prefix `[Meridian] `, namespace `meridian`.
 
 ### 3.2 Enable it
 
@@ -95,7 +101,7 @@ dynatrace:
     enabled: true
     appsBaseUrl: ""          # defaults to https://<environmentId>.apps.dynatrace.com
     platformToken: ""        # REQUIRED — dt0s16... platform token (see scopes below)
-    eventProvider: "meridian.city"
+    eventProvider: ""        # empty -> derived per-instance as meridian-<hash>.city
 ```
 
 The Job renders only when a **platform token** is present (so it's a no-op until
@@ -160,6 +166,51 @@ type is therefore just: emit it from the service (gated) + list it on the step i
 > (some flows are scheduler-driven and land minutes later — see each scenario's
 > description), then open the flow in Dynatrace to show the error branch and the
 > conversion drop-off. Reset from the panel ("Reset All") when done.
+
+### 3.5 Multi-instance on a shared tenant
+
+Several SEs can run **concurrent** Meridian installs against the **same** tenant
+(and the same cluster) without colliding. `scripts/deploy.sh install` generates a
+short **per-instance hash** (e.g. `a1b2`) and threads it through every infra and
+observability identifier:
+
+| Dimension | Per-instance value |
+|---|---|
+| k8s namespace / Helm release | `meridian-<hash>` |
+| Kafka / Postgres clusters, Secrets, DynaKube | `meridian-<hash>-*` |
+| `k8s.cluster.name` | `meridian-<hash>-cluster` |
+| `deployment.environment` | `<base>-<hash>` (e.g. `demo-a1b2`) |
+| bizevent provider | `meridian-<hash>.city` |
+| OpenPipeline pipeline | customId `meridian-<hash>-business-events` |
+| Business Flow titles | `[Meridian <hash>] …` |
+| logs routing matcher | `k8s.namespace.name == "meridian-<hash>"` |
+
+So in Dynatrace each instance is fully filterable by namespace, cluster,
+`deployment.environment`, or bizevent provider, and its OpenPipeline pipeline +
+five Business Flows are distinct objects. The **only shared Settings object** is
+`builtin:openpipeline.logs.routing` (a tenant singleton) — each instance merges in
+exactly one routing entry keyed by its own pipeline name and never overwrites
+others'. `helm uninstall` (and `scripts/teardown.sh`) runs a **pre-delete hook**
+that removes only that instance's pipeline, routing entry, and flows.
+
+**Cluster-singleton operators are shared, not per-instance:** CloudNativePG,
+Strimzi (with `watchAnyNamespace=true`), and the Dynatrace Operator are installed
+**once** by `deploy.sh` and reconcile every instance's namespaced CRs. Tearing down
+one instance never touches them; remove them only when no instances remain
+(`teardown.sh --with-shared-operators`).
+
+**Caveats (where per-instance isolation is partial):**
+- **OneAgent-detected service names** (Java/Node services) share a base display
+  name across instances (e.g. `citizen-service`) because OneAgent — not
+  `OTEL_SERVICE_NAME` — names them. They are still distinct entities, filterable
+  by the per-instance namespace / `k8s.cluster.name` / `deployment.environment`.
+  OTel-SDK services (Python `analytics`/`ai`/`telemetry`) *do* carry the hash in
+  `service.name` (e.g. `analytics-service-a1b2`).
+- **RUM application identity** is defined by the snippet/web-app you paste, not by
+  the chart. For per-instance RUM, register a separate Dynatrace web application
+  per instance and paste its snippet into that instance's values.
+- **`localhost` port-forwards** can only serve one instance at a time (ports
+  collide). For concurrent instances use the per-instance `LoadBalancer` IPs.
 
 ---
 

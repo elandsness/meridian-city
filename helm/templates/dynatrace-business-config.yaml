@@ -1,11 +1,15 @@
 {{- /*
-Auto-provisions the Dynatrace business-observability configuration on deploy:
-  - an OpenPipeline custom logs pipeline that extracts the BusinessEvents JSON
-    log lines as bizevents (provider=meridian.city), and a routing entry for it
-  - five Business Flows (one per /analytics business process)
-Runs as a post-install/post-upgrade hook Job that calls the Settings API
-(modern platform endpoint) with a platform token. The provisioner is idempotent.
-Renders only when enabled AND a platform token + apps base URL are available.
+Auto-provisions (and, on uninstall, deprovisions) the Dynatrace business-observability
+configuration for THIS instance:
+  - an OpenPipeline custom logs pipeline (customId meridian-<hash>-business-events) that
+    extracts the BusinessEvents JSON log lines as bizevents (per-instance provider), and
+    a routing entry for it keyed on this instance's k8s namespace
+  - five Business Flows titled "[Meridian <hash>] ..."
+Runs as a post-install/post-upgrade hook Job (DT_ACTION=provision). A separate pre-delete
+hook Job (DT_ACTION=delete) removes ONLY this instance's objects on `helm uninstall`, so
+concurrent instances on the shared tenant are never affected. The provisioner is idempotent
+and matches objects by a stable per-instance key. Renders only when enabled AND a platform
+token + apps base URL are available.
 */}}
 {{- $bc := .Values.dynatrace.businessConfig }}
 {{- $appsUrl := $bc.appsBaseUrl }}
@@ -13,11 +17,20 @@ Renders only when enabled AND a platform token + apps base URL are available.
 {{- $appsUrl = printf "https://%s.apps.dynatrace.com" .Values.dynatrace.environmentId }}
 {{- end }}
 {{- if and $bc.enabled $bc.platformToken $appsUrl }}
+{{- $ns := include "meridian.namespace" . }}
+{{- $provider := include "meridian.dynatrace.eventProvider" . }}
+{{- $hash := include "meridian.instanceHash" . }}
+{{- $provName := printf "%s-dt-business-config" (include "meridian.fullname" .) }}
+{{- $deprovName := printf "%s-dt-deprovision" (include "meridian.fullname" .) }}
+{{- $image := $bc.image | default "python:3.12-slim" }}
+# =========================================================================== #
+# PROVISION — post-install / post-upgrade
+# =========================================================================== #
 apiVersion: v1
 kind: Secret
 metadata:
-  name: meridian-dt-business-config
-  namespace: {{ include "meridian.namespace" . }}
+  name: {{ $provName }}
+  namespace: {{ $ns }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
@@ -31,8 +44,8 @@ stringData:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: meridian-dt-business-config
-  namespace: {{ include "meridian.namespace" . }}
+  name: {{ $provName }}
+  namespace: {{ $ns }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
@@ -46,13 +59,13 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: meridian-dt-business-config
-  namespace: {{ include "meridian.namespace" . }}
+  name: {{ $provName }}
+  namespace: {{ $ns }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
-    # Runs after wait-for-operators (weight 0-1); only talks to the Dynatrace API.
+    # Only talks to the Dynatrace API; no in-cluster operator dependency.
     "helm.sh/hook-weight": "5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
@@ -66,20 +79,24 @@ spec:
       restartPolicy: Never
       containers:
         - name: provision
-          image: {{ $bc.image | default "python:3.12-slim" | quote }}
+          image: {{ $image | quote }}
           command: ["python3", "/scripts/provision.py"]
           env:
+            - name: DT_ACTION
+              value: "provision"
             - name: DT_APPS_URL
               value: {{ $appsUrl | quote }}
             - name: DT_PLATFORM_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: meridian-dt-business-config
+                  name: {{ $provName }}
                   key: platform-token
             - name: DT_EVENT_PROVIDER
-              value: {{ $bc.eventProvider | default "meridian.city" | quote }}
+              value: {{ $provider | quote }}
             - name: DT_LOG_NAMESPACE
-              value: {{ include "meridian.namespace" . | quote }}
+              value: {{ $ns | quote }}
+            - name: DT_INSTANCE_HASH
+              value: {{ $hash | quote }}
           volumeMounts:
             - name: scripts
               mountPath: /scripts
@@ -87,5 +104,94 @@ spec:
       volumes:
         - name: scripts
           configMap:
-            name: meridian-dt-business-config
+            name: {{ $provName }}
+---
+# =========================================================================== #
+# DEPROVISION — pre-delete (runs on `helm uninstall`)
+# Removes ONLY this instance's pipeline, routing entry, and flows. Best-effort:
+# the container exits 0 even on failure so a tenant-API hiccup can never wedge
+# `helm uninstall` (any orphans can be cleaned by re-running provision.py with
+# DT_ACTION=delete). Its own Secret/ConfigMap are rendered fresh at uninstall
+# time because the provision set's hooks are deleted after they succeed.
+# =========================================================================== #
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $deprovName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+type: Opaque
+stringData:
+  platform-token: {{ $bc.platformToken | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $deprovName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+data:
+  provision.py: |
+{{ .Files.Get "files/provision-dynatrace-business-config.py" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $deprovName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  ttlSecondsAfterFinished: 120
+  backoffLimit: 1
+  activeDeadlineSeconds: 180
+  template:
+    metadata:
+      labels:
+        {{- include "meridian.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: deprovision
+          image: {{ $image | quote }}
+          # Best-effort: never fail the uninstall on a tenant-API error.
+          command: ["sh", "-c", "python3 /scripts/provision.py || echo '[deprovision] non-fatal failure; orphans may remain'"]
+          env:
+            - name: DT_ACTION
+              value: "delete"
+            - name: DT_APPS_URL
+              value: {{ $appsUrl | quote }}
+            - name: DT_PLATFORM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $deprovName }}
+                  key: platform-token
+            - name: DT_EVENT_PROVIDER
+              value: {{ $provider | quote }}
+            - name: DT_LOG_NAMESPACE
+              value: {{ $ns | quote }}
+            - name: DT_INSTANCE_HASH
+              value: {{ $hash | quote }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ $deprovName }}
 {{- end }}

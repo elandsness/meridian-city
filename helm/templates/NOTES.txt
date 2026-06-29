@@ -3,14 +3,18 @@
 ╚══════════════════════════════════════════════════════════════════════════╝
 
 Release:   {{ .Release.Name }}
-Namespace: {{ .Values.global.namespace }}
+Namespace: {{ include "meridian.namespace" . }}
+{{- $hash := include "meridian.instanceHash" . }}
+{{- if $hash }}
+Instance:  {{ $hash }}   (per-instance hash — this install is isolated from other Meridian instances)
+{{- end }}
 Version:   {{ .Values.global.imageTag }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CHECKING DEPLOYMENT STATUS:
 
-  kubectl get pods -n {{ .Values.global.namespace }}
+  kubectl get pods -n {{ include "meridian.namespace" . }}
 
 Wait for all pods to reach Running/Ready state (~2-3 minutes for first deploy).
 
@@ -25,15 +29,15 @@ ACCESSING THE APPLICATION:
   To access the UIs via port-forward (local development):
 
   Public Portal:
-    kubectl port-forward svc/public-portal 8080:80 -n {{ .Values.global.namespace }}
+    kubectl port-forward svc/public-portal 8080:80 -n {{ include "meridian.namespace" . }}
     → open http://localhost:8080
 
   Ops Dashboard (login: {{ .Values.auth.username }} / {{ .Values.auth.password }}):
-    kubectl port-forward svc/ops-dashboard 8081:80 -n {{ .Values.global.namespace }}
+    kubectl port-forward svc/ops-dashboard 8081:80 -n {{ include "meridian.namespace" . }}
     → open http://localhost:8081
 
   API Gateway:
-    kubectl port-forward svc/api-gateway 3000:3000 -n {{ .Values.global.namespace }}
+    kubectl port-forward svc/api-gateway 3000:3000 -n {{ include "meridian.namespace" . }}
     → curl http://localhost:3000/health
 {{- end }}
 
@@ -42,16 +46,25 @@ ACCESSING THE APPLICATION:
 DYNATRACE CONFIGURATION:
 
 {{- if .Values.dynatrace.apiUrl }}
-  Tenant:   {{ .Values.dynatrace.apiUrl }}
-  Env ID:   {{ .Values.dynatrace.environmentId }}
+  Tenant:        {{ .Values.dynatrace.apiUrl }}
+  Env ID:        {{ .Values.dynatrace.environmentId }}
+  Cluster name:  {{ include "meridian.dynatrace.clusterName" . }}
+  Environment:   {{ include "meridian.dynatrace.deploymentEnvironment" . }}
+  Event provider:{{ "" }} {{ include "meridian.dynatrace.eventProvider" . }}
+
+  This instance is distinguishable on the SHARED tenant by ANY of:
+    • k8s namespace      = {{ include "meridian.namespace" . }}
+    • k8s.cluster.name   = {{ include "meridian.dynatrace.clusterName" . }}
+    • deployment.environment = {{ include "meridian.dynatrace.deploymentEnvironment" . }}
+    • bizevent provider  = {{ include "meridian.dynatrace.eventProvider" . }}
 
   After pods start, verify OneAgent injection:
-    kubectl describe pod -n {{ .Values.global.namespace }} -l app.kubernetes.io/name=citizen-service \
+    kubectl describe pod -n {{ include "meridian.namespace" . }} -l app.kubernetes.io/name=citizen-service \
       | grep -A5 "Init Containers"
 
   Verify OTel data:
     In Dynatrace → Observe and Explore → Distributed Traces
-    Filter: Service = "iot-ingestion" or "ai-service"
+    Filter by deployment.environment = "{{ include "meridian.dynatrace.deploymentEnvironment" . }}"
 {{- else }}
   ⚠  dynatrace.apiUrl is not set — Dynatrace integration is inactive.
      Set this value and run `helm upgrade` to enable observability.

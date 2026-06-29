@@ -1,6 +1,7 @@
 {{- if and .Values.logCollector.enabled .Values.dynatrace.otlpEndpoint }}
+{{- $lc := printf "%s-log-collector" (include "meridian.fullname" .) -}}
 # ---------------------------------------------------------------------------
-# Meridian log collector (DaemonSet)
+# Meridian log collector (DaemonSet)  — OPT-IN, default OFF
 #
 # WHY: the DynaKube runs OneAgent in applicationMonitoring mode (no host
 # OneAgent DaemonSet — it crash-loops on kind), so nothing tails container
@@ -11,22 +12,26 @@
 # services never arrive, so the log-based Business Event funnels cannot populate.
 #
 # This is a small, self-contained otel-collector-contrib DaemonSet that tails the
-# meridian namespace's pod logs off each node's filesystem and ships them to
+# instance namespace's pod logs off each node's filesystem and ships them to
 # Dynatrace via OTLP/HTTP. It is intentionally SEPARATE from the trace/metric
 # collector (helm/templates/otel-configmap.yaml) so it cannot affect that
 # pipeline. The `container` operator extracts k8s.namespace.name / pod / container
 # from the file path, so these logs become scopable by namespace in Grail (the
 # OTLP-exported spans carry k8s.cluster.name but logs previously had neither).
 #
+# MULTI-TENANCY: a node-level DaemonSet is shared hardware, so two instances each
+# running their own log-collector both tail /var/log/pods and filter to THEIR OWN
+# namespace's pods (the filelog `include` path is per-instance). Names are
+# prefixed with the instance (meridian-<hash>-log-collector) so they don't collide.
+#
 # NOTE: getting the logs into Grail is necessary but not sufficient for the
-# funnels — a Dynatrace log-processing rule (extract event.type + correlation
-# keys from the JSON) and the Business Events / Business Flow config still have to
-# be applied in the tenant. See docs/dynatrace-config-guide.md.
+# funnels — the OpenPipeline extraction + Business Flow config still have to be
+# applied in the tenant (see helm/templates/dynatrace-business-config.yaml).
 # ---------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: meridian-log-collector-config
+  name: {{ $lc }}-config
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -38,7 +43,7 @@ data:
         endpoint: "0.0.0.0:13133"
 
     receivers:
-      # Tail the meridian namespace's container logs from the node filesystem.
+      # Tail this instance namespace's container logs from the node filesystem.
       # The `container` operator auto-detects the CRI/containerd format and adds
       # k8s.namespace.name / k8s.pod.name / k8s.container.name from the file path.
       filelog:
@@ -46,7 +51,7 @@ data:
           - /var/log/pods/{{ include "meridian.namespace" . }}_*/*/*.log
         exclude:
           # Never tail our own logs — would create an ingest feedback loop.
-          - /var/log/pods/{{ include "meridian.namespace" . }}_meridian-log-collector-*/*/*.log
+          - /var/log/pods/{{ include "meridian.namespace" . }}_{{ $lc }}-*/*/*.log
         start_at: end
         include_file_path: true
         operators:
@@ -65,14 +70,14 @@ data:
         send_batch_max_size: 2048
 
       # Match the resource attributes the trace/metric collector applies, so logs
-      # land scoped to the same cluster/environment as the spans.
+      # land scoped to the same (per-instance) cluster/environment as the spans.
       resource:
         attributes:
           - key: deployment.environment
-            value: "{{ .Values.dynatrace.deploymentEnvironment }}"
+            value: "{{ include "meridian.dynatrace.deploymentEnvironment" . }}"
             action: upsert
           - key: k8s.cluster.name
-            value: "{{ .Values.dynatrace.clusterName }}"
+            value: "{{ include "meridian.dynatrace.clusterName" . }}"
             action: upsert
 
     exporters:
@@ -103,7 +108,7 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: meridian-log-collector
+  name: {{ $lc }}
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -111,18 +116,18 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: meridian-log-collector
+      app: {{ $lc }}
   template:
     metadata:
       labels:
-        app: meridian-log-collector
+        app: {{ $lc }}
         {{- include "meridian.labels" . | nindent 8 }}
         app.kubernetes.io/component: log-collector
       annotations:
         # This collector exports logs to Dynatrace itself — no OneAgent injection.
         dynatrace.com/inject: "false"
         # Roll the DaemonSet when the inputs that drive its config change.
-        checksum/config: {{ printf "%s|%s|%s|%s" .Values.dynatrace.otlpEndpoint .Values.dynatrace.clusterName .Values.dynatrace.deploymentEnvironment (.Values.logCollector | toYaml) | sha256sum }}
+        checksum/config: {{ printf "%s|%s|%s|%s" .Values.dynatrace.otlpEndpoint (include "meridian.dynatrace.clusterName" .) (include "meridian.dynatrace.deploymentEnvironment" .) (.Values.logCollector | toYaml) | sha256sum }}
     spec:
       # Run on every node, tolerating any taint (e.g. kind's control-plane node).
       tolerations:
@@ -156,7 +161,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: meridian-log-collector-config
+            name: {{ $lc }}-config
         - name: varlogpods
           hostPath:
             path: /var/log/pods

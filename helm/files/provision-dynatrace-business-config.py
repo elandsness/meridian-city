@@ -1,24 +1,41 @@
 #!/usr/bin/env python3
-"""Provision Meridian City Dynatrace business-observability config.
+"""Provision (or deprovision) Meridian City Dynatrace business-observability config.
 
-Creates (idempotently, safe to re-run on every deploy):
-  1. An OpenPipeline custom logs pipeline that parses the `BusinessEvents` JSON
-     log lines and extracts them as business events (`event.provider = meridian.city`,
+MULTI-TENANCY: every object this script creates is PER-INSTANCE so that many SEs
+can run concurrent Meridian installs against the SAME shared tenant without
+colliding. The per-instance hash (DT_INSTANCE_HASH, e.g. "a1b2") is folded into
+the bizevent provider, the OpenPipeline customId/displayName, the Business Flow
+title prefix, and the routing matcher (which keys on the instance's k8s namespace).
+
+Provision (DT_ACTION=provision, the default) creates idempotently — safe to re-run
+on every deploy:
+  1. An OpenPipeline custom logs pipeline (customId = meridian-<hash>-business-events)
+     that parses the `BusinessEvents` JSON log lines and extracts them as business
+     events (`event.provider` = the per-instance provider, e.g. meridian-a1b2.city,
      `event.type` = the business event type) with all correlation fields carried over.
-  2. A routing entry that sends Meridian `BusinessEvents` logs into that pipeline
-     (merged into the single shared logs-routing object — never overwritten).
-  3. Five Business Flows (one per /analytics business process) wired to the
-     extracted bizevents on a single correlation id each.
+  2. A routing entry that sends THIS instance's `BusinessEvents` logs (matched by
+     k8s.namespace.name) into that pipeline — merged into the single shared
+     logs-routing object, keyed by this instance's pipeline name so concurrent
+     instances each own exactly one entry and never overwrite each other's.
+  3. Five Business Flows (one per /analytics business process), titled
+     "[Meridian <hash>] ...", wired to the extracted bizevents on one correlation id.
+
+Deprovision (DT_ACTION=delete) removes ONLY this instance's objects — its pipeline,
+its routing entry, and its five flows — leaving every other instance's objects (and
+the shared routing object itself) intact. Used by the chart's pre-delete hook on
+`helm uninstall` / scripts/teardown.sh.
 
 Targets the Dynatrace Settings API via the modern platform endpoint with a
-platform token. Matches existing objects by a stable key so re-runs update in
-place rather than duplicating.
+platform token. Matches existing objects by a stable per-instance key so re-runs
+update in place rather than duplicating.
 
 Env:
   DT_APPS_URL         e.g. https://<env>.apps.dynatrace.com   (required)
   DT_PLATFORM_TOKEN   dt0s16... with settings:objects:read/write, settings:schemas:read (required)
-  DT_EVENT_PROVIDER   bizevent provider name (default: meridian.city)
+  DT_EVENT_PROVIDER   per-instance bizevent provider (default: derived from hash)
   DT_LOG_NAMESPACE    k8s namespace the services run in (default: meridian)
+  DT_INSTANCE_HASH    short per-instance hash, e.g. "a1b2" (default: "" = legacy single-instance)
+  DT_ACTION           provision | delete   (default: provision)
 """
 import json
 import os
@@ -29,21 +46,35 @@ import uuid
 
 APPS = os.environ["DT_APPS_URL"].rstrip("/")
 TOKEN = os.environ["DT_PLATFORM_TOKEN"]
-PROVIDER = os.environ.get("DT_EVENT_PROVIDER", "meridian.city")
 NAMESPACE = os.environ.get("DT_LOG_NAMESPACE", "meridian")
+HASH = os.environ.get("DT_INSTANCE_HASH", "").strip()
+ACTION = os.environ.get("DT_ACTION", "provision").strip().lower()
 BASE = APPS + "/platform/classic/environment-api/v2/settings"
 
-# Shared-tenant marker: all Business Flow titles are prefixed so Meridian's flows
-# are distinguishable from other teams' on the same Dynatrace tenant.
-FLOW_TITLE_PREFIX = "[Meridian] "
-PIPE_CUSTOM_ID = "meridian-business-events"
-PIPE_NAME = "Meridian City — Business Events"
+# Per-instance identity. With a hash, every name carries it so concurrent installs
+# on the shared tenant stay isolated; without one we keep the legacy single-instance
+# names (backwards compatible).
+PROVIDER = os.environ.get("DT_EVENT_PROVIDER") or (
+    "meridian-%s.city" % HASH if HASH else "meridian.city")
+if HASH:
+    FLOW_TITLE_PREFIX = "[Meridian %s] " % HASH
+    PIPE_CUSTOM_ID = "meridian-%s-business-events" % HASH
+    PIPE_NAME = "Meridian City — Business Events (%s)" % HASH
+else:
+    # Shared-tenant marker even in the legacy case: flow titles are prefixed so
+    # Meridian's flows are distinguishable from other teams' on the same tenant.
+    FLOW_TITLE_PREFIX = "[Meridian] "
+    PIPE_CUSTOM_ID = "meridian-business-events"
+    PIPE_NAME = "Meridian City — Business Events"
+
 PIPELINE_SCHEMA = "builtin:openpipeline.logs.pipelines"
 ROUTING_SCHEMA = "builtin:openpipeline.logs.routing"
 FLOW_SCHEMA = "app:dynatrace.biz.flow:biz-flow-settings"
 
 # Stable namespace for deterministic step UUIDs (so re-runs produce identical ids).
+# The hash is folded into the seed so two instances' flow objects never share step ids.
 _NS = uuid.UUID("a1b2c3d4-e5f6-4000-8000-000000000001")
+_SEED_PREFIX = (HASH + "/") if HASH else ""
 
 
 def api(method, path, body=None):
@@ -69,6 +100,14 @@ def list_objects(schema):
     if status != 200:
         sys.exit("FATAL: list %s failed: %s %s" % (schema, status, body))
     return body.get("items", [])
+
+
+def delete_object(schema, oid):
+    status, body = api("DELETE", "/objects/" + oid)
+    # 200/204 = deleted; 404 = already gone (idempotent). Anything else is fatal.
+    if status not in (200, 204, 404):
+        sys.exit("FATAL: delete %s %s failed: %s %s" % (schema.split(":")[-1], oid, status, body))
+    print("  deleted: %s -> %s" % (schema.split(":")[-1], oid))
 
 
 def upsert(schema, value, matches):
@@ -211,7 +250,7 @@ def flow_value(spec):
     for i, step_spec in enumerate(spec["steps"]):
         name, event_type = step_spec[0], step_spec[1]
         error_types = step_spec[2] if len(step_spec) > 2 else []
-        sid = str(uuid.uuid5(_NS, spec["key"] + "/" + name))
+        sid = str(uuid.uuid5(_NS, _SEED_PREFIX + spec["key"] + "/" + name))
         ids.append(sid)
         events = [_event(event_type)] + [_event(et, is_error=True) for et in error_types]
         step = {"name": name, "id": sid, "events": events}
@@ -231,8 +270,9 @@ def flow_value(spec):
 
 
 # --------------------------------------------------------------------------- #
-def main():
-    print("Provisioning Meridian business observability (provider=%s, namespace=%s)" % (PROVIDER, NAMESPACE))
+def provision():
+    print("Provisioning Meridian business observability "
+          "(instance=%s, provider=%s, namespace=%s)" % (HASH or "(legacy)", PROVIDER, NAMESPACE))
 
     print("- OpenPipeline extraction pipeline")
     pipe_oid = upsert(PIPELINE_SCHEMA, pipeline_value(),
@@ -244,6 +284,8 @@ def main():
         sys.exit("FATAL: no %s object found" % ROUTING_SCHEMA)
     robj = routing[0]
     rvalue = robj["value"]
+    # Key this instance's entry by its (per-instance) pipeline name so concurrent
+    # instances each own exactly one entry.
     entries = [e for e in rvalue.get("routingEntries", []) if e.get("description") != PIPE_NAME]
     entries.append(routing_entry(pipe_oid))
     rvalue["routingEntries"] = entries
@@ -258,6 +300,55 @@ def main():
         upsert(FLOW_SCHEMA, value, lambda v, name=value["name"]: v.get("name") == name)
 
     print("Done.")
+
+
+def deprovision():
+    """Remove ONLY this instance's objects; leave other instances' intact."""
+    print("Deprovisioning Meridian business observability "
+          "(instance=%s, provider=%s, namespace=%s)" % (HASH or "(legacy)", PROVIDER, NAMESPACE))
+
+    # 1. Drop this instance's routing entry from the shared routing object first
+    #    (so it stops referencing the pipeline we are about to delete). Never delete
+    #    the shared routing object itself — other instances have entries in it.
+    print("- Logs routing entry (remove from shared object)")
+    routing = list_objects(ROUTING_SCHEMA)
+    if routing:
+        robj = routing[0]
+        rvalue = robj["value"]
+        before = rvalue.get("routingEntries", [])
+        entries = [e for e in before if e.get("description") != PIPE_NAME]
+        if len(entries) != len(before):
+            rvalue["routingEntries"] = entries
+            status, body = api("PUT", "/objects/" + robj["objectId"], {"value": rvalue})
+            if status != 200:
+                sys.exit("FATAL: routing PUT failed: %s %s" % (status, body))
+            print("  removed routing entry -> %s (%d remain)" % (robj["objectId"], len(entries)))
+        else:
+            print("  no routing entry for this instance (already removed)")
+
+    # 2. Delete this instance's OpenPipeline pipeline (matched by per-instance customId).
+    print("- OpenPipeline extraction pipeline")
+    for o in list_objects(PIPELINE_SCHEMA):
+        if o["value"].get("customId") == PIPE_CUSTOM_ID:
+            delete_object(PIPELINE_SCHEMA, o["objectId"])
+
+    # 3. Delete this instance's five Business Flows (matched by per-instance title).
+    print("- Business Flows")
+    wanted = {FLOW_TITLE_PREFIX + spec["name"] for spec in FLOW_SPECS}
+    for o in list_objects(FLOW_SCHEMA):
+        if o["value"].get("name") in wanted:
+            delete_object(FLOW_SCHEMA, o["objectId"])
+
+    print("Done.")
+
+
+def main():
+    if ACTION == "delete":
+        deprovision()
+    elif ACTION == "provision":
+        provision()
+    else:
+        sys.exit("FATAL: unknown DT_ACTION=%r (expected provision|delete)" % ACTION)
 
 
 if __name__ == "__main__":

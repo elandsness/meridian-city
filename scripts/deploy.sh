@@ -17,10 +17,27 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-RELEASE_NAME="${RELEASE_NAME:-meridian}"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)/helm"
-NAMESPACE="${NAMESPACE:-meridian}"
 DYNATRACE_NAMESPACE="dynatrace"
+
+# ---------------------------------------------------------------------------
+# Shared cluster-singleton operators — installed ONCE, reused by every instance.
+# Override the namespaces/release names via env if your cluster already hosts them.
+# ---------------------------------------------------------------------------
+CNPG_NAMESPACE="${CNPG_NAMESPACE:-cnpg-system}"
+CNPG_RELEASE="${CNPG_RELEASE:-cnpg}"
+STRIMZI_NAMESPACE="${STRIMZI_NAMESPACE:-strimzi-system}"
+STRIMZI_RELEASE="${STRIMZI_RELEASE:-strimzi}"
+
+# ---------------------------------------------------------------------------
+# Per-instance identity (multi-tenancy). The Helm release name is meridian-<hash>
+# and the namespace matches it, so concurrent installs never collide. Pin any of
+# these via env to target a specific instance; otherwise `install` generates a
+# fresh hash and the other commands auto-detect the instance. See resolve_instance.
+# ---------------------------------------------------------------------------
+RELEASE_NAME="${RELEASE_NAME:-}"
+NAMESPACE="${NAMESPACE:-}"
+INSTANCE_HASH="${INSTANCE_HASH:-}"
 
 # Colors
 RED='\033[0;31m'
@@ -33,6 +50,72 @@ info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+
+# Generate a short per-instance hash (4 chars, base36: a-z0-9).
+gen_hash() { LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 4; }
+
+# Resolve RELEASE_NAME / NAMESPACE / INSTANCE_HASH for this invocation ($1 = subcommand).
+#   install : generate a fresh hash unless RELEASE_NAME / INSTANCE_HASH is pinned.
+#   others  : target an existing instance — use RELEASE_NAME if given, else
+#             auto-detect the sole meridian-* Helm release (error on 0 or >1).
+resolve_instance() {
+  local cmd="$1"
+  if [[ -n "$RELEASE_NAME" ]]; then
+    [[ -z "$INSTANCE_HASH" ]] && INSTANCE_HASH="${RELEASE_NAME#meridian-}"
+  elif [[ -n "$INSTANCE_HASH" ]]; then
+    RELEASE_NAME="meridian-${INSTANCE_HASH}"
+  elif [[ "$cmd" == "install" ]]; then
+    INSTANCE_HASH="$(gen_hash)"
+    RELEASE_NAME="meridian-${INSTANCE_HASH}"
+  else
+    local found n
+    found=$(helm list -A -q --filter '^meridian-' 2>/dev/null || true)
+    n=$(printf '%s' "$found" | grep -c . || true)
+    if [[ "$n" -eq 1 ]]; then
+      RELEASE_NAME="$found"
+      INSTANCE_HASH="${RELEASE_NAME#meridian-}"
+    elif [[ "$n" -eq 0 ]]; then
+      error "No Meridian instance found. Pin one with RELEASE_NAME=meridian-<hash>, or run: $0 install"
+      exit 1
+    else
+      error "Multiple Meridian instances found — set RELEASE_NAME=meridian-<hash> to pick one:"
+      printf '%s\n' "$found" | sed 's/^/    /' >&2
+      exit 1
+    fi
+  fi
+  NAMESPACE="${NAMESPACE:-$RELEASE_NAME}"
+  info "Instance:  release=${RELEASE_NAME}  namespace=${NAMESPACE}  hash=${INSTANCE_HASH:-<none>}"
+}
+
+# Install the cluster-singleton operators ONCE (idempotent: skipped if their Helm
+# release already exists, so concurrent instance deploys never disturb them).
+# These own cluster-scoped CRDs/webhooks, so they MUST be shared, not per-instance.
+ensure_shared_operators() {
+  if helm status "$CNPG_RELEASE" -n "$CNPG_NAMESPACE" &>/dev/null; then
+    info "Shared CloudNativePG operator present (${CNPG_RELEASE}/${CNPG_NAMESPACE})."
+  else
+    info "Installing shared CloudNativePG operator into '${CNPG_NAMESPACE}'..."
+    helm upgrade --install "$CNPG_RELEASE" cloudnative-pg/cloudnative-pg \
+      --namespace "$CNPG_NAMESPACE" --create-namespace \
+      --set crds.create=true --wait --timeout 5m
+    success "CloudNativePG operator ready."
+  fi
+
+  if helm status "$STRIMZI_RELEASE" -n "$STRIMZI_NAMESPACE" &>/dev/null; then
+    info "Shared Strimzi operator present (${STRIMZI_RELEASE}/${STRIMZI_NAMESPACE})."
+  else
+    info "Installing shared Strimzi operator into '${STRIMZI_NAMESPACE}' (watchAnyNamespace=true)..."
+    helm upgrade --install "$STRIMZI_RELEASE" strimzi/strimzi-kafka-operator \
+      --namespace "$STRIMZI_NAMESPACE" --create-namespace \
+      --set watchAnyNamespace=true --wait --timeout 5m
+    success "Strimzi operator ready."
+  fi
+
+  # The shared operators just (maybe) registered cluster-scoped CRDs. Helm's
+  # KubeClient locks its REST mapper at client init, so flush the shared discovery
+  # cache or the umbrella install fails with "no matches for kind: Kafka/Cluster".
+  rm -rf "${HOME}/.kube/cache/discovery/"
+}
 
 check_prerequisites() {
   local missing=0
@@ -123,13 +206,15 @@ install_or_upgrade() {
   local dt_enabled=false
 
   check_prerequisites
+  resolve_instance "$cmd"
 
-  # The Dynatrace Operator is no longer a sub-chart (it's installed as its own
-  # release in the 'dynatrace' namespace below). Remove any stale operator
-  # sub-chart tarball left in charts/ by a previous 'helm dependency update' —
-  # Helm loads sub-charts from charts/ regardless of Chart.yaml, so a leftover
-  # would redeploy the operator into the meridian namespace and break injection.
-  rm -f "${CHART_DIR}"/charts/dynatrace-operator-*.tgz 2>/dev/null || true
+  # The cluster-singleton operators are no longer sub-charts. Remove any stale
+  # operator sub-chart tarballs left in charts/ by an older 'helm dependency
+  # update' — Helm loads sub-charts from charts/ regardless of Chart.yaml, so a
+  # leftover would redeploy a per-release operator into the instance namespace.
+  rm -f "${CHART_DIR}"/charts/dynatrace-operator-*.tgz \
+        "${CHART_DIR}"/charts/cloudnative-pg-*.tgz \
+        "${CHART_DIR}"/charts/strimzi-kafka-operator-*.tgz 2>/dev/null || true
 
   # Ensure the app namespace exists and carries Helm ownership labels.
   # Three cases:
@@ -208,32 +293,12 @@ install_or_upgrade() {
   ) &
   progress_pid=$!
 
-  # Pre-apply CRDs before helm install so the REST mapper discovers them at startup.
-  # Helm's KubeClient.Build() uses a mapper locked at client init — CRDs applied
-  # during install (from crds/) don't refresh it, so any template type not yet in
-  # the cluster causes a "no matches for kind" build failure.
-  if [[ -d "${CHART_DIR}/crds" ]] && [[ -n "$(ls -A "${CHART_DIR}/crds/" 2>/dev/null)" ]]; then
-    info "Pre-applying CRDs from helm/crds/ ..."
-    kubectl apply --server-side --field-manager=helm --force-conflicts -f "${CHART_DIR}/crds/"
-    kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null \
-      | xargs -r kubectl wait --for=condition=Established --timeout=60s 2>/dev/null || true
-    # Stamp Helm ownership annotations so that CRDs sourced from operator templates/
-    # (not crds/) can be adopted by this release without "invalid ownership metadata" errors.
-    kubectl get -f "${CHART_DIR}/crds/" -o name 2>/dev/null | while read -r res; do
-      kubectl annotate "$res" \
-        "meta.helm.sh/release-name=${RELEASE_NAME}" \
-        "meta.helm.sh/release-namespace=${NAMESPACE}" \
-        --overwrite 2>/dev/null || true
-      kubectl label "$res" \
-        "app.kubernetes.io/managed-by=Helm" \
-        --overwrite 2>/dev/null || true
-    done
-    # Flush the client-side discovery cache so Helm re-queries the API server.
-    # Both kubectl and Helm share ~/.kube/cache/discovery/; a stale cache causes
-    # "no matches for kind" even when CRDs are fully established.
-    rm -rf "${HOME}/.kube/cache/discovery/"
-    success "CRDs established."
-  fi
+  # Ensure the shared cluster-singleton operators (CloudNativePG + Strimzi) are
+  # installed and ready BEFORE the instance install. They own the cluster-scoped
+  # CRDs (Cluster, Kafka/KafkaTopic) this chart's CRs reference, so this both
+  # registers those kinds and flushes the discovery cache — replacing the old
+  # per-release helm/crds/ pre-apply, which would have collided across instances.
+  ensure_shared_operators
 
   # ---------------------------------------------------------------------------
   # Dynatrace Operator — installed as its OWN Helm release in the 'dynatrace'
@@ -268,15 +333,36 @@ install_or_upgrade() {
     info "Dynatrace not configured (DynaKube does not render) — skipping operator install."
   fi
 
+  # MULTI-TENANCY: the Log Module + ActiveGate are node/cluster-level singletons —
+  # only ONE DynaKube per cluster may run them (the webhook rejects a second). Detect
+  # whether ANOTHER instance already owns cluster monitoring (a DynaKube with
+  # logMonitoring set, excluding this instance's own) and, if so, deploy this
+  # instance's DynaKube as applicationMonitoring-only. The single owner's Log Module
+  # captures every namespace's logs, so all instances' business events still flow.
+  # A present logMonitoring (empty object) serializes as "={}" (or "=map[]" on some
+  # kubectl versions); an absent one is just "=". Count non-self DynaKubes that have it.
+  local cluster_mon=true others
+  others=$(kubectl get dynakube -n "$DYNATRACE_NAMESPACE" \
+    -o jsonpath='{range .items[*]}{.metadata.name}={.spec.logMonitoring}{"\n"}{end}' 2>/dev/null \
+    | grep -v "^${RELEASE_NAME}=" | grep -cE '=.+' || true)
+  if [[ "${others:-0}" -gt 0 ]]; then
+    cluster_mon=false
+    info "Cluster monitoring already owned by another instance — this DynaKube does applicationMonitoring only."
+  else
+    info "This instance will own cluster monitoring (Log Module + ActiveGate) for the cluster."
+  fi
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   # --wait is intentionally omitted: Java services crash-loop until DB is ready,
-  # which would deadlock the post-install hooks that provision the DB.
-  # Instead, a post-install Job (wait-for-operators) ensures operators are up
-  # before the CNPG Cluster and Strimzi Kafka CRs are created (hook weights 1→5→10).
+  # which would deadlock the post-install hooks. The shared operators are already
+  # ready (ensure_shared_operators ran with --wait), so the namespaced CR hooks
+  # (CNPG Cluster / Strimzi Kafka, weight 5) reconcile as soon as they're applied.
   helm "$cmd" "$RELEASE_NAME" "$CHART_DIR" \
     --namespace "$NAMESPACE" \
     --create-namespace \
     --timeout 20m \
+    --set global.instanceHash="$INSTANCE_HASH" \
+    --set dynatrace.clusterMonitoring.enabled="$cluster_mon" \
     "$@"
 
   # Helm has submitted resources and hooks are running. Wait for everything to converge.
@@ -325,7 +411,7 @@ install_or_upgrade() {
   # Seed demo data on a fresh install (idempotent — safe to re-run on upgrade too).
   echo ""
   info "Seeding demo data..."
-  if bash "${SCRIPT_DIR}/seed-data.sh"; then
+  if RELEASE_NAME="$RELEASE_NAME" NAMESPACE="$NAMESPACE" bash "${SCRIPT_DIR}/seed-data.sh"; then
     echo ""
   else
     warn "Seed data failed — platform is up but demo data may be missing."
@@ -529,23 +615,31 @@ case "${1:-}" in
     ;;
   seed)
     shift
-    bash "${SCRIPT_DIR}/seed-data.sh" "$@"
+    resolve_instance seed
+    RELEASE_NAME="$RELEASE_NAME" NAMESPACE="$NAMESPACE" bash "${SCRIPT_DIR}/seed-data.sh" "$@"
     ;;
   status)
+    resolve_instance status
     show_status
     ;;
   port-forward)
+    resolve_instance port-forward
     port_forward
     ;;
   *)
     echo "Usage: $0 {repos|install|upgrade|seed|status|port-forward} [flags...]"
     echo ""
+    echo "Multi-tenancy: 'install' generates a fresh per-instance hash (release"
+    echo "meridian-<hash>, namespace meridian-<hash>). Pin or target an instance with"
+    echo "RELEASE_NAME=meridian-<hash> (or INSTANCE_HASH=<hash>). upgrade/seed/status/"
+    echo "port-forward auto-detect the sole instance, or take RELEASE_NAME to pick one."
+    echo ""
     echo "Examples:"
     echo "  $0 repos"
-    echo "  $0 install -f helm/values-custom.yaml"
-    echo "  $0 upgrade -f helm/values-custom.yaml"
-    echo "  $0 seed"
-    echo "  $0 seed --reset"
+    echo "  $0 install -f helm/values-custom.yaml                 # fresh random instance"
+    echo "  INSTANCE_HASH=demo1 $0 install -f helm/values-custom.yaml"
+    echo "  RELEASE_NAME=meridian-a1b2 $0 upgrade -f helm/values-custom.yaml"
+    echo "  RELEASE_NAME=meridian-a1b2 $0 seed --reset"
     echo "  $0 status"
     echo "  $0 port-forward"
     exit 1
