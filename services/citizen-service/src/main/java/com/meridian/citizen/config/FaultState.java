@@ -23,6 +23,16 @@ public class FaultState {
     private volatile boolean dbSlowdownEnabled = false;
     private volatile double dbSlowdownSeconds = 0.0;
 
+    // Business-exception toggles (default off). Gated, demo-only error branches that
+    // make the Dynatrace Business Flows show process failures + conversion drop-off:
+    //   request-reject  -> service_request.rejected at validation (ServiceRequestService)
+    //   account-fail    -> account.verification_failed / account.activation_failed
+    //                      (AccountLifecycleScheduler)
+    private volatile boolean requestRejectEnabled = false;
+    private volatile double requestRejectRate = 0.0;
+    private volatile boolean accountFailEnabled = false;
+    private volatile double accountFailRate = 0.0;
+
     public boolean isDbSlowdownEnabled() {
         return dbSlowdownEnabled;
     }
@@ -34,6 +44,32 @@ public class FaultState {
     public void setDbSlowdown(boolean enabled, double seconds) {
         this.dbSlowdownEnabled = enabled;
         this.dbSlowdownSeconds = seconds;
+    }
+
+    public boolean isRequestRejectEnabled() {
+        return requestRejectEnabled;
+    }
+
+    public double getRequestRejectRate() {
+        return requestRejectRate;
+    }
+
+    public void setRequestReject(boolean enabled, double rate) {
+        this.requestRejectEnabled = enabled;
+        this.requestRejectRate = rate;
+    }
+
+    public boolean isAccountFailEnabled() {
+        return accountFailEnabled;
+    }
+
+    public double getAccountFailRate() {
+        return accountFailRate;
+    }
+
+    public void setAccountFail(boolean enabled, double rate) {
+        this.accountFailEnabled = enabled;
+        this.accountFailRate = rate;
     }
 
     /**

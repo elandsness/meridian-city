@@ -155,11 +155,20 @@ def routing_entry(pipeline_object_id):
 # --------------------------------------------------------------------------- #
 # 2. Business Flows — one per /analytics business process
 # --------------------------------------------------------------------------- #
+# Each step is (name, happy_event_type[, [error_event_type, ...]]). The optional third
+# element lists business-exception event types attached to that step as isError events, so
+# the flow renders an error branch + conversion drop-off at that step. These error events
+# are emitted only when an SE turns on the matching demo-control scenario (default off), so
+# the happy-path funnels stay clean otherwise. No DQL/pipeline change is needed: every error
+# event carries a correlation id already surfaced by DQL_SCRIPT (request.id / citizen.id /
+# work_order.id / incident.id / cart.id / order.id / bill.id) and auto-extracts as a bizevent
+# via the includeAll + isNotNull(meridian.event_type) extraction.
 FLOW_SPECS = [
     {"key": "service-request", "name": "Service Request Lifecycle", "correlationID": "request.id",
      "kpiLabel": "Resolved requests", "kpi": "request.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "service_request.resolved",
-     "steps": [("Submitted", "service_request.submitted"), ("Validated", "service_request.validated"),
+     "steps": [("Submitted", "service_request.submitted"),
+               ("Validated", "service_request.validated", ["service_request.rejected"]),
                ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
                ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
     {"key": "account-creation", "name": "Account Creation", "correlationID": "citizen.id",
@@ -168,38 +177,44 @@ FLOW_SPECS = [
      "steps": [("Registration started", "account.registration_started"),
                ("Details submitted", "account.details_submitted"),
                ("Verification sent", "account.verification_sent"),
-               ("Verified", "account.verified"), ("Activated", "account.activated")]},
+               ("Verified", "account.verified", ["account.verification_failed"]),
+               ("Activated", "account.activated", ["account.activation_failed"])]},
     {"key": "iot-incident", "name": "IoT Incident Resolution", "correlationID": "incident.id",
      "kpiLabel": "Resolved incidents", "kpi": "incident.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "workorder.resolved",
      "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident created", "incident.created"),
                ("Work order created", "workorder.created"), ("Work order assigned", "workorder.assigned"),
                ("Work order acknowledged", "workorder.acknowledged"),
-               ("Work order resolved", "workorder.resolved")]},
+               ("Work order resolved", "workorder.resolved", ["workorder.escalated"])]},
     {"key": "purchase", "name": "City Store Purchase", "correlationID": "cart.id",
      "kpiLabel": "Revenue", "kpi": "order.total_cents", "kpiCalculation": "sum",
      "kpiEventName": "checkout.completed",
-     "steps": [("Item added", "cart.item_added"), ("Checkout completed", "checkout.completed"),
+     "steps": [("Item added", "cart.item_added"),
+               ("Checkout completed", "checkout.completed", ["checkout.payment_declined"]),
                ("Order packed", "order.packed"), ("Order shipped", "order.shipped"),
-               ("Order delivered", "order.delivered")]},
+               ("Order delivered", "order.delivered", ["order.delivery_failed"])]},
     {"key": "tax-payment", "name": "Tax Payment", "correlationID": "bill.id",
      "kpiLabel": "Tax collected", "kpi": "bill.amount_cents", "kpiCalculation": "sum",
      "kpiEventName": "tax.payment_completed",
-     "steps": [("Bill issued", "tax.bill_issued"), ("Payment completed", "tax.payment_completed")]},
+     "steps": [("Bill issued", "tax.bill_issued"),
+               ("Payment completed", "tax.payment_completed", ["tax.payment_failed"])]},
 ]
 
 
-def _event(event_type):
+def _event(event_type, is_error=False):
     return {"id": "provider:%s-event:%s" % (PROVIDER, event_type), "name": event_type,
-            "provider": PROVIDER, "isError": False, "isDisabled": False}
+            "provider": PROVIDER, "isError": is_error, "isDisabled": False}
 
 
 def flow_value(spec):
     steps, ids = [], []
-    for i, (name, event_type) in enumerate(spec["steps"]):
+    for i, step_spec in enumerate(spec["steps"]):
+        name, event_type = step_spec[0], step_spec[1]
+        error_types = step_spec[2] if len(step_spec) > 2 else []
         sid = str(uuid.uuid5(_NS, spec["key"] + "/" + name))
         ids.append(sid)
-        step = {"name": name, "id": sid, "events": [_event(event_type)]}
+        events = [_event(event_type)] + [_event(et, is_error=True) for et in error_types]
+        step = {"name": name, "id": sid, "events": events}
         if i == 0:
             step["isRoot"] = True
         steps.append(step)

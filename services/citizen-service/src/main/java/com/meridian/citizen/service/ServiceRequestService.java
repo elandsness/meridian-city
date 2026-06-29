@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class ServiceRequestService {
@@ -111,6 +112,26 @@ public class ServiceRequestService {
                 request.getZoneId()
         );
         recordEvent(request.getId(), "service_request.submitted");
+
+        // 2b. Business-exception (gated, default off): reject a share of requests at
+        //     validation. Emits service_request.rejected on the same request.id and stops
+        //     the flow here — no validated, no dispatch — so the Service Request business
+        //     flow shows an error branch + conversion drop-off at the Validated step.
+        if (faultState.isRequestRejectEnabled()
+                && ThreadLocalRandom.current().nextDouble() < faultState.getRequestRejectRate()) {
+            businessEventLogger.requestRejected(
+                    request.getId(), request.getCitizenId(), request.getCategory(), "validation_failed");
+            recordEvent(request.getId(), "service_request.rejected");
+            request.setStatus("rejected");
+            if (lifecycleProps.isEnabled()) {
+                request.setLifecycleStage("rejected");
+                request.setNextTransitionAt(null);
+                request.setAssignedTargetAt(null);
+            }
+            serviceRequestRepository.save(request);
+            log.info("Service request rejected at validation: requestId={}", request.getId());
+            return ServiceRequestResponse.from(request);
+        }
 
         // 3. When the lifecycle is enabled, 'validated' is deferred to the
         //    RequestLifecycleScheduler (validated band) so the bizevent flow shows a realistic

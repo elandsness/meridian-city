@@ -26,6 +26,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,6 +60,17 @@ public class OrderService {
 
         int total = items.stream().mapToInt(it -> it.getUnitPriceCents() * it.getQuantity()).sum();
         int count = items.stream().mapToInt(CartItem::getQuantity).sum();
+
+        // Business-exception (gated, default off): decline a share of checkouts. Emits
+        // checkout.payment_declined on the same cart.id and rejects with 402 — no order,
+        // cart left open for retry — so the City Store Purchase flow shows an error branch
+        // + conversion drop-off at the Checkout step.
+        FaultInjectionConfig.PaymentDecline decline = faultConfig.getPaymentDecline();
+        if (decline.isEnabled() && ThreadLocalRandom.current().nextDouble() < decline.getRate()) {
+            businessEventLogger.checkoutPaymentDeclined(cart.getId(), citizenId, total, count);
+            log.warn("Checkout payment declined (fault) cart={} citizen={}", cart.getId(), citizenId);
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "payment declined");
+        }
 
         Order order = Order.create(citizenId, cart.getId(), total, count);
         order.setNextTransitionAt(OffsetDateTime.now().plusSeconds(fulfillment.nextPackedDelaySeconds()));

@@ -17,6 +17,15 @@
  *   llm-latency      — ai-service LLM latency, tunable (default manual)
  *   memory-pressure  — analytics-service leak: tunable cap + ramp (default manual)
  *   cascade-failure  — db-slowdown + llm-latency simultaneously (default manual)
+ *
+ * Business-process exceptions (gated error branches that make the Dynatrace Business
+ * Flows show process failures + conversion drop-off; default off, default manual clear):
+ *   request-failures      — citizen-service: service_request.rejected at Validated
+ *   account-failures      — citizen-service: account.verification_failed / .activation_failed
+ *   incident-escalations  — city-operations: workorder.escalated at the resolution step
+ *   checkout-declines     — commerce-service: checkout.payment_declined + order.delivery_failed
+ *   tax-payment-failures  — billing-service: tax.payment_failed at the Payment step
+ *   business-exceptions   — all five of the above at once (umbrella)
  */
 
 const config = require('./config')
@@ -25,6 +34,12 @@ const state = require('./state')
 
 const CLEAR_MIN = 1
 const CLEAR_MAX = 30
+
+/** Convert a percent param (5–100) to a 0..1 fraction, falling back to a default percent. */
+const pctToFrac = (v, def) => (Number(v) > 0 ? Number(v) : def) / 100
+
+/** Shared shape for the per-flow failure-rate slider. */
+const RATE_PARAM = { name: 'rate', label: 'Failure rate', min: 5, max: 100, step: 5, default: 30, unit: '%' }
 
 /** @type {Record<string, ScenarioDef>} */
 const SCENARIOS = {
@@ -118,6 +133,145 @@ const SCENARIOS = {
       await SCENARIOS['db-slowdown'].reset()
       await SCENARIOS['llm-latency'].reset()
       return { ok: true, data: { message: 'cascade-failure reset' } }
+    },
+  },
+
+  // --------------------------------------------------------------------------- //
+  // Business-process exceptions — gated error branches for the Business Flows.
+  // Off by default; an SE turns one on for a demo so Dynatrace surfaces the
+  // process failure / conversion drop-off without polluting the happy-path funnels.
+  // --------------------------------------------------------------------------- //
+
+  'request-failures': {
+    name: 'Service Request Rejections',
+    description: 'Rejects a share of new service requests at validation, so the [Meridian] Service Request Lifecycle flow shows a service_request.rejected error branch + drop-off at the Validated step. Needs request traffic (Citizen-request journey).',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
+        request_reject_enabled: true, request_reject_rate: rate,
+      })
+      state.setFault('citizen-service', { request_reject_enabled: true, request_reject_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
+        request_reject_enabled: false, request_reject_rate: 0,
+      })
+      state.setFault('citizen-service', { request_reject_enabled: false, request_reject_rate: 0 })
+      return r
+    },
+  },
+
+  'account-failures': {
+    name: 'Account Verification/Activation Failures',
+    description: 'Fails verification/activation for a share of new accounts, so the [Meridian] Account Creation flow shows account.verification_failed / account.activation_failed error branches + drop-off at the Verified/Activated steps. Deferred steps land over the lifecycle bands, so failures appear minutes after signup.',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
+        account_fail_enabled: true, account_fail_rate: rate,
+      })
+      state.setFault('citizen-service', { account_fail_enabled: true, account_fail_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
+        account_fail_enabled: false, account_fail_rate: 0,
+      })
+      state.setFault('citizen-service', { account_fail_enabled: false, account_fail_rate: 0 })
+      return r
+    },
+  },
+
+  'incident-escalations': {
+    name: 'IoT Incident Escalations',
+    description: 'Escalates a share of acknowledged work orders instead of resolving them, so the [Meridian] IoT Incident Resolution flow shows a workorder.escalated error branch + drop-off at the resolution step. Driven by the IoT anomaly pipeline.',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`, {
+        type: 'workorder-escalation', enabled: true, rate,
+      })
+      state.setFault('city-operations', { workorder_escalation_enabled: true, workorder_escalation_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`, {
+        type: 'workorder-escalation', enabled: false, rate: 0,
+      })
+      state.setFault('city-operations', { workorder_escalation_enabled: false, workorder_escalation_rate: 0 })
+      return r
+    },
+  },
+
+  'checkout-declines': {
+    name: 'Store Checkout Declines',
+    description: 'Declines a share of checkouts and fails the same share of deliveries, so the [Meridian] City Store Purchase flow shows checkout.payment_declined + order.delivery_failed error branches + drop-off at the Checkout and Delivered steps. Needs store traffic (Store-purchase journey).',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.COMMERCE_SERVICE_URL}/admin/fault`, {
+        type: 'checkout-failures', enabled: true, rate,
+      })
+      state.setFault('commerce-service', { checkout_failures_enabled: true, checkout_failures_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.COMMERCE_SERVICE_URL}/admin/fault`, {
+        type: 'checkout-failures', enabled: false, rate: 0,
+      })
+      state.setFault('commerce-service', { checkout_failures_enabled: false, checkout_failures_rate: 0 })
+      return r
+    },
+  },
+
+  'tax-payment-failures': {
+    name: 'Tax Payment Failures',
+    description: 'Fails a share of tax-bill payments at the gateway (bill stays outstanding), so the [Meridian] Tax Payment flow shows a tax.payment_failed error branch + drop-off at the Payment step. Needs tax traffic (Pay-tax journey).',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.BILLING_SERVICE_URL}/admin/fault`, {
+        payment_fail_enabled: true, payment_fail_rate: rate,
+      })
+      state.setFault('billing-service', { payment_fail_enabled: true, payment_fail_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.BILLING_SERVICE_URL}/admin/fault`, {
+        payment_fail_enabled: false, payment_fail_rate: 0,
+      })
+      state.setFault('billing-service', { payment_fail_enabled: false, payment_fail_rate: 0 })
+      return r
+    },
+  },
+
+  'business-exceptions': {
+    name: 'Business Process Failures (all flows)',
+    description: 'Umbrella: turns on the failure branch for all five business flows at once (request rejections, account verification/activation failures, IoT escalations, checkout declines, tax payment failures) at one shared rate — the "Dynatrace surfaces process failures everywhere" story.',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      await SCENARIOS['request-failures'].activate(opts)
+      await SCENARIOS['account-failures'].activate(opts)
+      await SCENARIOS['incident-escalations'].activate(opts)
+      await SCENARIOS['checkout-declines'].activate(opts)
+      await SCENARIOS['tax-payment-failures'].activate(opts)
+      return { ok: true, data: { message: 'business-exceptions activated' } }
+    },
+    async reset () {
+      await SCENARIOS['request-failures'].reset()
+      await SCENARIOS['account-failures'].reset()
+      await SCENARIOS['incident-escalations'].reset()
+      await SCENARIOS['checkout-declines'].reset()
+      await SCENARIOS['tax-payment-failures'].reset()
+      return { ok: true, data: { message: 'business-exceptions reset' } }
     },
   },
 }

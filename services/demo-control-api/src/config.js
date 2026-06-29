@@ -16,4 +16,6 @@ module.exports = {
   IOT_SIMULATOR_URL:        process.env.IOT_SIMULATOR_URL        || 'http://localhost:8088',
   TRAFFIC_BOT_URL:          process.env.TRAFFIC_BOT_URL          || 'http://localhost:8089',
   ANALYTICS_SERVICE_URL:    process.env.ANALYTICS_SERVICE_URL    || 'http://analytics-service:8084',
+  COMMERCE_SERVICE_URL:     process.env.COMMERCE_SERVICE_URL     || 'http://localhost:8090',
+  BILLING_SERVICE_URL:      process.env.BILLING_SERVICE_URL      || 'http://localhost:8091',
 }

@@ -119,6 +119,48 @@ carry `cart.id`). To change the taxonomy, edit `FLOW_SPECS` / `DQL_SCRIPT` in th
 provisioner — it is the single source of truth for both the extraction and the
 flows.
 
+### 3.4 Demoable failures (business exceptions)
+
+Each flow also has an **error branch** so an SE can show Dynatrace surfacing
+*process* failures and conversion drop-off — not just the happy path. Each error
+event is attached to its step in `FLOW_SPECS` with `isError: true`, so the flow
+renders the failure as a drop-off at that step.
+
+| Business Flow | Error event (`isError`) | Step | Owning service |
+|---|---|---|---|
+| Service Request Lifecycle | `service_request.rejected` | Validated | citizen-service |
+| Account Creation | `account.verification_failed` / `account.activation_failed` | Verified / Activated | citizen-service |
+| IoT Incident Resolution | `workorder.escalated` | Work order resolved | city-operations |
+| City Store Purchase | `checkout.payment_declined` / `order.delivery_failed` | Checkout completed / Order delivered | commerce-service |
+| Tax Payment | `tax.payment_failed` | Payment completed | billing-service |
+
+These are **off by default** (so they never pollute the happy-path funnels) and
+**toggled per scenario** from the ops-dashboard **Demo Control** panel (backed by
+`demo-control-api`). Each scenario posts a gated toggle + tunable failure-rate to
+the owning service's `/admin/fault`; the service then emits the error event
+(carrying the flow's correlation id) on the matching code path:
+
+| Demo Control scenario | Turns on |
+|---|---|
+| **Service Request Rejections** | `request-failures` → citizen-service |
+| **Account Verification/Activation Failures** | `account-failures` → citizen-service |
+| **IoT Incident Escalations** | `incident-escalations` → city-operations |
+| **Store Checkout Declines** | `checkout-declines` → commerce-service |
+| **Tax Payment Failures** | `tax-payment-failures` → billing-service |
+| **Business Process Failures (all flows)** | `business-exceptions` → all five at one shared rate |
+
+No OpenPipeline change is needed to add an error branch: the error events go
+through the same `BusinessEvents` logger and carry a correlation id already
+surfaced by `DQL_SCRIPT`, so the `includeAll` + `isNotNull(meridian.event_type)`
+extraction picks them up as bizevents automatically. Adding a *new* error event
+type is therefore just: emit it from the service (gated) + list it on the step in
+`FLOW_SPECS` + re-run the provisioner.
+
+> **Demo tip:** turn a scenario on, wait for the relevant traffic to flow
+> (some flows are scheduler-driven and land minutes later — see each scenario's
+> description), then open the flow in Dynatrace to show the error branch and the
+> conversion drop-off. Reset from the panel ("Reset All") when done.
+
 ---
 
 ## 4. Site Reliability Guardian — SLO Configuration

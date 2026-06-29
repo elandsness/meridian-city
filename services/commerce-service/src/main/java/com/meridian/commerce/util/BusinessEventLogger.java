@@ -37,6 +37,35 @@ public class BusinessEventLogger {
         );
     }
 
+    /**
+     * Emit a checkout.payment_declined business event — the error branch at the Checkout
+     * step (gated demo fault). Carries cart.id so the City Store Purchase business flow
+     * shows the decline as a drop-off on the same in-flight cart.
+     */
+    public void checkoutPaymentDeclined(String cartId, String citizenId, int totalCents, int itemCount) {
+        BUSINESS_EVENTS.warn("checkout.payment_declined",
+                StructuredArguments.keyValue("event.type", "checkout.payment_declined"),
+                StructuredArguments.keyValue("cart.id", cartId),
+                StructuredArguments.keyValue("citizen.id", citizenId),
+                StructuredArguments.keyValue("order.total_cents", totalCents),
+                StructuredArguments.keyValue("order.item_count", itemCount)
+        );
+    }
+
+    /**
+     * Emit an order.delivery_failed business event — the error branch at the Delivered step
+     * (gated demo fault). Carries cart.id so the City Store Purchase business flow shows the
+     * failed delivery as a drop-off on the same in-flight cart.
+     */
+    public void orderDeliveryFailed(String orderId, String cartId, String citizenId) {
+        BUSINESS_EVENTS.warn("order.delivery_failed",
+                StructuredArguments.keyValue("event.type", "order.delivery_failed"),
+                StructuredArguments.keyValue("order.id", orderId),
+                StructuredArguments.keyValue("cart.id", cartId),
+                StructuredArguments.keyValue("citizen.id", citizenId)
+        );
+    }
+
     public void orderPacked(String orderId, String cartId, String citizenId) {
         BUSINESS_EVENTS.info("order.packed",
                 StructuredArguments.keyValue("event.type", "order.packed"),

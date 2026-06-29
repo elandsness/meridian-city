@@ -47,6 +47,10 @@ spec:
               value: "http://iot-simulator:8088"
             - name: TRAFFIC_BOT_URL
               value: "http://traffic-bot:8089"
+            - name: COMMERCE_SERVICE_URL
+              value: "http://commerce-service:8090"
+            - name: BILLING_SERVICE_URL
+              value: "http://billing-service:8091"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:

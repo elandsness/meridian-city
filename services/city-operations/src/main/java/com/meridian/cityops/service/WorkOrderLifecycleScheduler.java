@@ -1,5 +1,6 @@
 package com.meridian.cityops.service;
 
+import com.meridian.cityops.config.FaultInjectionConfig;
 import com.meridian.cityops.config.WorkOrderLifecycleProperties;
 import com.meridian.cityops.domain.Incident;
 import com.meridian.cityops.domain.WorkOrder;
@@ -37,6 +38,7 @@ public class WorkOrderLifecycleScheduler {
     private final IncidentRepository incidentRepository;
     private final BusinessEventLogger businessEventLogger;
     private final WorkOrderLifecycleProperties props;
+    private final FaultInjectionConfig faultConfig;
 
     @Scheduled(fixedDelay = 10_000)
     @Transactional
@@ -94,7 +96,16 @@ public class WorkOrderLifecycleScheduler {
                 businessEventLogger.workOrderAcknowledged(wo.getId(), wo.getIncidentId());
             }
             case "acknowledged" -> {
-                if (ThreadLocalRandom.current().nextDouble() <= props.getCompletionProbability()) {
+                FaultInjectionConfig.Escalation esc = faultConfig.getEscalation();
+                if (esc.isEnabled() && ThreadLocalRandom.current().nextDouble() < esc.getRate()) {
+                    // Business-exception (gated): escalate instead of resolving — an error
+                    // branch + drop-off at the resolution step. The incident stays open.
+                    wo.setStatus("escalated");
+                    wo.setNextTransitionAt(null);
+                    workOrderRepository.save(wo);
+                    businessEventLogger.workOrderEscalated(
+                            wo.getId(), wo.getIncidentId(), wo.getAssignedDepartment());
+                } else if (ThreadLocalRandom.current().nextDouble() <= props.getCompletionProbability()) {
                     wo.setStatus("resolved");
                     wo.setResolvedAt(now);
                     wo.setNextTransitionAt(null);

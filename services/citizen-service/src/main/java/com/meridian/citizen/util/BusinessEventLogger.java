@@ -73,6 +73,20 @@ public class BusinessEventLogger {
     }
 
     /**
+     * Emit a service_request.rejected business event — the error branch at the Validated
+     * step (gated demo fault). Carries request.id so the Service Request business flow
+     * shows the rejection as a drop-off on the same in-flight request.
+     */
+    public void requestRejected(String requestId, String citizenId, String category, String reason) {
+        BUSINESS_EVENTS.warn("service_request.rejected",
+                StructuredArguments.keyValue("event.type", "service_request.rejected"),
+                StructuredArguments.keyValue("request.id", requestId),
+                StructuredArguments.keyValue("citizen.id", citizenId),
+                StructuredArguments.keyValue("request.category", category),
+                StructuredArguments.keyValue("request.reject_reason", reason));
+    }
+
+    /**
      * Emit a service_request.status_updated business event.
      */
     public void requestStatusUpdated(String requestId, String citizenId, String oldStatus,

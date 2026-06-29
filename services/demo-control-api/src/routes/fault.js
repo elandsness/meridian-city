@@ -9,10 +9,14 @@
  *
  * Supported services:
  *   ai-service           { llm_latency_enabled, llm_latency_seconds }
- *   citizen-service      { db_slowdown_enabled, db_slowdown_seconds }
- *   city-operations      { db_slowdown_enabled, db_slowdown_seconds }
+ *   citizen-service      { db_slowdown_enabled, db_slowdown_seconds,
+ *                          request_reject_enabled, request_reject_rate,
+ *                          account_fail_enabled, account_fail_rate }
+ *   city-operations      { type: 'db-slowdown'|'cpu-spike'|'workorder-escalation', enabled, delayMs|rate }
  *   analytics-service    { db_slowdown_enabled, db_slowdown_seconds, memory_pressure_enabled }
  *   telemetry-processor  { memory_pressure_enabled }
+ *   commerce-service     { type: 'db-slowdown'|'checkout-failures', enabled, delayMs|rate }
+ *   billing-service      { payment_fail_enabled, payment_fail_rate }
  */
 
 const config = require('../config')
@@ -25,6 +29,8 @@ const SERVICE_URLS = {
   'city-operations':     config.CITY_OPERATIONS_URL,
   'analytics-service':   config.ANALYTICS_SERVICE_URL,
   'telemetry-processor': config.TELEMETRY_PROCESSOR_URL,
+  'commerce-service':    config.COMMERCE_SERVICE_URL,
+  'billing-service':     config.BILLING_SERVICE_URL,
 }
 
 /**
@@ -63,18 +69,22 @@ async function faultRoutes (fastify) {
   fastify.post('/api/v1/fault/reset-all', async (_request, reply) => {
     const resets = await Promise.allSettled([
       proxy.post(`${config.AI_SERVICE_URL}/admin/fault`,          { llm_latency_enabled: false }),
-      proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`,     { db_slowdown_enabled: false }),
-      proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`,     { db_slowdown_enabled: false }),
+      proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`,     { db_slowdown_enabled: false, request_reject_enabled: false, account_fail_enabled: false }),
+      proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`,     { type: 'workorder-escalation', enabled: false }),
       proxy.post(`${config.ANALYTICS_SERVICE_URL}/admin/fault`,   { db_slowdown_enabled: false, memory_pressure_enabled: false }),
       proxy.post(`${config.TELEMETRY_PROCESSOR_URL}/admin/fault`, { memory_pressure_enabled: false }),
+      proxy.post(`${config.COMMERCE_SERVICE_URL}/admin/fault`,    { type: 'checkout-failures', enabled: false }),
+      proxy.post(`${config.BILLING_SERVICE_URL}/admin/fault`,     { payment_fail_enabled: false }),
     ])
 
     // Update local state
     setFault('ai-service',          { llm_latency_enabled: false, llm_latency_seconds: 0 })
-    setFault('citizen-service',     { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
-    setFault('city-operations',     { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
+    setFault('citizen-service',     { db_slowdown_enabled: false, db_slowdown_seconds: 0, request_reject_enabled: false, request_reject_rate: 0, account_fail_enabled: false, account_fail_rate: 0 })
+    setFault('city-operations',     { workorder_escalation_enabled: false, workorder_escalation_rate: 0 })
     setFault('analytics-service',   { db_slowdown_enabled: false, db_slowdown_seconds: 0, memory_pressure_enabled: false })
     setFault('telemetry-processor', { memory_pressure_enabled: false })
+    setFault('commerce-service',    { checkout_failures_enabled: false, checkout_failures_rate: 0 })
+    setFault('billing-service',     { payment_fail_enabled: false, payment_fail_rate: 0 })
 
     const results = resets.map((r, i) => ({
       service: Object.keys(SERVICE_URLS)[i],

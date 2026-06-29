@@ -19,9 +19,10 @@ import java.util.Map;
  * <p>POST /admin/fault body:
  * <pre>
  * {
- *   "type": "db-slowdown" | "cpu-spike",
+ *   "type": "db-slowdown" | "cpu-spike" | "workorder-escalation",
  *   "enabled": true | false,
  *   "delayMs": 2000      (only relevant for db-slowdown)
+ *   "rate": 0.3          (only relevant for workorder-escalation)
  * }
  * </pre>
  */
@@ -40,6 +41,9 @@ public class AdminController {
         int delayMs = body.containsKey("delayMs")
                 ? Integer.parseInt(String.valueOf(body.get("delayMs")))
                 : 0;
+        double rate = body.containsKey("rate")
+                ? Double.parseDouble(String.valueOf(body.get("rate")))
+                : faultConfig.getEscalation().getRate();
 
         switch (type) {
             case "db-slowdown" -> {
@@ -51,9 +55,14 @@ public class AdminController {
                 faultConfig.getCpuSpike().setEnabled(enabled);
                 log.warn("Fault injection updated: cpu-spike enabled={}", enabled);
             }
+            case "workorder-escalation" -> {
+                faultConfig.getEscalation().setEnabled(enabled);
+                faultConfig.getEscalation().setRate(rate);
+                log.warn("Fault injection updated: workorder-escalation enabled={} rate={}", enabled, rate);
+            }
             default -> throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Unknown fault type: " + type + ". Valid values: db-slowdown, cpu-spike");
+                    "Unknown fault type: " + type + ". Valid values: db-slowdown, cpu-spike, workorder-escalation");
         }
 
         return Map.of("applied", true, "type", type, "enabled", enabled);
