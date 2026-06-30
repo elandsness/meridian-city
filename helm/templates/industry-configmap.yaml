@@ -1,0 +1,18 @@
+{{/*
+Industry config ConfigMap. Renders the browser-safe `industry` values block to
+config.json, which is mounted into both frontends at the nginx html root and
+fetched at startup by each SPA's ConfigContext. One ConfigMap serves both SPAs.
+Namespace-scoped, so the name stays plain (multi-tenancy isolates by namespace).
+NEVER add secrets to .Values.industry: config.json is served to every browser.
+*/}}
+{{- if or .Values.publicPortal.enabled .Values.opsDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: industry-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+data:
+  config.json: {{ .Values.industry | toJson | quote }}
+{{- end }}

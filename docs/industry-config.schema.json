@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://meridian.dev/industry-config.schema.json",
+  "title": "Meridian industry config",
+  "description": "Re-skins a Meridian deployment for a target industry. Rendered to /config.json by helm/templates/industry-configmap.yaml and merged over each SPA's baked defaults (frontends/<app>/src/config/defaults.js) at startup. BROWSER-VISIBLE ONLY — never include secrets. Later phases add `flows`, `data`, and `dynatrace` sections (root additionalProperties stays open for forward compatibility).",
+  "type": "object",
+  "required": ["version", "company", "theme", "screens"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Config schema version."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Short industry id, e.g. 'city', 'airport', 'energy'."
+    },
+    "company": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "Full brand name shown in the UI (e.g. 'Meridian City')." },
+        "short": { "type": "string", "minLength": 1, "description": "Short brand name (e.g. 'Meridian'), used where space is tight." },
+        "tagline": { "type": "string" },
+        "assistant": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "name": { "type": "string", "description": "AI assistant display name (e.g. 'Meri')." },
+            "persona": { "type": "string", "description": "One-line persona used in the assistant system prompt." }
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "required": ["colors"],
+      "additionalProperties": true,
+      "properties": {
+        "colors": {
+          "type": "object",
+          "description": "Brand palette as hex; mapped to CSS variables (--brand, --accent, …) at runtime.",
+          "required": ["brand", "accent"],
+          "additionalProperties": false,
+          "properties": {
+            "brand": { "$ref": "#/$defs/hexColor" },
+            "brandDeep": { "$ref": "#/$defs/hexColor" },
+            "brandSoft": { "$ref": "#/$defs/hexColor" },
+            "brandTint": { "$ref": "#/$defs/hexColor" },
+            "accent": { "$ref": "#/$defs/hexColor" },
+            "accentSoft": { "$ref": "#/$defs/hexColor" },
+            "accentInk": { "$ref": "#/$defs/hexColor" }
+          }
+        },
+        "logo": { "type": "string", "description": "URL or path to the brand logo." },
+        "favicon": { "type": "string", "description": "URL or path to the favicon." }
+      }
+    },
+    "terminology": {
+      "type": "object",
+      "description": "Maps generic domain nouns (customer, request, incident, asset, workOrder, …) to industry-specific nouns.",
+      "additionalProperties": { "type": "string" }
+    },
+    "screens": {
+      "type": "object",
+      "description": "Which curated screen modules each SPA mounts. (Consumed by the module registry in Phase 2; carried as data in Phase 0.)",
+      "additionalProperties": false,
+      "properties": {
+        "public": { "$ref": "#/$defs/screenList" },
+        "ops": { "$ref": "#/$defs/screenList" },
+        "disabled": { "$ref": "#/$defs/screenList" }
+      }
+    }
+  },
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+      "description": "Hex color, e.g. #0C447C or #abc."
+    },
+    "screenList": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+      "uniqueItems": true
+    }
+  }
+}

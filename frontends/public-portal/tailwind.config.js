@@ -5,16 +5,19 @@ export default {
     extend: {
       colors: {
         // Bold Meridian brand — deep civic blue + amber "noon sun" accent.
+        // Values resolve to CSS variables (defaults in src/index.css) so one build
+        // can be re-themed at runtime from the industry config. The
+        // rgb(var(--x) / <alpha-value>) form preserves Tailwind opacity modifiers.
         meridian: {
-          blue: '#0C447C',
-          'blue-deep': '#082f57',
-          'blue-soft': '#185FA5',
-          tint: '#E6F1FB',
+          blue: 'rgb(var(--brand) / <alpha-value>)',
+          'blue-deep': 'rgb(var(--brand-deep) / <alpha-value>)',
+          'blue-soft': 'rgb(var(--brand-soft) / <alpha-value>)',
+          tint: 'rgb(var(--brand-tint) / <alpha-value>)',
         },
         noon: {
-          sun: '#EF9F27',
-          'sun-soft': '#f6b54e',
-          ink: '#412402',
+          sun: 'rgb(var(--accent) / <alpha-value>)',
+          'sun-soft': 'rgb(var(--accent-soft) / <alpha-value>)',
+          ink: 'rgb(var(--accent-ink) / <alpha-value>)',
         },
       },
     },

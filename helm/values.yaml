@@ -38,6 +38,51 @@ global:
   imagePullSecrets: []
 
 # ---------------------------------------------------------------------------
+# Industry config (multi-industry platform)
+# ---------------------------------------------------------------------------
+# Rendered to /config.json by templates/industry-configmap.yaml, mounted into both
+# frontends, and merged over each SPA's baked defaults at startup. BROWSER-VISIBLE
+# ONLY — never put secrets here. The default below reproduces "Meridian City".
+# Keep in sync with frontends/*/src/config/defaults.js and
+# docs/industry-config.schema.json. To re-skin an instance, override this block in
+# a values-<industry>.yaml passed to deploy.sh (e.g. -f helm/values-airport.yaml).
+industry:
+  version: 1
+  id: city
+  company:
+    name: "Meridian City"
+    short: "Meridian"
+    tagline: "Your city, connected."
+    assistant:
+      name: "Meri"
+      persona: "Meridian City's virtual assistant"
+  theme:
+    colors:
+      brand: "#0C447C"
+      brandDeep: "#082f57"
+      brandSoft: "#185FA5"
+      brandTint: "#E6F1FB"
+      accent: "#EF9F27"
+      accentSoft: "#f6b54e"
+      accentInk: "#412402"
+    logo: "/meridian-logo.svg"
+    favicon: "/meridian-logo.svg"
+  terminology:
+    customer: "Citizen"
+    customerPlural: "Citizens"
+    request: "Service request"
+    requestPlural: "Service requests"
+    incident: "Incident"
+    incidentPlural: "Incidents"
+    workOrder: "Work order"
+    asset: "Asset"
+    assetPlural: "Assets"
+  screens:
+    public: ["home", "service-requests", "store", "billing", "messages"]
+    ops: ["overview", "iot", "incidents", "requests", "analytics", "demo-control"]
+    disabled: []
+
+# ---------------------------------------------------------------------------
 # Dynatrace configuration
 # ---------------------------------------------------------------------------
 dynatrace:
