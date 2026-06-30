@@ -167,31 +167,39 @@ spots, each becomes config/env-driven:
 **Verdict (from recon): Path A — Dynatrace-side service naming rules.** Renaming a
 OneAgent-detected Java service's display name would mean changing `spring.application.name`
 (baked in the image) and Go services hardcode `service.name` — both would force
-per-industry images, which decision #1 forbids. Dynatrace **naming rules** (Settings
-API) keyed on the instance namespace rename the *display* uniformly across Java/Node/
-Python/Go with zero image/k8s change, are reversible, and extend the **existing
-per-instance provisioner** (`helm/files/provision-dynatrace-business-config.py`),
-which already keys objects by hash + namespace and self-cleans on uninstall.
+per-industry images, which decision #1 forbids. Instead Dynatrace renames the
+*display* names with zero image/k8s change, reversibly, via **two** mechanisms
+(confirmed in the Phase 0 spike below): namespace-scoped **`builtin:naming.services`**
+rules for OneAgent-detected services, and **`OTEL_SERVICE_NAME`** env for OTel-ingested
+services. Both extend machinery that already keys by hash + namespace and self-cleans:
+the **per-instance provisioner** (`helm/files/provision-dynatrace-business-config.py`)
+for the rules, and Helm env for the OTel names.
 
 Extend the provisioner to also:
-- Upsert **service naming rules** mapping each technical service → the config's
-  `dynatrace.service_display_names` (scoped to this instance's namespace, idempotent,
-  delete-on-uninstall — same pattern as the Business Flows it already manages).
+- Upsert **`builtin:naming.services`** rules mapping each OneAgent service → the config's
+  `dynatrace.service_display_names` (condition scoped to this instance's namespace,
+  idempotent, delete-on-uninstall — same pattern as the Business Flows it already manages).
+  OTel services (Go `iot-*`, `ai-service`) instead take their display name from
+  `OTEL_SERVICE_NAME` in Helm env (naming rules don't apply to OTLP services).
 - Generate **Business Flows + business-event extraction** from the config's `flows`
   (replacing the 5 hardcoded City flows with the industry's), keyed per instance.
 
 **Caveats (documented, accepted):**
 - Deep entity detail pages may still show the underlying pod name — fine for a sales
   motion.
-- **RUM apps cannot be renamed by rules** — identity is baked into the snippet's app
-  id. Each industry needs its own RUM application created in Dynatrace, snippet pasted
-  into the config. One manual step per industry (automate via the RUM app API later).
+- **RUM:** the web app *display name* CAN be set via the **`builtin:rum.frontend.name`**
+  schema (the provisioner can name it per industry) — but *identity* is still the app id
+  in the injected snippet, so concurrent instances sharing a snippet are one web app. For
+  distinct per-instance RUM identities, use a distinct RUM app id (snippet) per instance.
 - We run on a **shared tenant (kyw96254)** — every new Settings object MUST be
   per-instance-keyed and delete-on-uninstall, or it clobbers other SEs. Follow the
   provisioner's established pattern exactly (CLAUDE.md §Multi-tenancy).
 
-**Phase-0 spike:** confirm the service-naming-rule schema id on the live tenant and
-that it matches on `k8s.namespace.name` (recon inferred but didn't doc-confirm).
+**Phase 0 spike — confirmed (via ask-dynatrace-docs):** service naming =
+`builtin:naming.services`, condition matches `k8s.namespace.name` (namespace-scoped on
+the shared tenant ✓), OneAgent services only; OTel services rename via `OTEL_SERVICE_NAME`.
+RUM display name = `builtin:rum.frontend.name`; RUM identity stays the snippet app id.
+The live rename-and-revert test is deferred to Phase 3 (needs the dt0s16 platform token).
 
 ### 3.6 Authoring kit (in the slice)
 

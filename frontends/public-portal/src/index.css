@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Brand theme tokens as RGB channels so Tailwind's <alpha-value> opacity
+   modifiers keep working (e.g. bg-meridian-blue/50). Defaults below reproduce
+   the Meridian City palette exactly; the runtime ConfigContext overrides these
+   from the deployed industry config (theme.colors, authored as hex). */
+:root {
+  --brand: 12 68 124;        /* #0C447C */
+  --brand-deep: 8 47 87;     /* #082f57 */
+  --brand-soft: 24 95 165;   /* #185FA5 */
+  --brand-tint: 230 241 251; /* #E6F1FB */
+  --accent: 239 159 39;      /* #EF9F27 */
+  --accent-soft: 246 181 78; /* #f6b54e */
+  --accent-ink: 65 36 2;     /* #412402 */
+}
+
 html, body {
   @apply bg-slate-900;
 }

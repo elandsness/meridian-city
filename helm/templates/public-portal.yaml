@@ -16,6 +16,7 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/frontend-nginx-configmap.yaml") . | sha256sum }}
+        checksum/industry-config: {{ include (print $.Template.BasePath "/industry-configmap.yaml") . | sha256sum }}
       labels:
         app: public-portal
         {{- include "meridian.labels" . | nindent 8 }}
@@ -25,6 +26,9 @@ spec:
         - name: nginx-config
           configMap:
             name: public-portal-nginx-config
+        - name: industry-config
+          configMap:
+            name: industry-config
       containers:
         - name: public-portal
           image: {{ include "meridian.image" (dict "repository" .Values.publicPortal.image.repository "tag" .Values.publicPortal.image.tag "context" $) }}
@@ -36,6 +40,9 @@ spec:
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
+            - name: industry-config
+              mountPath: /usr/share/nginx/html/config.json
+              subPath: config.json
           livenessProbe:
             httpGet:
               path: /
