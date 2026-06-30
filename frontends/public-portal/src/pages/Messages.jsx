@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
 import { timeAgo } from '../lib/format.js'
+import { useConfig } from '../config/ConfigContext'
 
 const TYPE_ICON = {
   order_delivered: <path d="M16 16l-4 2-4-2M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" />,
@@ -29,6 +30,7 @@ export default function Messages() {
   const { user } = useAuth()
   const citizenId = user?.id
   const qc = useQueryClient()
+  const cfg = useConfig()
 
   const { data, isLoading } = useQuery({
     queryKey: ['messages', citizenId],
@@ -49,7 +51,7 @@ export default function Messages() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
-          <p className="text-slate-500 text-sm mt-1">Updates from across Meridian City.</p>
+          <p className="text-slate-500 text-sm mt-1">Updates from across {cfg.company.name}.</p>
         </div>
         {unread > 0 && (
           <Button variant="outline" size="sm" onClick={() => readAllMut.mutate()} disabled={readAllMut.isPending}>

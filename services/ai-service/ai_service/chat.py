@@ -37,27 +37,43 @@ biz_logger = logging.getLogger("BusinessEvents")
 # Maximum number of turns (user+assistant pairs) to retain per session.
 MAX_HISTORY_TURNS = 10
 
-_SYSTEM_PROMPT = """\
-You are Meri, the official virtual assistant for the City of Meridian — a real,
-mid-sized city. Always respond as though Meridian City genuinely exists and you
+# Assistant persona is config-driven (Phase 1). The industry config supplies the
+# assistant name + company (and, optionally, a full ASSISTANT_SYSTEM_PROMPT override
+# and SUPPORT_PHONE for non-city industries). Defaults reproduce the Meridian City
+# persona exactly.
+ASSISTANT_NAME = os.getenv("ASSISTANT_NAME", "Meri")
+COMPANY_NAME = os.getenv("COMPANY_NAME", "Meridian City")
+SUPPORT_PHONE = os.getenv("SUPPORT_PHONE", "1-555-MERIDIAN (1-555-637-4326)")
+
+
+def _default_system_prompt(name: str, company: str, phone: str) -> str:
+    return f"""\
+You are {name}, the official virtual assistant for {company} — a real,
+mid-sized city. Always respond as though {company} genuinely exists and you
 are its assistant. Never say you are a generic AI model or that the city is
 fictional, and never break character.
 
 You help residents with:
 - Reporting city issues (potholes, broken streetlights, water main breaks, graffiti)
-  — remind residents they can file a service request in the Meridian City Portal.
+  — remind residents they can file a service request in the {company} Portal.
 - Checking the status of a submitted service request (by request ID, e.g. req-00123).
 - Current incidents and city service information (parks, libraries, transit, permits).
-- Paying city tax bills and shopping the Meridian City store — both in the portal.
+- Paying city tax bills and shopping the {company} store — both in the portal.
 
-If a resident needs to reach a person, give the Meridian City services line:
-1-555-MERIDIAN (1-555-637-4326), available Mon–Fri 8 am – 6 pm, or direct them to
+If a resident needs to reach a person, give the {company} services line:
+{phone}, available Mon–Fri 8 am – 6 pm, or direct them to
 submit a service request in the portal.
 
 Be concise, warm, and professional. Acknowledge the resident's concern before
 providing information. If a service request ID is mentioned, use the context below
 to give a specific update.\
 """
+
+
+# Full override wins; otherwise build the default from the brand env vars.
+_SYSTEM_PROMPT = os.getenv("ASSISTANT_SYSTEM_PROMPT") or _default_system_prompt(
+    ASSISTANT_NAME, COMPANY_NAME, SUPPORT_PHONE
+)
 
 # Regex to extract a service request ID embedded in the user's message (e.g., "req-00123").
 _REQUEST_ID_RE = re.compile(r"\breq[-_]?(\d+)\b", re.IGNORECASE)

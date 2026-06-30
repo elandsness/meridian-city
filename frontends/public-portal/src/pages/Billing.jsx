@@ -6,6 +6,7 @@ import Button from '../ui/Button.jsx'
 import Badge from '../ui/Badge.jsx'
 import { formatCents } from '../lib/format.js'
 import { startAction, addActionProperties, endAction, reportError } from '../lib/rum.js'
+import { useConfig } from '../config/ConfigContext'
 
 function formatDate(ts) {
   if (!ts) return '—'
@@ -24,6 +25,7 @@ export default function Billing() {
   const { user } = useAuth()
   const citizenId = user?.id
   const qc = useQueryClient()
+  const cfg = useConfig()
 
   const { data, isLoading } = useQuery({
     // Distinct key from Home's outstanding-only query so the two don't collide in
@@ -55,7 +57,7 @@ export default function Billing() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tax &amp; billing</h1>
-          <p className="text-slate-500 text-sm mt-1">Your quarterly Meridian City tax bills.</p>
+          <p className="text-slate-500 text-sm mt-1">Your quarterly {cfg.company.name} tax bills.</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 text-right">
           <div className="text-xs text-slate-500">Balance due</div>

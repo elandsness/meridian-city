@@ -3,6 +3,8 @@
 // phone weather widget, fronted by a smiling sun in sunglasses. Replaces the old
 // "Open incidents" stat tile.
 
+import { useConfig } from '../config/ConfigContext'
+
 function SunFace() {
   const rays = Array.from({ length: 12 }, (_, i) => {
     const a = (i * 30 * Math.PI) / 180
@@ -42,11 +44,12 @@ function SunFace() {
 }
 
 export default function WeatherTile() {
+  const cfg = useConfig()
   return (
     <div className="relative overflow-hidden rounded-xl px-4 py-3 text-white bg-gradient-to-br from-sky-400 to-blue-500">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-white/90 truncate">Meridian City</div>
+          <div className="text-xs font-medium text-white/90 truncate">{cfg.company.name}</div>
           <div className="text-3xl font-semibold leading-tight">75°</div>
           <div className="text-sm text-white/90">Sunny</div>
         </div>

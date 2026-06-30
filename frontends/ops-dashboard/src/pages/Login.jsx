@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useConfig } from '../config/ConfigContext';
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const cfg = useConfig();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +32,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">🏙</div>
-          <h1 className="text-2xl font-bold text-white">Meridian Ops</h1>
+          <h1 className="text-2xl font-bold text-white">{cfg.company.short} Ops</h1>
           <p className="text-gray-500 text-sm mt-1">Operations Dashboard</p>
         </div>
 

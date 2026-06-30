@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import ChatWidget from './ChatWidget.jsx'
 import BrandMark from './BrandMark.jsx'
+import { useConfig } from '../config/ConfigContext'
 
 function initials(user) {
   const src = user?.name || user?.username || ''
@@ -18,6 +19,7 @@ const navLinkClass = ({ isActive }) =>
 
 export default function Layout() {
   const { isAuthenticated, user, logout } = useAuth()
+  const cfg = useConfig()
   const navigate = useNavigate()
 
   function handleLogout() {
@@ -31,7 +33,7 @@ export default function Layout() {
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2.5">
             <BrandMark className="w-9 h-9" />
-            <span className="text-base font-semibold text-white tracking-tight">Meridian City</span>
+            <span className="text-base font-semibold text-white tracking-tight">{cfg.company.name}</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-5">

@@ -4,10 +4,12 @@ import { useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/AuthShell.jsx'
 import Button from '../ui/Button.jsx'
 import { inputClass, labelClass } from '../ui/form.js'
+import { useConfig } from '../config/ConfigContext'
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const cfg = useConfig()
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -31,7 +33,7 @@ export default function Login() {
   }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to your Meridian City account">
+    <AuthShell title="Welcome back" subtitle={`Sign in to your ${cfg.company.name} account`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className={labelClass}>Email or username</label>

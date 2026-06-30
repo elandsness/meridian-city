@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { sendMessage } from '../api/chat.js'
 import { useChat } from '../context/ChatContext.jsx'
 import { trackAction } from '../lib/rum.js'
+import { useConfig } from '../config/ConfigContext'
 
 function ChatIcon() {
   return (
@@ -24,8 +25,10 @@ function DotsLoader() {
 
 export default function ChatWidget() {
   const { open, toggleChat, closeChat } = useChat()
+  const cfg = useConfig()
+  const assistant = cfg.company.assistant.name
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hi, I'm Meri — Meridian City's assistant. How can I help you today?" },
+    { role: 'assistant', content: `Hi, I'm ${assistant} — ${cfg.company.name}'s assistant. How can I help you today?` },
   ])
   const [input, setInput] = useState('')
   const [sessionId] = useState(() => uuidv4())
@@ -82,8 +85,8 @@ export default function ChatWidget() {
         >
           <div className="bg-meridian-blue px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2 text-white">
-              <span className="w-6 h-6 rounded-full bg-noon-sun text-noon-ink flex items-center justify-center text-xs font-semibold">M</span>
-              <span className="font-semibold text-sm">Ask Meri</span>
+              <span className="w-6 h-6 rounded-full bg-noon-sun text-noon-ink flex items-center justify-center text-xs font-semibold">{assistant.charAt(0)}</span>
+              <span className="font-semibold text-sm">Ask {assistant}</span>
             </div>
             <button
               onClick={closeChat}
@@ -142,7 +145,7 @@ export default function ChatWidget() {
       <button
         onClick={toggleChat}
         className="bg-meridian-blue hover:bg-meridian-blue-deep text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors"
-        aria-label="Ask Meri"
+        aria-label={`Ask ${assistant}`}
       >
         {open ? <span className="text-2xl leading-none">×</span> : <ChatIcon />}
       </button>

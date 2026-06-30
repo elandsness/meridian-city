@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
+import { useConfig } from '../config/ConfigContext';
 
 const navItems = [
   { to: '/overview', label: 'Overview', icon: '📊' },
@@ -14,6 +15,7 @@ const navItems = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const cfg = useConfig();
 
   return (
     <div className="flex h-full min-h-screen">
@@ -23,7 +25,7 @@ export default function Layout() {
         <div className="px-6 py-5 border-b border-gray-800">
           <span className="flex items-center gap-2 text-xl font-bold text-white tracking-tight">
             <BrandMark className="w-7 h-7" />
-            Meridian Ops
+            {cfg.company.short} Ops
           </span>
           <p className="text-xs text-gray-500 mt-1">Operations Dashboard</p>
         </div>

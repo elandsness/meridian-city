@@ -4,12 +4,14 @@ import client from '../api/client.js'
 import AuthShell from '../components/AuthShell.jsx'
 import Button from '../ui/Button.jsx'
 import { inputClass, labelClass } from '../ui/form.js'
+import { useConfig } from '../config/ConfigContext'
 
 export default function Register() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', address: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const cfg = useConfig()
 
   function handleChange(e) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -44,7 +46,7 @@ export default function Register() {
   }
 
   return (
-    <AuthShell title="Create account" subtitle="Join Meridian City">
+    <AuthShell title="Create account" subtitle={`Join ${cfg.company.name}`}>
       {success ? (
         <div className="space-y-4">
           <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
@@ -81,7 +83,7 @@ export default function Register() {
             <label className={labelClass}>
               Address <span className="text-slate-400 font-normal">(optional)</span>
             </label>
-            <input type="text" name="address" value={form.address} onChange={handleChange} maxLength={50} className={inputClass} placeholder="123 Main St, Meridian City" />
+            <input type="text" name="address" value={form.address} onChange={handleChange} maxLength={50} className={inputClass} placeholder={`123 Main St, ${cfg.company.name}`} />
           </div>
 
           {error && (
