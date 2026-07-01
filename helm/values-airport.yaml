@@ -78,6 +78,13 @@ industry:
       - { id: incidents, label: "Operational incidents" }
       - { id: analytics, label: "On-time performance" }
       - demo-control
+  # Home-page modules for the passenger portal: status board, airfield map, journey tracker.
+  home:
+    public:
+      - flight-status
+      - airfield-map
+      - my-journey
+      - quick-actions
   # Backend-only demo data + dispatch routing (delivered to traffic-bot +
   # service-dispatch via env; never sent to the browser config.json).
   data:

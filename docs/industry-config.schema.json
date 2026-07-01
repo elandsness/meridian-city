@@ -73,6 +73,15 @@
         "ops": { "$ref": "#/$defs/screenList" },
         "disabled": { "$ref": "#/$defs/screenList" }
       }
+    },
+    "home": {
+      "type": "object",
+      "description": "Home-page module composition per SPA (module ids from the home-module registry).",
+      "additionalProperties": false,
+      "properties": {
+        "public": { "$ref": "#/$defs/screenList" },
+        "ops": { "$ref": "#/$defs/screenList" }
+      }
     }
   },
   "$defs": {
