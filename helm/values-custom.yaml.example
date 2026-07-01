@@ -64,6 +64,17 @@ dynatrace:
   operator:
     enabled: true
 
+  # Auto-provisions business-observability config into the tenant on every
+  # deploy: an OpenPipeline pipeline that extracts the BusinessEvents JSON logs
+  # as bizevents, plus a Business Flow per business process (and deprovisions
+  # them again on `scripts/teardown.sh`). Leave platformToken blank to skip
+  # this feature entirely — OneAgent/RUM/logs work fine without it.
+  businessConfig:
+    # REQUIRED for this feature: a PLATFORM token (dt0s16...) — NOT the classic
+    # apiToken above. Create one under Access Tokens with scopes:
+    #   settings:objects:read, settings:objects:write, settings:schemas:read
+    platformToken: ""
+
 # ---------------------------------------------------------------------------
 # RUM (Real User Monitoring) — front-end user sessions for the two SPAs.
 # The agentless RUM JS is injected at runtime via nginx sub_filter (no rebuild).
