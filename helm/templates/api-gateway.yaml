@@ -44,6 +44,8 @@ spec:
               value: "http://city-operations:8083"
             - name: FLIGHT_OPS_URL
               value: "http://flight-ops:8092"
+            - name: PASSENGER_SERVICE_URL
+              value: "http://passenger-service:8093"
             - name: ANALYTICS_SERVICE_URL
               value: "http://analytics-service:8084"
             - name: AI_SERVICE_URL

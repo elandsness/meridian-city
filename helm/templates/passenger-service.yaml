@@ -1,0 +1,83 @@
+{{- if .Values.passengerService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passenger-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: passenger-service
+spec:
+  replicas: {{ .Values.passengerService.replicaCount }}
+  selector:
+    matchLabels:
+      app: passenger-service
+  template:
+    metadata:
+      labels:
+        app: passenger-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: passenger-service
+    spec:
+      containers:
+        - name: passenger-service
+          image: {{ include "meridian.image" (dict "repository" .Values.passengerService.image.repository "tag" .Values.passengerService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8093
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "passenger-service"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: db-password
+            # Flyway owns the schema; Hibernate maps without validating (mirrors the
+            # other Java services), so a fresh image never crash-loops on ddl validate.
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            # Best-effort link from a passenger journey to a departing flight.
+            - name: FLIGHT_OPS_URL
+              value: "http://flight-ops:8092"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.passengerService.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8093
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8093
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.passengerService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: passenger-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: passenger-service
+spec:
+  type: ClusterIP
+  selector:
+    app: passenger-service
+  ports:
+    - name: http
+      port: {{ .Values.passengerService.service.port }}
+      targetPort: 8093
+{{- end }}

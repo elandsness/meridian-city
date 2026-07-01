@@ -428,6 +428,35 @@ flightOps:
   env: {}
 
 # ---------------------------------------------------------------------------
+# Passenger Service (Java / Spring Boot) — airport vertical
+# Passenger journey (check-in → security → boarding, optional bag steps) + board API.
+# Best-effort links each journey to a departing flight from flight-ops (FLIGHT_OPS_URL).
+# ---------------------------------------------------------------------------
+passengerService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "passenger-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8093
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  # Journey timing + generator (defaults in passenger-service application.yml).
+  # Override per-instance, e.g.:
+  #   env:
+  #     PASSENGER_JOURNEY_MIN_SECONDS: "10"
+  #     PASSENGER_GENERATOR_MAX_ACTIVE: "60"
+  #     PASSENGER_GENERATOR_BAG_PROBABILITY: "0.7"
+  env: {}
+
+# ---------------------------------------------------------------------------
 # Analytics Service (Python / FastAPI)
 # KPI aggregation, SRG metric endpoint, and Business Analytics support.
 # ---------------------------------------------------------------------------

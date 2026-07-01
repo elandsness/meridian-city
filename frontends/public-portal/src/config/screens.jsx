@@ -10,12 +10,14 @@ import Store from '../pages/Store.jsx'
 import Orders from '../pages/Orders.jsx'
 import Billing from '../pages/Billing.jsx'
 import Messages from '../pages/Messages.jsx'
+import MyJourney from '../pages/MyJourney.jsx'
 
 // `protected` gates the route behind auth; `termKey` (optional) pulls the nav label
 // from the terminology map so it re-skins per industry. `subRoutes` are child paths
 // (detail/new) that mount whenever the parent screen is active.
 export const SCREENS = {
   home: { path: '/', label: 'Home', component: Home, protected: false },
+  'my-journey': { path: '/my-journey', label: 'My Journey', icon: '🧳', component: MyJourney, protected: false },
   'service-requests': {
     path: '/service-requests',
     label: 'Service requests',

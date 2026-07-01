@@ -1,0 +1,57 @@
+server:
+  port: 8093
+
+spring:
+  application:
+    name: passenger-service
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: passengers
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: passengers
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Passenger journey simulation — each step spaced by a random delay in [min, max]s
+# so the Passenger Journey Business Flow steps are realistically spaced.
+passenger-journey:
+  enabled: ${PASSENGER_JOURNEY_ENABLED:true}
+  min-seconds: ${PASSENGER_JOURNEY_MIN_SECONDS:20}
+  max-seconds: ${PASSENGER_JOURNEY_MAX_SECONDS:120}
+
+# Steady passenger generator. bag-probability controls how many journeys include the
+# optional bag_check / bag_loaded steps (the rest skip them).
+passenger-generator:
+  enabled: ${PASSENGER_GENERATOR_ENABLED:true}
+  interval-ms: ${PASSENGER_GENERATOR_INTERVAL_MS:15000}
+  max-active: ${PASSENGER_GENERATOR_MAX_ACTIVE:40}
+  bag-probability: ${PASSENGER_GENERATOR_BAG_PROBABILITY:0.6}
+
+# Best-effort link to a departing flight (for the passenger→flight cross-flow story).
+flight-ops:
+  url: ${FLIGHT_OPS_URL:http://localhost:8092}
