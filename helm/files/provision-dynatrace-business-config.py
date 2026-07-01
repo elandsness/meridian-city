@@ -67,6 +67,7 @@ def _load_json_env(name):
 # Per-industry Dynatrace overrides (empty = City defaults / no naming rules).
 SERVICE_NAMES = _load_json_env("DT_SERVICE_NAMES")  # {k8s deployment name: service display name}
 FLOW_LABELS = _load_json_env("DT_FLOW_LABELS")      # {flow key: Business Flow display name}
+FLOW_KEYS = _load_json_env("DT_FLOWS")              # [flow key, ...] to provision (empty = City default set)
 
 # Per-instance identity. With a hash, every name carries it so concurrent installs
 # on the shared tenant stay isolated; without one we keep the legacy single-instance
@@ -155,6 +156,7 @@ DQL_SCRIPT = (
     "`cart.id` = bizjson[`cart.id`], `order.id` = bizjson[`order.id`], `bill.id` = bizjson[`bill.id`], "
     "`work_order.id` = bizjson[`work_order.id`], `incident.id` = bizjson[`incident.id`], "
     "`asset.id` = bizjson[`asset.id`], `anomaly.type` = bizjson[`anomaly.type`], "
+    "`flight.id` = bizjson[`flight.id`], `passenger.id` = bizjson[`passenger.id`], "
     "`assigned_department` = bizjson[`assigned_department`]\n"
     "| fieldsRemove bizjson"
 )
@@ -218,8 +220,8 @@ def routing_entry(pipeline_object_id):
 # are emitted only when an SE turns on the matching demo-control scenario (default off), so
 # the happy-path funnels stay clean otherwise. No DQL/pipeline change is needed: every error
 # event carries a correlation id already surfaced by DQL_SCRIPT (request.id / citizen.id /
-# work_order.id / incident.id / cart.id / order.id / bill.id) and auto-extracts as a bizevent
-# via the includeAll + isNotNull(meridian.event_type) extraction.
+# work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
+# auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
 FLOW_SPECS = [
     {"key": "service-request", "name": "Service Request Lifecycle", "correlationID": "request.id",
      "kpiLabel": "Resolved requests", "kpi": "request.id", "kpiCalculation": "lastEvent",
@@ -255,7 +257,26 @@ FLOW_SPECS = [
      "kpiEventName": "tax.payment_completed",
      "steps": [("Bill issued", "tax.bill_issued"),
                ("Payment completed", "tax.payment_completed", ["tax.payment_failed"])]},
+    # --- Airport vertical flows (provisioned only when DT_FLOWS selects them) ---
+    {"key": "aircraft-turnaround", "name": "Aircraft Turnaround", "correlationID": "flight.id",
+     "kpiLabel": "Departures", "kpi": "flight.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "flight.takeoff",
+     "steps": [("At gate", "flight.at_gate"), ("Servicing", "flight.servicing"),
+               ("Boarding", "flight.boarding"), ("Pushback & taxi", "flight.taxiing"),
+               ("Takeoff", "flight.takeoff")]},
+    {"key": "passenger-journey", "name": "Passenger Journey", "correlationID": "passenger.id",
+     "kpiLabel": "Boarded passengers", "kpi": "passenger.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "passenger.boarded",
+     "steps": [("Checked in", "passenger.checked_in"), ("Bag checked", "passenger.bag_checked"),
+               ("Security cleared", "passenger.security_cleared"), ("Bag loaded", "passenger.bag_loaded"),
+               ("Boarded", "passenger.boarded")]},
 ]
+
+# City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)
+# pass DT_FLOWS to select a different subset; provision()'s stale-flow cleanup removes any
+# of this instance's flows that drop out of the active set on an in-place upgrade.
+DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "iot-incident", "purchase", "tax-payment"]
+ACTIVE_FLOW_SPECS = [s for s in FLOW_SPECS if s["key"] in (FLOW_KEYS or DEFAULT_FLOW_KEYS)]
 
 
 def _event(event_type, is_error=False):
@@ -406,7 +427,7 @@ def provision():
 
     print("- Business Flows")
     wanted_names = set()
-    for spec in FLOW_SPECS:
+    for spec in ACTIVE_FLOW_SPECS:
         value = flow_value(spec)
         wanted_names.add(value["name"])
         upsert(FLOW_SCHEMA, value, lambda v, name=value["name"]: v.get("name") == name)

@@ -56,6 +56,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/passengers',
+      target: config.PASSENGER_SERVICE_URL,
+      serviceName: 'passenger-service',
+      requiresAuth: false,
+    },
+    {
       prefix: '/api/v1/analytics',
       target: config.ANALYTICS_SERVICE_URL,
       serviceName: 'analytics-service',

@@ -34,6 +34,7 @@ jobs:
           - commerce-service
           - billing-service
           - flight-ops
+          - passenger-service
     steps:
       - uses: actions/checkout@v4
 

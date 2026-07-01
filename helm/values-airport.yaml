@@ -66,10 +66,12 @@ industry:
     # store + billing intentionally omitted -> disabled for the airport
     public:
       - home
+      - { id: my-journey, label: "My Journey" }
       - { id: service-requests, label: "Help & requests" }
       - messages
     ops:
       - overview
+      - { id: flight-board, label: "Flight Board" }
       - { id: requests, label: "Maintenance queue" }
       - { id: iot, label: "Ground equipment" }
       - { id: incidents, label: "Operational incidents" }
@@ -140,3 +142,11 @@ industry:
       iot-incident: "Ground Equipment Incident Resolution"
       purchase: "Airport Retail Purchase"
       tax-payment: "Airport Fee Payment"
+    # Active Business Flows for the airport: drop the city store/tax funnels and add the
+    # two aviation hero flows (both defined in provision-dynatrace-business-config.py).
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - aircraft-turnaround
+      - passenger-journey
