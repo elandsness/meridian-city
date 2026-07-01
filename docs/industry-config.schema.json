@@ -83,8 +83,22 @@
     },
     "screenList": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-      "uniqueItems": true
+      "uniqueItems": true,
+      "items": {
+        "oneOf": [
+          { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "label": { "type": "string" },
+              "icon": { "type": "string" }
+            }
+          }
+        ]
+      }
     }
   }
 }

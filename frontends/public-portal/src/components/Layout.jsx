@@ -4,6 +4,7 @@ import NotificationBell from './NotificationBell.jsx'
 import ChatWidget from './ChatWidget.jsx'
 import BrandMark from './BrandMark.jsx'
 import { useConfig } from '../config/ConfigContext'
+import { getActiveScreens } from '../config/screens.jsx'
 
 function initials(user) {
   const src = user?.name || user?.username || ''
@@ -20,6 +21,7 @@ const navLinkClass = ({ isActive }) =>
 export default function Layout() {
   const { isAuthenticated, user, logout } = useAuth()
   const cfg = useConfig()
+  const screens = getActiveScreens(cfg)
   const navigate = useNavigate()
 
   function handleLogout() {
@@ -37,11 +39,11 @@ export default function Layout() {
           </Link>
 
           <div className="hidden md:flex items-center gap-5">
-            <NavLink to="/" end className={navLinkClass}>Home</NavLink>
-            <NavLink to="/service-requests" className={navLinkClass}>Service requests</NavLink>
-            <NavLink to="/store" className={navLinkClass}>City store</NavLink>
-            <NavLink to="/billing" className={navLinkClass}>Pay bills</NavLink>
-            <NavLink to="/messages" className={navLinkClass}>Messages</NavLink>
+            {screens.map((s) => (
+              <NavLink key={s.id} to={s.path} end={s.path === '/'} className={navLinkClass}>
+                {s.label}
+              </NavLink>
+            ))}
           </div>
 
           <div className="ml-auto flex items-center gap-3">
