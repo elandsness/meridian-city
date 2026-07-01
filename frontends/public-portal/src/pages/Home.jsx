@@ -13,6 +13,7 @@ import Button from '../ui/Button.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { displayName, greeting, formatCents } from '../lib/format.js'
+import { useConfig } from '../config/ConfigContext'
 
 const OPEN_STATUSES = new Set(['submitted', 'dispatched', 'assigned', 'acknowledged', 'in_progress'])
 
@@ -58,6 +59,8 @@ function QuickAction({ icon, title, subtitle, to, onClick }) {
 export default function Home() {
   const { isAuthenticated, user } = useAuth()
   const { openChat } = useChat()
+  const cfg = useConfig()
+  const assistant = cfg.company.assistant.name
 
   const { data: devicesData } = useQuery({
     queryKey: ['devices'],
@@ -104,9 +107,9 @@ export default function Home() {
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {isAuthenticated ? `${greeting()}, ${displayName(user)}` : 'Welcome to Meridian City'}
+            {isAuthenticated ? `${greeting()}, ${displayName(user)}` : `Welcome to ${cfg.company.name}`}
           </h1>
-          <p className="text-slate-500 mt-1">Here's what's happening across Meridian City today.</p>
+          <p className="text-slate-500 mt-1">Here's what's happening across {cfg.company.name} today.</p>
         </div>
         {!isAuthenticated && (
           <div className="flex gap-2">
@@ -132,7 +135,7 @@ export default function Home() {
 
       {/* Incidents + side column */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2" title="Meridian City transit" action={<LiveBadge />}>
+        <Card className="lg:col-span-2" title={`${cfg.company.name} transit`} action={<LiveBadge />}>
           <TransitPanel />
         </Card>
 
@@ -159,7 +162,7 @@ export default function Home() {
             )}
           </Card>
         ) : (
-          <Card title="Join Meridian City">
+          <Card title={`Join ${cfg.company.name}`}>
             <p className="text-sm text-slate-600">
               Create an account to submit service requests, track incidents near you, pay city
               bills, and shop the city store.
@@ -178,7 +181,7 @@ export default function Home() {
         <QuickAction icon="pay" title="Pay bills" subtitle="Tax bills & history" to="/billing" />
         <QuickAction icon="report" title="Report an issue" subtitle="Submit a service request" to="/service-requests/new" />
         <QuickAction icon="list" title="My requests" subtitle="Track your submissions" to="/service-requests" />
-        <QuickAction icon="chat" title="Ask Meri" subtitle="City AI assistant" onClick={openChat} />
+        <QuickAction icon="chat" title={`Ask ${assistant}`} subtitle="AI assistant" onClick={openChat} />
       </div>
     </div>
   )

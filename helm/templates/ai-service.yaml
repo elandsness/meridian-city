@@ -69,6 +69,21 @@ spec:
               value: "http://citizen-service:8081"
             - name: CITY_OPERATIONS_URL
               value: "http://city-operations:8083"
+            # AI persona — config-driven (Phase 1). The assistant re-skins with the
+            # industry brand. ASSISTANT_SYSTEM_PROMPT / SUPPORT_PHONE (optional) let a
+            # non-city industry fully override the persona and contact line.
+            - name: ASSISTANT_NAME
+              value: {{ .Values.industry.company.assistant.name | quote }}
+            - name: COMPANY_NAME
+              value: {{ .Values.industry.company.name | quote }}
+            {{- with .Values.industry.company.assistant.systemPrompt }}
+            - name: ASSISTANT_SYSTEM_PROMPT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.industry.company.assistant.supportPhone }}
+            - name: SUPPORT_PHONE
+              value: {{ . | quote }}
+            {{- end }}
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:

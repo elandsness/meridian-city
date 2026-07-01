@@ -6,6 +6,7 @@ import Card from '../ui/Card.jsx'
 import Badge from '../ui/Badge.jsx'
 import Timeline from '../ui/Timeline.jsx'
 import { formatCents } from '../lib/format.js'
+import { useConfig } from '../config/ConfigContext'
 
 const STAGES = [
   ['placed', 'Order placed'],
@@ -34,6 +35,7 @@ function unwrapArray(d) {
 export default function Orders() {
   const { user } = useAuth()
   const citizenId = user?.id
+  const cfg = useConfig()
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', citizenId],
@@ -49,7 +51,7 @@ export default function Orders() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Your orders</h1>
-          <p className="text-slate-500 text-sm mt-1">Track your Meridian City store orders.</p>
+          <p className="text-slate-500 text-sm mt-1">Track your {cfg.company.name} store orders.</p>
         </div>
         <Link to="/store" className="text-sm text-meridian-blue hover:underline font-medium">Back to store</Link>
       </div>
