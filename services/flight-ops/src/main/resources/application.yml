@@ -1,0 +1,54 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: flight-ops
+  jackson:
+    # Global SNAKE_CASE at the HTTP boundary (docs/API_CONVENTIONS.md §1).
+    property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: flights
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: flights
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Flight lifecycle simulation — each status transition is spaced by a random delay
+# in [min, max] seconds so the aircraft-turnaround Business Flow steps look realistic
+# (and, later, planes visibly creep across the airfield map). Tuned short by default
+# for a lively demo board; override via env for slower/faster pacing.
+flight-lifecycle:
+  enabled: ${FLIGHT_LIFECYCLE_ENABLED:true}
+  min-seconds: ${FLIGHT_LIFECYCLE_MIN_SECONDS:20}
+  max-seconds: ${FLIGHT_LIFECYCLE_MAX_SECONDS:120}
+
+# Steady flight generator — keeps a busy board of concurrent flights.
+flight-generator:
+  enabled: ${FLIGHT_GENERATOR_ENABLED:true}
+  interval-ms: ${FLIGHT_GENERATOR_INTERVAL_MS:25000}
+  max-active: ${FLIGHT_GENERATOR_MAX_ACTIVE:16}

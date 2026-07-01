@@ -1,0 +1,80 @@
+{{- if .Values.flightOps.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flight-ops
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flight-ops
+spec:
+  replicas: {{ .Values.flightOps.replicaCount }}
+  selector:
+    matchLabels:
+      app: flight-ops
+  template:
+    metadata:
+      labels:
+        app: flight-ops
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: flight-ops
+    spec:
+      containers:
+        - name: flight-ops
+          image: {{ include "meridian.image" (dict "repository" .Values.flightOps.image.repository "tag" .Values.flightOps.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8092
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "flight-ops"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: db-password
+            # Flyway owns the schema; Hibernate maps without validating (mirrors the
+            # other Java services), so a fresh image never crash-loops on ddl validate.
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.flightOps.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8092
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8092
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.flightOps.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flight-ops
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flight-ops
+spec:
+  type: ClusterIP
+  selector:
+    app: flight-ops
+  ports:
+    - name: http
+      port: {{ .Values.flightOps.service.port }}
+      targetPort: 8092
+{{- end }}

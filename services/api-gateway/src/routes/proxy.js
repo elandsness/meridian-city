@@ -50,6 +50,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/flights',
+      target: config.FLIGHT_OPS_URL,
+      serviceName: 'flight-ops',
+      requiresAuth: false,
+    },
+    {
       prefix: '/api/v1/analytics',
       target: config.ANALYTICS_SERVICE_URL,
       serviceName: 'analytics-service',

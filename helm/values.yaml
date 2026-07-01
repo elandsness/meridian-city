@@ -401,6 +401,33 @@ cityOperations:
   env: {}
 
 # ---------------------------------------------------------------------------
+# Flight Operations Service (Java / Spring Boot) — airport vertical
+# Flight lifecycle (turnaround + arrival) state machine + flight-board API.
+# ---------------------------------------------------------------------------
+flightOps:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "flight-ops"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8092
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  # Flight lifecycle timing + generator (defaults in flight-ops application.yml).
+  # Override per-instance, e.g.:
+  #   env:
+  #     FLIGHT_LIFECYCLE_MIN_SECONDS: "10"
+  #     FLIGHT_GENERATOR_MAX_ACTIVE: "24"
+  env: {}
+
+# ---------------------------------------------------------------------------
 # Analytics Service (Python / FastAPI)
 # KPI aggregation, SRG metric endpoint, and Business Analytics support.
 # ---------------------------------------------------------------------------

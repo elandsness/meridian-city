@@ -16,6 +16,7 @@ const config = {
   CITIZEN_SERVICE_URL: process.env.CITIZEN_SERVICE_URL || 'http://localhost:8081',
   SERVICE_DISPATCH_URL: process.env.SERVICE_DISPATCH_URL || 'http://localhost:8082',
   CITY_OPERATIONS_URL: process.env.CITY_OPERATIONS_URL || 'http://localhost:8083',
+  FLIGHT_OPS_URL: process.env.FLIGHT_OPS_URL || 'http://localhost:8092',
   ANALYTICS_SERVICE_URL: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:8084',
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:8085',
   NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8087',
