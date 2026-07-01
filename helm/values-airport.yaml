@@ -75,3 +75,49 @@ industry:
       - { id: incidents, label: "Operational incidents" }
       - { id: analytics, label: "On-time performance" }
       - demo-control
+  # Backend-only demo data + dispatch routing (delivered to traffic-bot +
+  # service-dispatch via env; never sent to the browser config.json).
+  data:
+    zones:
+      - terminal-1
+      - terminal-2
+      - concourse-a
+      - concourse-b
+      - airfield
+      - baggage-hall
+      - curbside
+    requestTemplates:
+      - { category: terminal,         title: "Jet bridge stuck at gate B12",       description: "The passenger boarding bridge at gate B12 is stuck and won't align with the aircraft door." }
+      - { category: terminal,         title: "Boarding display frozen at B7",      description: "The flight information display at gate B7 is frozen on a departed flight." }
+      - { category: terminal,         title: "Escalator down in Terminal 2",       description: "The escalator to the Terminal 2 mezzanine has stopped and is cordoned off." }
+      - { category: baggage,          title: "Baggage carousel 4 jammed",          description: "Carousel 4 in the baggage hall has jammed with bags backing up on the belt." }
+      - { category: baggage,          title: "Oversize bag scanner offline",       description: "The oversize baggage scanner near check-in row H is offline." }
+      - { category: airfield,         title: "FOD debris on Taxiway C",            description: "Foreign object debris reported on Taxiway C near the intersection with Taxiway B." }
+      - { category: airfield,         title: "Ground power unit fault at stand A3", description: "The fixed ground power unit at stand A3 keeps tripping its breaker." }
+      - { category: airfield,         title: "Apron floodlight out at stand C9",   description: "An apron floodlight over stand C9 is out, reducing night ramp visibility." }
+      - { category: security,         title: "Security lane 3 scanner error",      description: "The X-ray scanner at security lane 3 is throwing repeated faults." }
+      - { category: security,         title: "Long queue at Terminal 1 security",  description: "Passenger wait times at the Terminal 1 checkpoint are exceeding 30 minutes." }
+      - { category: facilities,       title: "Restroom flooding near gate A10",    description: "Water is pooling on the floor of the restroom near gate A10." }
+      - { category: facilities,       title: "Concourse B HVAC too warm",          description: "The air conditioning in Concourse B is not keeping up; passengers reporting heat." }
+      - { category: ground-transport, title: "Parking gate arm broken in P3",      description: "The exit gate arm in parking structure P3 is stuck down, blocking cars." }
+      - { category: ground-transport, title: "Shuttle bay 2 blocked",             description: "A stalled vehicle is blocking shuttle bay 2 at the arrivals curb." }
+    chatQuestions:
+      - "How long is the security wait at Terminal 1?"
+      - "Where is the nearest lounge?"
+      - "Which gate does my flight leave from?"
+      - "Where do I report lost or delayed baggage?"
+      - "Where is short-term parking and how much does it cost?"
+      - "How early should I arrive for an international flight?"
+      - "How do I get between Terminal 1 and Terminal 2?"
+      - "Where can I find wheelchair assistance?"
+      - "Are there charging stations after security?"
+      - "Where is the pet relief area?"
+      - "Where do I pick up my rental car?"
+      - "Is there a shuttle to long-term parking?"
+  routing:
+    terminal: "Terminal Operations"
+    baggage: "Baggage Handling"
+    airfield: "Airfield Operations"
+    security: "Security & Screening"
+    facilities: "Facilities Management"
+    ground-transport: "Ground Transportation"

@@ -1,29 +1,45 @@
 'use strict'
 
 // ---------------------------------------------------------------------------
-// Fake citizen data pools — realistic enough to make traces look human
+// Demo data pools. The City values below are the built-in fallback; an industry
+// overlay can override any pool via the INDUSTRY_DATA env var (JSON), delivered by
+// Helm from .Values.industry.data. This keeps generated traffic realistic per
+// industry with no rebuild. An empty/absent override => City defaults.
 // ---------------------------------------------------------------------------
 
-const FIRST_NAMES = [
+let OVERRIDE = {}
+try {
+  if (process.env.INDUSTRY_DATA) OVERRIDE = JSON.parse(process.env.INDUSTRY_DATA)
+} catch (err) {
+  console.warn('[traffic-bot] INDUSTRY_DATA is not valid JSON — using built-in city defaults:', err.message)
+  OVERRIDE = {}
+}
+
+// Use the override array when it's a non-empty array; otherwise the City fallback.
+const pick = (key, fallback) =>
+  Array.isArray(OVERRIDE[key]) && OVERRIDE[key].length ? OVERRIDE[key] : fallback
+
+const FIRST_NAMES = pick('firstNames', [
   'Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry',
   'Iris', 'Jack', 'Karen', 'Leo', 'Maya', 'Noah', 'Olivia', 'Paul',
   'Quinn', 'Rachel', 'Sam', 'Tara', 'Uma', 'Victor', 'Wendy', 'Xander',
   'Yasmin', 'Zoe', 'Aaron', 'Brianna', 'Carlos', 'Diana',
-]
+])
 
-const LAST_NAMES = [
+const LAST_NAMES = pick('lastNames', [
   'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller',
   'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez',
   'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin',
   'Lee', 'Perez', 'Thompson', 'White', 'Harris',
-]
+])
 
-const EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com', 'meridianmail.com', 'cityresident.org']
+const EMAIL_DOMAINS = pick('emailDomains', ['gmail.com', 'yahoo.com', 'outlook.com', 'meridianmail.com', 'cityresident.org'])
 
-const ZONES = ['zone-north', 'zone-south', 'zone-east', 'zone-west', 'zone-central']
+const ZONES = pick('zones', ['zone-north', 'zone-south', 'zone-east', 'zone-west', 'zone-central'])
 
-// Service request templates — spans all 5 categories for even Business Events coverage
-const REQUEST_TEMPLATES = [
+// Service request templates — City defaults span all 5 categories for even
+// Business Events coverage; an industry overlay supplies its own set.
+const REQUEST_TEMPLATES = pick('requestTemplates', [
   { category: 'infrastructure', title: 'Pothole on Main St',        description: 'Large pothole near the intersection of Main St and Oak Ave causing vehicle damage.' },
   { category: 'infrastructure', title: 'Broken sidewalk',           description: 'Cracked and raised sidewalk panel creating a trip hazard on Elm Street.' },
   { category: 'infrastructure', title: 'Graffiti on bridge',        description: 'Graffiti has appeared on the underpass wall near Central Station.' },
@@ -41,12 +57,12 @@ const REQUEST_TEMPLATES = [
   { category: 'transport',      title: 'Malfunctioning traffic light', description: 'Traffic lights at Oak St and Pine Ave are cycling incorrectly, causing congestion.' },
   { category: 'transport',      title: 'Missing road sign',         description: 'Stop sign at Birch Rd and Highway 9 has been knocked down.' },
   { category: 'transport',      title: 'Bike lane obstruction',     description: 'Construction debris is blocking the bike lane on 2nd Avenue.' },
-]
+])
 
 const PRIORITIES = ['low', 'normal', 'normal', 'normal', 'high', 'urgent']  // weighted toward normal
 
-// Chatbot questions — mirrors what a real citizen might type
-const CHAT_QUESTIONS = [
+// Chatbot questions — City defaults; an industry overlay supplies its own.
+const CHAT_QUESTIONS = pick('chatQuestions', [
   'Where do I report a broken streetlight?',
   'How do I submit a service request for a pothole?',
   'What are the current active incidents in the city?',
@@ -67,7 +83,7 @@ const CHAT_QUESTIONS = [
   'Can I attach photos to a service request?',
   'Is there a water main break on Elm Street?',
   'How do I report graffiti?',
-]
+])
 
 // ---------------------------------------------------------------------------
 // Generators

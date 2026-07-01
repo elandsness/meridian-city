@@ -52,6 +52,10 @@ spec:
             # is merged and CI has published new images.
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "none"
+            # Industry dispatch routing (category -> department). Empty {} => the
+            # RoutingEngine falls back to its built-in City routing.
+            - name: ROUTING_MAP
+              value: {{ .Values.industry.routing | default dict | toJson | quote }}
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
             {{- with .Values.serviceDispatch.env }}
             {{- include "meridian.extraEnv" . | nindent 12 }}
