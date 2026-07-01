@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG = {
       accentSoft: '#f6b54e',
       accentInk: '#412402',
     },
-    logo: '/meridian-logo.svg',
+    logo: '', // empty = use the built-in inline BrandMark; set a path/URL to override
     favicon: '/meridian-logo.svg',
   },
   terminology: {

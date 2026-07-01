@@ -65,7 +65,7 @@ industry:
       accent: "#EF9F27"
       accentSoft: "#f6b54e"
       accentInk: "#412402"
-    logo: "/meridian-logo.svg"
+    logo: ""  # empty = built-in BrandMark; an industry overlay sets its own
     favicon: "/meridian-logo.svg"
   terminology:
     customer: "Citizen"

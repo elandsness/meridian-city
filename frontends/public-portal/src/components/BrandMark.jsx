@@ -3,7 +3,15 @@
  * (its own orange disc), so it drops in without a background badge. Mirrors
  * frontends/meridian-logo.svg (also used for the favicon).
  */
+import { useConfig } from '../config/ConfigContext'
+
 export default function BrandMark({ className = 'w-8 h-8' }) {
+  const cfg = useConfig()
+  // A non-empty theme.logo overrides the built-in mark with an image; empty = use
+  // the inline brand mark below (the Meridian City default).
+  if (cfg.theme?.logo) {
+    return <img src={cfg.theme.logo} alt={`${cfg.company.name} logo`} className={className} />
+  }
   return (
     <svg viewBox="0 0 200 200" className={className} role="img" aria-label="Meridian City logo">
       <circle cx="100" cy="100" r="96" fill="#F97316" />
