@@ -33,6 +33,7 @@ jobs:
           - city-operations
           - commerce-service
           - billing-service
+          - flight-ops
     steps:
       - uses: actions/checkout@v4
 
