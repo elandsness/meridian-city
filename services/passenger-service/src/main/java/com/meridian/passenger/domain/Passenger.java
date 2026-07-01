@@ -47,6 +47,10 @@ public class Passenger {
     @Column(name = "gate")
     private String gate;
 
+    /** Citizen/user id that owns this personal journey; null for generator-created passengers. */
+    @Column(name = "owner_id")
+    private String ownerId;
+
     @Column(name = "has_bag", nullable = false)
     @Builder.Default
     private boolean hasBag = false;

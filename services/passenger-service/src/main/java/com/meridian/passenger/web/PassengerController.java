@@ -28,6 +28,13 @@ public class PassengerController {
         return passengers.stream().map(PassengerResponse::from).toList();
     }
 
+    /** The logged-in user's own journey, created on first visit (falls back to a fresh one). */
+    @GetMapping("/me")
+    public PassengerResponse myJourney(@RequestParam("user_id") String userId,
+                                       @RequestParam(value = "name", required = false) String name) {
+        return PassengerResponse.from(passengerService.getOrCreateForOwner(userId, name));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PassengerResponse> get(@PathVariable String id) {
         Passenger p = passengerService.findById(id);
