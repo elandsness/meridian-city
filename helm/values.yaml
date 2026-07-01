@@ -86,6 +86,9 @@ industry:
   # City defaults; an industry overlay (e.g. values-airport.yaml) supplies its own.
   data: {}
   routing: {}
+  # Per-industry Dynatrace: {serviceNames: {deployment: displayName}, flowLabels: {flowKey: name}}.
+  # Applied by the provisioner Job, scoped to this instance's namespace. Empty = City defaults.
+  dynatrace: {}
 
 # ---------------------------------------------------------------------------
 # Dynatrace configuration

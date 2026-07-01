@@ -14,5 +14,5 @@ metadata:
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
 data:
-  config.json: {{ omit .Values.industry "data" "routing" | toJson | quote }}
+  config.json: {{ omit .Values.industry "data" "routing" "dynatrace" | toJson | quote }}
 {{- end }}
