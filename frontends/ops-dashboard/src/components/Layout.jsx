@@ -3,19 +3,12 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
 import { useConfig } from '../config/ConfigContext';
-
-const navItems = [
-  { to: '/overview', label: 'Overview', icon: '📊' },
-  { to: '/iot', label: 'IoT Fleet', icon: '🌐' },
-  { to: '/incidents', label: 'Incidents', icon: '🚨' },
-  { to: '/requests', label: 'Requests', icon: '📋' },
-  { to: '/analytics', label: 'Business Analytics', icon: '📈' },
-  { to: '/demo-control', label: 'Demo Control', icon: '🎛' },
-];
+import { getActiveScreens } from '../config/screens.jsx';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const cfg = useConfig();
+  const screens = getActiveScreens(cfg);
 
   return (
     <div className="flex h-full min-h-screen">
@@ -32,10 +25,10 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          {navItems.map(({ to, label, icon }) => (
+          {screens.map((s) => (
             <NavLink
-              key={to}
-              to={to}
+              key={s.id}
+              to={s.path}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors border-l-2 ${
                   isActive
@@ -44,8 +37,8 @@ export default function Layout() {
                 }`
               }
             >
-              <span>{icon}</span>
-              <span>{label}</span>
+              <span>{s.icon}</span>
+              <span>{s.label}</span>
             </NavLink>
           ))}
         </nav>

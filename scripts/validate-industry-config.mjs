@@ -57,9 +57,16 @@ if (cfg.screens !== undefined) {
   for (const key of Object.keys(cfg.screens || {})) {
     check(SCREEN_KEYS.includes(key), `screens has unknown key "${key}"`)
     const list = cfg.screens[key]
+    const okItem = (s) =>
+      (isStr(s) && ID.test(s)) ||
+      (isObj(s) &&
+        isStr(s.id) &&
+        ID.test(s.id) &&
+        (s.label === undefined || isStr(s.label)) &&
+        (s.icon === undefined || isStr(s.icon)))
     check(
-      Array.isArray(list) && list.every((s) => isStr(s) && ID.test(s)),
-      `screens.${key} must be an array of screen ids (^[a-z][a-z0-9-]*$)`,
+      Array.isArray(list) && list.every(okItem),
+      `screens.${key} items must be a screen id or { id, label?, icon? }`,
     )
   }
 }
