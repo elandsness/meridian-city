@@ -72,6 +72,7 @@ industry:
     ops:
       - overview
       - { id: flight-board, label: "Flight Board" }
+      - { id: airfield, label: "Airfield" }
       - { id: requests, label: "Maintenance queue" }
       - { id: iot, label: "Ground equipment" }
       - { id: incidents, label: "Operational incidents" }
