@@ -51,8 +51,16 @@ success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
-# Generate a short per-instance hash (4 chars, base36: a-z0-9).
-gen_hash() { LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 4; }
+# Generate a short per-instance hash (4 chars, base36: a-z0-9). Read a BOUNDED chunk of
+# /dev/urandom so `tr` reaches EOF and exits cleanly. Piping endless /dev/urandom into
+# `head -c 4` makes head close the pipe after 4 bytes, killing `tr` with SIGPIPE (exit
+# 141) — which `set -o pipefail` + `set -e` turn into an aborted install. 256 random
+# bytes yield ~35 base36 chars, far more than the 4 we slice.
+gen_hash() {
+  local s
+  s=$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'a-z0-9')
+  printf '%s' "${s:0:4}"
+}
 
 # Resolve RELEASE_NAME / NAMESPACE / INSTANCE_HASH for this invocation ($1 = subcommand).
 #   install : generate a fresh hash unless RELEASE_NAME / INSTANCE_HASH is pinned.
