@@ -12,7 +12,7 @@ const SEG_MS = 55_000
 
 const DEP_STATES = ['at_gate', 'servicing', 'boarding', 'taxiing', 'takeoff', 'departed']
 const ARR_STATES = ['approach', 'landing', 'taxi_in', 'arrived']
-const TERMINAL_STATES = new Set(['departed', 'arrived'])
+const TERMINAL_STATES = new Set(['departed', 'arrived', 'cancelled'])
 
 const Y_GATE = 468
 const Y_TAXI = 300

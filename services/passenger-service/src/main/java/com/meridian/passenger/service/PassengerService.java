@@ -66,7 +66,7 @@ public class PassengerService {
     @Transactional
     public Passenger getOrCreateForOwner(String ownerId, String name) {
         return repository.findFirstByOwnerIdOrderByCreatedAtDesc(ownerId)
-                .filter(p -> !"boarded".equals(p.getStatus()))
+                .filter(p -> !"boarded".equals(p.getStatus()) && !"offloaded".equals(p.getStatus()))
                 .orElseGet(() -> spawn(name, ThreadLocalRandom.current().nextBoolean(), ownerId));
     }
 

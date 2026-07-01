@@ -18,4 +18,6 @@ module.exports = {
   ANALYTICS_SERVICE_URL:    process.env.ANALYTICS_SERVICE_URL    || 'http://analytics-service:8084',
   COMMERCE_SERVICE_URL:     process.env.COMMERCE_SERVICE_URL     || 'http://localhost:8090',
   BILLING_SERVICE_URL:      process.env.BILLING_SERVICE_URL      || 'http://localhost:8091',
+  FLIGHT_OPS_URL:           process.env.FLIGHT_OPS_URL           || 'http://localhost:8092',
+  PASSENGER_SERVICE_URL:    process.env.PASSENGER_SERVICE_URL    || 'http://localhost:8093',
 }

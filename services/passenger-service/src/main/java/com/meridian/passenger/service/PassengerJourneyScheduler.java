@@ -1,11 +1,13 @@
 package com.meridian.passenger.service;
 
+import com.meridian.passenger.config.FaultState;
 import com.meridian.passenger.config.PassengerJourneyProperties;
 import com.meridian.passenger.domain.Passenger;
 import com.meridian.passenger.repository.PassengerRepository;
 import com.meridian.passenger.util.BusinessEventLogger;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,28 +15,28 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Advances passengers through the departure journey on a fixed poll. The next
- * status depends on whether the passenger checked a bag — the bag_checked and
- * bag_loaded steps are skipped for carry-on-only journeys:
+ * Advances passengers through the departure journey on a fixed poll. The next status
+ * depends on whether the passenger checked a bag — the bag_checked and bag_loaded steps
+ * are skipped for carry-on-only journeys:
  *
  *   with bag:    checked_in → bag_checked → security_cleared → bag_loaded → boarded
  *   without bag: checked_in → security_cleared → boarded
  *
- * A transition only fires once now &gt;= next_transition_at, so steps are spaced by
- * the configured random band (Passenger Journey Business Flow durations).
+ * When fault injection is on, a share of passengers are offloaded at security.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class PassengerJourneyScheduler {
 
-    /** Non-terminal statuses eligible to advance (boarded is terminal). */
+    /** Non-terminal statuses eligible to advance (boarded / offloaded are terminal). */
     private static final List<String> ACTIVE = List.of(
             "checked_in", "bag_checked", "security_cleared", "bag_loaded");
 
     private final PassengerRepository repository;
     private final PassengerJourneyProperties journeyProps;
     private final BusinessEventLogger businessEvents;
+    private final FaultState faultState;
 
     private static String nextStatus(String current, boolean hasBag) {
         return switch (current) {
@@ -42,7 +44,7 @@ public class PassengerJourneyScheduler {
             case "bag_checked" -> "security_cleared";
             case "security_cleared" -> hasBag ? "bag_loaded" : "boarded";
             case "bag_loaded" -> "boarded";
-            default -> null; // boarded / unknown = terminal
+            default -> null; // boarded / offloaded / unknown = terminal
         };
     }
 
@@ -78,6 +80,15 @@ public class PassengerJourneyScheduler {
             repository.save(p);
             return;
         }
+        // Gated demo failure: offload a share of passengers as they reach security.
+        if ("security_cleared".equals(next) && shouldOffload()) {
+            p.setStatus("offloaded");
+            p.setUpdatedAt(now);
+            p.setNextTransitionAt(null);
+            repository.save(p);
+            businessEvents.passengerStatus(p); // emits passenger.offloaded
+            return;
+        }
         p.setStatus(next);
         p.setProgress(progressFor(next));
         p.setUpdatedAt(now);
@@ -86,5 +97,10 @@ public class PassengerJourneyScheduler {
                 : now.plusSeconds(journeyProps.nextDelaySeconds()));
         repository.save(p);
         businessEvents.passengerStatus(p);
+    }
+
+    private boolean shouldOffload() {
+        return faultState.isFailuresEnabled()
+                && ThreadLocalRandom.current().nextDouble() < faultState.getFailureRate();
     }
 }
