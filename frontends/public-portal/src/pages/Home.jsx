@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useChat } from '../context/ChatContext.jsx'
 import { displayName, greeting, formatCents } from '../lib/format.js'
 import { useConfig } from '../config/ConfigContext'
+import { getActiveScreens } from '../config/screens.jsx'
 
 const OPEN_STATUSES = new Set(['submitted', 'dispatched', 'assigned', 'acknowledged', 'in_progress'])
 
@@ -61,6 +62,7 @@ export default function Home() {
   const { openChat } = useChat()
   const cfg = useConfig()
   const assistant = cfg.company.assistant.name
+  const activeScreens = new Set(getActiveScreens(cfg).map((s) => s.id))
 
   const { data: devicesData } = useQuery({
     queryKey: ['devices'],
@@ -164,8 +166,8 @@ export default function Home() {
         ) : (
           <Card title={`Join ${cfg.company.name}`}>
             <p className="text-sm text-slate-600">
-              Create an account to submit service requests, track incidents near you, pay city
-              bills, and shop the city store.
+              Create an account to submit requests, track updates, and access everything{' '}
+              {cfg.company.name} has to offer.
             </p>
             <div className="flex gap-2 mt-4">
               <Button to="/register" variant="primary" size="sm">Create account</Button>
@@ -175,12 +177,20 @@ export default function Home() {
         )}
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions — only for screens the config actually enables */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <QuickAction icon="store" title="City store" subtitle="Mugs, tees & more" to="/store" />
-        <QuickAction icon="pay" title="Pay bills" subtitle="Tax bills & history" to="/billing" />
-        <QuickAction icon="report" title="Report an issue" subtitle="Submit a service request" to="/service-requests/new" />
-        <QuickAction icon="list" title="My requests" subtitle="Track your submissions" to="/service-requests" />
+        {activeScreens.has('store') && (
+          <QuickAction icon="store" title="City store" subtitle="Mugs, tees & more" to="/store" />
+        )}
+        {activeScreens.has('billing') && (
+          <QuickAction icon="pay" title="Pay bills" subtitle="Tax bills & history" to="/billing" />
+        )}
+        {activeScreens.has('service-requests') && (
+          <QuickAction icon="report" title="Report an issue" subtitle="Submit a service request" to="/service-requests/new" />
+        )}
+        {activeScreens.has('service-requests') && (
+          <QuickAction icon="list" title="My requests" subtitle="Track your submissions" to="/service-requests" />
+        )}
         <QuickAction icon="chat" title={`Ask ${assistant}`} subtitle="AI assistant" onClick={openChat} />
       </div>
     </div>

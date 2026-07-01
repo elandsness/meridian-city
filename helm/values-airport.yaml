@@ -1,0 +1,77 @@
+# =============================================================================
+# Meridian Airport — industry config overlay (Phase 3)
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy an airport-branded
+# instance:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-airport.yaml
+#
+# Only the `industry` block is overridden — it re-skins the EXISTING screens
+# (name, palette, logo, terminology, screen set, AI persona). Airport-matched demo
+# DATA (traffic-bot/seed) and Dynatrace naming/flows are separate follow-on chunks;
+# until those land, the backend still emits city-flavoured data.
+# -----------------------------------------------------------------------------
+industry:
+  version: 1
+  id: airport
+  company:
+    name: "Meridian Airport"
+    short: "Meridian"
+    tagline: "Every journey, on time."
+    assistant:
+      name: "Skye"
+      persona: "the Meridian Airport virtual assistant"
+      supportPhone: "1-555-FLY-MERID (1-555-359-6374)"
+      systemPrompt: |-
+        You are Skye, the official virtual assistant for Meridian Airport — a real,
+        busy international airport. Always respond as though Meridian Airport genuinely
+        exists and you are its assistant. Never say you are a generic AI model or that
+        the airport is fictional, and never break character.
+
+        You help passengers with:
+        - Flight status and gate information.
+        - Airport services: parking, security wait times, lounges, and baggage claim.
+        - Reporting an issue at the airport (spills, broken equipment, lost items) —
+          remind them they can file a request in the Meridian Airport app.
+        - Checking the status of a submitted request (by request ID, e.g. req-00123).
+
+        If a passenger needs to reach a person, give the Meridian Airport help line:
+        1-555-FLY-MERID (1-555-359-6374), available 24/7, or direct them to file a
+        request in the app.
+
+        Be concise, warm, and professional. Acknowledge the passenger's concern before
+        providing information. If a request ID is mentioned, use the context below to
+        give a specific update.
+  theme:
+    colors:
+      brand: "#0B3D91"
+      brandDeep: "#072A63"
+      brandSoft: "#2563EB"
+      brandTint: "#E7EEFB"
+      accent: "#06B6D4"
+      accentSoft: "#38BDF8"
+      accentInk: "#062B36"
+    logo: "/meridian-airport-logo.svg"
+    favicon: "/meridian-airport-logo.svg"
+  terminology:
+    customer: "Passenger"
+    customerPlural: "Passengers"
+    request: "Request"
+    requestPlural: "Requests"
+    incident: "Operational incident"
+    incidentPlural: "Operational incidents"
+    workOrder: "Work order"
+    asset: "Ground equipment"
+    assetPlural: "Ground equipment"
+  screens:
+    # store + billing intentionally omitted -> disabled for the airport
+    public:
+      - home
+      - { id: service-requests, label: "Help & requests" }
+      - messages
+    ops:
+      - overview
+      - { id: requests, label: "Maintenance queue" }
+      - { id: iot, label: "Ground equipment" }
+      - { id: incidents, label: "Operational incidents" }
+      - { id: analytics, label: "On-time performance" }
+      - demo-control
