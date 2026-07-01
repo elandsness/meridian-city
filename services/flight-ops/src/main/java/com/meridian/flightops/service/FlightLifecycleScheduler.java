@@ -1,5 +1,6 @@
 package com.meridian.flightops.service;
 
+import com.meridian.flightops.config.FaultState;
 import com.meridian.flightops.config.FlightLifecycleProperties;
 import com.meridian.flightops.domain.Flight;
 import com.meridian.flightops.repository.FlightRepository;
@@ -8,6 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * random delay (see {@link FlightLifecycleProperties}) so the aircraft-turnaround
  * Business Flow steps are realistically spaced. Departures and arrivals follow
  * separate status chains; terminal statuses (departed/arrived) stop advancing.
+ * When fault injection is on, a share of departing flights are cancelled at boarding.
  */
 @Component
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class FlightLifecycleScheduler {
     private final FlightRepository flightRepository;
     private final BusinessEventLogger businessEventLogger;
     private final FlightLifecycleProperties props;
+    private final FaultState faultState;
 
     @Scheduled(fixedDelay = 10_000)
     @Transactional
@@ -60,6 +64,14 @@ public class FlightLifecycleScheduler {
     }
 
     private void advance(Flight f, OffsetDateTime now) {
+        if (shouldCancel(f)) {
+            f.setStatus("cancelled");
+            f.setUpdatedAt(now);
+            f.setNextTransitionAt(null); // terminal — stop polling it
+            flightRepository.save(f);
+            businessEventLogger.flightStatus(f); // gated demo failure — emits flight.cancelled
+            return;
+        }
         String next = NEXT.get(f.getStatus());
         if (next == null) {
             f.setNextTransitionAt(null); // terminal — stop polling it
@@ -73,5 +85,13 @@ public class FlightLifecycleScheduler {
         f.setNextTransitionAt(terminal ? null : now.plusSeconds(props.nextDelaySeconds()));
         flightRepository.save(f);
         businessEventLogger.flightStatus(f);
+    }
+
+    /** Gated demo failure: cancel a share of departing flights at boarding. */
+    private boolean shouldCancel(Flight f) {
+        return faultState.isFailuresEnabled()
+                && "departure".equals(f.getDirection())
+                && "boarding".equals(f.getStatus())
+                && ThreadLocalRandom.current().nextDouble() < faultState.getFailureRate();
     }
 }

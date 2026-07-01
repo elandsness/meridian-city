@@ -85,6 +85,9 @@ industry:
       - airfield-map
       - my-journey
       - quick-actions
+    ops:
+      - flight-summary
+      - ops-overview
   # Backend-only demo data + dispatch routing (delivered to traffic-bot +
   # service-dispatch via env; never sent to the browser config.json).
   data:

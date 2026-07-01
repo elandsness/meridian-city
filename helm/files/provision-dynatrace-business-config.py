@@ -262,13 +262,13 @@ FLOW_SPECS = [
      "kpiLabel": "Departures", "kpi": "flight.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "flight.takeoff",
      "steps": [("At gate", "flight.at_gate"), ("Servicing", "flight.servicing"),
-               ("Boarding", "flight.boarding"), ("Pushback & taxi", "flight.taxiing"),
+               ("Boarding", "flight.boarding", ["flight.cancelled"]), ("Pushback & taxi", "flight.taxiing"),
                ("Takeoff", "flight.takeoff")]},
     {"key": "passenger-journey", "name": "Passenger Journey", "correlationID": "passenger.id",
      "kpiLabel": "Boarded passengers", "kpi": "passenger.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "passenger.boarded",
      "steps": [("Checked in", "passenger.checked_in"), ("Bag checked", "passenger.bag_checked"),
-               ("Security cleared", "passenger.security_cleared"), ("Bag loaded", "passenger.bag_loaded"),
+               ("Security cleared", "passenger.security_cleared", ["passenger.offloaded"]), ("Bag loaded", "passenger.bag_loaded"),
                ("Boarded", "passenger.boarded")]},
 ]
 

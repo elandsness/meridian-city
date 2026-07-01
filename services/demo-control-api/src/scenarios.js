@@ -252,6 +252,50 @@ const SCENARIOS = {
     },
   },
 
+  'flight-cancellations': {
+    name: 'Flight Cancellations',
+    description: 'Cancels a share of departing flights at boarding, so the Aircraft Turnaround flow shows a flight.cancelled error branch + drop-off at the Boarding step. Needs flight traffic (flight-ops).',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.FLIGHT_OPS_URL}/admin/fault`, {
+        failures_enabled: true, failure_rate: rate,
+      })
+      state.setFault('flight-ops', { failures_enabled: true, failure_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.FLIGHT_OPS_URL}/admin/fault`, {
+        failures_enabled: false, failure_rate: 0,
+      })
+      state.setFault('flight-ops', { failures_enabled: false, failure_rate: 0 })
+      return r
+    },
+  },
+
+  'passenger-offloads': {
+    name: 'Passenger Offloads',
+    description: 'Offloads a share of passengers at security, so the Passenger Journey flow shows a passenger.offloaded error branch + drop-off at the Security step. Needs passenger traffic (passenger-service).',
+    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+    params: [RATE_PARAM],
+    async activate (opts = {}) {
+      const rate = pctToFrac(opts.rate, 30)
+      const r = await proxy.post(`${config.PASSENGER_SERVICE_URL}/admin/fault`, {
+        failures_enabled: true, failure_rate: rate,
+      })
+      state.setFault('passenger-service', { failures_enabled: true, failure_rate: rate })
+      return r
+    },
+    async reset () {
+      const r = await proxy.post(`${config.PASSENGER_SERVICE_URL}/admin/fault`, {
+        failures_enabled: false, failure_rate: 0,
+      })
+      state.setFault('passenger-service', { failures_enabled: false, failure_rate: 0 })
+      return r
+    },
+  },
+
   'business-exceptions': {
     name: 'Business Failures',
     description: 'Inject business-process failures across every active business flow at one shared rate — Dynatrace surfaces the failure branch + conversion drop-off wherever traffic is flowing. One toggle + one rate for all flows (replaces the old per-flow failure scenarios).',
@@ -263,6 +307,8 @@ const SCENARIOS = {
       await SCENARIOS['incident-escalations'].activate(opts)
       await SCENARIOS['checkout-declines'].activate(opts)
       await SCENARIOS['tax-payment-failures'].activate(opts)
+      await SCENARIOS['flight-cancellations'].activate(opts)
+      await SCENARIOS['passenger-offloads'].activate(opts)
       return { ok: true, data: { message: 'business-exceptions activated' } }
     },
     async reset () {
@@ -271,6 +317,8 @@ const SCENARIOS = {
       await SCENARIOS['incident-escalations'].reset()
       await SCENARIOS['checkout-declines'].reset()
       await SCENARIOS['tax-payment-failures'].reset()
+      await SCENARIOS['flight-cancellations'].reset()
+      await SCENARIOS['passenger-offloads'].reset()
       return { ok: true, data: { message: 'business-exceptions reset' } }
     },
   },
@@ -288,6 +336,8 @@ const HIDDEN_SCENARIOS = new Set([
   'incident-escalations',
   'checkout-declines',
   'tax-payment-failures',
+  'flight-cancellations',
+  'passenger-offloads',
 ])
 
 /**
