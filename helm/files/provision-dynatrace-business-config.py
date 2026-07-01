@@ -51,6 +51,23 @@ HASH = os.environ.get("DT_INSTANCE_HASH", "").strip()
 ACTION = os.environ.get("DT_ACTION", "provision").strip().lower()
 BASE = APPS + "/platform/classic/environment-api/v2/settings"
 
+
+def _load_json_env(name):
+    """Parse a JSON-object env var; empty/malformed => {} (fall back to defaults)."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except ValueError as e:
+        print("WARN: %s is not valid JSON (%s) — ignoring" % (name, e))
+        return {}
+
+
+# Per-industry Dynatrace overrides (empty = City defaults / no naming rules).
+SERVICE_NAMES = _load_json_env("DT_SERVICE_NAMES")  # {k8s deployment name: service display name}
+FLOW_LABELS = _load_json_env("DT_FLOW_LABELS")      # {flow key: Business Flow display name}
+
 # Per-instance identity. With a hash, every name carries it so concurrent installs
 # on the shared tenant stay isolated; without one we keep the legacy single-instance
 # names (backwards compatible).
@@ -70,6 +87,7 @@ else:
 PIPELINE_SCHEMA = "builtin:openpipeline.logs.pipelines"
 ROUTING_SCHEMA = "builtin:openpipeline.logs.routing"
 FLOW_SCHEMA = "app:dynatrace.biz.flow:biz-flow-settings"
+NAMING_SCHEMA = "builtin:naming.services"
 
 # Stable namespace for deterministic step UUIDs (so re-runs produce identical ids).
 # The hash is folded into the seed so two instances' flow objects never share step ids.
@@ -260,13 +278,105 @@ def flow_value(spec):
     connections = [{"id": "%s__%s" % (a, b), "source": a, "target": b}
                    for a, b in zip(ids, ids[1:])]
     return {
-        "name": FLOW_TITLE_PREFIX + spec["name"], "version": 1, "steps": steps, "connections": connections,
+        "name": FLOW_TITLE_PREFIX + FLOW_LABELS.get(spec["key"], spec["name"]), "version": 1, "steps": steps, "connections": connections,
         "correlationID": spec["correlationID"], "analysisType": "conversion",
         "analysisCustomLabel": "Conversions", "isSmartscapeTopologyEnabled": False,
         "isDefaultQueryLimitIgnored": False, "kpiLabel": spec["kpiLabel"],
         "kpi": spec["kpi"], "kpiCalculation": spec["kpiCalculation"],
         "kpiEvent": {"name": spec["kpiEventName"], "provider": PROVIDER},
     }
+
+
+# --------------------------------------------------------------------------- #
+# 3. Service naming rules (Path A) — rename the service map per industry, each rule
+#    scoped to THIS instance's namespace + deployment so other tenants' services on
+#    the shared environment are never affected. Applies to OneAgent-detected services;
+#    OTel services are renamed via OTEL_SERVICE_NAME instead. Resilient: any failure
+#    warns and continues (the schema payload is tenant-verified at deploy) so it can
+#    never abort the pipeline/routing/flows provisioned above.
+# --------------------------------------------------------------------------- #
+def _naming_rule_value(deployment, display_name):
+    return {
+        "enabled": True,
+        "nameFormat": display_name,
+        "rules": [{
+            "conditions": [
+                {"attribute": "k8s.namespace.name",
+                 "comparisonInfo": {"type": "EQUALS", "value": NAMESPACE}},
+                {"attribute": "k8s.deployment.name",
+                 "comparisonInfo": {"type": "EQUALS", "value": deployment}},
+            ],
+        }],
+    }
+
+
+def _rule_targets(value, deployment=None):
+    """True if the object has a rule scoped to our namespace (and deployment, if given)."""
+    for rule in value.get("rules", []):
+        conds = rule.get("conditions", [])
+        ns_ok = any(c.get("attribute") == "k8s.namespace.name"
+                    and c.get("comparisonInfo", {}).get("value") == NAMESPACE for c in conds)
+        if not ns_ok:
+            continue
+        if deployment is None:
+            return True
+        if any(c.get("attribute") == "k8s.deployment.name"
+               and c.get("comparisonInfo", {}).get("value") == deployment for c in conds):
+            return True
+    return False
+
+
+def _list_naming():
+    status, body = api("GET",
+                       "/objects?schemaIds=%s&fields=objectId,value&pageSize=500" % NAMING_SCHEMA)
+    if status != 200:
+        raise RuntimeError("list %s -> %s %s" % (NAMING_SCHEMA, status, body))
+    return body.get("items", [])
+
+
+def provision_service_names():
+    if not SERVICE_NAMES:
+        return
+    print("- Service naming rules (%d, namespace-scoped)" % len(SERVICE_NAMES))
+    try:
+        existing = _list_naming()
+    except Exception as e:
+        print("  WARN: cannot list naming rules (%s) — skipping" % e)
+        return
+    for deployment, display_name in SERVICE_NAMES.items():
+        try:
+            match = next((o for o in existing if _rule_targets(o["value"], deployment)), None)
+            value = _naming_rule_value(deployment, display_name)
+            if match:
+                st, bd = api("PUT", "/objects/" + match["objectId"], {"value": value})
+                act, oid = "updated", match["objectId"]
+            else:
+                st, bd = api("POST", "/objects",
+                             [{"schemaId": NAMING_SCHEMA, "scope": "environment", "value": value}])
+                act = "created"
+                oid = bd[0]["objectId"] if isinstance(bd, list) and bd and "objectId" in bd[0] else None
+            if st in (200, 201):
+                print("  %s: %s -> %r" % (act, deployment, display_name))
+            else:
+                print("  WARN: naming rule for %s failed: %s %s" % (deployment, st, bd))
+        except Exception as e:
+            print("  WARN: naming rule for %s errored: %s" % (deployment, e))
+
+
+def deprovision_service_names():
+    print("- Service naming rules (remove this namespace's)")
+    try:
+        objs = _list_naming()
+    except Exception as e:
+        print("  WARN: cannot list naming rules (%s) — skipping" % e)
+        return
+    for o in objs:
+        if _rule_targets(o["value"]):
+            try:
+                api("DELETE", "/objects/" + o["objectId"])
+                print("  deleted naming rule -> %s" % o["objectId"])
+            except Exception as e:
+                print("  WARN: delete naming rule %s failed: %s" % (o["objectId"], e))
 
 
 # --------------------------------------------------------------------------- #
@@ -295,9 +405,19 @@ def provision():
     print("  merged routing entry -> %s (%d total)" % (robj["objectId"], len(entries)))
 
     print("- Business Flows")
+    wanted_names = set()
     for spec in FLOW_SPECS:
         value = flow_value(spec)
+        wanted_names.add(value["name"])
         upsert(FLOW_SCHEMA, value, lambda v, name=value["name"]: v.get("name") == name)
+    # Clean up this instance's stale flows whose label changed (e.g. City -> Airport
+    # on an in-place upgrade) so relabeling never leaves duplicates behind.
+    for o in list_objects(FLOW_SCHEMA):
+        nm = o["value"].get("name", "")
+        if nm.startswith(FLOW_TITLE_PREFIX) and nm not in wanted_names:
+            delete_object(FLOW_SCHEMA, o["objectId"])
+
+    provision_service_names()
 
     print("Done.")
 
@@ -334,10 +454,13 @@ def deprovision():
 
     # 3. Delete this instance's five Business Flows (matched by per-instance title).
     print("- Business Flows")
-    wanted = {FLOW_TITLE_PREFIX + spec["name"] for spec in FLOW_SPECS}
+    # Match any flow carrying this instance's prefix, so all our flows are removed
+    # regardless of per-industry label changes across upgrades.
     for o in list_objects(FLOW_SCHEMA):
-        if o["value"].get("name") in wanted:
+        if o["value"].get("name", "").startswith(FLOW_TITLE_PREFIX):
             delete_object(FLOW_SCHEMA, o["objectId"])
+
+    deprovision_service_names()
 
     print("Done.")
 

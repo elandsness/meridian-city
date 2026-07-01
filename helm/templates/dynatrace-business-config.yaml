@@ -97,6 +97,10 @@ spec:
               value: {{ $ns | quote }}
             - name: DT_INSTANCE_HASH
               value: {{ $hash | quote }}
+            - name: DT_SERVICE_NAMES
+              value: {{ .Values.industry.dynatrace.serviceNames | default dict | toJson | quote }}
+            - name: DT_FLOW_LABELS
+              value: {{ .Values.industry.dynatrace.flowLabels | default dict | toJson | quote }}
           volumeMounts:
             - name: scripts
               mountPath: /scripts
@@ -186,6 +190,10 @@ spec:
               value: {{ $ns | quote }}
             - name: DT_INSTANCE_HASH
               value: {{ $hash | quote }}
+            - name: DT_SERVICE_NAMES
+              value: {{ .Values.industry.dynatrace.serviceNames | default dict | toJson | quote }}
+            - name: DT_FLOW_LABELS
+              value: {{ .Values.industry.dynatrace.flowLabels | default dict | toJson | quote }}
           volumeMounts:
             - name: scripts
               mountPath: /scripts

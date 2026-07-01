@@ -121,3 +121,22 @@ industry:
     security: "Security & Screening"
     facilities: "Facilities Management"
     ground-transport: "Ground Transportation"
+  # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
+  # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
+  # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
+  dynatrace:
+    serviceNames:
+      citizen-service: "Passenger Services"
+      service-dispatch: "Operations Dispatch"
+      city-operations: "Airfield Operations"
+      api-gateway: "Airport API Gateway"
+      notification-service: "Passenger Notifications"
+      commerce-service: "Airport Retail"
+      billing-service: "Airport Fees"
+      demo-control-api: "Demo Control"
+    flowLabels:
+      service-request: "Maintenance Request Lifecycle"
+      account-creation: "Passenger Registration"
+      iot-incident: "Ground Equipment Incident Resolution"
+      purchase: "Airport Retail Purchase"
+      tax-payment: "Airport Fee Payment"
