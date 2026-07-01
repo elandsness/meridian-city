@@ -253,8 +253,8 @@ const SCENARIOS = {
   },
 
   'business-exceptions': {
-    name: 'Business Process Failures (all flows)',
-    description: 'Umbrella: turns on the failure branch for all five business flows at once (request rejections, account verification/activation failures, IoT escalations, checkout declines, tax payment failures) at one shared rate — the "Dynatrace surfaces process failures everywhere" story.',
+    name: 'Business Failures',
+    description: 'Inject business-process failures across every active business flow at one shared rate — Dynatrace surfaces the failure branch + conversion drop-off wherever traffic is flowing. One toggle + one rate for all flows (replaces the old per-flow failure scenarios).',
     clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [RATE_PARAM],
     async activate (opts = {}) {
@@ -276,17 +276,33 @@ const SCENARIOS = {
   },
 }
 
+// The per-flow failure scenarios are folded into the single 'business-exceptions'
+// control (one toggle + rate for all flows). They stay defined as internal building
+// blocks the umbrella calls, but are hidden from the catalog so operators use the one
+// unified control instead of toggling failures a flow at a time. Making a new
+// industry's flow failable means wiring its service into 'business-exceptions', not
+// adding (and re-skinning) another per-flow scenario.
+const HIDDEN_SCENARIOS = new Set([
+  'request-failures',
+  'account-failures',
+  'incident-escalations',
+  'checkout-declines',
+  'tax-payment-failures',
+])
+
 /**
- * Return metadata for all scenarios (no activate/reset functions).
+ * Return metadata for the catalog scenarios (hidden building-block scenarios excluded).
  */
 function listScenarios () {
-  return Object.entries(SCENARIOS).map(([id, s]) => ({
-    id,
-    name: s.name,
-    description: s.description,
-    clear: s.clear,
-    params: s.params ?? [],
-  }))
+  return Object.entries(SCENARIOS)
+    .filter(([id]) => !HIDDEN_SCENARIOS.has(id))
+    .map(([id, s]) => ({
+      id,
+      name: s.name,
+      description: s.description,
+      clear: s.clear,
+      params: s.params ?? [],
+    }))
 }
 
 /**
