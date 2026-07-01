@@ -163,8 +163,18 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
 spec:
   ttlSecondsAfterFinished: 120
-  backoffLimit: 1
-  activeDeadlineSeconds: 180
+  # Generous like the provision Job's backoffLimit: GKE Autopilot can need to
+  # schedule a fresh node and cold-pull the image on teardown (nodes are often
+  # already scaling down by the time `helm uninstall` runs), and the previous
+  # backoffLimit: 1 / activeDeadlineSeconds: 180 could kill the pod via
+  # DeadlineExceeded before it ever ran the script — silently skipping the
+  # tenant-API delete calls (the `|| echo` fallback only catches script/API
+  # errors, not the pod being killed out from under it) and leaving this
+  # instance's pipeline/routing entry/Business Flows stale in Dynatrace.
+  # Kept just under teardown.sh's `helm uninstall --timeout 5m` so the Job gets
+  # the full outer budget instead of truncating it early.
+  backoffLimit: 3
+  activeDeadlineSeconds: 270
   template:
     metadata:
       labels:

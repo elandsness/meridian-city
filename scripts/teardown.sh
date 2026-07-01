@@ -197,8 +197,25 @@ fi
 # ---------------------------------------------------------------------------
 if helm status "$RELEASE_NAME" -n "$NAMESPACE" &>/dev/null; then
   info "Uninstalling Helm release: $RELEASE_NAME (deprovisions its Dynatrace objects)..."
-  helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --timeout 5m
-  success "Helm release removed."
+  # A non-zero exit here usually means the pre-delete hook (Dynatrace deprovision)
+  # failed or timed out — under 'set -e' that would otherwise abort this script
+  # immediately, skipping DynaKube/PVC/namespace cleanup below AND leaving the
+  # tenant-API failure invisible. Handle it explicitly instead: warn with the
+  # exact objects to check, and keep going so the cluster side never gets stuck
+  # on an external API hiccup.
+  if helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --timeout 5m; then
+    success "Helm release removed."
+  else
+    warn "Helm uninstall reported an error — the pre-delete Dynatrace deprovision hook"
+    warn "(pipeline/routing entry/Business Flows) may not have completed. Continuing"
+    warn "the rest of teardown regardless."
+    warn "Check the tenant for stale objects titled '[Meridian ${RELEASE_NAME#meridian-}] ...'"
+    warn "and, if present, remove them by re-running the provisioner directly (needs no"
+    warn "cluster — it only talks to the Dynatrace API):"
+    warn "  DT_ACTION=delete DT_APPS_URL=https://<env>.apps.dynatrace.com \\"
+    warn "  DT_PLATFORM_TOKEN=<platform token> DT_INSTANCE_HASH=${RELEASE_NAME#meridian-} \\"
+    warn "  DT_LOG_NAMESPACE=${NAMESPACE} python3 helm/files/provision-dynatrace-business-config.py"
+  fi
 else
   warn "Helm release '$RELEASE_NAME' not found in namespace '$NAMESPACE'. Skipping."
 fi
