@@ -81,6 +81,11 @@ industry:
     public: ["home", "service-requests", "store", "billing", "messages"]
     ops: ["overview", "iot", "incidents", "requests", "analytics", "demo-control"]
     disabled: []
+  # Backend-only demo-data pools + dispatch routing. NOT rendered into the browser
+  # config.json (see industry-configmap.yaml). Empty = services use their built-in
+  # City defaults; an industry overlay (e.g. values-airport.yaml) supplies its own.
+  data: {}
+  routing: {}
 
 # ---------------------------------------------------------------------------
 # Dynatrace configuration

@@ -45,6 +45,10 @@ spec:
               value: {{ .Values.trafficBot.config.scenarios.injectAnomaly | quote }}
             - name: SCENARIO_CHATBOT
               value: {{ .Values.trafficBot.config.scenarios.chatbot | quote }}
+            # Industry demo-data overlay (zones, request templates, chat questions).
+            # Empty {} => traffic-bot uses its built-in City defaults.
+            - name: INDUSTRY_DATA
+              value: {{ .Values.industry.data | default dict | toJson | quote }}
           livenessProbe:
             httpGet:
               path: /health
