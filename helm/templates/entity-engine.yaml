@@ -1,0 +1,103 @@
+{{/*
+Generic config-driven entity/lifecycle engine (Stage 2 of the generic-entity-engine
+initiative). One codebase; for now a single deployment owning every entity type in
+the mounted config (ENTITY_TYPES unset). Real City/Airport retrofit (Stage 6/7) will
+deploy this same image twice with different names/identities and a non-empty
+ENTITY_TYPES allow-list each (customer-entity-service, ops-entity-service) -- see
+the plan referenced from the project_generic_entity_engine memory.
+*/}}
+{{- if .Values.entityEngine.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entity-engine
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: entity-engine
+spec:
+  replicas: {{ .Values.entityEngine.replicaCount }}
+  selector:
+    matchLabels:
+      app: entity-engine
+  template:
+    metadata:
+      annotations:
+        checksum/entity-config: {{ include (print $.Template.BasePath "/entity-config-configmap.yaml") . | sha256sum }}
+      labels:
+        app: entity-engine
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: entity-engine
+    spec:
+      volumes:
+        - name: entity-config
+          configMap:
+            name: entity-config
+      containers:
+        - name: entity-engine
+          image: {{ include "meridian.image" (dict "repository" .Values.entityEngine.image.repository "tag" .Values.entityEngine.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8094
+          volumeMounts:
+            - name: entity-config
+              mountPath: /etc/meridian/entity-config.json
+              subPath: entity-config.json
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "entity-engine"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: db-password
+            # Flyway owns the schema; Hibernate maps without validating (mirrors
+            # every other Java service here), so a fresh image never crash-loops
+            # on ddl validate.
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            - name: ENTITY_CONFIG_PATH
+              value: "file:/etc/meridian/entity-config.json"
+            - name: ENTITY_TYPES
+              value: {{ .Values.entityEngine.ownedTypes | quote }}
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.entityEngine.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8094
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8094
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.entityEngine.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entity-engine
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: entity-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: entity-engine
+  ports:
+    - name: http
+      port: {{ .Values.entityEngine.service.port }}
+      targetPort: 8094
+{{- end }}

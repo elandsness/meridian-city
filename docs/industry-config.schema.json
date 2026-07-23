@@ -286,7 +286,7 @@
                 "interpolation": { "enum": ["linear", "easeInOut"] },
                 "waypoints": {
                   "type": "object",
-                  "description": "state → {x,y}. Keys must be a subset of this entity's states.",
+                  "description": "state → {x,y}. Keys must be a subset of this entity's states. AUTHORING GOTCHA: always quote the \"y\" key in YAML (e.g. helm/values-*.yaml) -- unquoted, YAML 1.1 reads the bareword key `y` as the boolean `true` (the classic Norway-problem coercion, also affects Yes/No/On/Off), which then silently serializes as the JSON key \"true\" instead of \"y\".",
                   "additionalProperties": {
                     "type": "object",
                     "required": ["x", "y"],

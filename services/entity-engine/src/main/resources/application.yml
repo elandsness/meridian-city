@@ -1,0 +1,59 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: entity-engine
+  jackson:
+    # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: entities
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: entities
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# The generic entity engine (Stage 2 of the generic-entity-engine initiative — see
+# docs/regression-baseline-2026-07-23.md and the plan file referenced from the
+# project_generic_entity_engine memory). One codebase, deployed multiple times with
+# different identities/owned-types (customer-entity-service, ops-entity-service) once
+# real City/Airport retrofit happens in Stage 6/7; for now a single instance owns
+# whatever entity types are in its mounted config.
+entity-engine:
+  # Path to the mounted industry entity-config JSON (rendered from
+  # `industry.entities` by a future Helm ConfigMap, mirroring industry-configmap.yaml).
+  # Falls back to a local dev fixture so the service is runnable without a mount.
+  config-path: ${ENTITY_CONFIG_PATH:classpath:dev-entity-config.json}
+  # Comma-separated allow-list of entity type ids this instance owns. Empty/unset =
+  # own every entity type found in the config (used for the Stage 2 synthetic proof;
+  # City/Airport retrofit will split this into customer-facing vs ops-facing sets).
+  owned-types: ${ENTITY_TYPES:}
+  # How often to evaluate due transitions and run generators.
+  scheduler-fixed-delay-ms: ${ENTITY_ENGINE_SCHEDULER_MS:5000}

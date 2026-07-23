@@ -94,6 +94,15 @@ industry:
   # Per-industry Dynatrace: {serviceNames: {deployment: displayName}, flowLabels: {flowKey: name}}.
   # Applied by the provisioner Job, scoped to this instance's namespace. Empty = City defaults.
   dynatrace: {}
+  # Config-driven entity/lifecycle definitions for the generic entity engine
+  # (entity-engine + movement-service; see docs/industry-config.schema.json's
+  # `entities` section). Unlike data/routing/dynatrace above, this one IS
+  # rendered into the browser config.json too (no secret in it, and the
+  # frontend's generic templates need it at render time) -- see
+  # industry-configmap.yaml's header comment. Empty until Stage 6/7 retrofits
+  # City/Airport onto it; a throwaway synthetic-entity overlay proves the
+  # engine itself in Stage 2 without touching this default.
+  entities: {}
 
 # ---------------------------------------------------------------------------
 # Dynatrace configuration
@@ -459,6 +468,61 @@ passengerService:
   #     PASSENGER_JOURNEY_MIN_SECONDS: "10"
   #     PASSENGER_GENERATOR_MAX_ACTIVE: "60"
   #     PASSENGER_GENERATOR_BAG_PROBABILITY: "0.7"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Entity Engine (Java / Spring Boot) — generic-entity-engine initiative, Stage 2
+# Generic config-driven entity/lifecycle engine, driven entirely by
+# industry.entities (see above). One deployment for now, owning every entity
+# type in the mounted config; Stage 6/7 retrofits City/Airport by deploying
+# this same image twice (customer-entity-service, ops-entity-service) with a
+# non-empty ownedTypes each — see docs/regression-baseline-2026-07-23.md and
+# the project_generic_entity_engine memory for the full plan.
+# ---------------------------------------------------------------------------
+entityEngine:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "entity-engine"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8094
+  # Comma-separated allow-list of entity type ids this instance owns; empty =
+  # own every entity type found in industry.entities.
+  ownedTypes: ""
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Movement Service (Go) — generic-entity-engine initiative, Stage 2
+# Fast, dedicated tick that computes/persists computed.position for entity
+# types that declare it, reading the same mounted entity-config as
+# entity-engine. Deliberately its own process/language — see
+# services/movement-service's package doc for why.
+# ---------------------------------------------------------------------------
+movementService:
+  enabled: true
+  image:
+    repository: "movement-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8095
+  tickMs: 2000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
   env: {}
 
 # ---------------------------------------------------------------------------
