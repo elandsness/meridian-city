@@ -1,0 +1,91 @@
+industry:
+  version: 1
+  id: banking
+  company:
+    name: "Meridian Bank"
+    short: "Meridian"
+    tagline: "Unexpectedly Human Banking."
+    assistant:
+      name: "Mera"
+      persona: "the Meridian Bank virtual assistant"
+      supportPhone: "1-800-MERIDIAN"
+      systemPrompt: |-
+        You are Mera, the virtual assistant for Meridian Bank. Help customers navigate
+        their digital banking, check balances, pay credit card bills, dispute charges,
+        find ATMs, and report lost cards. Be professional, secure, and concise. Always
+        advise users not to share their full account numbers in the chat.
+  theme:
+    colors:
+      brand: "#00B33A"             # Signature TD-style Green
+      brandDeep: "#00822A"         # Darker forest green for headers/active states
+      brandSoft: "#4DCC75"         # Lighter green for hovers
+      brandTint: "#E6F7EB"         # Very light green wash for backgrounds
+      accent: "#1E293B"            # Professional slate gray/navy for contrast
+      accentSoft: "#334155"        # Lighter slate
+      accentInk: "#FFFFFF"         # White text on accent backgrounds
+    logo: ""                       # Uses built-in mark, which will recolor to brand hex
+    favicon: ""
+  terminology:
+    customer: "Customer"
+    customerPlural: "Customers"
+    request: "Support ticket"
+    requestPlural: "Support tickets"
+    incident: "System alert"
+    incidentPlural: "System alerts"
+    workOrder: "Maintenance ticket"
+    asset: "ATM"
+    assetPlural: "ATMs"
+  screens:
+    public:
+      - home
+      - { id: billing, label: "Pay Bills & Cards" }
+      - { id: service-requests, label: "Help & Support" }
+      - messages
+    ops:
+      - overview
+      - { id: requests, label: "Support Queue" }
+      - { id: incidents, label: "IT Incidents" }
+      - { id: iot, label: "ATM Network" }
+      - { id: analytics, label: "Transaction Analytics" }
+      - demo-control
+  home:
+    public: ["city-home", "quick-actions"]
+    ops: ["ops-overview"]
+  data:
+    zones: ["northeast-region", "midwest-region", "south-region", "west-coast", "digital-channels"]
+    requestTemplates:
+      - { category: card-services, title: "Report Lost or Stolen Card", description: "Customer reported missing credit or debit card. Needs immediate freeze and replacement issuance." }
+      - { category: card-services, title: "Credit Card Billing Dispute", description: "Customer is contesting a recent credit card charge as fraudulent or unrecognized." }
+      - { category: digital-banking, title: "Mobile App Login Issue", description: "Customer is locked out of the mobile banking app or experiencing biometric login failures." }
+      - { category: branch-ops, title: "ATM Cash Dispense Error", description: "ATM debited account but did not dispense physical cash." }
+      - { category: fraud-claims, title: "Suspicious Wire Transfer", description: "Flagged outbound wire transfer requiring secondary customer verification." }
+    chatQuestions:
+      - "How do I pay my credit card bill?"
+      - "I lost my debit card, what should I do?"
+      - "Where is the nearest ATM?"
+      - "Why is my account locked?"
+      - "How do I dispute a credit card charge?"
+  routing:
+    card-services: "Card Operations"
+    digital-banking: "Digital Channel Support"
+    branch-ops: "Branch & ATM Network"
+    fraud-claims: "Fraud Detection Unit"
+  dynatrace:
+    serviceNames:
+      citizen-service: "Digital Banking Portal"
+      city-operations: "Core Banking Operations"
+      service-dispatch: "Case Management System"
+      api-gateway: "Open Banking API Gateway"
+      notification-service: "Alerts & OTP Service"
+      billing-service: "Payments & Transfers Service"
+    flowLabels:
+      service-request: "Customer Support Resolution"
+      account-creation: "Digital Account Opening"
+      iot-incident: "ATM Network Outage"
+      tax-payment: "Credit Card Bill Payment"
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <!-- Main M / Monster Head Shape -->
+  <path d="M 100 180 C 180 180, 190 90, 160 30 L 100 80 L 40 30 C 10 90, 20 180, 100 180 Z" fill="#800020"/>
+  
+  <!-- Baby Blue Accent Details -->
+  <path d="M 100 95 L 140 45 L 140 65 L 100 115 L 60 65 L 60 45 Z" fill="#89CFF0"/>
+  
+  <!-- Fierce Monster Eyes -->
+  <path d="M 55 100 L 85 115 L 65 125 Z" fill="#89CFF0"/>
+  <path d="M 145 100 L 115 115 L 135 125 Z" fill="#89CFF0"/>
+  
+  <!-- Fangs -->
+  <path d="M 75 140 L 85 160 L 100 145 L 115 160 L 125 140 Z" fill="#F5E6E9"/>
+</svg>
+

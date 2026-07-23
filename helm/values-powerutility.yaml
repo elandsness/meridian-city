@@ -1,0 +1,87 @@
+industry:
+  version: 1
+  id: energy
+  company:
+    name: "Meridian Power"
+    short: "Meridian"
+    tagline: "Empowering your world, reliably."
+    assistant:
+      name: "Volt"
+      persona: "the Meridian Power virtual assistant"
+      systemPrompt: |-
+        You are Volt, the virtual assistant for Meridian Power. Help customers check
+        for power outages, report downed lines, understand their energy bills, and
+        manage smart meter services. Be concise, empathetic, and prioritize safety
+        when dealing with electrical hazards.
+  theme:
+    colors:
+      brand: "#1E40AF"             # Strong, calming utility blue
+      brandDeep: "#172554"         # Dark navy for headers
+      brandSoft: "#3B82F6"         # Lighter blue for active states
+      brandTint: "#EFF6FF"         # Very light blue background tint
+      accent: "#F59E0B"            # Amber/Orange for alerts & energy
+      accentSoft: "#FCD34D"        # Light amber
+      accentInk: "#78350F"         # Dark amber text for readability
+    logo: ""
+    favicon: ""
+  terminology:
+    customer: "Customer"
+    customerPlural: "Customers"
+    request: "Outage Report"
+    requestPlural: "Outage Reports"
+    incident: "Grid Outage"
+    incidentPlural: "Grid Outages"
+    workOrder: "Field Dispatch"
+    asset: "Grid Asset"
+    assetPlural: "Grid Assets"
+  screens:
+    public:
+      - home
+      - { id: service-requests, label: "Report Outage" }
+      - { id: billing, label: "Pay Bill" }
+      - messages
+    ops:
+      - overview
+      - { id: requests, label: "Field Dispatch" }
+      - { id: incidents, label: "Grid Outages" }
+      - { id: iot, label: "Smart Grid Assets" }
+      - { id: analytics, label: "Grid Performance" }
+      - demo-control
+  home:
+    public: ["city-home", "quick-actions"]
+    ops: ["ops-overview"]
+  data:
+    zones: ["North District", "South Substation", "Downtown Grid", "East Valley", "Westside Substation"]
+    requestTemplates:
+      - { category: grid-ops, title: "Total Power Loss", description: "Entire block is out of power." }
+      - { category: grid-ops, title: "Flickering Lights", description: "Power is intermittent and lights are flickering." }
+      - { category: maintenance, title: "Downed Power Line", description: "Tree fell on a line, wire is on the ground. (High Priority)" }
+      - { category: maintenance, title: "Transformer Sparking", description: "Loud pop and sparks from the pole transformer." }
+      - { category: customer-service, title: "Smart Meter Check", description: "Meter is blank or seems to be reading incorrectly." }
+    chatQuestions:
+      - "Is there an outage reported in my area?"
+      - "How do I report a downed power line?"
+      - "Can I pay my energy bill online?"
+      - "Why is my power flickering?"
+  routing:
+    grid-ops: "Grid Operations"
+    maintenance: "Line Maintenance"
+    customer-service: "Customer Support"
+  dynatrace:
+    serviceNames:
+      citizen-service: "Customer Portal Services"
+      city-operations: "Grid Operations Center"
+      service-dispatch: "Field Dispatch Service"
+      api-gateway: "Utility API Gateway"
+      notification-service: "Outage Alert Service"
+      billing-service: "Energy Billing System"
+    flowLabels:
+      service-request: "Outage Report Lifecycle"
+      account-creation: "New Customer Registration"
+      iot-incident: "Smart Asset Fault Resolution"
+      tax-payment: "Utility Bill Payment"
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment

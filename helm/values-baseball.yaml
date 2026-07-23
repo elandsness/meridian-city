@@ -1,0 +1,92 @@
+industry:
+  version: 1
+  id: baseball
+  company:
+    name: "Meridian Marauders"
+    short: "Marauders"
+    tagline: "Unleash the Monster at the Ballpark."
+    assistant:
+      name: "Slugger"
+      persona: "the Marauders fan experience assistant"
+      supportPhone: "1-800-MARAUDERS"
+      systemPrompt: |-
+        You are Slugger, the virtual assistant for the Meridian Marauders baseball team. 
+        Help fans buy or renew season tickets, find stadium parking, check game schedules, 
+        and report issues at the ballpark (like spills or broken seats). Be energetic, 
+        fan-friendly, and always show team spirit!
+  theme:
+    colors:
+      brand: "#800020"             # Classic Marauders Burgundy
+      brandDeep: "#4D0013"         # Darker burgundy for headers/nav
+      brandSoft: "#A6294B"         # Lighter burgundy for hovers
+      brandTint: "#F5E6E9"         # Very light burgundy wash for backgrounds
+      accent: "#89CFF0"            # Baby blue accent
+      accentSoft: "#B3E0F5"        # Lighter baby blue
+      accentInk: "#002B40"         # Dark navy/slate for text reading on baby blue
+    logo: "/marauders-monster.svg" # Reference to the monster logo asset
+    favicon: "/marauders-monster.svg"
+  terminology:
+    customer: "Fan"
+    customerPlural: "Fans"
+    request: "Guest service request"
+    requestPlural: "Guest service requests"
+    incident: "Stadium incident"
+    incidentPlural: "Stadium incidents"
+    workOrder: "Facilities work order"
+    asset: "Stadium equipment"
+    assetPlural: "Stadium equipment"
+  screens:
+    public:
+      - home
+      - { id: billing, label: "Season Tickets" }
+      - { id: service-requests, label: "Guest Services" }
+      - messages
+    ops:
+      - overview
+      - { id: requests, label: "Dispatch Queue" }
+      - { id: incidents, label: "Stadium Incidents" }
+      - { id: iot, label: "Turnstiles & POS" }
+      - { id: analytics, label: "Attendance & Sales" }
+      - demo-control
+  home:
+    public: ["city-home", "quick-actions"]
+    ops: ["ops-overview"]
+  data:
+    zones: ["home-plate-gate", "left-field-bleachers", "upper-deck", "concourse-a", "clubhouse", "parking-lot"]
+    requestTemplates:
+      - { category: box-office, title: "Season Ticket Payment Issue", description: "Fan cannot access digital season tickets or process their renewal payment for the playoffs." }
+      - { category: facilities, title: "Broken Seat Back", description: "Seat 12 in Section 104, Row G is loose and needs immediate repair." }
+      - { category: cleaning, title: "Spill in Concourse", description: "Large soda spill near the main concession stand in Concourse A." }
+      - { category: security, title: "Lost Child", description: "Parent separated from child near the left-field bleachers." }
+      - { category: iot-maintenance, title: "Ticket Scanner Offline", description: "Digital ticket scanner at Home Plate Gate is unresponsive." }
+    chatQuestions:
+      - "How do I pay for my season tickets?"
+      - "What time do the gates open today?"
+      - "Where is the nearest restroom to section 112?"
+      - "I spilled my drink, can someone clean it up?"
+      - "Where can I pick up my will-call tickets?"
+  routing:
+    box-office: "Box Office & Ticketing"
+    facilities: "Stadium Maintenance"
+    cleaning: "Custodial Services"
+    security: "Stadium Security"
+    iot-maintenance: "IT & Venue Technology"
+  dynatrace:
+    serviceNames:
+      citizen-service: "Fan Portal App"
+      city-operations: "Stadium Operations Center"
+      service-dispatch: "Guest Services Dispatch"
+      api-gateway: "Marauders API Gateway"
+      notification-service: "Fan Alerts Service"
+      billing-service: "Ticketing & Billing Service"
+    flowLabels:
+      service-request: "Guest Issue Resolution"
+      account-creation: "Fan Club Registration"
+      iot-incident: "Turnstile Outage"
+      tax-payment: "Season Ticket Payment"
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+
