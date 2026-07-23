@@ -13,8 +13,23 @@ import (
 )
 
 type transition struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	From string                 `json:"from"`
+	To   string                 `json:"to"`
+	When map[string]interface{} `json:"when"`
+}
+
+// isStochastic reports whether a transition's condition is a probability/
+// faultGate roll (the ~20%-chance branches like a fault/error path) rather
+// than a deterministic one -- used only to pick a sane default glide target
+// below, never to decide which transition actually fires (that stays entirely
+// entity-engine's job).
+func isStochastic(when map[string]interface{}) bool {
+	if when == nil {
+		return false
+	}
+	_, hasProbability := when["probability"]
+	_, hasFaultGate := when["faultGate"]
+	return hasProbability || hasFaultGate
 }
 
 // Waypoint is a scene coordinate for one state, in whatever scene-local units
@@ -39,11 +54,10 @@ type entityDefinition struct {
 }
 
 // MovableEntity is the subset of one entity type's config movement-service
-// actually needs: its coordinate space and a state -> next-state map (the
-// first declared transition out of each state, matching the same "declared
-// order, first match" convention the entity engine uses -- see the entity
-// engine's TransitionEvaluator/scheduleNext for the authoritative version this
-// mirrors for interpolation purposes only).
+// actually needs: its coordinate space and a state -> next-state map, used
+// only to pick which waypoint to glide toward -- entity-engine's
+// TransitionEvaluator remains the sole authority on which transition actually
+// fires.
 type MovableEntity struct {
 	Waypoints map[string]Waypoint
 	NextState map[string]string
@@ -66,10 +80,25 @@ func Load(path string) (map[string]MovableEntity, error) {
 		if def.Computed == nil || def.Computed.Position == nil || len(def.Computed.Position.Waypoints) == 0 {
 			continue
 		}
+		// Prefer the first DETERMINISTIC outgoing transition per state as the
+		// glide target -- e.g. for "scanning: fault_detected (20% chance) |
+		// validating (otherwise)", declared in that order, glide toward
+		// "validating" (the common case) rather than "fault_detected" (a rare
+		// branch declared first). Falls back to the first declared transition
+		// for any state where every outgoing transition is stochastic.
+		firstAny := make(map[string]string)
 		nextState := make(map[string]string)
 		for _, t := range def.Transitions {
-			if _, exists := nextState[t.From]; !exists {
+			if _, exists := firstAny[t.From]; !exists {
+				firstAny[t.From] = t.To
+			}
+			if _, exists := nextState[t.From]; !exists && !isStochastic(t.When) {
 				nextState[t.From] = t.To
+			}
+		}
+		for from, to := range firstAny {
+			if _, exists := nextState[from]; !exists {
+				nextState[from] = to
 			}
 		}
 		result[entityType] = MovableEntity{

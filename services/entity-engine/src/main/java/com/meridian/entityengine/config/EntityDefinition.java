@@ -46,7 +46,15 @@ public class EntityDefinition {
         private String label;
         private String tone;
         private boolean terminal;
+        // Lombok generates isError()/isKpi() getters for these (it doesn't double
+        // up "is" since the field already starts with it) -- but Jackson then
+        // derives the JSON property name by stripping "is" from ANY isXxx()
+        // getter, landing on "error"/"kpi", not "isError"/"isKpi". Pin the JSON
+        // name explicitly rather than rename the field and disagree with the
+        // schema/docs/authoring vocabulary everywhere else.
+        @JsonProperty("isError")
         private boolean isError;
+        @JsonProperty("isKpi")
         private boolean isKpi;
         private String glyph;
     }
