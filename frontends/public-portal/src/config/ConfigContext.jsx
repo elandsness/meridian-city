@@ -63,7 +63,7 @@ function applyTheme(config) {
 function mergeConfig(base, override) {
   if (!override || typeof override !== 'object') return base
   const out = { ...base, ...override }
-  for (const key of ['company', 'theme', 'terminology', 'screens']) {
+  for (const key of ['company', 'theme', 'terminology', 'screens', 'home', 'entities']) {
     if (override[key] && typeof override[key] === 'object' && !Array.isArray(override[key])) {
       out[key] = { ...base[key], ...override[key] }
     }

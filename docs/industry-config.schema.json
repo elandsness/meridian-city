@@ -185,9 +185,9 @@
                   }
                 }
               },
-              "detailScreen": { "type": "string", "description": "Sibling screen id (entity-detail template) to link list rows to." },
               "background": { "type": "object", "description": "entity-map only: { kind: 'image'|'preset'|'shapes'|'none', ... }." },
-              "legend": { "type": "array", "description": "entity-map only." }
+              "legend": { "type": "array", "description": "entity-map only." },
+              "labelField": { "type": "string", "description": "entity-map only: which field to show next to each sprite." }
             }
           }
         ]

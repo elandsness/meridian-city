@@ -11,6 +11,21 @@ import Orders from '../pages/Orders.jsx'
 import Billing from '../pages/Billing.jsx'
 import Messages from '../pages/Messages.jsx'
 import MyJourney from '../pages/MyJourney.jsx'
+import EntityListPage from '../components/entity/EntityListPage.jsx'
+import EntityDetailPage from '../components/entity/EntityDetailPage.jsx'
+import EntityMapPage from '../components/entity/EntityMapPage.jsx'
+import EntityAnalyticsPage from '../components/entity/EntityAnalyticsPage.jsx'
+
+// Generic entity-template registry (generic-entity-engine initiative). A
+// screens.public entry of the form {id, template, entityType, ...} resolves
+// through here instead of the static SCREENS map above -- see
+// docs/industry-config.schema.json's third screenList branch.
+const TEMPLATES = {
+  'entity-list': EntityListPage,
+  'entity-detail': EntityDetailPage,
+  'entity-map': EntityMapPage,
+  'entity-analytics': EntityAnalyticsPage,
+}
 
 // `protected` gates the route behind auth; `termKey` (optional) pulls the nav label
 // from the terminology map so it re-skins per industry. `subRoutes` are child paths
@@ -42,14 +57,29 @@ export const SCREENS = {
 
 // Resolve the ordered, active screens for a config: applies per-screen label/icon
 // overrides and terminology. Unknown ids are ignored; an absent list falls back to
-// the full registry (so the default config = today's app).
+// the full registry (so the default config = today's app). Strictly additive:
+// a config entry with a `template` key resolves through TEMPLATES instead of the
+// static SCREENS map, but App.jsx's route-building never changes -- it still
+// only ever sees {id, path, component, protected, subRoutes}.
 export function getActiveScreens(config) {
   const list = config?.screens?.public ?? Object.keys(SCREENS)
   const term = (key, fallback) => config?.terminology?.[key] ?? fallback
   return list
     .map((item) => (typeof item === 'string' ? { id: item } : item))
-    .filter((it) => it && SCREENS[it.id])
+    .filter((it) => it && (it.template ? TEMPLATES[it.template] : SCREENS[it.id]))
     .map((it) => {
+      if (it.template) {
+        const Template = TEMPLATES[it.template]
+        return {
+          id: it.id,
+          path: `/${it.id}`,
+          component: () => <Template {...it} />,
+          protected: true,
+          subRoutes: [],
+          label: it.label ?? it.id,
+          icon: it.icon,
+        }
+      }
       const def = SCREENS[it.id]
       return {
         id: it.id,
@@ -57,6 +87,10 @@ export function getActiveScreens(config) {
         component: def.component,
         protected: def.protected,
         subRoutes: def.subRoutes || [],
+        // Previously dropped on the floor here (Layout.jsx never rendered it,
+        // unlike ops-dashboard's equivalent) -- wiring it through now that the
+        // catalog is growing makes per-screen icon overrides actually work.
+        icon: it.icon ?? def.icon,
         label: it.label ?? (def.termKey ? term(def.termKey, def.label) : def.label),
       }
     })

@@ -7,6 +7,7 @@ import QuickActions from '../components/home/QuickActions.jsx'
 import FlightStatus from '../components/home/FlightStatus.jsx'
 import AirfieldMapCard from '../components/home/AirfieldMapCard.jsx'
 import MyJourneyCard from '../components/home/MyJourneyCard.jsx'
+import EntityMapCard from '../components/entity/EntityMapCard.jsx'
 
 export const HOME_MODULES = {
   'city-home': CityHome,
@@ -16,10 +17,22 @@ export const HOME_MODULES = {
   'my-journey': MyJourneyCard,
 }
 
+// Generic entity-template home modules (generic-entity-engine initiative) --
+// currently just the map card; list/detail/analytics templates are screen-only.
+const TEMPLATES = {
+  'entity-map': EntityMapCard,
+}
+
 export function getActiveHomeModules(config) {
   const list = config?.home?.public ?? ['city-home', 'quick-actions']
   return list
     .map((item) => (typeof item === 'string' ? { id: item } : item))
-    .filter((it) => it && HOME_MODULES[it.id])
-    .map((it) => ({ id: it.id, Component: HOME_MODULES[it.id] }))
+    .filter((it) => it && (it.template ? TEMPLATES[it.template] : HOME_MODULES[it.id]))
+    .map((it) => {
+      if (it.template) {
+        const Template = TEMPLATES[it.template]
+        return { id: it.id, Component: () => <Template {...it} /> }
+      }
+      return { id: it.id, Component: HOME_MODULES[it.id] }
+    })
 }

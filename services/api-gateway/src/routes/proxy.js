@@ -131,6 +131,13 @@ function buildRouteTable (config) {
       requiresAuth: true,
       rewritePrefix: '/api/v1',
     },
+    {
+      // Generic entity engine (generic-entity-engine initiative) — /api/v1/entities/<type>[/...]
+      prefix: '/api/v1/entities',
+      target: config.ENTITY_ENGINE_URL,
+      serviceName: 'entity-engine',
+      requiresAuth: false,
+    },
   ]
 }
 

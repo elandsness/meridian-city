@@ -44,6 +44,11 @@ export const DEFAULT_CONFIG = {
     ops: ['overview', 'iot', 'incidents', 'requests', 'analytics', 'demo-control'],
     disabled: [],
   },
+  home: {
+    public: ['city-home', 'quick-actions'],
+    ops: ['ops-overview'],
+  },
+  entities: {},
 }
 
 export default DEFAULT_CONFIG
