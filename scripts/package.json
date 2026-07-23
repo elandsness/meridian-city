@@ -1,0 +1,14 @@
+{
+  "name": "meridian-scripts",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tooling for validating Meridian industry-config values files. Not a deployable service.",
+  "type": "module",
+  "scripts": {
+    "validate": "node validate-industry-config.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "js-yaml": "^4.1.0"
+  }
+}

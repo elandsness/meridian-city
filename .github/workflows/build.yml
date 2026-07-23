@@ -333,6 +333,30 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ github.sha }}
 
   # -------------------------------------------------------------------------
+  # Industry config validation (docs/industry-config.schema.json via ajv)
+  # -------------------------------------------------------------------------
+  validate-industry-configs:
+    name: Validate Industry Configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: scripts/package-lock.json
+
+      - name: Install validator dependencies
+        working-directory: scripts
+        run: npm ci
+
+      - name: Validate every values-*.yaml industry overlay
+        working-directory: scripts
+        run: node validate-industry-config.mjs ../helm/values.yaml ../helm/values-*.yaml
+
+  # -------------------------------------------------------------------------
   # Helm chart lint
   # -------------------------------------------------------------------------
   helm-lint:

@@ -4,6 +4,18 @@ config.json, which is mounted into both frontends at the nginx html root and
 fetched at startup by each SPA's ConfigContext. One ConfigMap serves both SPAs.
 Namespace-scoped, so the name stays plain (multi-tenancy isolates by namespace).
 NEVER add secrets to .Values.industry: config.json is served to every browser.
+
+`data`/`routing`/`dynatrace` are omitted below because they're backend-only
+mechanism config with nothing a browser renders. `entities` (the generic
+entity-engine's field/state/transition definitions) is deliberately NOT added
+to this omit list even though parts of it are backend-only mechanics (transition
+conditions/effects, generator strategy) — there's no secret in it, and the
+frontend's generic page/map templates need the browser-relevant parts (states,
+fields, computed.position.waypoints) at render time. Trimming it down to just
+those parts here would need per-field projection logic in this template, which
+isn't worth building for zero real benefit; the frontend simply ignores the
+fields it doesn't use. If a future entity-engine field ever needs to be a real
+secret, omit it explicitly by name here rather than omitting `entities` wholesale.
 */}}
 {{- if or .Values.publicPortal.enabled .Values.opsDashboard.enabled }}
 apiVersion: v1

@@ -1,87 +1,134 @@
 #!/usr/bin/env node
-// Lightweight, dependency-free validation of a Meridian industry config (the JSON
-// that ends up at /config.json). Mirrors the key constraints in
-// docs/industry-config.schema.json so a bad config fails fast before deploy.
-// Phase 6 replaces this with full JSON-Schema (ajv) validation wired into CI.
+// Validates a Meridian industry config against docs/industry-config.schema.json
+// using ajv, plus a few semantic checks ajv's structural validation can't express
+// (cross-references within the same document: state reachability, transition
+// endpoints, entity refs). Accepts either a `values-<industry>.yaml` overlay
+// (reads its top-level `industry:` key) or an already-rendered config.json —
+// YAML is a superset of JSON, so both parse the same way.
 //
-// Usage: node scripts/validate-industry-config.mjs <config.json>
+// Usage: node scripts/validate-industry-config.mjs <file> [<file> ...]
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import yaml from 'js-yaml'
+import Ajv2020 from 'ajv/dist/2020.js'
 
-const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
-const ID = /^[a-z][a-z0-9-]*$/
-const COLOR_KEYS = ['brand', 'brandDeep', 'brandSoft', 'brandTint', 'accent', 'accentSoft', 'accentInk']
-const SCREEN_KEYS = ['public', 'ops', 'disabled']
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const schemaPath = join(__dirname, '..', 'docs', 'industry-config.schema.json')
 
-const path = process.argv[2]
-if (!path) {
-  console.error('usage: node scripts/validate-industry-config.mjs <config.json>')
+const files = process.argv.slice(2)
+if (files.length === 0) {
+  console.error('usage: node scripts/validate-industry-config.mjs <file> [<file> ...]')
   process.exit(2)
 }
 
-let cfg
-try {
-  cfg = JSON.parse(readFileSync(path, 'utf8'))
-} catch (e) {
-  console.error(`✗ ${path}: not valid JSON — ${e.message}`)
-  process.exit(1)
+const schema = JSON.parse(readFileSync(schemaPath, 'utf8'))
+const ajv = new Ajv2020({ allErrors: true, strict: false })
+const validateSchema = ajv.compile(schema)
+
+// --- semantic checks ajv can't express (cross-references within one document) ---
+function checkEntities(entities) {
+  const errors = []
+  if (!entities || typeof entities !== 'object') return errors
+  const entityIds = new Set(Object.keys(entities))
+
+  for (const [entityId, def] of Object.entries(entities)) {
+    const states = def.states ? Object.keys(def.states) : []
+    const stateSet = new Set(states)
+
+    if (def.initial && !stateSet.has(def.initial)) {
+      errors.push(`entities.${entityId}.initial "${def.initial}" is not a key in states`)
+    }
+    if (states.length && !states.some((s) => def.states[s]?.terminal)) {
+      errors.push(`entities.${entityId}.states has no terminal:true state`)
+    }
+    for (const [i, t] of (def.transitions || []).entries()) {
+      if (t.from && !stateSet.has(t.from)) {
+        errors.push(`entities.${entityId}.transitions[${i}].from "${t.from}" is not a key in states`)
+      }
+      if (t.to && !stateSet.has(t.to)) {
+        errors.push(`entities.${entityId}.transitions[${i}].to "${t.to}" is not a key in states`)
+      }
+    }
+    for (const [fieldId, field] of Object.entries(def.fields || {})) {
+      if (field.type === 'ref' && field.entity && !entityIds.has(field.entity)) {
+        errors.push(`entities.${entityId}.fields.${fieldId}.entity "${field.entity}" is not a key in entities`)
+      }
+    }
+    if (def.computed?.position?.waypoints) {
+      for (const stateKey of Object.keys(def.computed.position.waypoints)) {
+        if (!stateSet.has(stateKey)) {
+          errors.push(`entities.${entityId}.computed.position.waypoints has key "${stateKey}" which is not a key in states`)
+        }
+      }
+    }
+
+    // Reachability from `initial`, walking declared transitions.
+    if (def.initial && stateSet.has(def.initial)) {
+      const adjacency = new Map(states.map((s) => [s, []]))
+      for (const t of def.transitions || []) {
+        if (adjacency.has(t.from) && stateSet.has(t.to)) adjacency.get(t.from).push(t.to)
+      }
+      const reached = new Set([def.initial])
+      const queue = [def.initial]
+      while (queue.length) {
+        for (const next of adjacency.get(queue.shift()) || []) {
+          if (!reached.has(next)) { reached.add(next); queue.push(next) }
+        }
+      }
+      const unreachable = states.filter((s) => !reached.has(s))
+      if (unreachable.length) {
+        errors.push(`entities.${entityId}.states has state(s) unreachable from "${def.initial}": ${unreachable.join(', ')}`)
+      }
+    }
+  }
+  return errors
 }
 
-const errors = []
-const isStr = (v) => typeof v === 'string'
-const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v)
-const check = (cond, msg) => { if (!cond) errors.push(msg) }
-
-check(isObj(cfg), 'root must be an object')
-check(cfg.version === 1, 'version must be 1')
-if (cfg.id !== undefined) check(isStr(cfg.id) && ID.test(cfg.id), 'id must match ^[a-z][a-z0-9-]*$')
-
-check(isObj(cfg.company), 'company is required (object)')
-if (isObj(cfg.company)) {
-  check(isStr(cfg.company.name) && cfg.company.name.length > 0, 'company.name is required (non-empty string)')
-  if (cfg.company.short !== undefined) check(isStr(cfg.company.short), 'company.short must be a string')
+function checkRouting(cfg) {
+  const errors = []
+  if (!cfg.routing || !cfg.data?.requestTemplates) return errors
+  const routingKeys = new Set(Object.keys(cfg.routing))
+  for (const [i, tmpl] of cfg.data.requestTemplates.entries()) {
+    if (tmpl.category && !routingKeys.has(tmpl.category)) {
+      errors.push(`data.requestTemplates[${i}].category "${tmpl.category}" has no matching key in routing`)
+    }
+  }
+  return errors
 }
 
-check(isObj(cfg.theme) && isObj(cfg.theme.colors), 'theme.colors is required (object)')
-if (isObj(cfg.theme) && isObj(cfg.theme.colors)) {
-  const colors = cfg.theme.colors
-  check(isStr(colors.brand) && HEX.test(colors.brand), 'theme.colors.brand must be a hex color')
-  check(isStr(colors.accent) && HEX.test(colors.accent), 'theme.colors.accent must be a hex color')
-  for (const [k, v] of Object.entries(colors)) {
-    check(COLOR_KEYS.includes(k), `theme.colors has unknown key "${k}"`)
-    check(isStr(v) && HEX.test(v), `theme.colors.${k} must be a hex color`)
+let failures = 0
+for (const path of files) {
+  let cfg
+  try {
+    const parsed = yaml.load(readFileSync(path, 'utf8'))
+    const isObj = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    if (isObj && 'industry' in parsed) {
+      cfg = parsed.industry
+    } else if (isObj && ('company' in parsed || 'theme' in parsed || 'screens' in parsed)) {
+      cfg = parsed // already a bare rendered config.json, not a values-*.yaml overlay
+    } else {
+      console.log(`… ${path}: skipped (no industry: block — not an industry-config overlay)`)
+      continue
+    }
+  } catch (e) {
+    console.error(`✗ ${path}: not valid YAML/JSON — ${e.message}`)
+    failures++
+    continue
+  }
+
+  const structurallyValid = validateSchema(cfg)
+  const semanticErrors = structurallyValid ? [...checkEntities(cfg.entities), ...checkRouting(cfg)] : []
+  const ajvErrors = structurallyValid ? [] : validateSchema.errors.map((e) => `${e.instancePath || '(root)'} ${e.message}`)
+  const allErrors = [...ajvErrors, ...semanticErrors]
+
+  if (allErrors.length) {
+    console.error(`✗ ${path}: ${allErrors.length} error(s):`)
+    for (const e of allErrors) console.error(`  - ${e}`)
+    failures++
+  } else {
+    console.log(`✓ ${path}: valid industry config (${cfg.company?.name ?? '?'})`)
   }
 }
 
-if (cfg.screens !== undefined) {
-  check(isObj(cfg.screens), 'screens must be an object')
-  for (const key of Object.keys(cfg.screens || {})) {
-    check(SCREEN_KEYS.includes(key), `screens has unknown key "${key}"`)
-    const list = cfg.screens[key]
-    const okItem = (s) =>
-      (isStr(s) && ID.test(s)) ||
-      (isObj(s) &&
-        isStr(s.id) &&
-        ID.test(s.id) &&
-        (s.label === undefined || isStr(s.label)) &&
-        (s.icon === undefined || isStr(s.icon)))
-    check(
-      Array.isArray(list) && list.every(okItem),
-      `screens.${key} items must be a screen id or { id, label?, icon? }`,
-    )
-  }
-}
-
-if (cfg.terminology !== undefined) {
-  check(isObj(cfg.terminology), 'terminology must be an object')
-  for (const [k, v] of Object.entries(cfg.terminology || {})) {
-    check(isStr(v), `terminology.${k} must be a string`)
-  }
-}
-
-const unique = [...new Set(errors)]
-if (unique.length) {
-  console.error(`✗ ${path}: ${unique.length} error(s):`)
-  for (const e of unique) console.error(`  - ${e}`)
-  process.exit(1)
-}
-console.log(`✓ ${path}: valid industry config (${cfg.company.name})`)
+process.exit(failures ? 1 : 0)

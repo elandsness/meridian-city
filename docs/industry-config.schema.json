@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://meridian.dev/industry-config.schema.json",
   "title": "Meridian industry config",
-  "description": "Re-skins a Meridian deployment for a target industry. Rendered to /config.json by helm/templates/industry-configmap.yaml and merged over each SPA's baked defaults (frontends/<app>/src/config/defaults.js) at startup. BROWSER-VISIBLE ONLY — never include secrets. Later phases add `flows`, `data`, and `dynatrace` sections (root additionalProperties stays open for forward compatibility).",
+  "description": "Re-skins a Meridian deployment for a target industry. This is the full authored `industry:` block from a `values-<industry>.yaml` overlay — broader than what reaches the browser. `company`/`theme`/`terminology`/`screens`/`home`/`entities` are rendered to /config.json by helm/templates/industry-configmap.yaml and merged over each SPA's baked defaults (frontends/<app>/src/config/defaults.js) at startup; `data`/`routing`/`dynatrace` are backend-only (omitted from that render, consumed via env by traffic-bot/service-dispatch/the Dynatrace provisioner). Whatever IS rendered to the browser must never include secrets. Root additionalProperties stays open for forward compatibility.",
   "type": "object",
   "required": ["version", "company", "theme", "screens"],
   "additionalProperties": true,
@@ -30,7 +30,9 @@
           "additionalProperties": true,
           "properties": {
             "name": { "type": "string", "description": "AI assistant display name (e.g. 'Meri')." },
-            "persona": { "type": "string", "description": "One-line persona used in the assistant system prompt." }
+            "persona": { "type": "string", "description": "One-line persona used in the assistant system prompt." },
+            "supportPhone": { "type": "string" },
+            "systemPrompt": { "type": "string" }
           }
         }
       }
@@ -66,7 +68,7 @@
     },
     "screens": {
       "type": "object",
-      "description": "Which curated screen modules each SPA mounts. (Consumed by the module registry in Phase 2; carried as data in Phase 0.)",
+      "description": "Which curated screen modules (or generic entity-template pages) each SPA mounts.",
       "additionalProperties": false,
       "properties": {
         "public": { "$ref": "#/$defs/screenList" },
@@ -76,11 +78,64 @@
     },
     "home": {
       "type": "object",
-      "description": "Home-page module composition per SPA (module ids from the home-module registry).",
+      "description": "Home-page module composition per SPA (module ids from the home-module registry, or generic entity-template cards).",
       "additionalProperties": false,
       "properties": {
         "public": { "$ref": "#/$defs/screenList" },
         "ops": { "$ref": "#/$defs/screenList" }
+      }
+    },
+    "entities": {
+      "type": "object",
+      "description": "Config-driven entity/lifecycle definitions — the generic entity engine. Each key is an entity type id (e.g. 'flight', 'service_request'). Rendered to the browser in full alongside company/theme/screens/home: entity definitions contain no secrets, and the frontend's generic list/detail/map/analytics templates need the browser-relevant parts (states, fields, computed.position) at render time, so it isn't worth building per-field projection logic to strip out the backend-only mechanics (transition conditions/effects, generator strategy) that the frontend simply ignores.",
+      "additionalProperties": { "$ref": "#/$defs/entityType" }
+    },
+    "data": {
+      "type": "object",
+      "description": "Backend-only demo data seeds, delivered to traffic-bot via the INDUSTRY_DATA env var. Never rendered to the browser.",
+      "additionalProperties": true,
+      "properties": {
+        "zones": { "type": "array", "items": { "type": "string" } },
+        "requestTemplates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "title", "description"],
+            "properties": {
+              "category": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "chatQuestions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "description": "Backend-only category→department map, delivered to service-dispatch's RoutingEngine via the ROUTING_MAP env var. Keys must match data.requestTemplates[].category. Never rendered to the browser.",
+      "additionalProperties": { "type": "string" }
+    },
+    "dynatrace": {
+      "type": "object",
+      "description": "Backend-only Dynatrace naming + Business Flow config, consumed by the per-instance provisioner (helm/files/provision-dynatrace-business-config.py). Never rendered to the browser.",
+      "additionalProperties": true,
+      "properties": {
+        "serviceNames": {
+          "type": "object",
+          "description": "k8s deployment name → Dynatrace service display name (builtin:naming.services).",
+          "additionalProperties": { "type": "string" }
+        },
+        "flowLabels": {
+          "type": "object",
+          "description": "Business-flow key → Business Flow title override.",
+          "additionalProperties": { "type": "string" }
+        },
+        "flows": {
+          "type": "array",
+          "description": "Which business-flow keys to actually provision for this industry.",
+          "items": { "type": "string" }
+        }
       }
     }
   },
@@ -105,8 +160,153 @@
               "label": { "type": "string" },
               "icon": { "type": "string" }
             }
+          },
+          {
+            "type": "object",
+            "description": "A generic entity-template page or card — id must be unique within this list, entityType must be a key in the top-level entities map.",
+            "required": ["id", "template", "entityType"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "label": { "type": "string" },
+              "icon": { "type": "string" },
+              "template": { "enum": ["entity-list", "entity-detail", "entity-map", "entity-analytics"] },
+              "entityType": { "type": "string" },
+              "fields": { "type": "array", "items": { "type": "string" } },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "label", "match"],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "label": { "type": "string" },
+                    "match": { "type": "object" }
+                  }
+                }
+              },
+              "detailScreen": { "type": "string", "description": "Sibling screen id (entity-detail template) to link list rows to." },
+              "background": { "type": "object", "description": "entity-map only: { kind: 'image'|'preset'|'shapes'|'none', ... }." },
+              "legend": { "type": "array", "description": "entity-map only." }
+            }
           }
         ]
+      }
+    },
+    "entityType": {
+      "type": "object",
+      "required": ["displayName", "fields", "initial", "states"],
+      "additionalProperties": false,
+      "properties": {
+        "displayName": { "type": "string" },
+        "displayNamePlural": { "type": "string" },
+        "idPrefix": { "type": "string", "pattern": "^[a-z][a-z0-9]*$", "description": "Generated ids look like '<idPrefix>-<5char>'." },
+        "fields": {
+          "type": "object",
+          "description": "Keys must be the real snake_case wire field name (e.g. 'flight_number'), matching the API's JSON casing — an authoring LLM must not camelCase these.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+              "type": { "enum": ["string", "number", "boolean", "date", "enum", "ref"] },
+              "required": { "type": "boolean" },
+              "default": {},
+              "values": { "type": "array", "items": { "type": "string" }, "description": "enum type only." },
+              "entity": { "type": "string", "description": "ref type only: must be a key in the top-level entities map." }
+            }
+          }
+        },
+        "initial": { "type": "string", "description": "Must be a key in states." },
+        "states": {
+          "type": "object",
+          "description": "At least one state should be terminal:true.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "tone": { "enum": ["slate", "blue", "amber", "orange", "green", "red"] },
+              "terminal": { "type": "boolean" },
+              "isError": { "type": "boolean" },
+              "isKpi": { "type": "boolean" },
+              "glyph": { "type": "string", "description": "Emoji/unicode sprite glyph for this state, used by the entity-map template." }
+            }
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "description": "Evaluated in declared order per 'from' state; first match wins. from/to must be keys in states.",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "additionalProperties": false,
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "label": { "type": "string", "description": "User-facing action label, if userTriggerable." },
+              "userTriggerable": { "type": "boolean" },
+              "when": { "type": "object", "description": "{field,equals|notEquals} | {probability} | {faultGate,probability} | {link,field,equals}. Loosely typed here — semantic validity isn't ajv-checked." },
+              "timer": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "minSeconds": { "type": "number" },
+                  "maxSeconds": { "type": "number" }
+                }
+              },
+              "effects": {
+                "type": "array",
+                "items": { "type": "object", "description": "{target,action,field?} — set|increment|transition|spawnLinked|callService. Loosely typed here." }
+              }
+            }
+          }
+        },
+        "linkOnCreate": {
+          "type": "object",
+          "description": "Best-effort link to another entity at creation time, e.g. a passenger picking a departing flight.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "query": { "type": "object" },
+              "strategy": { "type": "string" },
+              "required": { "type": "boolean" }
+            }
+          }
+        },
+        "computed": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "position": {
+              "type": "object",
+              "description": "Backend-computed (movement-service) scene position for the entity-map template.",
+              "properties": {
+                "type": { "const": "point2d" },
+                "interpolation": { "enum": ["linear", "easeInOut"] },
+                "waypoints": {
+                  "type": "object",
+                  "description": "state → {x,y}. Keys must be a subset of this entity's states.",
+                  "additionalProperties": {
+                    "type": "object",
+                    "required": ["x", "y"],
+                    "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "generator": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "strategy": { "enum": ["simpleSteadyState", "periodicHistoryBackfill"] },
+            "intervalMs": { "type": "number" },
+            "maxActive": { "type": "number" },
+            "fields": { "type": "object", "description": "Per-field generation hints, e.g. { has_bag: { probability: 0.6 } }." }
+          }
+        }
       }
     }
   }
