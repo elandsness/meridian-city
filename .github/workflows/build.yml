@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # On-demand image build from ANY branch (e.g. a long-lived feature branch that
+  # needs real images in GKE for live-cluster testing before it's ready to merge).
+  # SAFETY: this must never let a manual run touch :latest, which every existing
+  # instance's floating-tag imagePullPolicy:Always relies on meaning "main's HEAD".
+  # See the "Compute image tags" step in each build job -- a workflow_dispatch run
+  # always gets an auto-derived branch-scoped tag (branch-<ref>-<sha>), never
+  # :latest, and there is no tag input to type here at all, so there's no way to
+  # mistype your way into colliding with it.
+  workflow_dispatch: {}
 
 env:
   REGISTRY: ghcr.io
@@ -57,7 +66,7 @@ jobs:
         # docker.io/library/* during the image build.
         # Skips gracefully when the DOCKERHUB_* secrets aren't configured, so the
         # build falls back to anonymous pulls instead of hard-failing on login.
-        if: github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.DOCKERHUB_USERNAME != ''
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         uses: docker/login-action@v3
@@ -66,22 +75,31 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image tags
+        id: tags
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          else
+            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push ${{ matrix.service }} image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
           context: services/${{ matrix.service }}
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
 
   # -------------------------------------------------------------------------
   # Node.js services
@@ -121,7 +139,7 @@ jobs:
         # docker.io/library/* during the image build.
         # Skips gracefully when the DOCKERHUB_* secrets aren't configured, so the
         # build falls back to anonymous pulls instead of hard-failing on login.
-        if: github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.DOCKERHUB_USERNAME != ''
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         uses: docker/login-action@v3
@@ -130,22 +148,31 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image tags
+        id: tags
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          else
+            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push ${{ matrix.service }} image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
           context: services/${{ matrix.service }}
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
 
   # -------------------------------------------------------------------------
   # Python services
@@ -183,7 +210,7 @@ jobs:
         # docker.io/library/* during the image build.
         # Skips gracefully when the DOCKERHUB_* secrets aren't configured, so the
         # build falls back to anonymous pulls instead of hard-failing on login.
-        if: github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.DOCKERHUB_USERNAME != ''
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         uses: docker/login-action@v3
@@ -192,22 +219,31 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image tags
+        id: tags
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          else
+            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push ${{ matrix.service }} image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
           context: services/${{ matrix.service }}
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
 
   # -------------------------------------------------------------------------
   # Go services
@@ -247,7 +283,7 @@ jobs:
         # docker.io/library/* during the image build.
         # Skips gracefully when the DOCKERHUB_* secrets aren't configured, so the
         # build falls back to anonymous pulls instead of hard-failing on login.
-        if: github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.DOCKERHUB_USERNAME != ''
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         uses: docker/login-action@v3
@@ -256,22 +292,31 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image tags
+        id: tags
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          else
+            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push ${{ matrix.service }} image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
           context: services/${{ matrix.service }}
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
 
   # -------------------------------------------------------------------------
   # React frontends
@@ -308,7 +353,7 @@ jobs:
         # docker.io/library/* during the image build.
         # Skips gracefully when the DOCKERHUB_* secrets aren't configured, so the
         # build falls back to anonymous pulls instead of hard-failing on login.
-        if: github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.DOCKERHUB_USERNAME != ''
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         uses: docker/login-action@v3
@@ -317,22 +362,31 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image tags
+        id: tags
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          else
+            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push ${{ matrix.app }} image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
           context: frontends/${{ matrix.app }}
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
 
   # -------------------------------------------------------------------------
   # Industry config validation (docs/industry-config.schema.json via ajv)
