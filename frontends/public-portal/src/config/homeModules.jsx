@@ -4,6 +4,7 @@
 // the seam a config-authored industry plugs its home layout into.
 import CityHome from '../components/home/CityHome.jsx'
 import QuickActions from '../components/home/QuickActions.jsx'
+import TransitMapCard from '../components/home/TransitMapCard.jsx'
 import FlightStatus from '../components/home/FlightStatus.jsx'
 import AirfieldMapCard from '../components/home/AirfieldMapCard.jsx'
 import MyJourneyCard from '../components/home/MyJourneyCard.jsx'
@@ -11,6 +12,7 @@ import EntityMapCard from '../components/entity/EntityMapCard.jsx'
 
 export const HOME_MODULES = {
   'city-home': CityHome,
+  'transit-map': TransitMapCard,
   'quick-actions': QuickActions,
   'flight-status': FlightStatus,
   'airfield-map': AirfieldMapCard,

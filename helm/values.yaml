@@ -84,7 +84,7 @@ industry:
   # Home-page module composition per SPA (module ids from frontends/*/src/config/homeModules.jsx).
   # Absent falls back to the city bundle; an industry overlay supplies its own.
   home:
-    public: ["city-home", "quick-actions"]
+    public: ["city-home", "transit-map", "quick-actions"]
     ops: ["ops-overview"]
   # Backend-only demo-data pools + dispatch routing. NOT rendered into the browser
   # config.json (see industry-configmap.yaml). Empty = services use their built-in

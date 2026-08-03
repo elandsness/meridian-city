@@ -45,7 +45,7 @@ export const DEFAULT_CONFIG = {
     disabled: [],
   },
   home: {
-    public: ['city-home', 'quick-actions'],
+    public: ['city-home', 'transit-map', 'quick-actions'],
     ops: ['ops-overview'],
   },
   entities: {},
