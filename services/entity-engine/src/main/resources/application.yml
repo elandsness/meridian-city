@@ -28,6 +28,16 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: java.util.HashMap
 
 management:
   endpoints:
@@ -39,24 +49,6 @@ management:
       probes:
         enabled: true
       show-details: always
-
-# The generic entity engine (Stage 2 of the generic-entity-engine initiative — see
-# docs/regression-baseline-2026-07-23.md and the plan file referenced from the
-# project_generic_entity_engine memory). One codebase, deployed multiple times with
-# different identities/owned-types (customer-entity-service, ops-entity-service) once
-# real City/Airport retrofit happens in Stage 6/7; for now a single instance owns
-# whatever entity types are in its mounted config.
-spring:
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:}
-    consumer:
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-        spring.json.use.type.headers: false
-        spring.json.value.default.type: java.util.HashMap
 
 entity-engine:
   # Path to the mounted industry entity-config JSON (rendered from
