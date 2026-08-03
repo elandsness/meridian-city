@@ -832,10 +832,17 @@ postgresql:
     database: "meridian"
   storage:
     size: "10Gi"
+  # CNPG's default (100) is comfortably exceeded once every entity-related service
+  # (each ~10-connection HikariCP pool) coexists with an old pod generation during
+  # a rollout restart -- observed settling at 96/100 steady-state with only 8 Java
+  # services; Stage 6/7 add more. Bumped well ahead of that growth, not just to
+  # patch the current number.
+  parameters:
+    max_connections: "300"
   resources:
     requests:
       cpu: "250m"
-      memory: "256Mi"
+      memory: "384Mi"
     limits:
       cpu: "1000m"
       memory: "1Gi"

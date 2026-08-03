@@ -18,7 +18,7 @@
     },
     "transitions": [
       { "from": "queued", "to": "scanning", "timer": { "minSeconds": 2, "maxSeconds": 5 } },
-      { "from": "scanning", "to": "fault_detected", "when": { "faultGate": true, "probability": 0.2 }, "timer": { "minSeconds": 2, "maxSeconds": 5 } },
+      { "from": "scanning", "to": "fault_detected", "when": { "faultGate": "probe-fault-detected", "probability": 0.2 }, "timer": { "minSeconds": 2, "maxSeconds": 5 } },
       { "from": "scanning", "to": "validating", "timer": { "minSeconds": 2, "maxSeconds": 5 } },
       { "from": "validating", "to": "complete", "timer": { "minSeconds": 2, "maxSeconds": 5 } }
     ],

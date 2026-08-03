@@ -12,10 +12,10 @@
     </parent>
 
     <groupId>com.meridian</groupId>
-    <artifactId>entity-engine</artifactId>
+    <artifactId>routing-service</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>entity-engine</name>
-    <description>Meridian City Platform - Generic config-driven entity/lifecycle engine</description>
+    <name>routing-service</name>
+    <description>Meridian City Platform - Stateless config-driven routing decision service</description>
 
     <properties>
         <java.version>21</java.version>
@@ -28,42 +28,10 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Spring Boot JPA -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
-
         <!-- Spring Boot Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
-        <!-- BCrypt password hashing for "password"-type fields (e.g. the citizen entity
-             type's account password) + the generic /api/v1/auth/login endpoint.
-             crypto-only artifact: provides BCryptPasswordEncoder WITHOUT the full Spring
-             Security filter chain (which would otherwise lock down every endpoint). -->
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
-        </dependency>
-
-        <!-- Flyway -->
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
-        </dependency>
-
-        <!-- PostgreSQL Driver -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
         </dependency>
 
         <!-- Lombok -->

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Generic REST surface for every entity type this instance owns. There is
@@ -28,6 +29,14 @@ public class EntityController {
     @GetMapping("/{entityType}/{id}")
     public EntityResponse get(@PathVariable String entityType, @PathVariable String id) {
         return new EntityResponse(service.get(entityType, id));
+    }
+
+    /** Client-submitted create, e.g. a citizen registering, a service request being
+     * submitted, a cart item being added -- the generator isn't the only source of
+     * entities once a real industry retrofit (not just a synthetic proof) is live. */
+    @PostMapping("/{entityType}")
+    public EntityResponse create(@PathVariable String entityType, @RequestBody(required = false) Map<String, Object> body) {
+        return new EntityResponse(service.createFromClient(entityType, body));
     }
 
     @PostMapping("/{entityType}/{id}/actions/{action}")

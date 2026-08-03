@@ -34,6 +34,7 @@ public class EntityEngineService {
     private final TransitionEvaluator transitionEvaluator;
     private final EffectExecutor effectExecutor;
     private final EntityEventLogger eventLogger;
+    private final EntityFactory entityFactory;
 
     public List<EntityRecord> list(String entityType, String stateFilter) {
         configLoader.require(entityType);
@@ -52,13 +53,11 @@ public class EntityEngineService {
     public EntityRecord runAction(String entityType, String id, String action) {
         EntityDefinition def = configLoader.require(entityType);
         EntityRecord record = get(entityType, id);
-        EntityDefinition.TransitionDef transition = def.getTransitions().stream()
-                .filter(t -> t.isUserTriggerable()
-                        && t.getFrom().equals(record.getState())
-                        && (action.equals(t.getTo()) || action.equals(t.getLabel())))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "No user-triggerable action \"" + action + "\" from state \"" + record.getState() + "\""));
+        EntityDefinition.TransitionDef transition = transitionEvaluator.findMatchingUserAction(record, def, action);
+        if (transition == null) {
+            throw new IllegalStateException(
+                    "No user-triggerable action \"" + action + "\" from state \"" + record.getState() + "\"");
+        }
         return applyTransition(record, def, transition);
     }
 
@@ -66,17 +65,33 @@ public class EntityEngineService {
     @Transactional
     public EntityRecord create(String entityType, Map<String, Object> fieldOverrides) {
         EntityDefinition def = configLoader.require(entityType);
-        EntityRecord record = EntityRecord.create(entityType, def.getIdPrefix(), def.getInitial());
-
-        def.getFields().forEach((fieldName, fieldDef) -> {
-            Object override = fieldOverrides == null ? null : fieldOverrides.get(fieldName);
-            record.setField(fieldName, override != null ? override : generateFieldValue(fieldName, fieldDef, def));
-        });
-
+        EntityRecord record = entityFactory.build(def, entityType, fieldOverrides);
         applyLinkOnCreate(record, def);
-        scheduleNext(record, def);
+        entityFactory.scheduleNext(record, def);
         repository.save(record);
+        entityFactory.recordCreation(record, def);
         return record;
+    }
+
+    /**
+     * Client-submitted create, e.g. POST /api/v1/entities/{type} (a citizen
+     * registering, a service request being submitted, a cart item being added)
+     * -- unlike generator/spawnLinked creates, a missing required field here is
+     * the caller's mistake, not a config-authoring gap, so it's rejected with a
+     * 400 rather than silently filled in.
+     */
+    @Transactional
+    public EntityRecord createFromClient(String entityType, Map<String, Object> fields) {
+        EntityDefinition def = configLoader.require(entityType);
+        List<String> missing = def.getFields().entrySet().stream()
+                .filter(e -> e.getValue().isRequired())
+                .filter(e -> fields == null || fields.get(e.getKey()) == null)
+                .map(Map.Entry::getKey)
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(entityType + " missing required field(s): " + missing);
+        }
+        return create(entityType, fields);
     }
 
     /** Evaluates and, if a transition matches, applies it. Called by TransitionScheduler for due entities. */
@@ -99,7 +114,7 @@ public class EntityEngineService {
         String fromState = record.getState();
         record.setState(transition.getTo());
         record.setStateEnteredAt(OffsetDateTime.now());
-        scheduleNext(record, def);
+        entityFactory.scheduleNext(record, def);
 
         if (!transition.getEffects().isEmpty()) {
             effectExecutor.apply(record, transition.getEffects());
@@ -107,43 +122,13 @@ public class EntityEngineService {
 
         repository.save(record);
         eventRepository.save(EntityEventRecord.of(record, fromState, transition.getTo()));
-        eventLogger.transitioned(record, fromState);
+        eventLogger.transitioned(record, fromState, def);
         return record;
-    }
-
-    /**
-     * Sets next_transition_at for the state the record just entered. Multiple
-     * transitions can leave the same state (branching); since which one
-     * eventually fires depends on conditions evaluated at check time, the
-     * check-again delay is taken from the FIRST declared transition out of the
-     * new state that has a timer (consistent with "declared order, first match
-     * wins" everywhere else in the engine). A transition without a timer is
-     * treated as checkable on the very next tick. No outgoing transitions at
-     * all (a terminal state) leaves next_transition_at null, same as today's
-     * hand-written schedulers.
-     */
-    private void scheduleNext(EntityRecord record, EntityDefinition def) {
-        EntityDefinition.TransitionDef next = def.getTransitions().stream()
-                .filter(t -> t.getFrom().equals(record.getState()))
-                .findFirst()
-                .orElse(null);
-        if (next == null) {
-            record.setNextTransitionAt(null);
-            return;
-        }
-        EntityDefinition.TimerDef timer = next.getTimer();
-        if (timer == null || timer.getMinSeconds() == null) {
-            record.setNextTransitionAt(OffsetDateTime.now());
-            return;
-        }
-        double min = timer.getMinSeconds();
-        double max = timer.getMaxSeconds() != null ? timer.getMaxSeconds() : min;
-        double delaySeconds = min >= max ? min : ThreadLocalRandom.current().nextDouble(min, max);
-        record.setNextTransitionAt(OffsetDateTime.now().plusSeconds((long) delaySeconds));
     }
 
     private void applyLinkOnCreate(EntityRecord record, EntityDefinition def) {
         def.getLinkOnCreate().forEach((refField, linkDef) -> {
+            if (record.getLink(refField) != null) return; // already set by an explicit client-supplied ref field
             Map<String, Object> query = linkDef.getQuery();
             if (query == null) return;
             String targetEntityType = String.valueOf(query.get("entity"));
@@ -160,24 +145,6 @@ public class EntityEngineService {
             EntityRecord picked = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
             record.setLink(refField, picked.getId());
         });
-    }
-
-    private Object generateFieldValue(String fieldName, EntityDefinition.FieldDef fieldDef, EntityDefinition def) {
-        if (fieldDef.getDefaultValue() != null) return fieldDef.getDefaultValue();
-
-        Map<String, Object> hint = def.getGenerator() == null ? null : def.getGenerator().getFields().get(fieldName);
-        String type = fieldDef.getType();
-        if ("boolean".equals(type)) {
-            double probability = hint != null && hint.get("probability") instanceof Number n ? n.doubleValue() : 0.5;
-            return ThreadLocalRandom.current().nextDouble() < probability;
-        }
-        if ("enum".equals(type) && fieldDef.getValues() != null && !fieldDef.getValues().isEmpty()) {
-            List<String> values = fieldDef.getValues();
-            return values.get(ThreadLocalRandom.current().nextInt(values.size()));
-        }
-        if ("number".equals(type)) return 0;
-        if ("ref".equals(type)) return null; // resolved via linkOnCreate, not per-field generation
-        return fieldName + "-" + ThreadLocalRandom.current().nextInt(10000); // string / date fallback
     }
 
     @SuppressWarnings("unchecked")

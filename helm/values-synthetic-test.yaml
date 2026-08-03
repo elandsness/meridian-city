@@ -52,7 +52,7 @@ industry:
           timer: { minSeconds: 5, maxSeconds: 15 }
         - from: scanning
           to: fault_detected
-          when: { faultGate: true, probability: 0.2 }
+          when: { faultGate: "probe-fault-detected", probability: 0.2 }
           timer: { minSeconds: 5, maxSeconds: 15 }
         - from: scanning
           to: validating

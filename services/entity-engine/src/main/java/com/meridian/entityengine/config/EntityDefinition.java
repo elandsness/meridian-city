@@ -57,6 +57,11 @@ public class EntityDefinition {
         @JsonProperty("isKpi")
         private boolean isKpi;
         private String glyph;
+        /** isKpi states only: sum this field across every entity reaching this state
+         * (kpiCalculation="sum" in the derived Business Flow) instead of the default
+         * lastEvent count of entities reaching it -- e.g. a "delivered" order state
+         * declaring kpiField "totalCents" reproduces a Revenue KPI, not just a count. */
+        private String kpiField;
     }
 
     @Data
@@ -65,10 +70,26 @@ public class EntityDefinition {
         private String to;
         private String label;
         private boolean userTriggerable;
-        /** {field,equals|notEquals} | {probability} | {faultGate,probability} | {link,field,equals}. */
+        /**
+         * {field,equals|notEquals} | {probability} | {faultGate:"<gateName>",probability}
+         * | {link,field,equals}. faultGate's value is a gate NAME (not a boolean) looked
+         * up in FaultGateRegistry at evaluation time; the sibling `probability` is only
+         * the config-authored DEFAULT rate used the first time that gate is referenced
+         * (a gate is seeded enabled iff its default rate is positive, matching every
+         * hand-written FaultState/FaultInjectionConfig's own off-by-default convention) --
+         * an admin can override enabled/rate at runtime via FaultGateAdminController.
+         */
         private Map<String, Object> when;
         private TimerDef timer;
-        /** {target,action,field?} — target is "self" or "link.<refFieldName>"; action is set|increment|transition|spawnLinked|callService. */
+        /**
+         * {target,action,field?,value|by?} for set/increment (target is "self" or
+         * "link.<refFieldName>"). spawnLinked/callService effects use a different shape
+         * (no `target` resolution against this entity's own links -- they build a brand
+         * new entity or an outbound call instead): spawnLinked is
+         * {action:"spawnLinked", entityType, fields:{fieldName:{value|from,map?,default?}}};
+         * callService is {action:"callService", url, method?, body:{...same field-spec
+         * shape...}, responseFields:{selfField: responseJsonKey}}. See EffectExecutor.
+         */
         private List<Map<String, Object>> effects = List.of();
     }
 
@@ -109,5 +130,30 @@ public class EntityDefinition {
         private Long intervalMs;
         private Integer maxActive;
         private Map<String, Map<String, Object>> fields = Map.of();
+        // periodicHistoryBackfill only (Stage 6): generalizes billing-service's two tax-bill
+        // generators (one-time per-citizen quarter backfill + ongoing per-period issuance)
+        // into one strategy that, per tick, tops up every ownerEntityType instance to have
+        // a record for the current period -- backfilling missing history the first time an
+        // owner is seen, issuing just the current period afterwards. See TransitionScheduler.
+        private String ownerEntityType;
+        private String ownerField;
+        private String periodField;
+        private BackfillDef backfill;
+        private AmountRangeDef amount;
+        private Integer dueDays;
+    }
+
+    @Data
+    public static class BackfillDef {
+        private int minPeriods;
+        private int maxPeriods;
+        private int outstandingMin;
+        private int outstandingMax;
+    }
+
+    @Data
+    public static class AmountRangeDef {
+        private long minCents;
+        private long maxCents;
     }
 }

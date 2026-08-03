@@ -17,6 +17,9 @@ spec:
   # cluster that allows 0 evictions and blocks GKE node drains during maintenance.
   # Disabling lets the pod be evicted/rescheduled in maintenance windows.
   enablePDB: {{ .Values.postgresql.enablePDB }}
+  postgresql:
+    parameters:
+      {{- toYaml .Values.postgresql.parameters | nindent 6 }}
   bootstrap:
     initdb:
       database: {{ .Values.postgresql.auth.database }}

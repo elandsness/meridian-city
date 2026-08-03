@@ -2,6 +2,7 @@ package com.meridian.entityengine.service;
 
 import com.meridian.entityengine.config.EntityDefinition;
 import com.meridian.entityengine.domain.EntityRecord;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -17,11 +18,38 @@ import java.util.concurrent.ThreadLocalRandom;
  * hand-written scheduler's `switch (state) { case ... }` this replaces).
  */
 @Component
+@RequiredArgsConstructor
 public class TransitionEvaluator {
 
+    private final FaultGateRegistry faultGateRegistry;
+
+    /** Scheduler-driven advancement only -- a userTriggerable transition is reachable
+     * exclusively via {@link #findMatchingUserAction}, never picked up by the automatic
+     * tick sweep (it would otherwise fire the instant its `from` state is entered, since
+     * an unconditional userTriggerable transition has no other condition standing in the
+     * way). */
     public EntityDefinition.TransitionDef findMatchingTransition(EntityRecord record, EntityDefinition def) {
         for (EntityDefinition.TransitionDef t : def.getTransitions()) {
+            if (t.isUserTriggerable()) continue;
             if (!Objects.equals(t.getFrom(), record.getState())) continue;
+            if (conditionMatches(t.getWhen(), record)) {
+                return t;
+            }
+        }
+        return null;
+    }
+
+    /** POST .../actions/{action}-driven advancement. Matches by declared order same as
+     * the scheduler path -- this matters when one action name has multiple branches (e.g.
+     * "checkout" gated by a faultGate payment-decline check first, falling through to an
+     * unconditional success second): the first transition whose `when` condition currently
+     * passes wins, so a probability/faultGate roll only ever happens once per call, not
+     * repeatedly like the scheduler's due-entity sweep. */
+    public EntityDefinition.TransitionDef findMatchingUserAction(EntityRecord record, EntityDefinition def, String action) {
+        for (EntityDefinition.TransitionDef t : def.getTransitions()) {
+            if (!t.isUserTriggerable()) continue;
+            if (!Objects.equals(t.getFrom(), record.getState())) continue;
+            if (!(Objects.equals(action, t.getTo()) || Objects.equals(action, t.getLabel()))) continue;
             if (conditionMatches(t.getWhen(), record)) {
                 return t;
             }
@@ -44,13 +72,16 @@ public class TransitionEvaluator {
             return false;
         }
         if (when.containsKey("faultGate")) {
-            // faultGate generalizes today's hand-written FaultState.java on/off toggle
-            // (e.g. the "Business Failures" admin switch). No live per-instance toggle
-            // is wired into the engine yet -- that's a Stage 6/7 concern when a real
-            // retrofit needs an admin endpoint to flip it. Until then a fault-gated
-            // transition behaves as if the gate is always on, i.e. a pure probability
-            // roll, so the synthetic proof can still exercise the branch.
-            return rollProbability(when.get("probability"));
+            // faultGate generalizes today's hand-written FaultState.java {enabled, rate}
+            // on/off toggle. The value is a gate NAME looked up in the runtime registry;
+            // `probability` is only the config-authored default rate used the first time
+            // the gate is referenced (see FaultGateRegistry). An admin can flip enabled/
+            // rate at runtime via FaultGateAdminController, same as the old /admin/fault
+            // endpoints did per-service.
+            String gateName = String.valueOf(when.get("faultGate"));
+            double configuredDefaultRate = numberOf(when.get("probability"), 0.0);
+            FaultGateRegistry.FaultGateState state = faultGateRegistry.get(gateName, configuredDefaultRate);
+            return state.enabled() && rollProbability(state.rate());
         }
         if (when.containsKey("probability")) {
             return rollProbability(when.get("probability"));

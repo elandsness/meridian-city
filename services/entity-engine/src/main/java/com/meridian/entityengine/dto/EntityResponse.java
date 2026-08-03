@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.meridian.entityengine.domain.EntityRecord;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -11,6 +12,11 @@ import java.util.Map;
  * timestamps), the same flat shape today's hand-written *Response DTOs use
  * (e.g. FlightResponse: id, flight_number, direction, status, ..., updated_at
  * all flat, no nested "fields" object) -- generic across every entity type.
+ * Ref-typed fields (e.g. a service_request's citizen_id) live in the separate
+ * `links` map, not `data` (see EntityFactory.build) -- merged into the same
+ * flat output here so a consumer never has to know which map a given field
+ * actually lives in; `links` is also kept as its own nested key for anything
+ * that wants the raw link set.
  */
 public class EntityResponse {
 
@@ -31,7 +37,9 @@ public class EntityResponse {
     public Map<String, Object> getLinks() { return record.getLinks(); }
 
     @JsonAnyGetter
-    public Map<String, Object> getData() {
-        return record.getData();
+    public Map<String, Object> getFlattenedFields() {
+        Map<String, Object> merged = new LinkedHashMap<>(record.getData());
+        record.getLinks().forEach(merged::putIfAbsent);
+        return merged;
     }
 }

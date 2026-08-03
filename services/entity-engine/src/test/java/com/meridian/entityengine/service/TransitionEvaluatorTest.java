@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TransitionEvaluatorTest {
 
-    private final TransitionEvaluator evaluator = new TransitionEvaluator();
+    private final TransitionEvaluator evaluator = new TransitionEvaluator(new FaultGateRegistry());
 
     private static EntityDefinition.TransitionDef transition(String from, String to, Map<String, Object> when) {
         EntityDefinition.TransitionDef t = new EntityDefinition.TransitionDef();
@@ -79,16 +79,35 @@ class TransitionEvaluatorTest {
     }
 
     @Test
-    void probabilityZero_neverMatches_soDeclaredOrderFallsThrough() {
+    void faultGateZeroDefaultRate_neverMatches_soDeclaredOrderFallsThrough() {
+        // A faultGate's default rate of 0.0 seeds the named gate as disabled (matching
+        // every hand-written FaultState's own off-by-default convention) -- it must
+        // never fire until something explicitly enables it via FaultGateAdminController.
         EntityDefinition def = new EntityDefinition();
         def.setTransitions(List.of(
-                transition("scanning", "fault_detected", Map.of("faultGate", true, "probability", 0.0)),
+                transition("scanning", "fault_detected", Map.of("faultGate", "test-fault", "probability", 0.0)),
                 transition("scanning", "validating", null)
         ));
 
         EntityDefinition.TransitionDef result = evaluator.findMatchingTransition(recordIn("scanning", Map.of()), def);
 
         assertEquals("validating", result.getTo());
+    }
+
+    @Test
+    void faultGatePositiveDefaultRate_isEnabledOutOfTheBox() {
+        // A positive default rate seeds the gate as enabled (e.g. a demo-authored fault
+        // meant to fire out of the box, like the synthetic probe's fault_detected branch)
+        // -- probability 1.0 always rolls true once enabled.
+        EntityDefinition def = new EntityDefinition();
+        def.setTransitions(List.of(
+                transition("scanning", "fault_detected", Map.of("faultGate", "always-on-fault", "probability", 1.0)),
+                transition("scanning", "validating", null)
+        ));
+
+        EntityDefinition.TransitionDef result = evaluator.findMatchingTransition(recordIn("scanning", Map.of()), def);
+
+        assertEquals("fault_detected", result.getTo());
     }
 
     @Test
