@@ -55,6 +55,10 @@ spec:
               value: "http://flight-ops:8092"
             - name: PASSENGER_SERVICE_URL
               value: "http://passenger-service:8093"
+            - name: CUSTOMER_ENTITY_SERVICE_URL
+              value: "http://customer-entity-service:8094"
+            - name: OPS_ENTITY_SERVICE_URL
+              value: "http://ops-entity-service:8094"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:

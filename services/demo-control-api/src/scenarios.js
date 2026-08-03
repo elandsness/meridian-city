@@ -20,11 +20,11 @@
  *
  * Business-process exceptions (gated error branches that make the Dynatrace Business
  * Flows show process failures + conversion drop-off; default off, default manual clear):
- *   request-failures      — citizen-service: service_request.rejected at Validated
- *   account-failures      — citizen-service: account.verification_failed / .activation_failed
- *   incident-escalations  — city-operations: workorder.escalated at the resolution step
- *   checkout-declines     — commerce-service: checkout.payment_declined + order.delivery_failed
- *   tax-payment-failures  — billing-service: tax.payment_failed at the Payment step
+ *   request-failures      — customer-entity-service: fault-gate service-request-rejected
+ *   account-failures      — customer-entity-service: fault-gates account-verification-failed + account-activation-failed
+ *   incident-escalations  — ops-entity-service: fault-gate work-order-escalated
+ *   checkout-declines     — customer-entity-service: fault-gates checkout-payment-declined + order-delivery-failed
+ *   tax-payment-failures  — customer-entity-service: fault-gate tax-payment-failed
  *   business-exceptions   — all five of the above at once (umbrella)
  */
 
@@ -149,17 +149,17 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
-        request_reject_enabled: true, request_reject_rate: rate,
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
+        enabled: true, rate,
       })
-      state.setFault('citizen-service', { request_reject_enabled: true, request_reject_rate: rate })
+      state.setFault('customer-entity-service', { 'service-request-rejected': { enabled: true, rate } })
       return r
     },
     async reset () {
-      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
-        request_reject_enabled: false, request_reject_rate: 0,
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
+        enabled: false, rate: 0,
       })
-      state.setFault('citizen-service', { request_reject_enabled: false, request_reject_rate: 0 })
+      state.setFault('customer-entity-service', { 'service-request-rejected': { enabled: false, rate: 0 } })
       return r
     },
   },
@@ -171,17 +171,21 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
-        account_fail_enabled: true, account_fail_rate: rate,
+      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-verification-failed`, { enabled: true, rate })
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: true, rate })
+      state.setFault('customer-entity-service', {
+        'account-verification-failed': { enabled: true, rate },
+        'account-activation-failed': { enabled: true, rate },
       })
-      state.setFault('citizen-service', { account_fail_enabled: true, account_fail_rate: rate })
       return r
     },
     async reset () {
-      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
-        account_fail_enabled: false, account_fail_rate: 0,
+      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-verification-failed`, { enabled: false, rate: 0 })
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: false, rate: 0 })
+      state.setFault('customer-entity-service', {
+        'account-verification-failed': { enabled: false, rate: 0 },
+        'account-activation-failed': { enabled: false, rate: 0 },
       })
-      state.setFault('citizen-service', { account_fail_enabled: false, account_fail_rate: 0 })
       return r
     },
   },
@@ -193,17 +197,17 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`, {
-        type: 'workorder-escalation', enabled: true, rate,
+      const r = await proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
+        enabled: true, rate,
       })
-      state.setFault('city-operations', { workorder_escalation_enabled: true, workorder_escalation_rate: rate })
+      state.setFault('ops-entity-service', { 'work-order-escalated': { enabled: true, rate } })
       return r
     },
     async reset () {
-      const r = await proxy.post(`${config.CITY_OPERATIONS_URL}/admin/fault`, {
-        type: 'workorder-escalation', enabled: false, rate: 0,
+      const r = await proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
+        enabled: false, rate: 0,
       })
-      state.setFault('city-operations', { workorder_escalation_enabled: false, workorder_escalation_rate: 0 })
+      state.setFault('ops-entity-service', { 'work-order-escalated': { enabled: false, rate: 0 } })
       return r
     },
   },
@@ -215,17 +219,21 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.COMMERCE_SERVICE_URL}/admin/fault`, {
-        type: 'checkout-failures', enabled: true, rate,
+      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/checkout-payment-declined`, { enabled: true, rate })
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: true, rate })
+      state.setFault('customer-entity-service', {
+        'checkout-payment-declined': { enabled: true, rate },
+        'order-delivery-failed': { enabled: true, rate },
       })
-      state.setFault('commerce-service', { checkout_failures_enabled: true, checkout_failures_rate: rate })
       return r
     },
     async reset () {
-      const r = await proxy.post(`${config.COMMERCE_SERVICE_URL}/admin/fault`, {
-        type: 'checkout-failures', enabled: false, rate: 0,
+      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/checkout-payment-declined`, { enabled: false, rate: 0 })
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: false, rate: 0 })
+      state.setFault('customer-entity-service', {
+        'checkout-payment-declined': { enabled: false, rate: 0 },
+        'order-delivery-failed': { enabled: false, rate: 0 },
       })
-      state.setFault('commerce-service', { checkout_failures_enabled: false, checkout_failures_rate: 0 })
       return r
     },
   },
@@ -237,17 +245,17 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.BILLING_SERVICE_URL}/admin/fault`, {
-        payment_fail_enabled: true, payment_fail_rate: rate,
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
+        enabled: true, rate,
       })
-      state.setFault('billing-service', { payment_fail_enabled: true, payment_fail_rate: rate })
+      state.setFault('customer-entity-service', { 'tax-payment-failed': { enabled: true, rate } })
       return r
     },
     async reset () {
-      const r = await proxy.post(`${config.BILLING_SERVICE_URL}/admin/fault`, {
-        payment_fail_enabled: false, payment_fail_rate: 0,
+      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
+        enabled: false, rate: 0,
       })
-      state.setFault('billing-service', { payment_fail_enabled: false, payment_fail_rate: 0 })
+      state.setFault('customer-entity-service', { 'tax-payment-failed': { enabled: false, rate: 0 } })
       return r
     },
   },
