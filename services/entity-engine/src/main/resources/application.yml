@@ -46,6 +46,18 @@ management:
 # different identities/owned-types (customer-entity-service, ops-entity-service) once
 # real City/Airport retrofit happens in Stage 6/7; for now a single instance owns
 # whatever entity types are in its mounted config.
+spring:
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: java.util.HashMap
+
 entity-engine:
   # Path to the mounted industry entity-config JSON (rendered from
   # `industry.entities` by a future Helm ConfigMap, mirroring industry-configmap.yaml).
@@ -57,3 +69,9 @@ entity-engine:
   owned-types: ${ENTITY_TYPES:}
   # How often to evaluate due transitions and run generators.
   scheduler-fixed-delay-ms: ${ENTITY_ENGINE_SCHEDULER_MS:5000}
+  # Kafka group ID for this instance -- set to a unique value per deployment so
+  # customer-entity-service and ops-entity-service don't compete for messages.
+  kafka-group-id: ${KAFKA_GROUP_ID:entity-engine-group}
+  # Set to true to enable Kafka trigger listeners (entity creation from Kafka messages).
+  # Only ops-entity-service should set this; customer-entity-service leaves it false.
+  kafka-triggers-enabled: ${KAFKA_TRIGGERS_ENABLED:false}

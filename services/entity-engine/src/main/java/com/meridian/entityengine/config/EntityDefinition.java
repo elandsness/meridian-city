@@ -35,6 +35,7 @@ public class EntityDefinition {
     private Map<String, LinkOnCreateDef> linkOnCreate = Map.of();
     private ComputedDef computed;
     private GeneratorDef generator;
+    private TriggersDef triggers;
 
     @Data
     public static class FieldDef {
@@ -160,5 +161,26 @@ public class EntityDefinition {
     public static class AmountRangeDef {
         private long minCents;
         private long maxCents;
+    }
+
+    /** Top-level triggers block on an entity type -- currently supports Kafka only. */
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class TriggersDef {
+        private List<KafkaTriggerDef> kafka = List.of();
+    }
+
+    /**
+     * Declares that a Kafka message on `topic` should create a new entity of the
+     * enclosing type. `fieldMapping` maps entity field names to field-spec objects
+     * using the same {from, value, map, default} vocabulary as callService body --
+     * resolved against the Kafka message payload (treated as the "source").
+     */
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class KafkaTriggerDef {
+        private String topic;
+        /** {entityField: {from: msgKey} | {value: literal} | {from, map, default}} */
+        private Map<String, Object> fieldMapping = Map.of();
     }
 }

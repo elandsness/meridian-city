@@ -19,6 +19,10 @@ public class EntityEngineProperties {
 
     private long schedulerFixedDelayMs = 5000;
 
+    private String kafkaGroupId = "entity-engine-group";
+
+    private boolean kafkaTriggersEnabled = false;
+
     public List<String> ownedTypesList() {
         if (ownedTypes == null || ownedTypes.isBlank()) return List.of();
         return List.of(ownedTypes.split(",")).stream().map(String::trim).filter(s -> !s.isBlank()).toList();
