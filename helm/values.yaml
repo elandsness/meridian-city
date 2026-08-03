@@ -416,6 +416,7 @@ industry:
           tone: green
           terminal: true
           isKpi: true
+          externallyTriggered: true  # reached via work_order completion callService, not a local transition
       transitions:
         - from: detecting
           to: open

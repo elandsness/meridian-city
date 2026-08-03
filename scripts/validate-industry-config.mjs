@@ -76,7 +76,7 @@ function checkEntities(entities) {
           if (!reached.has(next)) { reached.add(next); queue.push(next) }
         }
       }
-      const unreachable = states.filter((s) => !reached.has(s))
+      const unreachable = states.filter((s) => !reached.has(s) && !def.states[s]?.externallyTriggered)
       if (unreachable.length) {
         errors.push(`entities.${entityId}.states has state(s) unreachable from "${def.initial}": ${unreachable.join(', ')}`)
       }

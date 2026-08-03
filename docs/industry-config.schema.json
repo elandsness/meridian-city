@@ -209,7 +209,7 @@
             "required": ["type"],
             "additionalProperties": false,
             "properties": {
-              "type": { "enum": ["string", "number", "boolean", "date", "enum", "ref"] },
+              "type": { "enum": ["string", "number", "boolean", "date", "enum", "ref", "password"] },
               "required": { "type": "boolean" },
               "default": {},
               "values": { "type": "array", "items": { "type": "string" }, "description": "enum type only." },
@@ -230,6 +230,8 @@
               "terminal": { "type": "boolean" },
               "isError": { "type": "boolean" },
               "isKpi": { "type": "boolean" },
+              "kpiField": { "type": "string", "description": "When isKpi:true, the numeric field whose value to sum/avg for the KPI metric (e.g. 'amount_cents'). Used by the Dynatrace provisioner's derive_flow_specs_from_entity_config()." },
+              "externallyTriggered": { "type": "boolean", "description": "Set true on states that are only reachable via a cross-entity callService effect (e.g. incident.resolved triggered by work_order completion). The validator skips local-transition reachability for these states." },
               "glyph": { "type": "string", "description": "Emoji/unicode sprite glyph for this state, used by the entity-map template." }
             }
           }
@@ -299,13 +301,19 @@
         },
         "generator": {
           "type": "object",
-          "additionalProperties": false,
+          "additionalProperties": true,
+          "description": "Backend-only generation config. additionalProperties is open because periodicHistoryBackfill carries strategy-specific fields (ownerEntityType, backfill, amount, etc.) that vary per strategy and are consumed only by the entity engine.",
           "properties": {
             "strategy": { "enum": ["simpleSteadyState", "periodicHistoryBackfill"] },
             "intervalMs": { "type": "number" },
             "maxActive": { "type": "number" },
             "fields": { "type": "object", "description": "Per-field generation hints, e.g. { has_bag: { probability: 0.6 } }." }
           }
+        },
+        "triggers": {
+          "type": "object",
+          "description": "Backend-only Kafka trigger config: maps topic names to trigger behaviour for this entity type.",
+          "additionalProperties": true
         }
       }
     }
