@@ -364,21 +364,53 @@ def derive_flow_specs_from_entity_config():
         ordered = _topo_walk(initial, states, transitions)
         if not ordered:
             continue
+
+        # Use the LAST isKpi state (the terminal success step) as the flow
+        # endpoint, not the first. The first isKpi state may be an intermediate
+        # waypoint (e.g. service_request.in_progress, bill.outstanding, cart.placed)
+        # whereas the flow's KPI metric should track completion.
+        kpi_candidates = [s for s in ordered if states[s].get("isKpi")]
+        kpi_state = kpi_candidates[-1] if kpi_candidates else ordered[-1]
+
+        # States that have outgoing transitions are waypoints on the happy path.
+        # Terminal states with no outgoing transitions are either the success
+        # endpoint (kpi_state) or drop-out alternatives (abandoned, verified_only).
+        # Exclude the drop-out terminals from the step list -- they are not
+        # sequential steps but silent dropout points visible as drop-off.
+        has_outgoing = {t.get("from") for t in transitions}
         steps = []
         for state_id in ordered:
+            if state_id not in has_outgoing and state_id != kpi_state:
+                continue
             label = states[state_id].get("label", state_id)
             event_type = "%s.%s" % (entity_type, state_id)
             errors = _error_events_from(state_id, entity_type, states, transitions)
             steps.append((label, event_type, errors) if errors else (label, event_type))
-        kpi_state = next((s for s in ordered if states[s].get("isKpi")), ordered[-1])
+
+        if not steps:
+            continue
+
         display_name = definition.get("displayName", entity_type)
+
+        # If the kpi_state declares a kpiField, aggregate it as a sum KPI
+        # (e.g. bill.amount_cents, cart.total_cents). Otherwise count completions.
+        kpi_field = states[kpi_state].get("kpiField")
+        if kpi_field:
+            kpi = "%s.%s" % (entity_type, kpi_field)
+            kpi_calc = "sum"
+            kpi_label = "%s total" % display_name
+        else:
+            kpi = "%s.id" % entity_type
+            kpi_calc = "lastEvent"
+            kpi_label = "%s completed" % display_name
+
         specs.append({
             "key": entity_type,
             "name": display_name,
             "correlationID": "%s.id" % entity_type,
-            "kpiLabel": "%s completed" % display_name,
-            "kpi": "%s.id" % entity_type,
-            "kpiCalculation": "lastEvent",
+            "kpiLabel": kpi_label,
+            "kpi": kpi,
+            "kpiCalculation": kpi_calc,
             "kpiEventName": "%s.%s" % (entity_type, kpi_state),
             "steps": steps,
         })
