@@ -117,6 +117,23 @@ for (const path of files) {
     continue
   }
 
+  // A partial overlay (e.g. values-synthetic-test.yaml) may set only `entities:`
+  // and rely on the base values.yaml for company/theme/screens. Detect this by
+  // checking for the absence of every top-level required field — skip structural
+  // validation but still run semantic entity checks so cross-reference bugs surface.
+  const isPartialOverlay = !cfg.version && !cfg.company && !cfg.theme && !cfg.screens
+  if (isPartialOverlay) {
+    const semanticErrors = checkEntities(cfg.entities)
+    if (semanticErrors.length) {
+      console.error(`✗ ${path}: ${semanticErrors.length} error(s) (partial overlay):`)
+      for (const e of semanticErrors) console.error(`  - ${e}`)
+      failures++
+    } else {
+      console.log(`… ${path}: partial overlay (entities-only) — structural validation skipped`)
+    }
+    continue
+  }
+
   const structurallyValid = validateSchema(cfg)
   const semanticErrors = structurallyValid ? [...checkEntities(cfg.entities), ...checkRouting(cfg)] : []
   const ajvErrors = structurallyValid ? [] : validateSchema.errors.map((e) => `${e.instancePath || '(root)'} ${e.message}`)
