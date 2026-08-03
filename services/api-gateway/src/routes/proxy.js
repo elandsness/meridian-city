@@ -132,10 +132,27 @@ function buildRouteTable (config) {
       rewritePrefix: '/api/v1',
     },
     {
-      // Generic entity engine (generic-entity-engine initiative) — /api/v1/entities/<type>[/...]
+      // Ops entity types (incident, work_order) → ops-entity-service.
+      // These prefixes must come BEFORE the customer-entity-service catch-all
+      // below so the more-specific match wins (routeTable.find() returns first).
+      prefix: '/api/v1/entities/incident',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      prefix: '/api/v1/entities/work_order',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      // Customer entity types (citizen, service_request, bill, cart) +
+      // admin fault-gates on customer entities → customer-entity-service.
+      // Also serves as the entity-engine fallback if Stage 6 is disabled.
       prefix: '/api/v1/entities',
-      target: config.ENTITY_ENGINE_URL,
-      serviceName: 'entity-engine',
+      target: config.CUSTOMER_ENTITY_SERVICE_URL,
+      serviceName: 'customer-entity-service',
       requiresAuth: false,
     },
   ]

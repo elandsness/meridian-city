@@ -26,6 +26,8 @@ const config = {
   TELEMETRY_PROCESSOR_URL: process.env.TELEMETRY_PROCESSOR_URL || 'http://localhost:8086',
   DEMO_CONTROL_API_URL: process.env.DEMO_CONTROL_API_URL || 'http://localhost:3001',
   ENTITY_ENGINE_URL: process.env.ENTITY_ENGINE_URL || 'http://localhost:8094',
+  CUSTOMER_ENTITY_SERVICE_URL: process.env.CUSTOMER_ENTITY_SERVICE_URL || 'http://localhost:8094',
+  OPS_ENTITY_SERVICE_URL: process.env.OPS_ENTITY_SERVICE_URL || 'http://localhost:8094',
 }
 
 async function build () {

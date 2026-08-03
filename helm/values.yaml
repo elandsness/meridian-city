@@ -899,8 +899,11 @@ passengerService:
 # non-empty ownedTypes each — see docs/regression-baseline-2026-07-23.md and
 # the project_generic_entity_engine memory for the full plan.
 # ---------------------------------------------------------------------------
+# Stage 6: replaced by customerEntityService + opsEntityService below.
+# Kept here as disabled so any existing tooling that references entityEngine.*
+# doesn't crash; will be removed in Stage 10 cleanup.
 entityEngine:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: "entity-engine"
@@ -908,8 +911,6 @@ entityEngine:
   service:
     type: ClusterIP
     port: 8094
-  # Comma-separated allow-list of entity type ids this instance owns; empty =
-  # own every entity type found in industry.entities.
   ownedTypes: ""
   resources:
     requests:
@@ -918,6 +919,79 @@ entityEngine:
     limits:
       cpu: "1000m"
       memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Customer Entity Service — entity-engine image, customer-facing entity types
+# Owns: citizen, service_request, bill, cart
+# Calls: routing-service (for department assignment), ops-entity-service
+#        (to create linked work_order on service request submission)
+# ---------------------------------------------------------------------------
+customerEntityService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "entity-engine"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8094
+  ownedTypes: "citizen,service_request,bill,cart"
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Ops Entity Service — entity-engine image, ops-facing entity types
+# Owns: incident, work_order
+# Listens: iot.anomalies Kafka topic (KAFKA_TRIGGERS_ENABLED=true)
+# ---------------------------------------------------------------------------
+opsEntityService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "entity-engine"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8094
+  ownedTypes: "incident,work_order"
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Routing Service — stateless (category, zone) → department decision
+# Called internally by customer-entity-service via callService effect;
+# no public gateway route (internal-only). Reads ROUTING_MAP from
+# industry.routing (same shape as old service-dispatch RoutingEngine).
+# ---------------------------------------------------------------------------
+routingService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "routing-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8095
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
   env: {}
 
 # ---------------------------------------------------------------------------

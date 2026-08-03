@@ -9,7 +9,7 @@ config, vs. rendered into the browser bundle for the frontend's generic
 templates). Namespace-scoped, so the name stays plain (multi-tenancy isolates
 by namespace).
 */}}
-{{- if or .Values.entityEngine.enabled .Values.movementService.enabled }}
+{{- if or .Values.entityEngine.enabled .Values.customerEntityService.enabled .Values.opsEntityService.enabled .Values.movementService.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
