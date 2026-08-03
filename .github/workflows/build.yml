@@ -45,6 +45,7 @@ jobs:
           - flight-ops
           - passenger-service
           - entity-engine
+          - routing-service
     steps:
       - uses: actions/checkout@v4
 
