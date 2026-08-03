@@ -1,5 +1,6 @@
 package com.meridian.entityengine.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -16,8 +17,12 @@ import java.util.Map;
  * cross-entity links, one computed value (position), and a generator. No
  * scripting, no arbitrary branching beyond the closed condition/effect
  * vocabulary in {@link TransitionDef}.
+ *
+ * <p>Unknown keys (e.g. `triggers` before task #21's Kafka bridge is wired)
+ * are silently ignored so the config can evolve ahead of the engine code.
  */
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class EntityDefinition {
 
     private String displayName;

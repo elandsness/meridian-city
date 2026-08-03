@@ -94,15 +94,435 @@ industry:
   # Per-industry Dynatrace: {serviceNames: {deployment: displayName}, flowLabels: {flowKey: name}}.
   # Applied by the provisioner Job, scoped to this instance's namespace. Empty = City defaults.
   dynatrace: {}
-  # Config-driven entity/lifecycle definitions for the generic entity engine
-  # (entity-engine + movement-service; see docs/industry-config.schema.json's
-  # `entities` section). Unlike data/routing/dynatrace above, this one IS
-  # rendered into the browser config.json too (no secret in it, and the
-  # frontend's generic templates need it at render time) -- see
-  # industry-configmap.yaml's header comment. Empty until Stage 6/7 retrofits
-  # City/Airport onto it; a throwaway synthetic-entity overlay proves the
-  # engine itself in Stage 2 without touching this default.
-  entities: {}
+  # Config-driven entity/lifecycle definitions for the generic entity engine.
+  # customer-entity-service owns: citizen, service_request, bill, cart
+  # ops-entity-service owns: incident, work_order
+  # See docs/industry-config.schema.json and the generic-entity-engine plan.
+  entities:
+    # -----------------------------------------------------------------------
+    # CITIZEN — account creation lifecycle
+    # Replaces citizen-service's AccountLifecycleScheduler.
+    # Created externally (traffic-bot / REST), no generator.
+    # -----------------------------------------------------------------------
+    citizen:
+      displayName: "Citizen"
+      displayNamePlural: "Citizens"
+      idPrefix: "cit"
+      fields:
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string }
+        zone_id: { type: string }
+        password: { type: password }
+      initial: verification_sent
+      states:
+        verification_sent: { label: "Verification Sent", tone: amber }
+        verified: { label: "Verified", tone: blue }
+        verification_failed:
+          label: "Verification Failed"
+          tone: red
+          terminal: true
+          isError: true
+        activated:
+          label: "Activated"
+          tone: green
+          terminal: true
+          isKpi: true
+        abandoned: { label: "Abandoned", tone: slate, terminal: true }
+        verified_only: { label: "Verified Only", tone: slate, terminal: true }
+        activation_failed:
+          label: "Activation Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        # Fault path evaluated first -- gate off by default (rate 0), so
+        # normal deploys never see it unless demo-control enables the gate.
+        - from: verification_sent
+          to: verification_failed
+          when: { faultGate: "account-verification-failed", probability: 0.05 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verification_sent
+          to: verified
+          when: { probability: 0.85 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        # Catch-all: drop-off if neither fault nor probability fired.
+        - from: verification_sent
+          to: abandoned
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verified
+          to: activation_failed
+          when: { faultGate: "account-activation-failed", probability: 0.05 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verified
+          to: activated
+          when: { probability: 0.92 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verified
+          to: verified_only
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+
+    # -----------------------------------------------------------------------
+    # SERVICE REQUEST — citizen-submitted request lifecycle
+    # Replaces CitizenService + RequestLifecycleScheduler.
+    # On submitted→validated: calls routing-service (department assignment)
+    # then calls ops-entity-service to create a linked work_order.
+    # citizen_id is plain string (not ref) so the field lives in data JSONB
+    # and can be queried directly -- no cross-entity effects from request→citizen.
+    # -----------------------------------------------------------------------
+    service_request:
+      displayName: "Service Request"
+      displayNamePlural: "Service Requests"
+      idPrefix: "req"
+      fields:
+        citizen_id: { type: string }
+        category: { type: string }
+        priority:
+          type: enum
+          values: [low, normal, high, urgent]
+          default: normal
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+        assigned_department: { type: string }
+        assigned_to: { type: string }
+      initial: submitted
+      states:
+        submitted: { label: "Submitted", tone: slate }
+        rejected:
+          label: "Rejected"
+          tone: red
+          terminal: true
+          isError: true
+        validated: { label: "Validated", tone: blue }
+        in_progress:
+          label: "In Progress"
+          tone: amber
+          isKpi: true
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+        abandoned: { label: "Abandoned", tone: slate, terminal: true }
+      transitions:
+        - from: submitted
+          to: rejected
+          when: { faultGate: "service-request-rejected", probability: 0.1 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: submitted
+          to: validated
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            # Step 1: ask routing-service for the responsible department;
+            # result is written back to assigned_department on this entity.
+            # Step 2 then reads that field to pass it to the work_order.
+            - action: callService
+              url: "${ROUTING_SERVICE_URL}/api/v1/route"
+              method: POST
+              body:
+                category: { from: category }
+                zone_id: { from: zone_id }
+              responseFields:
+                assigned_department: department
+            # Step 2: create a linked work_order on ops-entity-service.
+            # Best-effort -- a downstream failure is logged and skipped.
+            - action: callService
+              url: "${OPS_ENTITY_SERVICE_URL}/api/v1/entities/work_order"
+              method: POST
+              body:
+                request_id: { from: id }
+                title: { from: title }
+                priority: { from: priority }
+                assigned_department: { from: assigned_department }
+                zone_id: { from: zone_id }
+        - from: validated
+          to: in_progress
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: in_progress
+          to: resolved
+          when: { probability: 0.88 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        # Drop-off: ~12% of in_progress requests are abandoned (no match above).
+        - from: in_progress
+          to: abandoned
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+
+    # -----------------------------------------------------------------------
+    # BILL (tax bill) — quarterly billing lifecycle
+    # Replaces billing-service's BillingService + BillingScheduler.
+    # periodicHistoryBackfill: for every citizen, seeds 2-8 quarters of bill
+    # history on first tick, then issues one new bill per quarter.
+    # citizen_id is plain string (not ref) -- TransitionScheduler's
+    # groupingBy uses getField(), which reads data JSONB only.
+    # -----------------------------------------------------------------------
+    bill:
+      displayName: "Tax Bill"
+      displayNamePlural: "Tax Bills"
+      idPrefix: "bill"
+      fields:
+        citizen_id: { type: string }
+        period: { type: string }
+        amount_cents: { type: number, default: 0 }
+        issued_at: { type: string }
+        due_at: { type: string }
+        paid_at: { type: string }
+      initial: outstanding
+      states:
+        outstanding:
+          label: "Outstanding"
+          tone: amber
+          isKpi: true
+        paid:
+          label: "Paid"
+          tone: green
+          terminal: true
+          isKpi: true
+          kpiField: amount_cents
+        payment_failed:
+          label: "Payment Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        # Fault path first -- user action "Pay Now" tries this gate first.
+        - from: outstanding
+          to: payment_failed
+          userTriggerable: true
+          when: { faultGate: "tax-payment-failed", probability: 0.3 }
+          label: "Pay Now"
+        - from: outstanding
+          to: paid
+          userTriggerable: true
+          label: "Pay Now"
+      generator:
+        strategy: periodicHistoryBackfill
+        ownerEntityType: citizen
+        ownerField: citizen_id
+        periodField: period
+        backfill:
+          minPeriods: 2
+          maxPeriods: 8
+          outstandingMin: 1
+          outstandingMax: 2
+        amount:
+          minCents: 15000
+          maxCents: 45000
+        dueDays: 45
+
+    # -----------------------------------------------------------------------
+    # CART (collapses cart + order) — shopping and fulfillment lifecycle
+    # Replaces commerce-service's CartService + OrderService + FulfillmentScheduler.
+    # Cart item management (add/remove items) stays in a thin compatibility
+    # layer on customer-entity-service for Stage 6; the state machine below
+    # handles checkout and fulfillment only.
+    # -----------------------------------------------------------------------
+    cart:
+      displayName: "Order"
+      displayNamePlural: "Orders"
+      idPrefix: "cart"
+      fields:
+        citizen_id: { type: string }
+        total_cents: { type: number, default: 0 }
+        item_count: { type: number, default: 0 }
+      initial: open
+      states:
+        open: { label: "Open", tone: slate }
+        payment_declined:
+          label: "Payment Declined"
+          tone: red
+          terminal: true
+          isError: true
+        placed:
+          label: "Order Placed"
+          tone: blue
+          isKpi: true
+        packed: { label: "Packed", tone: amber }
+        shipped: { label: "Shipped", tone: amber }
+        delivered:
+          label: "Delivered"
+          tone: green
+          terminal: true
+          isKpi: true
+          kpiField: total_cents
+        delivery_failed:
+          label: "Delivery Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        # Fault path evaluated first -- when demo-control enables the gate,
+        # checkout calls hit payment_declined at the declared rate.
+        - from: open
+          to: payment_declined
+          userTriggerable: true
+          when: { faultGate: "checkout-payment-declined", probability: 0.25 }
+          label: Checkout
+        - from: open
+          to: placed
+          userTriggerable: true
+          label: Checkout
+        - from: placed
+          to: packed
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: packed
+          to: shipped
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: shipped
+          to: delivery_failed
+          when: { faultGate: "order-delivery-failed", probability: 0.1 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: shipped
+          to: delivered
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+
+    # -----------------------------------------------------------------------
+    # INCIDENT — operational incident lifecycle
+    # Replaces city-operations IncidentService.
+    # 'detecting' is a brief (5-30s) holding state that exists solely to run
+    # the spawnLinked effect atomically in the same transaction as creation --
+    # the entity engine has no 'creationEffects' hook, so this one-state
+    # detour is the declarative equivalent of createFromIot()'s synchronous
+    # incident+workorder creation block.
+    # Kafka trigger for iot.anomalies: implemented by task #21 (kafkaTrigger
+    # engine support); config declared here for completeness.
+    # -----------------------------------------------------------------------
+    incident:
+      displayName: "Incident"
+      displayNamePlural: "Incidents"
+      idPrefix: "inc"
+      fields:
+        asset_id: { type: string }
+        source:
+          type: enum
+          values: [manual, iot]
+          default: manual
+        severity:
+          type: enum
+          values: [low, medium, high, critical]
+          default: medium
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+      initial: detecting
+      states:
+        detecting: { label: "Detecting", tone: amber }
+        open:
+          label: "Open"
+          tone: red
+          isKpi: true
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+      transitions:
+        - from: detecting
+          to: open
+          timer: { minSeconds: 5, maxSeconds: 30 }
+          effects:
+            - action: spawnLinked
+              entityType: work_order
+              fields:
+                incident_id: { from: id }
+                title: { from: title }
+                zone_id: { from: zone_id }
+                priority:
+                  from: severity
+                  map:
+                    critical: urgent
+                    high: high
+                    medium: normal
+                    low: normal
+                  default: normal
+        # open→resolved is driven by the linked work_order's 'transition'
+        # effect (work_order.resolved cascades incident to resolved).
+        # No timer here -- incident resolution is always work_order-triggered.
+      triggers:
+        # Kafka bridge (task #21): on iot.anomalies message, create an
+        # incident entity with the mapped fields below. fieldMapping uses
+        # the same {from, value, map, default} spec as callService body.
+        kafka:
+          - topic: iot.anomalies
+            fieldMapping:
+              asset_id: { from: device_id }
+              severity:
+                from: severity
+                map:
+                  warning: medium
+                  critical: critical
+                  high: high
+                  low: low
+                default: medium
+              source: { value: iot }
+              title: { from: anomaly_type }
+              description: { from: metric_name }
+
+    # -----------------------------------------------------------------------
+    # WORK ORDER — field operations lifecycle
+    # Replaces city-operations WorkOrderService + WorkOrderLifecycleScheduler.
+    # incident_id is ref-typed so it lands in links JSONB, enabling the
+    # 'link.incident_id' transition effect target on the resolved transition.
+    # -----------------------------------------------------------------------
+    work_order:
+      displayName: "Work Order"
+      displayNamePlural: "Work Orders"
+      idPrefix: "wo"
+      fields:
+        incident_id: { type: ref, entity: incident }
+        request_id: { type: string }
+        title: { type: string }
+        assigned_department: { type: string }
+        assigned_to: { type: string }
+        priority:
+          type: enum
+          values: [normal, high, urgent]
+          default: normal
+        zone_id: { type: string }
+      initial: created
+      states:
+        created: { label: "Created", tone: slate }
+        assigned: { label: "Assigned", tone: blue }
+        acknowledged: { label: "Acknowledged", tone: amber }
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+        escalated:
+          label: "Escalated"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        - from: created
+          to: assigned
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            - action: set
+              target: self
+              field: assigned_to
+              value: "Field Operations Team"
+        - from: assigned
+          to: acknowledged
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: acknowledged
+          to: escalated
+          when: { faultGate: "work-order-escalated", probability: 0.1 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: acknowledged
+          to: resolved
+          when: { probability: 0.85 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            # Cascade resolution to the linked incident (if any -- request-
+            # path work_orders have no incident link and this is a no-op).
+            - action: transition
+              target: link.incident_id
+              to: resolved
+        # Drop-off: ~15% of work orders loop (new timer) until resolved or
+        # escalated -- no explicit abandoned state needed; scheduleNext
+        # retries automatically when no transition matches.
 
 # ---------------------------------------------------------------------------
 # Dynatrace configuration
