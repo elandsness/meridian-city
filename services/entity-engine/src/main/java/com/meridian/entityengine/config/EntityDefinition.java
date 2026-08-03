@@ -68,6 +68,10 @@ public class EntityDefinition {
          * lastEvent count of entities reaching it -- e.g. a "delivered" order state
          * declaring kpiField "totalCents" reproduces a Revenue KPI, not just a count. */
         private String kpiField;
+        /** States only reachable via a cross-entity callService effect (not a local
+         * transition). Skipped by the validator's reachability check and by the
+         * engine's own local-transition evaluator. */
+        private boolean externallyTriggered;
     }
 
     @Data
