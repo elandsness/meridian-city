@@ -172,7 +172,7 @@ spec:
             - name: KAFKA_TRIGGERS_ENABLED
               value: "true"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: {{ include "meridian.kafkaBootstrap" . | quote }}
+              value: {{ printf "%s:9092" (include "meridian.kafkaBootstrap" .) | quote }}
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
             {{- with .Values.opsEntityService.env }}
             {{- include "meridian.extraEnv" . | nindent 12 }}
