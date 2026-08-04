@@ -31,19 +31,22 @@ async def compute_kpis() -> dict:
     pool = await get_pool()
     async with pool.acquire() as conn:
         requests_today = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM requests.service_requests
-            WHERE created_at >= CURRENT_DATE
+            SELECT COUNT(*) FROM entities.entity
+            WHERE entity_type = 'service_request'
+              AND created_at >= CURRENT_DATE
         """)
 
         requests_open = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM requests.service_requests
-            WHERE status NOT IN ('resolved', 'closed', 'cancelled')
+            SELECT COUNT(*) FROM entities.entity
+            WHERE entity_type = 'service_request'
+              AND state NOT IN ('resolved', 'rejected', 'abandoned')
         """)
 
         requests_resolved_today = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM requests.service_requests
-            WHERE status = 'resolved'
-              AND resolved_at >= CURRENT_DATE
+            SELECT COUNT(*) FROM entities.entity
+            WHERE entity_type = 'service_request'
+              AND state = 'resolved'
+              AND updated_at >= CURRENT_DATE
         """)
 
         incidents_open = await safe_fetchval(conn, """
@@ -59,17 +62,16 @@ async def compute_kpis() -> dict:
               AND created_at >= NOW() - INTERVAL '24 hours'
         """)
 
-        # Mean resolution time over the last 30 days, in MINUTES — resolutions in
-        # this demo run ~1-2 min, which rounded to 0.0 when expressed in hours.
+        # Mean resolution time over the last 30 days, in MINUTES.
         avg_resolution_minutes_raw = await safe_fetchval(conn, """
             SELECT COALESCE(
-                EXTRACT(EPOCH FROM AVG(resolved_at - created_at)) / 60,
+                EXTRACT(EPOCH FROM AVG(updated_at - created_at)) / 60,
                 0
             )
-            FROM requests.service_requests
-            WHERE status = 'resolved'
-              AND resolved_at IS NOT NULL
-              AND resolved_at >= NOW() - INTERVAL '30 days'
+            FROM entities.entity
+            WHERE entity_type = 'service_request'
+              AND state = 'resolved'
+              AND updated_at >= NOW() - INTERVAL '30 days'
         """, default=0.0)
 
         # AI chats today — ai-service persists each chatbot interaction here.

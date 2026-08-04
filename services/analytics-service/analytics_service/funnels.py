@@ -34,8 +34,6 @@ _FUNNELS: dict[str, list[str]] = {
     "service-request": [
         "service_request.submitted",
         "service_request.validated",
-        "service_request.dispatched",
-        "service_request.assigned",
         "service_request.in_progress",
         "service_request.resolved",
     ],
@@ -99,18 +97,24 @@ async def get_funnel(funnel_name: str) -> List[dict]:
 
 async def _query_event_log(pool, stages: list[str]) -> list[dict]:
     """
-    Count service-request events per stage from requests.request_events within the
-    recent window. One row per lifecycle transition, e.g.:
-      event_type = 'service_request.submitted', request_id = 'req-00123'
+    Count service-request events per stage from entities.entity_event.
+
+    Uses cohort-based counting: only consider entities whose CREATION falls
+    within the recent window, then count how many reached each stage regardless
+    of when that transition happened. This avoids the classic funnel inversion
+    where a rolling event-timestamp window counts later-stage events for
+    entities submitted before the window.
     """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
             count = await safe_fetchval(conn, """
-                SELECT COUNT(DISTINCT request_id)
-                FROM requests.request_events
-                WHERE event_type = $1
-                  AND created_at >= NOW() - ($2 || ' hours')::INTERVAL
+                SELECT COUNT(DISTINCT ee.entity_id)
+                FROM entities.entity_event ee
+                JOIN entities.entity e ON e.id = ee.entity_id
+                WHERE ee.entity_type = 'service_request'
+                  AND ee.event_type = $1
+                  AND e.created_at >= NOW() - ($2 || ' hours')::INTERVAL
             """, stage, WINDOW_HOURS)
             result.append({"stage": stage, "count": int(count)})
     return result
