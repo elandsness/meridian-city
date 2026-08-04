@@ -29,6 +29,8 @@ public class EntityResponse {
     public String getId() { return record.getId(); }
     public String getEntityType() { return record.getEntityType(); }
     public String getState() { return record.getState(); }
+    /** Alias for state — legacy frontends read 'status' not 'state'. */
+    public String getStatus() { return record.getState(); }
     public OffsetDateTime getStateEnteredAt() { return record.getStateEnteredAt(); }
     public OffsetDateTime getNextTransitionAt() { return record.getNextTransitionAt(); }
     public String getOwnerId() { return record.getOwnerId(); }

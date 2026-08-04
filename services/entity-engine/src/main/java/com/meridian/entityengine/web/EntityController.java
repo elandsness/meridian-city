@@ -22,8 +22,15 @@ public class EntityController {
 
     @GetMapping("/{entityType}")
     public List<EntityResponse> list(@PathVariable String entityType,
-                                      @RequestParam(required = false) String state) {
-        return service.list(entityType, state).stream().map(EntityResponse::new).toList();
+                                      @RequestParam(required = false) String state,
+                                      @RequestParam Map<String, String> allParams) {
+        // Strip known non-field params before passing the rest as field filters.
+        Map<String, String> fieldFilters = new java.util.HashMap<>(allParams);
+        fieldFilters.remove("state");
+        fieldFilters.remove("page");
+        fieldFilters.remove("limit");
+        return service.list(entityType, state, fieldFilters.isEmpty() ? null : fieldFilters)
+                .stream().map(EntityResponse::new).toList();
     }
 
     @GetMapping("/{entityType}/{id}")

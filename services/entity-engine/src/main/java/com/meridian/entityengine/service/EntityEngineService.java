@@ -36,11 +36,18 @@ public class EntityEngineService {
     private final EntityEventLogger eventLogger;
     private final EntityFactory entityFactory;
 
-    public List<EntityRecord> list(String entityType, String stateFilter) {
+    public List<EntityRecord> list(String entityType, String stateFilter, Map<String, String> fieldFilters) {
         configLoader.require(entityType);
-        return stateFilter == null
+        List<EntityRecord> records = stateFilter == null
                 ? repository.findByEntityType(entityType)
                 : repository.findByEntityTypeAndState(entityType, stateFilter);
+        if (fieldFilters == null || fieldFilters.isEmpty()) return records;
+        return records.stream()
+                .filter(r -> fieldFilters.entrySet().stream().allMatch(e -> {
+                    Object val = r.getField(e.getKey());
+                    return val != null && e.getValue().equals(String.valueOf(val));
+                }))
+                .toList();
     }
 
     public EntityRecord get(String entityType, String id) {
