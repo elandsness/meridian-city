@@ -305,12 +305,12 @@ industry:
           # Terminal gates sit at x≈197 (right edge of terminal block).
           # Taxiway centerline at y≈182. Runway centerline at y≈260.
           waypoints:
-            at_gate:   { x: 197, y: 99 }
-            boarding:  { x: 197, y: 159 }
-            taxiing:   { x: 310, y: 182 }
-            takeoff:   { x: 620, y: 260 }
-            departed:  { x: 895, y: 240 }
-            cancelled: { x: 197, y: 219 }
+            at_gate:   { x: 197, "y": 99 }
+            boarding:  { x: 197, "y": 159 }
+            taxiing:   { x: 310, "y": 182 }
+            takeoff:   { x: 620, "y": 260 }
+            departed:  { x: 895, "y": 240 }
+            cancelled: { x: 197, "y": 219 }
       generator:
         strategy: simpleSteadyState
         maxActive: 8
@@ -390,12 +390,12 @@ industry:
       computed:
         position:
           waypoints:
-            approach: { x: 895, y: 280 }
-            landing:  { x: 560, y: 260 }
-            taxi_in:  { x: 290, y: 182 }
-            at_gate:  { x: 197, y: 344 }
-            arrived:  { x: 197, y: 404 }
-            diverted: { x: 680, y: 130 }
+            approach: { x: 895, "y": 280 }
+            landing:  { x: 560, "y": 260 }
+            taxi_in:  { x: 290, "y": 182 }
+            at_gate:  { x: 197, "y": 344 }
+            arrived:  { x: 197, "y": 404 }
+            diverted: { x: 680, "y": 130 }
       generator:
         strategy: simpleSteadyState
         maxActive: 8
