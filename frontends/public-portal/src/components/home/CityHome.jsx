@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { formatCents } from '../../lib/format.js'
 import { useConfig } from '../../config/ConfigContext'
 
-const OPEN_STATUSES = new Set(['submitted', 'dispatched', 'assigned', 'acknowledged', 'in_progress'])
+const OPEN_STATUSES = new Set(['submitted', 'validated', 'in_progress'])
 
 function unwrap(d, ...keys) {
   if (Array.isArray(d)) return d

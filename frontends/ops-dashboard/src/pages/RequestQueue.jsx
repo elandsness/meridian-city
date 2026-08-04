@@ -4,15 +4,14 @@ import { getServiceRequests, updateRequestStatus } from '../api/requests.js';
 
 const STATUS = {
   submitted: 'bg-blue-500/20 text-blue-300',
-  dispatched: 'bg-blue-500/20 text-blue-300',
-  assigned: 'bg-amber-500/20 text-amber-300',
-  acknowledged: 'bg-amber-500/20 text-amber-300',
+  validated: 'bg-blue-500/20 text-blue-300',
   in_progress: 'bg-amber-500/20 text-amber-300',
   resolved: 'bg-green-500/20 text-green-300',
-  cancelled: 'bg-gray-500/20 text-gray-300',
+  rejected: 'bg-rose-500/20 text-rose-300',
+  closed: 'bg-gray-500/20 text-gray-300',
 };
 
-const CLOSED = new Set(['resolved', 'cancelled']);
+const CLOSED = new Set(['resolved', 'rejected', 'closed']);
 
 function StatusBadge({ status }) {
   const cls = STATUS[(status || '').toLowerCase()] || STATUS.cancelled;

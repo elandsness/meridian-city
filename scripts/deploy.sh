@@ -328,6 +328,7 @@ install_or_upgrade() {
     if helm upgrade --install dynatrace-operator dynatrace/dynatrace-operator \
          --namespace "$DYNATRACE_NAMESPACE" \
          --create-namespace \
+         --set csidriver.enabled=false \
          --wait --timeout 5m; then
       success "Dynatrace Operator ready in '$DYNATRACE_NAMESPACE'."
       # The operator just registered the DynaKube CRD; flush the shared discovery

@@ -8,17 +8,14 @@ import { requestStatusMeta } from '../lib/format.js'
 
 const STAGES = [
   ['submitted', 'Submitted'],
-  ['dispatched', 'Dispatched to department'],
-  ['assigned', 'Assigned to a crew'],
+  ['validated', 'Under review'],
   ['in_progress', 'Work in progress'],
   ['resolved', 'Resolved'],
 ]
 
-// Map the current status onto the lifecycle stages (acknowledged ~ assigned).
 function buildSteps(status) {
   const s = (status || '').toLowerCase()
   let current = STAGES.findIndex(([key]) => key === s)
-  if (s === 'acknowledged') current = 2
   if (current < 0) current = 0
   const resolved = s === 'resolved'
   return STAGES.map(([, label], i) => ({
@@ -46,7 +43,7 @@ export default function RequestDetail() {
 
   const req = data && !Array.isArray(data) ? data : null
   const meta = requestStatusMeta(req?.status)
-  const cancelled = (req?.status || '').toLowerCase() === 'cancelled'
+  const cancelled = ['rejected', 'closed'].includes((req?.status || req?.state || '').toLowerCase())
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

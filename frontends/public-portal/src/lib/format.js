@@ -53,12 +53,10 @@ export function severityRank(sev) {
 
 const REQUEST_STATUS = {
   submitted: { tone: 'blue', label: 'Submitted' },
-  dispatched: { tone: 'blue', label: 'Dispatched' },
-  assigned: { tone: 'amber', label: 'Assigned' },
-  acknowledged: { tone: 'amber', label: 'Acknowledged' },
+  validated: { tone: 'blue', label: 'Validated' },
   in_progress: { tone: 'amber', label: 'In progress' },
   resolved: { tone: 'green', label: 'Resolved' },
-  cancelled: { tone: 'slate', label: 'Cancelled' },
+  rejected: { tone: 'red', label: 'Rejected' },
   closed: { tone: 'slate', label: 'Closed' },
 }
 
