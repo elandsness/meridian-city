@@ -47,8 +47,8 @@ export default function Billing() {
   })
 
   const bills = unwrapArray(data)
-  const outstanding = bills.filter((b) => (b.status || '').toLowerCase() === 'outstanding')
-  const paid = bills.filter((b) => (b.status || '').toLowerCase() === 'paid')
+  const outstanding = bills.filter((b) => (b.status || b.state || '').toLowerCase() === 'outstanding')
+  const paid = bills.filter((b) => (b.status || b.state || '').toLowerCase() === 'paid')
   const balanceCents = outstanding.reduce((sum, b) => sum + (b.amount_cents || 0), 0)
   const payingId = payMut.isPending ? payMut.variables : null
 

@@ -1,11 +1,13 @@
 import client from './client.js'
 
 export function getBills(citizenId, status) {
-  return client
-    .get('/api/v1/billing/bills', { params: { citizen_id: citizenId, status } })
-    .then((r) => r.data)
+  const params = {}
+  if (citizenId) params.citizen_id = citizenId
+  // entity engine uses `state` not `status`; map the legacy caller's param name
+  if (status) params.state = status
+  return client.get('/api/v1/entities/bill', { params }).then((r) => r.data)
 }
 
 export function payBill(billId) {
-  return client.post(`/api/v1/billing/bills/${billId}/pay`).then((r) => r.data)
+  return client.post(`/api/v1/entities/bill/${billId}/actions/pay`).then((r) => r.data)
 }
