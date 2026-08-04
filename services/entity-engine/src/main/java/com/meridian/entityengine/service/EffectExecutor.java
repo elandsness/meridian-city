@@ -99,7 +99,9 @@ public class EffectExecutor {
             return;
         }
         if ("set".equals(action)) {
-            targetRecord.setField(field, effect.get("value"));
+            Object value = effect.get("value");
+            if ("${now}".equals(value)) value = OffsetDateTime.now().toString();
+            targetRecord.setField(field, value);
         } else {
             increment(targetRecord, field, effect.get("by"));
         }

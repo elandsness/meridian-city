@@ -116,7 +116,8 @@ public class EntityFactory {
         if ("number".equals(type)) return 0;
         // ref: resolved via linkOnCreate, not per-field generation. password: only ever
         // client-supplied (a generator has no plaintext to hash) -- stays unset otherwise.
-        if ("ref".equals(type) || "password".equals(type)) return null;
-        return fieldName + "-" + ThreadLocalRandom.current().nextInt(10000); // string / date fallback
+        // string/date without a default stay null; optional timestamp fields like paid_at
+        // must be set explicitly via a transition effect, not auto-populated with noise.
+        return null;
     }
 }

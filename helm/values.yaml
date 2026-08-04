@@ -295,6 +295,11 @@ industry:
           to: paid
           userTriggerable: true
           label: "Pay Now"
+          effects:
+            - action: set
+              target: self
+              field: paid_at
+              value: "${now}"
       generator:
         strategy: periodicHistoryBackfill
         ownerEntityType: citizen
