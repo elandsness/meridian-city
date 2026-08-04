@@ -9,5 +9,5 @@ export function getBills(citizenId, status) {
 }
 
 export function payBill(billId) {
-  return client.post(`/api/v1/entities/bill/${billId}/actions/pay`).then((r) => r.data)
+  return client.post(`/api/v1/entities/bill/${billId}/actions/paid`).then((r) => r.data)
 }
