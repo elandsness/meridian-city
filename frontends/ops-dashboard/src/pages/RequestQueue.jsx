@@ -8,10 +8,11 @@ const STATUS = {
   in_progress: 'bg-amber-500/20 text-amber-300',
   resolved: 'bg-green-500/20 text-green-300',
   rejected: 'bg-rose-500/20 text-rose-300',
+  abandoned: 'bg-gray-500/20 text-gray-300',
   closed: 'bg-gray-500/20 text-gray-300',
 };
 
-const CLOSED = new Set(['resolved', 'rejected', 'closed']);
+const CLOSED = new Set(['resolved', 'rejected', 'abandoned', 'closed']);
 
 function StatusBadge({ status }) {
   const cls = STATUS[(status || '').toLowerCase()] || STATUS.cancelled;
@@ -113,16 +114,16 @@ export default function RequestQueue() {
                     <td className="px-4 py-3 text-gray-400">{formatDate(req.created_at ?? req.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        {open && status !== 'in_progress' && (
+                        {(status === 'submitted' || status === 'validated') && (
                           <button
-                            onClick={() => advance(req.id, 'in_progress')}
+                            onClick={() => advance(req.id, status === 'submitted' ? 'validated' : 'in_progress')}
                             disabled={busy}
                             className="text-xs px-2.5 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
                           >
                             {busy ? '…' : 'Start'}
                           </button>
                         )}
-                        {open && (
+                        {status === 'in_progress' && (
                           <button
                             onClick={() => advance(req.id, 'resolved')}
                             disabled={busy}
