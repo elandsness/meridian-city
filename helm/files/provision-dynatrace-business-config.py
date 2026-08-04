@@ -327,7 +327,12 @@ def _topo_walk(initial, states, transitions):
     over declared transitions) -- the flow's step order. Error states are
     walked (so unreachable-from-error branches still get visited) but excluded
     from the returned step list; they're attached to their predecessor step
-    instead (see _error_events_from)."""
+    instead (see _error_events_from).
+
+    States marked externallyTriggered:true are appended after the BFS result:
+    they are reachable but via a cross-entity effect (e.g. a work_order cascade
+    driving its parent incident to "resolved"), so no transition declares them
+    as a target within this entity type's own graph."""
     adjacency = {}
     for t in transitions:
         adjacency.setdefault(t.get("from"), []).append(t.get("to"))
@@ -340,6 +345,11 @@ def _topo_walk(initial, states, transitions):
         if not states[current].get("isError"):
             visited.append(current)
         queue.extend(adjacency.get(current, []))
+    # Append externallyTriggered states in declaration order (they're terminal
+    # success/kpi steps that close the flow but have no incoming local transition).
+    for state_id, state_def in states.items():
+        if state_def.get("externallyTriggered") and state_id not in seen and not state_def.get("isError"):
+            visited.append(state_id)
     return visited
 
 
@@ -372,15 +382,18 @@ def derive_flow_specs_from_entity_config():
         kpi_candidates = [s for s in ordered if states[s].get("isKpi")]
         kpi_state = kpi_candidates[-1] if kpi_candidates else ordered[-1]
 
-        # States that have outgoing transitions are waypoints on the happy path.
-        # Terminal states with no outgoing transitions are either the success
-        # endpoint (kpi_state) or drop-out alternatives (abandoned, verified_only).
-        # Exclude the drop-out terminals from the step list -- they are not
-        # sequential steps but silent dropout points visible as drop-off.
-        has_outgoing = {t.get("from") for t in transitions}
+        # Non-terminal states are always waypoints (sequential steps on the path to
+        # completion). Terminal non-kpi states (abandoned, verified_only, ...) are
+        # silent dropout points -- visible as drop-off in the funnel but not listed
+        # as a step in their own right. The kpi_state is always included regardless.
+        #
+        # The old "has_outgoing" proxy is insufficient for externallyTriggered states
+        # (e.g. incident.open has no outgoing transition in its own config but IS a
+        # real intermediate waypoint resolved by a cross-entity effect).
         steps = []
         for state_id in ordered:
-            if state_id not in has_outgoing and state_id != kpi_state:
+            is_non_terminal = not states[state_id].get("terminal")
+            if not is_non_terminal and state_id != kpi_state:
                 continue
             label = states[state_id].get("label", state_id)
             event_type = "%s.%s" % (entity_type, state_id)
