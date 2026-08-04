@@ -42,14 +42,15 @@ spec:
       matchLabels:
         kubernetes.io/metadata.name: {{ include "meridian.namespace" . }}
 
+  # NOTE: spec.logMonitoring (Dynatrace K8s Log Module) is blocked on GKE Autopilot —
+  # it requires DAC_READ_SEARCH capability and write-mode hostPath for
+  # /var/lib/docker/containers, both denied by Warden. Log collection on GKE Autopilot
+  # uses the log-collector DaemonSet (logCollector.enabled=true) which reads only
+  # /var/log/pods in read-only mode — allowed by Autopilot.
+
   # ActiveGate: Kubernetes monitoring + routing telemetry. One per cluster (lives on
   # the clusterMonitoring owner); it monitors all namespaces and routes all instances'
   # OneAgent traffic, so non-owner instances don't need their own.
-  #
-  # NOTE: logMonitoring DaemonSet (spec.logMonitoring) requires DAC_READ_SEARCH
-  # capability + write-mode hostPath volumes blocked by GKE Autopilot Warden.
-  # Business-event logs reach Grail via the structured-log output the OneAgent
-  # code module captures from the instrumented JVM process, not from a log tail.
   {{- if .Values.dynatrace.clusterMonitoring.enabled }}
   activeGate:
     capabilities:
