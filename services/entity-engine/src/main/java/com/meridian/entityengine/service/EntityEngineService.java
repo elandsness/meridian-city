@@ -34,6 +34,7 @@ public class EntityEngineService {
     private final TransitionEvaluator transitionEvaluator;
     private final EffectExecutor effectExecutor;
     private final EntityEventLogger eventLogger;
+    private final EntityKafkaPublisher kafkaPublisher;
     private final EntityFactory entityFactory;
 
     public List<EntityRecord> list(String entityType, String stateFilter, Map<String, String> fieldFilters) {
@@ -130,6 +131,7 @@ public class EntityEngineService {
         repository.save(record);
         eventRepository.save(EntityEventRecord.of(record, fromState, transition.getTo()));
         eventLogger.transitioned(record, fromState, def);
+        kafkaPublisher.publish(record);
         return record;
     }
 

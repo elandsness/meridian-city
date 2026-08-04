@@ -41,6 +41,7 @@ public class TransitionScheduler {
     private final EntityRecordRepository repository;
     private final EntityEngineProperties properties;
     private final EntityFactory entityFactory;
+    private final EntityKafkaPublisher kafkaPublisher;
 
     @Scheduled(fixedDelayString = "${entity-engine.scheduler-fixed-delay-ms:5000}")
     public void tick() {
@@ -161,6 +162,7 @@ public class TransitionScheduler {
         entityFactory.scheduleNext(record, def);
         repository.save(record);
         entityFactory.recordCreation(record, def);
+        kafkaPublisher.publish(record);
     }
 
     private void seedPaidHistory(String entityType, EntityDefinition def, EntityDefinition.GeneratorDef gen, EntityRecord owner,
