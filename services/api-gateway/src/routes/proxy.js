@@ -8,16 +8,21 @@ const { v4: uuidv4 } = require('uuid')
 function buildRouteTable (config) {
   return [
     {
+      // citizen registration + profile — rewritten to the entity engine's generic path.
+      // Login is handled separately in auth.js (also hits customer-entity-service).
       prefix: '/api/v1/citizens',
-      target: config.CITIZEN_SERVICE_URL,
-      serviceName: 'citizen-service',
+      target: config.CUSTOMER_ENTITY_SERVICE_URL,
+      serviceName: 'customer-entity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/citizen',
     },
     {
+      // service requests — rewritten to the entity engine's generic path.
       prefix: '/api/v1/service-requests',
-      target: config.CITIZEN_SERVICE_URL,
-      serviceName: 'citizen-service',
+      target: config.CUSTOMER_ENTITY_SERVICE_URL,
+      serviceName: 'customer-entity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/service_request',
     },
     {
       prefix: '/api/v1/dispatch',
