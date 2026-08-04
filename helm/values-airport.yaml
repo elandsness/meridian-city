@@ -234,7 +234,7 @@ industry:
     flight_departure:
       displayName: "Departure"
       displayNamePlural: "Departures"
-      idPrefix: "flt-d"
+      idPrefix: "fltd"
       fields:
         airline:
           type: enum
@@ -270,7 +270,7 @@ industry:
           glyph: "✈️"
         takeoff:
           label: "Taking Off"
-          tone: cyan
+          tone: blue
           glyph: "🛫"
         departed:
           label: "Departed"
@@ -325,7 +325,7 @@ industry:
     flight_arrival:
       displayName: "Arrival"
       displayNamePlural: "Arrivals"
-      idPrefix: "flt-a"
+      idPrefix: "flta"
       fields:
         airline:
           type: enum

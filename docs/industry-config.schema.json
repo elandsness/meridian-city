@@ -185,6 +185,7 @@
                   }
                 }
               },
+              "viewBox": { "type": "string", "description": "entity-map only: SVG viewBox string (e.g. '0 0 900 520')." },
               "background": { "type": "object", "description": "entity-map only: { kind: 'image'|'preset'|'shapes'|'none', ... }." },
               "legend": { "type": "array", "description": "entity-map only." },
               "labelField": { "type": "string", "description": "entity-map only: which field to show next to each sprite." }
