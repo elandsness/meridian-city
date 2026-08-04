@@ -66,6 +66,10 @@ spec:
               value: {{ .Values.customerEntityService.ownedTypes | quote }}
             - name: KAFKA_GROUP_ID
               value: "customer-entity-service-group"
+            # application.yml binds spring.kafka.bootstrap-servers from SPRING_KAFKA_BOOTSTRAP_SERVERS,
+            # not from the generic KAFKA_BOOTSTRAP_SERVERS that commonEnv provides -- must be explicit.
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: {{ printf "%s:9092" (include "meridian.kafkaBootstrap" .) | quote }}
             # Routing-service URL for the service_request submitted→validated callService effect.
             - name: ROUTING_SERVICE_URL
               value: "http://routing-service:8095"
