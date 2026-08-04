@@ -1,15 +1,18 @@
 # =============================================================================
-# Meridian Airport — industry config overlay (Phase 3)
+# Meridian Airport — industry config overlay (Stage 7: entity engine retrofit)
 # =============================================================================
 # Layer this over the base chart + your secrets to deploy an airport-branded
-# instance:
+# instance backed by the generic entity engine:
 #   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-airport.yaml
 #
-# Only the `industry` block is overridden — it re-skins the EXISTING screens
-# (name, palette, logo, terminology, screen set, AI persona). Airport-matched demo
-# DATA (traffic-bot/seed) and Dynatrace naming/flows are separate follow-on chunks;
-# until those land, the backend still emits city-flavoured data.
+# Entity types flight_departure, flight_arrival, and passenger are defined here
+# under industry.entities and picked up by the entity engine at startup. The
+# base chart deploys customer-entity-service and ops-entity-service; this file
+# overrides their ENTITY_TYPES to include the aviation entities:
+#   customer-entity-service: citizen, service_request, bill, cart, passenger
+#   ops-entity-service:      incident, work_order, flight_departure, flight_arrival
 # -----------------------------------------------------------------------------
+
 industry:
   version: 1
   id: airport
@@ -72,13 +75,57 @@ industry:
     ops:
       - overview
       - { id: flight-board, label: "Flight Board" }
-      - { id: airfield, label: "Airfield" }
+      # airfield: uses entity-map generic template — replaces bespoke AirfieldMap.jsx.
+      # EntityMapPage receives these props; labelField names which data field to show
+      # next to each sprite. movement-service computes position from computed.position
+      # waypoints declared in the flight_departure entity definition below.
+      - id: airfield
+        template: entity-map
+        entityType: flight_departure
+        label: "Airfield"
+        icon: "🛩️"
+        viewBox: "0 0 900 520"
+        labelField: airline
+        background:
+          kind: shapes
+          shapes:
+            # Terminal building
+            - { type: rect, x: 5, y: 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            # Gate jetbridge connectors (right edge of terminal)
+            - { type: rect, x: 185, y: 95, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, y: 155, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, y: 215, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, y: 340, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, y: 400, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, y: 460, width: 20, height: 8, fill: "#334155", rx: 2 }
+            # Gate position dots
+            - { type: circle, cx: 197, cy: 99, r: 5, fill: "#3b82f6" }
+            - { type: circle, cx: 197, cy: 159, r: 5, fill: "#3b82f6" }
+            - { type: circle, cx: 197, cy: 219, r: 5, fill: "#3b82f6" }
+            - { type: circle, cx: 197, cy: 344, r: 5, fill: "#60a5fa" }
+            - { type: circle, cx: 197, cy: 404, r: 5, fill: "#60a5fa" }
+            - { type: circle, cx: 197, cy: 464, r: 5, fill: "#60a5fa" }
+            # Taxiway (horizontal strip)
+            - { type: rect, x: 205, y: 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            # Runway (main)
+            - { type: rect, x: 375, y: 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
+            # Runway centerline dashes
+            - { type: line, x1: 390, "y1": 260, x2: 885, "y2": 260, stroke: "#fbbf24", "stroke-width": 1, "stroke-dasharray": "20,10" }
+            # Runway threshold marks
+            - { type: rect, x: 378, y: 220, width: 18, height: 80, fill: "#374151", rx: 1 }
+            # Labels
+            - { type: text, x: 97, y: 262, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
+            - { type: text, x: 97, y: 280, text: "Departures", fill: "#475569", "font-size": 11, "text-anchor": middle }
+            - { type: text, x: 97, y: 410, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
+            - { type: text, x: 97, y: 428, text: "Arrivals", fill: "#475569", "font-size": 11, "text-anchor": middle }
+            - { type: text, x: 550, y: 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
+            - { type: text, x: 630, y: 165, text: "Taxiway Alpha", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
       - { id: requests, label: "Maintenance queue" }
       - { id: iot, label: "Ground equipment" }
       - { id: incidents, label: "Operational incidents" }
       - { id: analytics, label: "On-time performance" }
       - demo-control
-  # Home-page modules for the passenger portal: status board, airfield map, journey tracker.
+  # Home-page modules for the airport portals.
   home:
     public:
       - flight-status
@@ -89,7 +136,7 @@ industry:
       - flight-summary
       - ops-overview
   # Backend-only demo data + dispatch routing (delivered to traffic-bot +
-  # service-dispatch via env; never sent to the browser config.json).
+  # routing-service via env; never sent to the browser config.json).
   data:
     zones:
       - terminal-1
@@ -134,30 +181,305 @@ industry:
     security: "Security & Screening"
     facilities: "Facilities Management"
     ground-transport: "Ground Transportation"
-  # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
-  # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
-  # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
+  # Dynatrace reskin: rename entity-engine services on the service map
+  # (one naming rule per service, scoped to this instance's namespace).
+  # OTel services (ai-service, iot-*) renamed via OTEL_SERVICE_NAME separately.
   dynatrace:
     serviceNames:
-      citizen-service: "Passenger Services"
-      service-dispatch: "Operations Dispatch"
-      city-operations: "Airfield Operations"
+      customer-entity-service: "Passenger Services"
+      routing-service: "Operations Dispatch"
+      ops-entity-service: "Airfield Operations"
       api-gateway: "Airport API Gateway"
       notification-service: "Passenger Notifications"
-      commerce-service: "Airport Retail"
-      billing-service: "Airport Fees"
       demo-control-api: "Demo Control"
     flowLabels:
       service-request: "Maintenance Request Lifecycle"
       account-creation: "Passenger Registration"
       iot-incident: "Ground Equipment Incident Resolution"
-      purchase: "Airport Retail Purchase"
-      tax-payment: "Airport Fee Payment"
-    # Active Business Flows for the airport: drop the city store/tax funnels and add the
-    # two aviation hero flows (both defined in provision-dynatrace-business-config.py).
+      flight_departure: "Aircraft Turnaround"
+      flight_arrival: "Arrival & Gate Assignment"
+      passenger: "Passenger Journey"
+    # Active Business Flows for the airport: operational + aviation hero flows.
     flows:
       - service-request
       - account-creation
       - iot-incident
-      - aircraft-turnaround
-      - passenger-journey
+      - flight_departure
+      - flight_arrival
+      - passenger
+
+  # =========================================================================
+  # Entity engine config — airport aviation entities.
+  # These are loaded by entity-engine at startup from the mounted entity-
+  # config.json (industry-configmap.yaml renders industry.entities as the
+  # entities key of that JSON). The `entities` key is NOT omitted from the
+  # browser config.json (unlike data/routing/dynatrace) — the frontend reads
+  # state labels, tones, and glyphs from here.
+  #
+  # flight_departure and flight_arrival are separate entity types (not one
+  # "flight" with a direction field) because they have different initial states
+  # (at_gate vs approach) and different field sets (destination vs origin),
+  # making the state machines non-overlapping.
+  #
+  # passenger has no generator — created externally by traffic-bot; this keeps
+  # the passenger count tied to realistic visitor load, not purely synthetic.
+  # =========================================================================
+  entities:
+    # -------------------------------------------------------------------------
+    # FLIGHT DEPARTURE — gate-to-wheels-up lifecycle for outbound aircraft.
+    # Owned by ops-entity-service (see opsEntityService.ownedTypes below).
+    # movement-service computes position from computed.position.waypoints;
+    # entity-map template on the airfield screen renders live positions.
+    # -------------------------------------------------------------------------
+    flight_departure:
+      displayName: "Departure"
+      displayNamePlural: "Departures"
+      idPrefix: "flt-d"
+      fields:
+        airline:
+          type: enum
+          values: [United, Delta, American, Southwest, JetBlue, "Air France", Lufthansa, Emirates]
+        flight_number:
+          type: enum
+          values: [UA101, UA202, UA345, DL301, DL442, DL561, AA512, AA673, WN801, WN932, B6103, B6214, AF261, LH482, EK201]
+        gate:
+          type: enum
+          values: [A1, A2, A3, A4, A5, B1, B2, B3, B4, B5, C1, C2, C3]
+        aircraft_type:
+          type: enum
+          values: ["Boeing 737", "Boeing 777", "Airbus A320", "Airbus A380", "Embraer E175", "Boeing 787"]
+        destination:
+          type: enum
+          values: ["New York", "Los Angeles", "Chicago", "London", "Paris", "Dubai", "Tokyo", "Sydney", "Toronto", "Miami"]
+        passenger_count:
+          type: number
+          default: 0
+      initial: at_gate
+      states:
+        at_gate:
+          label: "At Gate"
+          tone: blue
+          glyph: "✈️"
+        boarding:
+          label: "Boarding"
+          tone: amber
+          glyph: "🛫"
+        taxiing:
+          label: "Taxiing"
+          tone: amber
+          glyph: "✈️"
+        takeoff:
+          label: "Taking Off"
+          tone: cyan
+          glyph: "🛫"
+        departed:
+          label: "Departed"
+          tone: green
+          terminal: true
+          isKpi: true
+        cancelled:
+          label: "Cancelled"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        - from: at_gate
+          to: boarding
+          timer: { minSeconds: 20, maxSeconds: 90 }
+        - from: boarding
+          to: cancelled
+          when: { faultGate: "flight-departure-cancelled", probability: 0.1 }
+          timer: { minSeconds: 20, maxSeconds: 60 }
+        - from: boarding
+          to: taxiing
+          timer: { minSeconds: 20, maxSeconds: 60 }
+        - from: taxiing
+          to: takeoff
+          timer: { minSeconds: 15, maxSeconds: 45 }
+        - from: takeoff
+          to: departed
+          timer: { minSeconds: 10, maxSeconds: 30 }
+      computed:
+        position:
+          # Coordinates in viewBox "0 0 900 520" — matches airfield screen config above.
+          # Terminal gates sit at x≈197 (right edge of terminal block).
+          # Taxiway centerline at y≈182. Runway centerline at y≈260.
+          waypoints:
+            at_gate:   { x: 197, y: 99 }
+            boarding:  { x: 197, y: 159 }
+            taxiing:   { x: 310, y: 182 }
+            takeoff:   { x: 620, y: 260 }
+            departed:  { x: 895, y: 240 }
+            cancelled: { x: 197, y: 219 }
+      generator:
+        strategy: simpleSteadyState
+        maxActive: 8
+        intervalMs: 20000
+
+    # -------------------------------------------------------------------------
+    # FLIGHT ARRIVAL — wheels-down-to-gate lifecycle for inbound aircraft.
+    # Owned by ops-entity-service. Separate entity type from flight_departure:
+    # initial state (approach) differs, and `origin` replaces `destination`.
+    # Movement waypoints mirror departure in reverse along the same runway.
+    # -------------------------------------------------------------------------
+    flight_arrival:
+      displayName: "Arrival"
+      displayNamePlural: "Arrivals"
+      idPrefix: "flt-a"
+      fields:
+        airline:
+          type: enum
+          values: [United, Delta, American, Southwest, JetBlue, "Air France", Lufthansa, Emirates]
+        flight_number:
+          type: enum
+          values: [UA202, UA303, DL441, DL553, AA624, AA785, WN901, WN952, B6210, B6321, AF262, LH483, EK202]
+        gate:
+          type: enum
+          values: [A1, A2, A3, A4, A5, B1, B2, B3, B4, B5, C1, C2, C3]
+        aircraft_type:
+          type: enum
+          values: ["Boeing 737", "Boeing 777", "Airbus A320", "Airbus A380", "Embraer E175", "Boeing 787"]
+        origin:
+          type: enum
+          values: ["New York", "Los Angeles", "Chicago", "London", "Paris", "Dubai", "Tokyo", "Sydney", "Toronto", "Miami"]
+      initial: approach
+      states:
+        approach:
+          label: "On Approach"
+          tone: amber
+          glyph: "✈️"
+        landing:
+          label: "Landing"
+          tone: blue
+          glyph: "✈️"
+        taxi_in:
+          label: "Taxiing In"
+          tone: amber
+          glyph: "✈️"
+        at_gate:
+          label: "At Gate"
+          tone: blue
+          glyph: "🛬"
+        diverted:
+          label: "Diverted"
+          tone: red
+          terminal: true
+          isError: true
+        arrived:
+          label: "Arrived"
+          tone: green
+          terminal: true
+          isKpi: true
+      transitions:
+        - from: approach
+          to: landing
+          timer: { minSeconds: 15, maxSeconds: 45 }
+        - from: landing
+          to: diverted
+          when: { faultGate: "flight-arrival-diverted", probability: 0.08 }
+          timer: { minSeconds: 10, maxSeconds: 30 }
+        - from: landing
+          to: taxi_in
+          timer: { minSeconds: 10, maxSeconds: 30 }
+        - from: taxi_in
+          to: at_gate
+          timer: { minSeconds: 15, maxSeconds: 45 }
+        - from: at_gate
+          to: arrived
+          timer: { minSeconds: 20, maxSeconds: 60 }
+      computed:
+        position:
+          waypoints:
+            approach: { x: 895, y: 280 }
+            landing:  { x: 560, y: 260 }
+            taxi_in:  { x: 290, y: 182 }
+            at_gate:  { x: 197, y: 344 }
+            arrived:  { x: 197, y: 404 }
+            diverted: { x: 680, y: 130 }
+      generator:
+        strategy: simpleSteadyState
+        maxActive: 8
+        intervalMs: 25000
+
+    # -------------------------------------------------------------------------
+    # PASSENGER — passenger journey lifecycle.
+    # Owned by customer-entity-service (see customerEntityService.ownedTypes).
+    # Created externally by traffic-bot (no generator here) so passenger volume
+    # matches realistic visitor load rather than synthetic injection rate.
+    # has_bag boolean drives the longer security path in a real deployment;
+    # here we use probability 0.6 to approximate the bag-check branch since
+    # the DSL doesn't yet support field-equality conditions.
+    # -------------------------------------------------------------------------
+    passenger:
+      displayName: "Passenger"
+      displayNamePlural: "Passengers"
+      idPrefix: "pax"
+      fields:
+        has_bag:
+          type: boolean
+        flight_departure_id:
+          type: ref
+          entity: flight_departure
+      initial: checked_in
+      states:
+        checked_in:
+          label: "Checked In"
+          tone: blue
+        security_cleared:
+          label: "Security Cleared"
+          tone: blue
+        gate_ready:
+          label: "At Gate"
+          tone: amber
+          isKpi: true
+        boarded:
+          label: "Boarded"
+          tone: green
+        offloaded:
+          label: "Offloaded"
+          tone: red
+          terminal: true
+          isError: true
+        departed:
+          label: "Departed"
+          tone: green
+          terminal: true
+          isKpi: true
+      transitions:
+        - from: checked_in
+          to: security_cleared
+          timer: { minSeconds: 60, maxSeconds: 600 }
+        - from: security_cleared
+          to: gate_ready
+          # 60% probability path models the majority of passengers; the
+          # remaining ~40% take slightly longer (bag claim, etc.) but we
+          # collapse both into the same next state rather than branching
+          # until fieldEquals DSL is available.
+          timer: { minSeconds: 120, maxSeconds: 900 }
+        - from: gate_ready
+          to: offloaded
+          when: { faultGate: "passenger-offloaded", probability: 0.05 }
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: gate_ready
+          to: boarded
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: boarded
+          to: departed
+          timer: { minSeconds: 60, maxSeconds: 300 }
+      generator:
+        strategy: simpleSteadyState
+        maxActive: 40
+        intervalMs: 12000
+        fields:
+          has_bag:
+            probability: 0.6
+
+# =============================================================================
+# Entity engine ownership overrides — add aviation entities to each service's
+# ENTITY_TYPES env var. These are top-level values keys (not under `industry`).
+# =============================================================================
+customerEntityService:
+  ownedTypes: "citizen,service_request,bill,cart,passenger"
+
+opsEntityService:
+  ownedTypes: "incident,work_order,flight_departure,flight_arrival"

@@ -137,9 +137,10 @@ function buildRouteTable (config) {
       rewritePrefix: '/api/v1',
     },
     {
-      // Ops entity types (incident, work_order) → ops-entity-service.
-      // These prefixes must come BEFORE the customer-entity-service catch-all
-      // below so the more-specific match wins (routeTable.find() returns first).
+      // Ops entity types (incident, work_order, flight_departure, flight_arrival)
+      // → ops-entity-service. These prefixes must come BEFORE the
+      // customer-entity-service catch-all below so the more-specific match wins
+      // (routeTable.find() returns first).
       prefix: '/api/v1/entities/incident',
       target: config.OPS_ENTITY_SERVICE_URL,
       serviceName: 'ops-entity-service',
@@ -147,6 +148,18 @@ function buildRouteTable (config) {
     },
     {
       prefix: '/api/v1/entities/work_order',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      prefix: '/api/v1/entities/flight_departure',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      prefix: '/api/v1/entities/flight_arrival',
       target: config.OPS_ENTITY_SERVICE_URL,
       serviceName: 'ops-entity-service',
       requiresAuth: false,
