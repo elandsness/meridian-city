@@ -483,3 +483,11 @@ customerEntityService:
 
 opsEntityService:
   ownedTypes: "incident,work_order,flight_departure,flight_arrival"
+
+# Suppress billing and commerce inbox notifications — those screens are
+# disabled for the airport, so tax bills and store orders are irrelevant.
+# Passengers still get service-request lifecycle notifications (submitted /
+# resolved) and ops staff still get IoT anomaly alerts.
+notificationService:
+  env:
+    ENABLED_TOPICS: "iot.anomalies,requests.events"
