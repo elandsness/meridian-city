@@ -64,6 +64,13 @@
     "terminology": {
       "type": "object",
       "description": "Maps generic domain nouns (customer, request, incident, asset, workOrder, …) to industry-specific nouns.",
+      "properties": {
+        "requestCategories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Dropdown options for the Submit a request form. Always end with 'other'."
+        }
+      },
       "additionalProperties": { "type": "string" }
     },
     "screens": {
