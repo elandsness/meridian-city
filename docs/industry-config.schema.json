@@ -163,6 +163,27 @@
           },
           {
             "type": "object",
+            "description": "A home widget or ticker module — id must be unique within this list. No entityType required.",
+            "required": ["id", "template"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "template": { "enum": ["news-ticker", "weather-widget", "stock-ticker", "sports-ticker", "clock-widget", "entity-list-card", "entity-summary-card", "entity-kpi-row", "activity-feed"] },
+              "height": { "enum": ["slim", "half", "full"], "description": "Ticker/widget height: slim = marquee bar, half = compact card, full = expanded card." },
+              "mode": { "type": "string", "description": "weather-widget only: 'perfect' (always sunny) or 'forecast' (4-day rotating)." },
+              "sport": { "type": "string", "description": "sports-ticker only: sport name shown as card title." },
+              "league": { "type": "string", "description": "sports-ticker only: league/competition name shown in slim marquee prefix." },
+              "items": { "type": "array", "description": "news-ticker or announcements only: list of headline strings or {title,body,tone?} objects." },
+              "timezones": { "type": "array", "description": "clock-widget only: [{tz, label}] — tz='local' uses device time." },
+              "symbols": { "type": "array", "description": "stock-ticker only: [{symbol, name, basePrice}] overriding defaults." },
+              "entityType": { "type": "string", "description": "entity-summary-card / entity-kpi-row: entity type key from top-level entities map." },
+              "entityTypes": { "type": "array", "items": { "type": "string" }, "description": "entity-kpi-row / activity-feed: multiple entity types." },
+              "label": { "type": "string" },
+              "maxItems": { "type": "integer", "description": "activity-feed: max rows to show." }
+            }
+          },
+          {
+            "type": "object",
             "description": "A generic entity-template page or card — id must be unique within this list, entityType must be a key in the top-level entities map.",
             "required": ["id", "template", "entityType"],
             "additionalProperties": false,
@@ -170,7 +191,7 @@
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
               "label": { "type": "string" },
               "icon": { "type": "string" },
-              "template": { "enum": ["entity-list", "entity-detail", "entity-map", "entity-analytics"] },
+              "template": { "enum": ["entity-list", "entity-detail", "entity-map", "entity-analytics", "entity-journey"] },
               "entityType": { "type": "string" },
               "fields": { "type": "array", "items": { "type": "string" } },
               "filters": {
@@ -188,7 +209,10 @@
               "viewBox": { "type": "string", "description": "entity-map only: SVG viewBox string (e.g. '0 0 900 520')." },
               "background": { "type": "object", "description": "entity-map only: { kind: 'image'|'preset'|'shapes'|'none', ... }." },
               "legend": { "type": "array", "description": "entity-map only." },
-              "labelField": { "type": "string", "description": "entity-map only: which field to show next to each sprite." }
+              "labelField": { "type": "string", "description": "entity-map only: which field to show next to each sprite." },
+              "steps": { "type": "array", "items": { "type": "string" }, "description": "entity-journey only: ordered list of state keys to show as journey steps. Omit to use all non-error states in declaration order." },
+              "ownerField": { "type": "string", "description": "entity-journey only (portal): entity field whose value matches the logged-in user's id. When set, shows the personal journey view for authenticated users." },
+              "description": { "type": "string", "description": "entity-journey: subtitle shown below the page heading." }
             }
           }
         ]

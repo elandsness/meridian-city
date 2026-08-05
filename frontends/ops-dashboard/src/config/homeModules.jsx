@@ -5,16 +5,40 @@
 import OpsOverview from '../components/home/OpsOverview.jsx';
 import FlightSummary from '../components/home/FlightSummary.jsx';
 import EntityMapCard from '../components/entity/EntityMapCard.jsx';
+import WelcomeHero from '../components/home/WelcomeHero.jsx';
+import Announcements from '../components/home/Announcements.jsx';
+import NewsTicker from '../components/home/NewsTicker.jsx';
+import WeatherWidget from '../components/home/WeatherWidget.jsx';
+import StockTicker from '../components/home/StockTicker.jsx';
+import SportsTicker from '../components/home/SportsTicker.jsx';
+import ClockWidget from '../components/home/ClockWidget.jsx';
+import EntitySummaryCard from '../components/home/EntitySummaryCard.jsx';
+import EntityKpiRow from '../components/home/EntityKpiRow.jsx';
+import ActivityFeed from '../components/home/ActivityFeed.jsx';
+import IotAlertsCard from '../components/home/IotAlertsCard.jsx';
 
+// Static modules (no config props needed — component reads config internally or has
+// sensible defaults that don't require per-instance configuration).
 export const HOME_MODULES = {
   'ops-overview': OpsOverview,
   'flight-summary': FlightSummary,
+  'welcome-hero': WelcomeHero,
+  'iot-alerts-card': IotAlertsCard,
 };
 
-// Generic entity-template home modules (generic-entity-engine initiative) --
-// currently just the map card; list/detail/analytics templates are screen-only.
+// Template modules (receive all config props spread onto them — used via
+// { id, template, ...props } in config.home.ops).
 const TEMPLATES = {
   'entity-map': EntityMapCard,
+  'news-ticker': NewsTicker,
+  'weather-widget': WeatherWidget,
+  'stock-ticker': StockTicker,
+  'sports-ticker': SportsTicker,
+  'clock-widget': ClockWidget,
+  'announcements': Announcements,
+  'entity-summary-card': EntitySummaryCard,
+  'entity-kpi-row': EntityKpiRow,
+  'activity-feed': ActivityFeed,
 };
 
 export function getActiveHomeModules(config) {
