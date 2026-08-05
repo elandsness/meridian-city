@@ -219,11 +219,53 @@ industry:
           amount: { min: 5000, max: 500000 }
           credit_score: { min: 580, max: 820 }
 
-    # Override the base bill entity for the banking industry:
-    # monthly credit card statements with realistic payment amounts and 21-day due dates.
+    # Override the base bill entity for banking: monthly credit card statements
+    # with realistic payment amounts ($20–$800) and 21-day due dates.
+    # Must repeat required schema fields (fields/initial/states) even though
+    # they're identical to the base — the validator treats each entity as complete.
     bill:
       displayName: "Credit Card Statement"
       displayNamePlural: "Credit Card Statements"
+      idPrefix: "bill"
+      fields:
+        citizen_id: { type: string }
+        period: { type: string }
+        amount_cents: { type: number, default: 0 }
+        issued_at: { type: string }
+        due_at: { type: string }
+        paid_at: { type: string }
+      initial: outstanding
+      states:
+        outstanding:
+          label: "Outstanding"
+          tone: amber
+          isKpi: true
+        paid:
+          label: "Paid"
+          tone: green
+          terminal: true
+          isKpi: true
+          kpiField: amount_cents
+        payment_failed:
+          label: "Payment Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        - from: outstanding
+          to: payment_failed
+          userTriggerable: true
+          when: { faultGate: "tax-payment-failed", probability: 0.3 }
+          label: "Pay Now"
+        - from: outstanding
+          to: paid
+          userTriggerable: true
+          label: "Pay Now"
+          effects:
+            - action: set
+              target: self
+              field: paid_at
+              value: "${now}"
       generator:
         strategy: periodicHistoryBackfill
         ownerEntityType: citizen
