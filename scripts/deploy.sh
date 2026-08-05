@@ -369,7 +369,7 @@ install_or_upgrade() {
   current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
   if [[ -n "$current_branch" && "$current_branch" != "main" && "$current_branch" != "HEAD" ]]; then
     local safe_ref
-    safe_ref=$(echo "$current_branch" | tr -c 'a-zA-Z0-9' '-')
+    safe_ref=$(printf '%s' "$current_branch" | tr -c 'a-zA-Z0-9' '-')
     branch_args=(--set "global.imageTag=branch-${safe_ref}" --set "global.imagePullPolicy=Always")
     info "Branch '${current_branch}' — using image tag: branch-${safe_ref}"
   fi
