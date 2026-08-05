@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useConfig } from '../config/ConfigContext.jsx';
 import {
   getDemoStatus,
   getScenarios,
@@ -368,6 +369,11 @@ function ScenarioControlCard({ activeScenario }) {
 // ---------------------------------------------------------------------------
 function FleetCard() {
   const qc = useQueryClient();
+  const config = useConfig();
+  const term = config?.terminology ?? {};
+  const cat1 = term.iotCategory1 ?? 'Vehicles';
+  const cat2 = term.iotCategory2 ?? 'Buildings';
+  const cat3 = term.iotCategory3 ?? 'Machines';
   const { data: fleetStatus, isLoading } = useQuery({
     queryKey: ['fleet-status'],
     queryFn: getFleetStatus,
@@ -497,17 +503,17 @@ function FleetCard() {
         <p className="text-gray-500 text-sm">Loading fleet status…</p>
       ) : (
         <div className="flex gap-4 text-xs text-gray-400">
-          <span>Current: <span className="text-blue-400">{fleetStatus?.vehicles ?? '?'} vehicles</span></span>
-          <span><span className="text-green-400">{fleetStatus?.buildings ?? '?'} buildings</span></span>
-          <span><span className="text-orange-400">{fleetStatus?.machines ?? '?'} machines</span></span>
+          <span>Current: <span className="text-blue-400">{fleetStatus?.vehicles ?? '?'} {cat1}</span></span>
+          <span><span className="text-green-400">{fleetStatus?.buildings ?? '?'} {cat2}</span></span>
+          <span><span className="text-orange-400">{fleetStatus?.machines ?? '?'} {cat3}</span></span>
         </div>
       )}
 
       {/* Resize controls */}
       <div className="flex flex-wrap items-end gap-4">
-        <NumberInput label="Vehicles (1–100)" value={vehicles} setValue={setVehicles} min={1} max={100} />
-        <NumberInput label="Buildings (1–50)" value={buildings} setValue={setBuildings} min={1} max={50} />
-        <NumberInput label="Machines (1–30)" value={machines} setValue={setMachines} min={1} max={30} />
+        <NumberInput label={`${cat1} (1–100)`} value={vehicles} setValue={setVehicles} min={1} max={100} />
+        <NumberInput label={`${cat2} (1–50)`} value={buildings} setValue={setBuildings} min={1} max={50} />
+        <NumberInput label={`${cat3} (1–30)`} value={machines} setValue={setMachines} min={1} max={30} />
         <button
           onClick={handleResize}
           disabled={resizeLoading}
