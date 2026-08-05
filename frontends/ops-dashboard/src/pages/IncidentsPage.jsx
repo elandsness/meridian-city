@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import IncidentBadge from '../components/IncidentBadge.jsx';
 import { getIncidents } from '../api/incidents.js';
+import { useConfig } from '../config/ConfigContext.jsx';
 
 const PAGE_SIZE = 10;
 
@@ -16,6 +17,8 @@ function formatDate(ts) {
 
 export default function IncidentsPage() {
   const navigate = useNavigate();
+  const config = useConfig();
+  const incidentPlural = config?.terminology?.incidentPlural ?? 'Incidents';
   const [filter, setFilter] = useState('open'); // 'open' | 'all'
   const [page, setPage] = useState(0);
 
@@ -36,7 +39,7 @@ export default function IncidentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Incidents</h1>
+        <h1 className="text-2xl font-bold text-white">{incidentPlural}</h1>
         <button
           onClick={() => refetch()}
           className="text-xs text-gray-500 hover:text-cyan-400 transition-colors"

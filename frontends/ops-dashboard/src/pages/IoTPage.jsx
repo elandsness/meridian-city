@@ -37,6 +37,18 @@ export default function IoTPage() {
   const cat1 = term.iotCategory1 ?? 'Vehicles';
   const cat2 = term.iotCategory2 ?? 'Buildings';
   const cat3 = term.iotCategory3 ?? 'Machines';
+  const categoryLabel = { vehicle: cat1, building: cat2, machine: cat3 };
+  const pfx1 = term.iotIdPrefix1 ?? 'veh';
+  const pfx2 = term.iotIdPrefix2 ?? 'bldg';
+  const pfx3 = term.iotIdPrefix3 ?? 'mach';
+
+  function displayDeviceId(deviceId) {
+    if (!deviceId) return deviceId;
+    if (deviceId.startsWith('veh-')) return pfx1 + deviceId.slice(3);
+    if (deviceId.startsWith('bldg-')) return pfx2 + deviceId.slice(4);
+    if (deviceId.startsWith('mach-')) return pfx3 + deviceId.slice(4);
+    return deviceId;
+  }
   const [notifications, setNotifications] = useState([]);
   const esRef = useRef(null);
 
@@ -145,8 +157,8 @@ export default function IoTPage() {
               ) : (
                 sortedDevices.map((d) => (
                   <tr key={d.device_id} className="hover:bg-gray-800/40">
-                    <td className="px-4 py-2 font-mono text-gray-300 text-xs">{d.device_id}</td>
-                    <td className="px-4 py-2 text-gray-400 capitalize">{d.category}</td>
+                    <td className="px-4 py-2 font-mono text-gray-300 text-xs">{displayDeviceId(d.device_id)}</td>
+                    <td className="px-4 py-2 text-gray-400">{categoryLabel[d.category] ?? d.category}</td>
                     <td className="px-4 py-2 text-gray-400">{d.zone}</td>
                     <td className="px-4 py-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${DEVICE_STATUS[d.status] || 'bg-gray-700 text-gray-400'}`}>

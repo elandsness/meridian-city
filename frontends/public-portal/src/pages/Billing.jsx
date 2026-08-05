@@ -56,8 +56,8 @@ export default function Billing() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tax &amp; billing</h1>
-          <p className="text-slate-500 text-sm mt-1">Your quarterly {cfg.company.name} tax bills.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{cfg.terminology?.billingTitle ?? 'Tax & billing'}</h1>
+          <p className="text-slate-500 text-sm mt-1">{cfg.terminology?.billingSubtitle ?? `Your ${cfg.company.name} bills and payment history.`}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 text-right">
           <div className="text-xs text-slate-500">Balance due</div>
@@ -77,7 +77,7 @@ export default function Billing() {
             {outstanding.map((b) => (
               <div key={b.id} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-900">{b.period} tax bill</div>
+                  <div className="text-sm font-medium text-slate-900">{b.period} {cfg.terminology?.billNoun ?? 'tax bill'}</div>
                   <div className="text-xs text-slate-500">Due {formatDate(b.due_at)}</div>
                 </div>
                 <span className="text-sm font-medium text-slate-900">{formatCents(b.amount_cents)}</span>

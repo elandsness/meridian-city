@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getServiceRequests, updateRequestStatus } from '../api/requests.js';
+import { useConfig } from '../config/ConfigContext.jsx';
 
 const STATUS = {
   submitted: 'bg-blue-500/20 text-blue-300',
@@ -34,6 +35,10 @@ function formatDate(ts) {
 
 export default function RequestQueue() {
   const queryClient = useQueryClient();
+  const config = useConfig();
+  const term = config?.terminology ?? {};
+  const requestPlural = term.requestPlural ?? 'Service Requests';
+  const customerPlural = term.customerPlural ?? 'residents';
   const [openOnly, setOpenOnly] = useState(true);
   const [pendingId, setPendingId] = useState(null);
 
@@ -63,8 +68,8 @@ export default function RequestQueue() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Service Requests</h1>
-          <p className="text-sm text-gray-500 mt-1">Respond to issues reported by residents.</p>
+          <h1 className="text-2xl font-bold text-white">{requestPlural}</h1>
+          <p className="text-sm text-gray-500 mt-1">Respond to issues reported by {customerPlural.toLowerCase()}.</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-400">
           <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} />

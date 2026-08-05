@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useConfig } from '../config/ConfigContext.jsx'
 import { getServiceRequests } from '../api/serviceRequests.js'
 import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
@@ -29,6 +30,10 @@ function truncateId(id) {
 export default function ServiceRequests() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const cfg = useConfig()
+  const term = cfg?.terminology ?? {}
+  const requestPlural = term.requestPlural ?? 'Service requests'
+  const requestSingular = term.request ?? 'request'
 
   const params = { page: 1, limit: 20 }
   if (user?.id) params.citizen_id = user.id
@@ -44,10 +49,10 @@ export default function ServiceRequests() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Service requests</h1>
-          <p className="text-slate-500 text-sm mt-1">Track the issues you've reported to the city.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{requestPlural}</h1>
+          <p className="text-slate-500 text-sm mt-1">Track your {requestPlural.toLowerCase()} and their status.</p>
         </div>
-        <Button to="/service-requests/new" variant="primary">Submit new request</Button>
+        <Button to="/service-requests/new" variant="primary">Submit new {requestSingular.toLowerCase()}</Button>
       </div>
 
       {isLoading && <p className="text-slate-500">Loading…</p>}
@@ -61,9 +66,9 @@ export default function ServiceRequests() {
       {!isLoading && !isError && requests.length === 0 && (
         <Card>
           <div className="text-center py-8">
-            <p className="text-slate-500">You have no service requests yet.</p>
+            <p className="text-slate-500">You have no {requestPlural.toLowerCase()} yet.</p>
             <div className="mt-4 flex justify-center">
-              <Button to="/service-requests/new" variant="primary" size="sm">Submit your first request</Button>
+              <Button to="/service-requests/new" variant="primary" size="sm">Submit your first {requestSingular.toLowerCase()}</Button>
             </div>
           </div>
         </Card>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
+import { useConfig } from '../config/ConfigContext.jsx'
 import { getServiceRequest } from '../api/serviceRequests.js'
 import Card from '../ui/Card.jsx'
 import Badge from '../ui/Badge.jsx'
@@ -35,6 +36,8 @@ function formatDate(ts) {
 
 export default function RequestDetail() {
   const { id } = useParams()
+  const cfg = useConfig()
+  const requestPlural = cfg?.terminology?.requestPlural ?? 'requests'
   const { data, isLoading, isError } = useQuery({
     queryKey: ['serviceRequest', id],
     queryFn: () => getServiceRequest(id),
@@ -49,7 +52,7 @@ export default function RequestDetail() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Link to="/service-requests" className="text-slate-500 hover:text-slate-900 transition-colors text-sm">
-          ← Back to requests
+          ← Back to {requestPlural.toLowerCase()}
         </Link>
       </div>
 

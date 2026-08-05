@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useConfig } from '../config/ConfigContext.jsx'
 import { createServiceRequest } from '../api/serviceRequests.js'
 import { startAction, addActionProperties, endAction, reportError } from '../lib/rum.js'
 import Card from '../ui/Card.jsx'
@@ -13,6 +14,8 @@ const PRIORITIES = ['low', 'normal', 'high', 'urgent']
 export default function NewRequest() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const cfg = useConfig()
+  const requestSingular = cfg?.terminology?.request ?? 'request'
 
   const [form, setForm] = useState({
     category: 'infrastructure',
@@ -71,7 +74,7 @@ export default function NewRequest() {
         <Link to="/service-requests" className="text-slate-500 hover:text-slate-900 transition-colors text-sm">
           ← Back
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Submit a request</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Submit a {requestSingular.toLowerCase()}</h1>
       </div>
 
       <Card>

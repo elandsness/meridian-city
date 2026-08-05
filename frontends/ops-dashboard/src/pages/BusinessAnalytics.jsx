@@ -2,39 +2,12 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import FunnelChart from '../components/FunnelChart.jsx';
 import { getFunnel } from '../api/analytics.js';
+import { useConfig } from '../config/ConfigContext.jsx';
 
-const FUNNELS = [
-  {
-    key: 'service-request',
-    label: 'Service Request Lifecycle',
-    description: 'Tracks citizen service requests from submission through resolution.',
-  },
-  {
-    key: 'account-creation',
-    label: 'Account Creation',
-    description: 'Citizen portal registration and onboarding flow.',
-  },
-  {
-    key: 'iot-incident',
-    label: 'IoT Incident Resolution',
-    description: 'Device anomaly detection through remediation.',
-  },
-  {
-    key: 'purchase',
-    label: 'City Store Purchase',
-    description: 'Shopping cart through order delivery.',
-  },
-  {
-    key: 'tax-payment',
-    label: 'Tax Payment',
-    description: 'Tax bills issued through payment.',
-  },
-];
-
-function FunnelSection({ funnel }) {
+function FunnelSection({ flowKey, label }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ['funnel', funnel.key],
-    queryFn: () => getFunnel(funnel.key),
+    queryKey: ['funnel', flowKey],
+    queryFn: () => getFunnel(flowKey),
     refetchInterval: 60_000,
   });
 
@@ -49,8 +22,7 @@ function FunnelSection({ funnel }) {
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-3">
       <div>
-        <h2 className="text-base font-semibold text-white">{funnel.label}</h2>
-        <p className="text-xs text-gray-500 mt-0.5">{funnel.description}</p>
+        <h2 className="text-base font-semibold text-white">{label}</h2>
       </div>
 
       {isLoading ? (
@@ -72,13 +44,25 @@ function FunnelSection({ funnel }) {
   );
 }
 
+function toTitleCase(str) {
+  return str.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function BusinessAnalytics() {
+  const config = useConfig();
+  const flowLabels = config?.dynatrace?.flowLabels ?? {};
+  const flows = config?.dynatrace?.flows ?? ['service-request', 'account-creation', 'iot-incident', 'purchase', 'tax-payment'];
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Business Analytics</h1>
 
-      {FUNNELS.map((f) => (
-        <FunnelSection key={f.key} funnel={f} />
+      {flows.map((key) => (
+        <FunnelSection
+          key={key}
+          flowKey={key}
+          label={flowLabels[key] ?? toTitleCase(key)}
+        />
       ))}
     </div>
   );

@@ -34,9 +34,15 @@ industry:
     iotCategory1: "Field Vehicles"
     iotCategory2: "Substations"
     iotCategory3: "Smart Meters"
+    billingTitle: "Pay My Bill"
+    billingSubtitle: "Your Meridian Power energy bills and payment history."
+    billNoun: "energy bill"
     workOrder: "Field Dispatch"
     asset: "Grid Asset"
     assetPlural: "Grid Assets"
+    iotIdPrefix1: "fld"
+    iotIdPrefix2: "sub"
+    iotIdPrefix3: "mtr"
   screens:
     public:
       - home

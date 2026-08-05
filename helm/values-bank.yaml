@@ -38,6 +38,12 @@ industry:
     iotCategory1: "ATMs"
     iotCategory2: "Branches"
     iotCategory3: "Cash Machines"
+    billingTitle: "Pay Bills & Cards"
+    billingSubtitle: "Your Meridian Bank credit card and loan payments."
+    billNoun: "payment"
+    iotIdPrefix1: "atm"
+    iotIdPrefix2: "br"
+    iotIdPrefix3: "cm"
   screens:
     public:
       - home

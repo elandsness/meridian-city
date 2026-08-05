@@ -48,9 +48,15 @@ industry:
     iotCategory1: "Transport Vehicles"
     iotCategory2: "Patient Rooms"
     iotCategory3: "Medical Equipment"
+    billingTitle: "My Bills"
+    billingSubtitle: "Your Meridian Medical Center statements and payment history."
+    billNoun: "statement"
     workOrder: "Facilities work order"
     asset: "Medical equipment"
     assetPlural: "Medical equipment"
+    iotIdPrefix1: "trn"
+    iotIdPrefix2: "rm"
+    iotIdPrefix3: "eq"
   screens:
     public:
       - home

@@ -35,9 +35,15 @@ industry:
     iotCategory1: "Vehicles"
     iotCategory2: "Stadium Systems"
     iotCategory3: "Scoreboard & Displays"
+    billingTitle: "Season Tickets"
+    billingSubtitle: "Your Marauders season ticket invoices and renewal history."
+    billNoun: "ticket invoice"
     workOrder: "Facilities work order"
     asset: "Stadium equipment"
     assetPlural: "Stadium equipment"
+    iotIdPrefix1: "veh"
+    iotIdPrefix2: "sys"
+    iotIdPrefix3: "scr"
   screens:
     public:
       - home
