@@ -103,7 +103,9 @@ public class EntityFactory {
     private Object generateFieldValue(String fieldName, EntityDefinition.FieldDef fieldDef, EntityDefinition def) {
         if (fieldDef.getDefaultValue() != null) return fieldDef.getDefaultValue();
 
-        Map<String, Object> hint = def.getGenerator() == null ? null : def.getGenerator().getFields().get(fieldName);
+        Object rawHint = def.getGenerator() == null ? null : def.getGenerator().getFields().get(fieldName);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> hint = rawHint instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
         String type = fieldDef.getType();
         if ("boolean".equals(type)) {
             double probability = hint != null && hint.get("probability") instanceof Number n ? n.doubleValue() : 0.5;

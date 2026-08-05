@@ -139,7 +139,11 @@ public class EntityDefinition {
         private String strategy; // simpleSteadyState | periodicHistoryBackfill
         private Long intervalMs;
         private Integer maxActive;
-        private Map<String, Map<String, Object>> fields = Map.of();
+        // Raw Map<String,Object> (not nested generic) so Jackson can reliably
+        // deserialize it without losing inner-map type info via erasure. The
+        // hint values are always JSON objects, so at runtime they arrive as
+        // LinkedHashMap<String,Object> -- cast in EntityFactory.generateFieldValue.
+        private Map<String, Object> fields = Map.of();
         // periodicHistoryBackfill only (Stage 6): generalizes billing-service's two tax-bill
         // generators (one-time per-citizen quarter backfill + ongoing per-period issuance)
         // into one strategy that, per tick, tops up every ownerEntityType instance to have
