@@ -129,7 +129,23 @@ industry:
   home:
     public:
       - flight-status
-      - airfield-map
+      - id: airfield-home
+        template: entity-map
+        entityType: flight_departure
+        viewBox: "0 0 900 520"
+        labelField: flight_number
+        background:
+          kind: shapes
+          shapes:
+            # Runway
+            - { type: rect, x: 60, y: 110, width: 840, height: 40, fill: "#1f2937", rx: 4 }
+            - { type: line, x1: 82, "y1": 130, x2: 918, "y2": 130, stroke: "#4b5563", "stroke-width": 2, "stroke-dasharray": "20 16" }
+            # Taxiway
+            - { type: line, x1: 100, "y1": 280, x2: 900, "y2": 280, stroke: "#facc15", "stroke-opacity": 0.22, "stroke-width": 8 }
+            - { type: text, x: 110, "y": 268, text: "TAXIWAY A", fill: "#475569", "font-size": 11 }
+            # Terminal
+            - { type: rect, x: 120, "y": 420, width: 760, height: 90, rx: 10, fill: "#111827", stroke: "#374151" }
+            - { type: text, x: 500, "y": 472, text: "TERMINAL", fill: "#334155", "font-size": 18, "font-weight": bold, "text-anchor": middle }
       - my-journey
       - quick-actions
     ops:

@@ -9,7 +9,6 @@ import RequestQueue from '../pages/RequestQueue.jsx';
 import BusinessAnalytics from '../pages/BusinessAnalytics.jsx';
 import DemoControl from '../pages/DemoControl.jsx';
 import FlightBoard from '../pages/FlightBoard.jsx';
-import AirfieldMap from '../pages/AirfieldMap.jsx';
 import EntityListPage from '../components/entity/EntityListPage.jsx';
 import EntityDetailPage from '../components/entity/EntityDetailPage.jsx';
 import EntityMapPage from '../components/entity/EntityMapPage.jsx';
@@ -31,7 +30,6 @@ const TEMPLATES = {
 export const SCREENS = {
   overview: { path: '/overview', label: 'Overview', icon: '📊', component: Overview },
   'flight-board': { path: '/flight-board', label: 'Flight Board', icon: '✈️', component: FlightBoard },
-  airfield: { path: '/airfield', label: 'Airfield', icon: '🛩️', component: AirfieldMap },
   iot: { path: '/iot', label: 'IoT Fleet', icon: '🌐', component: IoTPage },
   incidents: {
     path: '/incidents',

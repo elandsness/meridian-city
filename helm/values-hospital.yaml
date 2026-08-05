@@ -1,0 +1,229 @@
+# =============================================================================
+# Meridian Medical Center — industry config overlay (Stage 9 new-industry proof)
+# =============================================================================
+# Layer this over the base chart to deploy a hospital-branded instance:
+#   helm upgrade --install meridian-<hash> ./helm \
+#     -f helm/values.yaml -f helm/values-hospital.yaml \
+#     -f helm/values-secrets.yaml -n <namespace>
+#
+# Generated using AUTHORING_PROMPT.md as acceptance test that zero new code
+# is required for a genuinely new industry with a novel domain entity.
+# =============================================================================
+
+industry:
+  version: 1
+  id: hospital
+  company:
+    name: "Meridian Medical Center"
+    short: "Meridian"
+    tagline: "Exceptional care, every step of the way."
+    assistant:
+      name: "Clara"
+      persona: "the Meridian Medical Center virtual assistant"
+      supportPhone: "1-800-MMC-CARE"
+      systemPrompt: |-
+        You are Clara, the virtual assistant for Meridian Medical Center. Help patients
+        and families navigate admission, understand billing, find their care team, and
+        track the status of their care journey. Be compassionate, clear, and always
+        recommend calling a nurse or dialing 911 for any urgent medical concern.
+        Never provide specific medical diagnoses or treatment recommendations.
+  theme:
+    colors:
+      brand: "#0F6FAD"             # Trustworthy healthcare blue
+      brandDeep: "#0A4D7A"         # Darker navy for headers
+      brandSoft: "#2E8FCC"         # Lighter blue for hovers/active
+      brandTint: "#EBF5FB"         # Very light blue wash for backgrounds
+      accent: "#16A085"            # Teal — clinical and calm
+      accentSoft: "#1ABC9C"        # Lighter teal for hover
+      accentInk: "#0D2B22"         # Dark text on teal backgrounds
+    logo: ""
+    favicon: ""
+  terminology:
+    customer: "Patient"
+    customerPlural: "Patients"
+    request: "Care request"
+    requestPlural: "Care requests"
+    incident: "Clinical incident"
+    incidentPlural: "Clinical incidents"
+    workOrder: "Facilities work order"
+    asset: "Medical equipment"
+    assetPlural: "Medical equipment"
+  screens:
+    public:
+      - home
+      - { id: service-requests, label: "Request Support" }
+      - { id: billing, label: "My Bills" }
+      - messages
+      - id: my-admission
+        template: entity-journey
+        entityType: patient_admission
+        label: "My Care Journey"
+        icon: "🏥"
+        ownerField: patient_name
+        steps:
+          - { state: registered, label: "Registered" }
+          - { state: triage, label: "Triage" }
+          - { state: assessment, label: "Assessment" }
+          - { state: treatment, label: "Treatment" }
+          - { state: observation, label: "Under Observation" }
+          - { state: discharged, label: "Discharged ✓" }
+        description: "Track your care journey from check-in through discharge, updated in real time."
+    ops:
+      - overview
+      - id: admissions
+        template: entity-list
+        entityType: patient_admission
+        label: "Admissions"
+        icon: "🏥"
+      - { id: requests, label: "Care Requests" }
+      - { id: incidents, label: "Clinical Incidents" }
+      - { id: iot, label: "Medical Equipment" }
+      - { id: analytics, label: "Patient Flow Analytics" }
+      - demo-control
+  home:
+    public:
+      - id: ed-ticker
+        template: ticker
+        height: slim
+        label: "🏥 MMC STATUS"
+        items:
+          - "ED wait time: 18 min (low volume) · All trauma bays available"
+          - "Radiology: MRI Suite 2 back online — full capacity restored"
+          - "Visitor hours: 10 AM – 8 PM daily · ICU visits by appointment only"
+          - "Blood donor drive: Fri Aug 9 in Main Lobby 9 AM – 3 PM — walk-ins welcome"
+          - "Flu vaccine clinic: Sat & Sun 8 AM – noon, Outpatient Entrance"
+          - "Parking: North Garage full — overflow available in South Lot (free shuttle)"
+      - welcome-hero
+      - quick-actions
+      - id: patient-notices
+        template: announcements
+        title: "Patient & Visitor Updates"
+        items:
+          - "New: View your discharge summary and lab results in the MyMMC patient portal within 24 hours."
+          - "Infection control: hand sanitizer stations refreshed across all floors. Thank you for keeping our community safe."
+          - "Cafeteria renovation complete — Level 2 dining now open with extended hours 6 AM – 10 PM."
+    ops:
+      - id: admission-kpi
+        template: entity-kpi-row
+        entityTypes: [patient_admission]
+      - ops-overview
+      - id: recent-admissions
+        template: activity-feed
+  data:
+    zones: ["Emergency Department", "ICU", "Surgical Suite", "Oncology Wing", "Pediatrics", "Outpatient Clinic"]
+    requestTemplates:
+      - { category: patient-services, title: "Medication Question", description: "Patient requesting clarification on discharge medication instructions and dosage schedule." }
+      - { category: patient-services, title: "Pain Management Concern", description: "Patient reporting pain level above 6/10 and requesting review from care team." }
+      - { category: facilities, title: "Room Temperature Issue", description: "Patient reports room is too cold and thermostat is unresponsive." }
+      - { category: equipment, title: "IV Pump Alarm", description: "IV infusion pump alarming repeatedly in room 412 — nursing staff unavailable." }
+      - { category: billing, title: "Insurance Verification Needed", description: "Patient needs assistance confirming their insurance coverage before scheduled procedure." }
+      - { category: dietary, title: "Special Diet Request", description: "Patient has not received a low-sodium meal per physician dietary order." }
+    chatQuestions:
+      - "How do I view my test results online?"
+      - "What are visiting hours for the ICU?"
+      - "How do I request a copy of my medical records?"
+      - "Where is the cafeteria?"
+      - "What insurance does Meridian Medical Center accept?"
+      - "How do I track my care journey?"
+      - "How do I pay my hospital bill?"
+  routing:
+    patient-services: "Patient Care Coordination"
+    facilities: "Facilities & Environmental Services"
+    equipment: "Biomedical Engineering"
+    billing: "Patient Financial Services"
+    dietary: "Nutrition & Food Services"
+  dynatrace:
+    serviceNames:
+      citizen-service: "Patient Portal Services"
+      city-operations: "Clinical Operations Platform"
+      service-dispatch: "Care Coordination Hub"
+      api-gateway: "Hospital API Gateway"
+      notification-service: "Patient Notification Service"
+      billing-service: "Healthcare Billing System"
+    flowLabels:
+      service-request: "Care Request Resolution"
+      account-creation: "Patient Registration"
+      iot-incident: "Medical Equipment Fault"
+      tax-payment: "Patient Bill Payment"
+      patient_admission: "Patient Care Journey"
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+  entities:
+    # -----------------------------------------------------------------------
+    # PATIENT ADMISSION — end-to-end inpatient care journey
+    # Tracks a patient from initial ED registration through triage, assessment,
+    # treatment, observation, and final discharge. Patients and families can
+    # follow progress via the my-admission entity-journey screen
+    # (ownerField: patient_name). Ops sees all active admissions in the
+    # admissions entity-list screen, with KPI tiles on the ops home page.
+    #
+    # The escalated state (isError) fires when the care-team-escalation fault
+    # gate is enabled via Demo Control — models a deteriorating patient being
+    # moved to a higher level of care, producing an error step in the Business
+    # Flow funnel that Dynatrace can surface in the Patient Care Journey flow.
+    # -----------------------------------------------------------------------
+    patient_admission:
+      displayName: "Patient Admission"
+      displayNamePlural: "Patient Admissions"
+      idPrefix: "pat"
+      fields:
+        patient_name: { type: string }
+        department:
+          type: enum
+          values: [emergency, general_medicine, surgery, oncology, pediatrics, orthopedics]
+          default: general_medicine
+        acuity:
+          type: enum
+          values: [low, moderate, high, critical]
+          default: moderate
+        attending_physician: { type: string }
+        room_number: { type: string }
+      initial: registered
+      states:
+        registered: { label: "Registered", tone: blue }
+        triage: { label: "Triage", tone: amber }
+        assessment: { label: "Assessment", tone: amber }
+        treatment: { label: "Treatment", tone: blue }
+        observation: { label: "Under Observation", tone: blue }
+        escalated: { label: "Escalated", tone: red, isError: true }
+        discharged: { label: "Discharged", tone: green, terminal: true, isKpi: true }
+        transferred: { label: "Transferred", tone: slate, terminal: true }
+      transitions:
+        - from: registered
+          to: triage
+          timer: { minSeconds: 30, maxSeconds: 180 }
+        - from: triage
+          to: assessment
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: assessment
+          to: escalated
+          when: { faultGate: "care-team-escalation", probability: 0.08 }
+          timer: { minSeconds: 90, maxSeconds: 360 }
+        - from: assessment
+          to: treatment
+          timer: { minSeconds: 90, maxSeconds: 360 }
+        - from: treatment
+          to: escalated
+          when: { faultGate: "care-team-escalation", probability: 0.05 }
+          timer: { minSeconds: 180, maxSeconds: 900 }
+        - from: treatment
+          to: observation
+          when: { probability: 0.75 }
+          timer: { minSeconds: 180, maxSeconds: 900 }
+        - from: treatment
+          to: discharged
+          timer: { minSeconds: 180, maxSeconds: 900 }
+        - from: observation
+          to: discharged
+          when: { probability: 0.90 }
+          timer: { minSeconds: 240, maxSeconds: 1200 }
+        - from: observation
+          to: transferred
+          timer: { minSeconds: 240, maxSeconds: 1200 }
+        - from: escalated
+          to: treatment
+          timer: { minSeconds: 120, maxSeconds: 480 }
+      generator: { strategy: simpleSteadyState, intervalMs: 60000, maxActive: 16 }

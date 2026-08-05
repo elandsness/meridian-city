@@ -37,13 +37,6 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - citizen-service
-          - service-dispatch
-          - city-operations
-          - commerce-service
-          - billing-service
-          - flight-ops
-          - passenger-service
           - entity-engine
           - routing-service
     steps:
