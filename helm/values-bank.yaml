@@ -45,6 +45,19 @@ industry:
     iotIdPrefix1: "atm"
     iotIdPrefix2: "br"
     iotIdPrefix3: "cm"
+    iotZoneLabels:
+      zone-north: "Northeast"
+      zone-south: "Southeast"
+      zone-east: "Midwest"
+      zone-west: "West Coast"
+      zone-central: "Digital Channels"
+    iotAnomalyLabels:
+      engine_overtemp: "Cash Dispenser Overheating"
+      high_speed: "Network Latency Spike"
+      hvac_overtemp: "Branch HVAC Fault"
+      high_co2: "Branch Air Quality Alert"
+      high_vibration: "ATM Mechanical Vibration"
+      high_error_rate: "ATM Transaction Error Rate"
   screens:
     public:
       - home
@@ -219,6 +232,88 @@ industry:
           applicant_name: { faker: fullName }
           amount: { min: 5000, max: 500000 }
           credit_score: { min: 580, max: 820 }
+
+    # Override incident Kafka trigger for banking: map city-device anomaly descriptions
+    # to ATM/branch appropriate titles. Physics (sensor metrics) come from the
+    # shared iot-simulator; this mapping translates at the entity creation boundary.
+    incident:
+      displayName: "System Alert"
+      displayNamePlural: "System Alerts"
+      idPrefix: "inc"
+      fields:
+        asset_id: { type: string }
+        source:
+          type: enum
+          values: [manual, iot]
+          default: manual
+        severity:
+          type: enum
+          values: [low, medium, high, critical]
+          default: medium
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+      initial: detecting
+      states:
+        detecting: { label: "Detecting", tone: amber }
+        open:
+          label: "Open"
+          tone: red
+          isKpi: true
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+          externallyTriggered: true
+      transitions:
+        - from: open
+          to: resolved
+          userTriggerable: true
+          label: "Resolve"
+        - from: detecting
+          to: open
+          timer: { minSeconds: 5, maxSeconds: 30 }
+          effects:
+            - action: spawnLinked
+              entityType: work_order
+              fields:
+                incident_id: { from: id }
+                title: { from: title }
+                zone_id: { from: zone_id }
+                priority:
+                  from: severity
+                  map:
+                    critical: urgent
+                    high: high
+                    medium: normal
+                    low: normal
+                  default: normal
+      triggers:
+        kafka:
+          - topic: iot.anomalies
+            fieldMapping:
+              asset_id: { from: device_id }
+              severity:
+                from: severity
+                map:
+                  warning: medium
+                  critical: critical
+                  high: high
+                  low: low
+                default: medium
+              source: { value: iot }
+              title:
+                from: anomaly_type
+                map:
+                  "Engine overtemperature": "Cash Dispenser Overheating"
+                  "Excessive speed": "ATM Network Latency Alert"
+                  "HVAC overtemperature": "Branch HVAC System Fault"
+                  "High CO2 level": "Branch Air Quality Warning"
+                  "High vibration": "ATM Mechanical Vibration Alert"
+                  "Elevated error rate": "ATM Transaction Error Rate Alert"
+                default: "ATM System Alert"
+              description: { from: metric_name }
 
     # Override the base bill entity for banking: monthly credit card statements
     # with realistic payment amounts ($20–$800) and 21-day due dates.

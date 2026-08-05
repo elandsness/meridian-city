@@ -69,6 +69,16 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Dropdown options for the Submit a request form. Always end with 'other'."
+        },
+        "iotZoneLabels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Maps raw zone IDs (e.g. 'zone-north') to industry-appropriate display labels."
+        },
+        "iotAnomalyLabels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Maps raw anomaly_type values (e.g. 'engine_overtemp') to industry-appropriate display labels."
         }
       },
       "additionalProperties": { "type": "string" }

@@ -41,6 +41,8 @@ export default function IoTPage() {
   const pfx1 = term.iotIdPrefix1 ?? 'veh';
   const pfx2 = term.iotIdPrefix2 ?? 'bldg';
   const pfx3 = term.iotIdPrefix3 ?? 'mach';
+  const zoneLabels = term.iotZoneLabels ?? {};
+  const anomalyLabels = term.iotAnomalyLabels ?? {};
 
   function displayDeviceId(deviceId) {
     if (!deviceId) return deviceId;
@@ -48,6 +50,14 @@ export default function IoTPage() {
     if (deviceId.startsWith('bldg-')) return pfx2 + deviceId.slice(4);
     if (deviceId.startsWith('mach-')) return pfx3 + deviceId.slice(4);
     return deviceId;
+  }
+
+  function displayZone(zone) {
+    return zoneLabels[zone] ?? zone;
+  }
+
+  function displayAnomaly(anomalyType) {
+    return anomalyLabels[anomalyType] ?? anomalyType;
   }
   const [notifications, setNotifications] = useState([]);
   const esRef = useRef(null);
@@ -159,10 +169,10 @@ export default function IoTPage() {
                   <tr key={d.device_id} className="hover:bg-gray-800/40">
                     <td className="px-4 py-2 font-mono text-gray-300 text-xs">{displayDeviceId(d.device_id)}</td>
                     <td className="px-4 py-2 text-gray-400">{categoryLabel[d.category] ?? d.category}</td>
-                    <td className="px-4 py-2 text-gray-400">{d.zone}</td>
+                    <td className="px-4 py-2 text-gray-400">{displayZone(d.zone)}</td>
                     <td className="px-4 py-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${DEVICE_STATUS[d.status] || 'bg-gray-700 text-gray-400'}`}>
-                        {d.status}{d.anomaly_type ? ` · ${d.anomaly_type}` : ''}
+                        {d.status}{d.anomaly_type ? ` · ${displayAnomaly(d.anomaly_type)}` : ''}
                       </span>
                     </td>
                     <td className="px-4 py-2">
