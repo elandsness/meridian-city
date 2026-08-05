@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useConfig } from '../../config/ConfigContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getEntities, getEntity, unwrapEntities } from '../../api/entities.js'
+import { getEntities, createEntity, unwrapEntities } from '../../api/entities.js'
 import { getEntityDef, getStateOrder } from './entityConfig.js'
 import Card from '../../ui/Card.jsx'
 import Button from '../../ui/Button.jsx'
@@ -23,12 +23,15 @@ import Button from '../../ui/Button.jsx'
 export default function EntityJourneyPage({ entityType, label, ownerField, steps: stepsProp, description }) {
   const cfg = useConfig()
   const { isAuthenticated, user } = useAuth()
-  const myId = user?.id
   const def = getEntityDef(cfg, entityType)
 
-  const showPersonal = !!(ownerField && myId)
+  // Use user.name (first + last from JWT) as the owner identity so the ownerField
+  // in the entity data (e.g. applicant_name, patient_name) contains a readable name
+  // rather than the opaque numeric citizen id.
+  const userName = user?.name
+  const showPersonal = !!(ownerField && userName)
 
-  if (showPersonal) return <MyOwnJourney entityType={entityType} userId={myId} ownerField={ownerField} label={label} stepsProp={stepsProp} description={description} cfg={cfg} def={def} />
+  if (showPersonal) return <MyOwnJourney entityType={entityType} userName={userName} ownerField={ownerField} label={label} stepsProp={stepsProp} description={description} cfg={cfg} def={def} />
   return <LiveBoard entityType={entityType} label={label} description={description} cfg={cfg} def={def} stepsProp={stepsProp} isAuthenticated={isAuthenticated} />
 }
 
@@ -108,14 +111,26 @@ function EntityCard({ entity, def, stepsProp, label }) {
   )
 }
 
-function MyOwnJourney({ entityType, userId, ownerField, label, stepsProp, description, cfg, def }) {
+function MyOwnJourney({ entityType, userName, ownerField, label, stepsProp, description, cfg, def }) {
+  const queryClient = useQueryClient()
+  const queryKey = ['entity-journey-mine', entityType, userName]
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['entity-journey-mine', entityType, userId],
-    queryFn: () => getEntities(entityType, { [ownerField]: userId }),
+    queryKey,
+    queryFn: () => getEntities(entityType, { [ownerField]: userName }),
     refetchInterval: 8000,
   })
   const entities = unwrapEntities(data)
   const entity = entities[0]
+
+  // Auto-create on first visit: if authenticated and no entity exists for this user,
+  // create one (mirrors the old passenger-service /me "create if not found" pattern).
+  const { mutate: create, isPending: isCreating } = useMutation({
+    mutationFn: () => createEntity(entityType, { [ownerField]: userName }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  })
+
+  const noEntity = !isLoading && !isError && !entity && !isCreating
 
   return (
     <div className="space-y-6">
@@ -124,13 +139,16 @@ function MyOwnJourney({ entityType, userId, ownerField, label, stepsProp, descri
         <p className="text-slate-500 text-sm mt-1">{description ?? `Track your progress through ${cfg.company.name}.`}</p>
       </div>
 
-      {isLoading && <p className="text-slate-500 text-sm">Loading…</p>}
+      {(isLoading || isCreating) && <p className="text-slate-500 text-sm">Loading…</p>}
       {isError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">Couldn't load your journey.</p>}
 
-      {!isLoading && !isError && !entity && (
+      {noEntity && (
         <Card>
-          <div className="text-center py-8">
-            <p className="text-slate-400">No active journey found.</p>
+          <div className="text-center py-8 space-y-3">
+            <p className="text-slate-500">You don't have an active {def?.displayName ?? label ?? 'journey'} yet.</p>
+            <Button variant="primary" size="sm" onClick={() => create()}>
+              Start a {def?.displayName ?? label ?? 'journey'}
+            </Button>
           </div>
         </Card>
       )}

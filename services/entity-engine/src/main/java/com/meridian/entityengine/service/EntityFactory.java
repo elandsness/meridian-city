@@ -113,11 +113,65 @@ public class EntityFactory {
             List<String> values = fieldDef.getValues();
             return values.get(ThreadLocalRandom.current().nextInt(values.size()));
         }
-        if ("number".equals(type)) return 0;
+        if ("number".equals(type)) {
+            if (hint != null) {
+                Number min = hint.get("min") instanceof Number n ? n : null;
+                Number max = hint.get("max") instanceof Number n ? n : null;
+                if (min != null && max != null) {
+                    return Math.round(ThreadLocalRandom.current().nextDouble(min.doubleValue(), max.doubleValue()));
+                }
+            }
+            return 0;
+        }
+        if ("string".equals(type) && hint != null) {
+            String faker = hint.get("faker") instanceof String s ? s : null;
+            if ("fullName".equals(faker)) return randomFullName();
+            if ("firstName".equals(faker)) return randomFirstName();
+            if ("lastName".equals(faker)) return randomLastName();
+            if ("streetAddress".equals(faker)) return randomAddress();
+        }
         // ref: resolved via linkOnCreate, not per-field generation. password: only ever
         // client-supplied (a generator has no plaintext to hash) -- stays unset otherwise.
         // string/date without a default stay null; optional timestamp fields like paid_at
         // must be set explicitly via a transition effect, not auto-populated with noise.
         return null;
+    }
+
+    private static final String[] FIRST_NAMES = {
+        "Alice", "Bob", "Carlos", "Diana", "Ethan", "Fatima", "Grace", "Henry",
+        "Isabella", "James", "Kiran", "Laura", "Marcus", "Nadia", "Omar", "Priya",
+        "Quinn", "Rachel", "Samuel", "Tanya", "Uma", "Victor", "Wendy", "Xavier",
+        "Yasmin", "Zoe", "Aaron", "Brianna", "Cole", "Danielle", "Eric", "Fiona",
+        "George", "Hannah", "Ian", "Julia", "Kevin", "Lily", "Michael", "Nina"
+    };
+
+    private static final String[] LAST_NAMES = {
+        "Adams", "Baker", "Carter", "Davis", "Evans", "Foster", "Garcia", "Harris",
+        "Ivanova", "Johnson", "Khan", "Lee", "Martinez", "Nelson", "O'Brien", "Patel",
+        "Quinn", "Rivera", "Smith", "Taylor", "Usman", "Vasquez", "Williams", "Xu",
+        "Young", "Zhang", "Anderson", "Brown", "Clark", "Diaz", "Edwards", "Flores"
+    };
+
+    private static final String[] STREETS = {
+        "Main St", "Oak Ave", "Maple Dr", "Cedar Ln", "Elm St", "Park Blvd",
+        "Washington Ave", "Lincoln Rd", "Jefferson Blvd", "Madison Ct"
+    };
+
+    private String randomFirstName() {
+        return FIRST_NAMES[ThreadLocalRandom.current().nextInt(FIRST_NAMES.length)];
+    }
+
+    private String randomLastName() {
+        return LAST_NAMES[ThreadLocalRandom.current().nextInt(LAST_NAMES.length)];
+    }
+
+    private String randomFullName() {
+        return randomFirstName() + " " + randomLastName();
+    }
+
+    private String randomAddress() {
+        int num = ThreadLocalRandom.current().nextInt(100, 9999);
+        String street = STREETS[ThreadLocalRandom.current().nextInt(STREETS.length)];
+        return num + " " + street;
     }
 }

@@ -248,4 +248,11 @@ industry:
         - from: escalated
           to: treatment
           timer: { minSeconds: 120, maxSeconds: 480 }
-      generator: { strategy: simpleSteadyState, intervalMs: 60000, maxActive: 16 }
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 60000
+        maxActive: 16
+        fields:
+          patient_name: { faker: fullName }
+          attending_physician: { faker: fullName }
+          room_number: { min: 100, max: 499 }

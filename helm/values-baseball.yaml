@@ -197,4 +197,10 @@ industry:
         - from: ready
           to: delivered
           timer: { minSeconds: 120, maxSeconds: 600 }
-      generator: { strategy: simpleSteadyState, intervalMs: 30000, maxActive: 20 }
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 30000
+        maxActive: 20
+        fields:
+          fan_name: { faker: fullName }
+          total: { min: 8, max: 85 }

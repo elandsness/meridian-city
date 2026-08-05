@@ -210,4 +210,11 @@ industry:
         - from: underwriting
           to: denied
           timer: { minSeconds: 120, maxSeconds: 600 }
-      generator: { strategy: simpleSteadyState, intervalMs: 90000, maxActive: 12 }
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 90000
+        maxActive: 12
+        fields:
+          applicant_name: { faker: fullName }
+          amount: { min: 5000, max: 500000 }
+          credit_score: { min: 580, max: 820 }

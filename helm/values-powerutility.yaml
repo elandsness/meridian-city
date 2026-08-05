@@ -205,4 +205,10 @@ industry:
         - from: escalated
           to: restoration_in_progress
           timer: { minSeconds: 300, maxSeconds: 900 }
-      generator: { strategy: simpleSteadyState, intervalMs: 120000, maxActive: 8 }
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 120000
+        maxActive: 8
+        fields:
+          address: { faker: streetAddress }
+          affected_customers: { min: 5, max: 850 }

@@ -993,7 +993,7 @@ customerEntityService:
   service:
     type: ClusterIP
     port: 8094
-  ownedTypes: "citizen,service_request,bill,cart"
+  ownedTypes: "citizen,service_request,bill,cart,loan_application,patient_admission,concession_order,outage_restoration"
   resources:
     requests:
       cpu: "150m"
