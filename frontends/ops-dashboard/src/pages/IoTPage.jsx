@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { getFleetStatus } from '../api/demo.js';
 import { getDevices } from '../api/devices.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useConfig } from '../config/ConfigContext.jsx';
 
 const DEVICE_STATUS = {
   ok: 'bg-green-500/20 text-green-400',
@@ -30,6 +31,12 @@ const TYPE_COLORS = {
 
 export default function IoTPage() {
   const { isAuthenticated, token } = useAuth();
+  const config = useConfig();
+  const term = config?.terminology ?? {};
+  const assetPlural = term.assetPlural ?? 'IoT Devices';
+  const cat1 = term.iotCategory1 ?? 'Vehicles';
+  const cat2 = term.iotCategory2 ?? 'Buildings';
+  const cat3 = term.iotCategory3 ?? 'Machines';
   const [notifications, setNotifications] = useState([]);
   const esRef = useRef(null);
 
@@ -93,28 +100,28 @@ export default function IoTPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">IoT Fleet</h1>
+      <h1 className="text-2xl font-bold text-white">{assetPlural}</h1>
 
       {/* Fleet summary */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-gray-800 rounded-lg p-4 text-center">
           <p className="text-3xl font-bold text-blue-400">{fleet.vehicles ?? '—'}</p>
-          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Vehicles</p>
+          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{cat1}</p>
         </div>
         <div className="bg-gray-800 rounded-lg p-4 text-center">
           <p className="text-3xl font-bold text-green-400">{fleet.buildings ?? '—'}</p>
-          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Buildings</p>
+          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{cat2}</p>
         </div>
         <div className="bg-gray-800 rounded-lg p-4 text-center">
           <p className="text-3xl font-bold text-orange-400">{fleet.machines ?? '—'}</p>
-          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Machines</p>
+          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{cat3}</p>
         </div>
       </div>
 
       {/* Device fleet */}
       <div className="bg-gray-900 rounded-xl border border-gray-800">
         <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Devices</h2>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">{assetPlural}</h2>
           {devicesData?.summary && (
             <span className="text-xs text-gray-500">
               {devicesData.summary.healthy} healthy · {devicesData.summary.warning} warning · {devicesData.summary.alert} alert

@@ -35,6 +35,9 @@ industry:
     workOrder: "Maintenance ticket"
     asset: "ATM"
     assetPlural: "ATMs"
+    iotCategory1: "ATMs"
+    iotCategory2: "Branches"
+    iotCategory3: "Cash Machines"
   screens:
     public:
       - home
