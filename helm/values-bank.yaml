@@ -218,3 +218,24 @@ industry:
           applicant_name: { faker: fullName }
           amount: { min: 5000, max: 500000 }
           credit_score: { min: 580, max: 820 }
+
+    # Override the base bill entity for the banking industry:
+    # monthly credit card statements with realistic payment amounts and 21-day due dates.
+    bill:
+      displayName: "Credit Card Statement"
+      displayNamePlural: "Credit Card Statements"
+      generator:
+        strategy: periodicHistoryBackfill
+        ownerEntityType: citizen
+        ownerField: citizen_id
+        periodField: period
+        periodFrequency: monthly
+        backfill:
+          minPeriods: 3
+          maxPeriods: 12
+          outstandingMin: 1
+          outstandingMax: 2
+        amount:
+          minCents: 2000
+          maxCents: 80000
+        dueDays: 21

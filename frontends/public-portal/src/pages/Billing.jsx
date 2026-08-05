@@ -17,6 +17,20 @@ function formatDate(ts) {
   }
 }
 
+// Renders a period key ("2026-Q3" or "2026-08") as a human-readable label.
+function formatPeriod(period) {
+  if (!period) return period
+  const quarterly = /^(\d{4})-Q([1-4])$/.exec(period)
+  if (quarterly) return `Q${quarterly[2]} ${quarterly[1]}`
+  const monthly = /^(\d{4})-(\d{2})$/.exec(period)
+  if (monthly) {
+    try {
+      return new Date(`${monthly[1]}-${monthly[2]}-01`).toLocaleDateString([], { month: 'long', year: 'numeric' })
+    } catch { /* fall through */ }
+  }
+  return period
+}
+
 function unwrapArray(d) {
   return Array.isArray(d) ? d : d?.items ?? []
 }
@@ -77,7 +91,7 @@ export default function Billing() {
             {outstanding.map((b) => (
               <div key={b.id} className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-900">{b.period} {cfg.terminology?.billNoun ?? 'tax bill'}</div>
+                  <div className="text-sm font-medium text-slate-900">{formatPeriod(b.period)} {cfg.terminology?.billNoun ?? 'tax bill'}</div>
                   <div className="text-xs text-slate-500">Due {formatDate(b.due_at)}</div>
                 </div>
                 <span className="text-sm font-medium text-slate-900">{formatCents(b.amount_cents)}</span>
@@ -111,7 +125,7 @@ export default function Billing() {
             <tbody>
               {paid.map((b) => (
                 <tr key={b.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2.5 text-slate-900">{b.period}</td>
+                  <td className="py-2.5 text-slate-900">{formatPeriod(b.period)}</td>
                   <td className="py-2.5 text-slate-700">{formatCents(b.amount_cents)}</td>
                   <td className="py-2.5 text-slate-500">{formatDate(b.paid_at)}</td>
                   <td className="py-2.5"><Badge tone="green">Paid</Badge></td>

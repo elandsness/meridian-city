@@ -148,6 +148,8 @@ public class EntityDefinition {
         private String ownerEntityType;
         private String ownerField;
         private String periodField;
+        /** "quarterly" (default) or "monthly" — controls period key format and backfill step size. */
+        private String periodFrequency;
         private BackfillDef backfill;
         private AmountRangeDef amount;
         private Integer dueDays;

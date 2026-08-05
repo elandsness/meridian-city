@@ -116,7 +116,8 @@ public class TransitionScheduler {
         }
         String periodField = gen.getPeriodField() != null ? gen.getPeriodField() : "period";
         int dueDays = gen.getDueDays() != null ? gen.getDueDays() : 45;
-        String currentPeriod = quarterPeriod(OffsetDateTime.now());
+        boolean monthly = "monthly".equalsIgnoreCase(gen.getPeriodFrequency());
+        String currentPeriod = monthly ? monthPeriod(OffsetDateTime.now()) : quarterPeriod(OffsetDateTime.now());
 
         List<EntityRecord> owners = repository.findByEntityType(gen.getOwnerEntityType());
         Map<String, List<EntityRecord>> existingByOwner = repository.findByEntityType(entityType).stream()
@@ -138,6 +139,7 @@ public class TransitionScheduler {
     private void backfillHistory(String entityType, EntityDefinition def, EntityDefinition.GeneratorDef gen, EntityRecord owner,
                                   String periodField, int dueDays, EntityDefinition.AmountRangeDef amount,
                                   EntityDefinition.BackfillDef backfill, String currentPeriod) {
+        boolean monthly = "monthly".equalsIgnoreCase(gen.getPeriodFrequency());
         int periods = backfill.getMinPeriods() + ThreadLocalRandom.current().nextInt(backfill.getMaxPeriods() - backfill.getMinPeriods() + 1);
         int outstandingCount = backfill.getOutstandingMin() + ThreadLocalRandom.current().nextInt(backfill.getOutstandingMax() - backfill.getOutstandingMin() + 1);
         String period = currentPeriod;
@@ -150,13 +152,14 @@ public class TransitionScheduler {
                 // event fires for it, only the outstanding bills (below) are "issued".
                 seedPaidHistory(entityType, def, gen, owner, periodField, dueDays, amount, period);
             }
-            period = quarterPeriodMinus(period, 1);
+            period = monthly ? monthPeriodMinus(period, 1) : quarterPeriodMinus(period, 1);
         }
     }
 
     private void issueOutstanding(String entityType, EntityDefinition def, EntityDefinition.GeneratorDef gen, EntityRecord owner,
                                    String periodField, int dueDays, EntityDefinition.AmountRangeDef amount, String period) {
-        OffsetDateTime issuedAt = quarterStart(period);
+        boolean monthly = "monthly".equalsIgnoreCase(gen.getPeriodFrequency());
+        OffsetDateTime issuedAt = monthly ? monthStart(period) : quarterStart(period);
         Map<String, Object> fields = baseFields(gen, owner, periodField, period, amount, issuedAt, dueDays);
         EntityRecord record = entityFactory.build(def, entityType, fields); // state = def.getInitial() (the "outstanding"-equivalent state)
         entityFactory.scheduleNext(record, def);
@@ -167,7 +170,8 @@ public class TransitionScheduler {
 
     private void seedPaidHistory(String entityType, EntityDefinition def, EntityDefinition.GeneratorDef gen, EntityRecord owner,
                                   String periodField, int dueDays, EntityDefinition.AmountRangeDef amount, String period) {
-        OffsetDateTime issuedAt = quarterStart(period);
+        boolean monthly = "monthly".equalsIgnoreCase(gen.getPeriodFrequency());
+        OffsetDateTime issuedAt = monthly ? monthStart(period) : quarterStart(period);
         OffsetDateTime dueAt = issuedAt.plusDays(dueDays);
         OffsetDateTime paidAt = dueAt.minusDays(5);
         Map<String, Object> fields = baseFields(gen, owner, periodField, period, amount, issuedAt, dueDays);
@@ -199,6 +203,25 @@ public class TransitionScheduler {
     static String quarterPeriod(OffsetDateTime t) {
         int quarter = (t.getMonthValue() - 1) / 3 + 1;
         return t.getYear() + "-Q" + quarter;
+    }
+
+    static String monthPeriod(OffsetDateTime t) {
+        return String.format("%d-%02d", t.getYear(), t.getMonthValue());
+    }
+
+    static String monthPeriodMinus(String period, int monthsBack) {
+        String[] parts = period.split("-");
+        int year = Integer.parseInt(parts[0]);
+        int month = Integer.parseInt(parts[1]);
+        int index = (year * 12 + (month - 1)) - monthsBack;
+        return String.format("%d-%02d", index / 12, index % 12 + 1);
+    }
+
+    static OffsetDateTime monthStart(String period) {
+        String[] parts = period.split("-");
+        int year = Integer.parseInt(parts[0]);
+        int month = Integer.parseInt(parts[1]);
+        return YearMonth.of(year, month).atDay(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
     }
 
     static String quarterPeriodMinus(String period, int quartersBack) {
