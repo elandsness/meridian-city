@@ -65,6 +65,7 @@ industry:
     workOrder: "Work order"
     asset: "Ground equipment"
     assetPlural: "Ground equipment"
+    requestCategories: [lost-item, accessibility, flight-query, lounge-access, baggage, other]
   screens:
     # store + billing intentionally omitted -> disabled for the airport
     public:

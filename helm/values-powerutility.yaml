@@ -40,6 +40,7 @@ industry:
     workOrder: "Field Dispatch"
     asset: "Grid Asset"
     assetPlural: "Grid Assets"
+    requestCategories: [outage-report, billing-issue, new-connection, meter-issue, hazard, other]
     iotIdPrefix1: "fld"
     iotIdPrefix2: "sub"
     iotIdPrefix3: "mtr"

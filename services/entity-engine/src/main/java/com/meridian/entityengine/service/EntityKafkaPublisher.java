@@ -1,5 +1,6 @@
 package com.meridian.entityengine.service;
 
+import com.meridian.entityengine.config.EntityConfigLoader;
 import com.meridian.entityengine.domain.EntityRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class EntityKafkaPublisher {
 
     private final KafkaTemplate<String, Map<String, Object>> kafkaTemplate;
+    private final EntityConfigLoader configLoader;
 
     /** Called after every state transition (applyTransition) and after issueOutstanding. */
     public void publish(EntityRecord record) {
@@ -48,12 +50,16 @@ public class EntityKafkaPublisher {
         };
         if (eventType == null) return;
 
+        var def = configLoader.getAllDefinitions().get("bill");
+        String displayName = def != null && def.getDisplayName() != null ? def.getDisplayName() : "Tax Bill";
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("event_type", eventType);
         payload.put("citizen_id", record.getField("citizen_id"));
         payload.put("period", record.getField("period"));
         payload.put("amount_cents", record.getField("amount_cents"));
         payload.put("bill_id", record.getId());
+        payload.put("display_name", displayName);
         kafkaTemplate.send("billing.events", record.getId(), payload);
     }
 

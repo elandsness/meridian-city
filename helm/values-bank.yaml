@@ -41,6 +41,7 @@ industry:
     billingTitle: "Pay Bills & Cards"
     billingSubtitle: "Your Meridian Bank credit card and loan payments."
     billNoun: "payment"
+    requestCategories: [account-issue, card-dispute, loan-inquiry, fraud-report, password-reset, other]
     iotIdPrefix1: "atm"
     iotIdPrefix2: "br"
     iotIdPrefix3: "cm"

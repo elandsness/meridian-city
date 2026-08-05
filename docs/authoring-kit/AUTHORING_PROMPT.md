@@ -286,6 +286,19 @@ Map generic nouns to industry-specific ones:
 `customer`, `customerPlural`, `request`, `requestPlural`, `incident`, `incidentPlural`,
 `workOrder`, `asset`, `assetPlural`.
 
+**`requestCategories`** — the dropdown options shown on the "Submit a request" form.
+Always provide an industry-specific list; the default is city infrastructure categories
+which make no sense for non-city contexts. Each entry is a short lowercase slug (use
+hyphens for multi-word values). Always end with `other`. Example for a bank:
+```yaml
+requestCategories: [account-issue, card-dispute, loan-inquiry, fraud-report, password-reset, other]
+```
+
+**Billing terminology** (required if the `billing` screen is enabled):
+`billingTitle` (nav label), `billingSubtitle` (page subtitle), `billNoun` (singular
+noun for a bill/statement/invoice used in notification messages — e.g. `"payment"`,
+`"credit card statement"`, `"energy bill"`).
+
 ### 4d. Theme
 `theme.colors`: `brand`, `brandDeep`, `brandSoft`, `brandTint`, `accent`, `accentSoft`,
 `accentInk` — all hex (`#RGB` or `#RRGGBB`). All color tokens should form a coherent
@@ -413,6 +426,7 @@ industry:
     customerPlural: "Passengers"
     asset: "Ground equipment"
     assetPlural: "Ground equipment"
+    requestCategories: [lost-item, accessibility, flight-query, lounge-access, baggage, other]
   screens:
     public:
       - home
@@ -545,6 +559,7 @@ industry:
     incidentPlural: "Clinical incidents"
     asset: "Medical equipment"
     assetPlural: "Medical equipment"
+    requestCategories: [care-concern, billing-query, appointment, dietary, environment, other]
   screens:
     public:
       - home

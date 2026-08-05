@@ -8,7 +8,7 @@ import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
 import { inputClass, labelClass } from '../ui/form.js'
 
-const CATEGORIES = ['infrastructure', 'utilities', 'safety', 'environment', 'transport', 'other']
+const DEFAULT_CATEGORIES = ['infrastructure', 'utilities', 'safety', 'environment', 'transport', 'other']
 const PRIORITIES = ['low', 'normal', 'high', 'urgent']
 
 export default function NewRequest() {
@@ -16,9 +16,10 @@ export default function NewRequest() {
   const navigate = useNavigate()
   const cfg = useConfig()
   const requestSingular = cfg?.terminology?.request ?? 'request'
+  const categories = cfg?.terminology?.requestCategories ?? DEFAULT_CATEGORIES
 
   const [form, setForm] = useState({
-    category: 'infrastructure',
+    category: categories[0] ?? 'other',
     title: '',
     description: '',
     priority: 'normal',
@@ -82,7 +83,7 @@ export default function NewRequest() {
           <div>
             <label className={labelClass}>Category</label>
             <select name="category" value={form.category} onChange={handleChange} required className={inputClass}>
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
               ))}
             </select>

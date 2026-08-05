@@ -54,6 +54,7 @@ industry:
     workOrder: "Facilities work order"
     asset: "Medical equipment"
     assetPlural: "Medical equipment"
+    requestCategories: [care-concern, billing-query, appointment, dietary, environment, other]
     iotIdPrefix1: "trn"
     iotIdPrefix2: "rm"
     iotIdPrefix3: "eq"

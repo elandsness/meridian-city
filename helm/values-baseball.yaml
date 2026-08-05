@@ -41,6 +41,7 @@ industry:
     workOrder: "Facilities work order"
     asset: "Stadium equipment"
     assetPlural: "Stadium equipment"
+    requestCategories: [seating-issue, food-beverage, lost-item, accessibility, venue-safety, other]
     iotIdPrefix1: "veh"
     iotIdPrefix2: "sys"
     iotIdPrefix3: "scr"

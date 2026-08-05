@@ -106,21 +106,22 @@ async function mapBillingToInbox (payload) {
   const eventType = payload.eventType || payload.event_type
   const citizenId = payload.citizenId || payload.citizen_id
   const period = payload.period || ''
+  const billNoun = (payload.display_name || 'Tax Bill').toLowerCase()
   if (!citizenId) return
   if (eventType === 'tax.bill_issued') {
     await insert({
       citizenId,
       type: 'tax_due',
-      title: `${period} tax bill issued`,
-      body: `A new ${period} tax bill is now due. View it under Pay bills.`,
+      title: `${period} ${billNoun} issued`,
+      body: `A new ${period} ${billNoun} is now due. View it under Pay bills.`,
       metadata: payload,
     })
   } else if (eventType === 'tax.payment_completed') {
     await insert({
       citizenId,
       type: 'tax_paid',
-      title: 'Tax payment received',
-      body: `Thank you — your ${period} tax bill is paid.`,
+      title: 'Payment received',
+      body: `Thank you — your ${period} ${billNoun} is paid.`,
       metadata: payload,
     })
   }

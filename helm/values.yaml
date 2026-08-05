@@ -77,6 +77,7 @@ industry:
     workOrder: "Work order"
     asset: "Asset"
     assetPlural: "Assets"
+    requestCategories: [infrastructure, utilities, safety, environment, transport, other]
   screens:
     public: ["home", "service-requests", "store", "billing", "messages"]
     ops: ["overview", "iot", "incidents", "requests", "analytics", "demo-control"]
