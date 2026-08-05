@@ -210,7 +210,24 @@
               "background": { "type": "object", "description": "entity-map only: { kind: 'image'|'preset'|'shapes'|'none', ... }." },
               "legend": { "type": "array", "description": "entity-map only." },
               "labelField": { "type": "string", "description": "entity-map only: which field to show next to each sprite." },
-              "steps": { "type": "array", "items": { "type": "string" }, "description": "entity-journey only: ordered list of state keys to show as journey steps. Omit to use all non-error states in declaration order." },
+              "steps": {
+                "type": "array",
+                "description": "entity-journey only: ordered list of steps to show. Each item is either a state key string or an object with `state` (key) and `label` (display text) — use object form to override the state's default label.",
+                "items": {
+                  "oneOf": [
+                    { "type": "string" },
+                    {
+                      "type": "object",
+                      "required": ["state"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": { "type": "string" },
+                        "label": { "type": "string" }
+                      }
+                    }
+                  ]
+                }
+              },
               "ownerField": { "type": "string", "description": "entity-journey only (portal): entity field whose value matches the logged-in user's id. When set, shows the personal journey view for authenticated users." },
               "description": { "type": "string", "description": "entity-journey: subtitle shown below the page heading." }
             }

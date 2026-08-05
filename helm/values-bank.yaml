@@ -41,16 +41,57 @@ industry:
       - { id: billing, label: "Pay Bills & Cards" }
       - { id: service-requests, label: "Help & Support" }
       - messages
+      - id: loan-tracker
+        template: entity-journey
+        entityType: loan_application
+        label: "My Loan Application"
+        icon: "🏦"
+        ownerField: applicant_name
+        steps:
+          - { state: submitted, label: "Application Received" }
+          - { state: credit_check, label: "Credit Check" }
+          - { state: underwriting, label: "Underwriting Review" }
+          - { state: approved, label: "Approved ✓" }
+        description: "Track your loan application through each review stage in real time."
     ops:
       - overview
+      - id: loan-pipeline
+        template: entity-list
+        entityType: loan_application
+        label: "Loan Pipeline"
+        icon: "📋"
       - { id: requests, label: "Support Queue" }
       - { id: incidents, label: "IT Incidents" }
       - { id: iot, label: "ATM Network" }
       - { id: analytics, label: "Transaction Analytics" }
       - demo-control
   home:
-    public: ["city-home", "quick-actions"]
-    ops: ["ops-overview"]
+    public:
+      - id: market-ticker
+        template: ticker
+        height: slim
+        label: "📈 RATES"
+        items:
+          - "30-yr Fixed Mortgage: 6.85%  ↓0.05%"
+          - "15-yr Fixed Mortgage: 6.12%  ↓0.03%"
+          - "5/1 ARM: 5.94%  ▲0.08%"
+          - "6-Month CD: 4.85% APY  ·  1-Yr CD: 5.10% APY"
+          - "Prime Rate: 7.50% — Fed holds steady"
+          - "High-Yield Savings: 4.60% APY — no minimum balance"
+      - welcome-hero
+      - quick-actions
+      - id: branch-notices
+        template: announcements
+        title: "Branch Updates"
+        items:
+          - "New: Set up automatic bill pay in 2 minutes directly in the Meridian Bank app."
+          - "Downtown location now open Saturdays 9 AM – 2 PM starting this weekend."
+          - "Reminder: Meridian will never ask for your full account number by text or phone."
+    ops:
+      - id: loan-kpi
+        template: entity-kpi-row
+        entityTypes: [loan_application]
+      - ops-overview
   data:
     zones: ["northeast-region", "midwest-region", "south-region", "west-coast", "digital-channels"]
     requestTemplates:
@@ -65,6 +106,8 @@ industry:
       - "Where is the nearest ATM?"
       - "Why is my account locked?"
       - "How do I dispute a credit card charge?"
+      - "What is my current mortgage rate?"
+      - "How do I apply for a personal loan?"
   routing:
     card-services: "Card Operations"
     digital-banking: "Digital Channel Support"
@@ -83,9 +126,66 @@ industry:
       account-creation: "Digital Account Opening"
       iot-incident: "ATM Network Outage"
       tax-payment: "Credit Card Bill Payment"
+      loan_application: "Loan Application Journey"
     flows:
       - service-request
       - account-creation
       - iot-incident
       - tax-payment
-
+  entities:
+    # -----------------------------------------------------------------------
+    # LOAN APPLICATION — customer-facing loan lifecycle
+    # Tracks a loan from submission through credit check, underwriting,
+    # and final approval or denial. Customers can track their own application
+    # via the loan-tracker entity-journey screen (ownerField: applicant_name).
+    # -----------------------------------------------------------------------
+    loan_application:
+      displayName: "Loan Application"
+      displayNamePlural: "Loan Applications"
+      idPrefix: "loan"
+      fields:
+        applicant_name: { type: string }
+        loan_type:
+          type: enum
+          values: [mortgage, auto, personal, business]
+          default: personal
+        amount: { type: number }
+        credit_score: { type: number }
+      initial: submitted
+      states:
+        submitted: { label: "Submitted", tone: blue }
+        credit_check: { label: "Credit Check", tone: amber }
+        underwriting: { label: "Underwriting", tone: amber }
+        on_hold: { label: "On Hold", tone: slate }
+        approved: { label: "Approved", tone: green, terminal: true, isKpi: true }
+        denied: { label: "Denied", tone: red, terminal: true, isError: true }
+      transitions:
+        - from: submitted
+          to: credit_check
+          timer: { minSeconds: 30, maxSeconds: 120 }
+        - from: credit_check
+          to: on_hold
+          when: { faultGate: "loan-credit-check-flag", probability: 0.08 }
+          timer: { minSeconds: 60, maxSeconds: 240 }
+        - from: credit_check
+          to: denied
+          when: { probability: 0.06 }
+          timer: { minSeconds: 60, maxSeconds: 240 }
+        - from: credit_check
+          to: underwriting
+          timer: { minSeconds: 60, maxSeconds: 240 }
+        - from: on_hold
+          to: underwriting
+          timer: { minSeconds: 300, maxSeconds: 900 }
+        - from: underwriting
+          to: denied
+          when: { faultGate: "loan-underwriting-denied", probability: 0.12 }
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: underwriting
+          to: approved
+          when: { probability: 0.85 }
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: underwriting
+          to: denied
+          timer: { minSeconds: 120, maxSeconds: 600 }
+      generator: { strategy: simpleSteadyState, intervalMs: 90000, maxActive: 12 }

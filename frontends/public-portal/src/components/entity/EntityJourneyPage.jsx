@@ -32,25 +32,29 @@ export default function EntityJourneyPage({ entityType, label, ownerField, steps
   return <LiveBoard entityType={entityType} label={label} description={description} cfg={cfg} def={def} stepsProp={stepsProp} isAuthenticated={isAuthenticated} />
 }
 
+// Normalize steps to [{state, label}] regardless of whether the caller passed
+// strings ("state_key") or objects ({state, label}) — schema allows both forms.
 function resolveSteps(def, stepsProp) {
   const order = stepsProp ?? getStateOrder(def)
-  return order.filter((s) => !def?.states?.[s]?.isError)
+  return order
+    .map((s) => (typeof s === 'string' ? { state: s } : s))
+    .filter(({ state }) => !def?.states?.[state]?.isError)
 }
 
 function JourneyStepper({ entity, def, stepsProp }) {
   const steps = resolveSteps(def, stepsProp)
-  const currentIdx = steps.indexOf(entity?.state)
+  const currentIdx = steps.findIndex(({ state }) => state === entity?.state)
   return (
     <div className="overflow-x-auto">
       <div className="flex items-start min-w-max">
-        {steps.map((s, i) => {
-          const stateMeta = def?.states?.[s] ?? {}
-          const idx = steps.indexOf(s)
-          const done = currentIdx >= idx
-          const current = entity?.state === s
+        {steps.map(({ state, label: stepLabel }, i) => {
+          const stateMeta = def?.states?.[state] ?? {}
+          const done = currentIdx >= i
+          const current = entity?.state === state
           const isLast = i === steps.length - 1
+          const displayLabel = stepLabel ?? stateMeta.label ?? state.replace(/_/g, ' ')
           return (
-            <div key={s} className="flex items-center">
+            <div key={state} className="flex items-center">
               <div className="flex flex-col items-center w-20">
                 <div
                   className={`w-4 h-4 rounded-full border-2 transition-colors ${
@@ -60,11 +64,11 @@ function JourneyStepper({ entity, def, stepsProp }) {
                   } ${current ? 'ring-4 ring-[rgb(var(--brand))]/20 scale-125' : ''}`}
                 />
                 <span className={`mt-1.5 text-[10px] leading-tight text-center px-1 ${done ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                  {stateMeta.label ?? s.replace(/_/g, ' ')}
+                  {displayLabel}
                 </span>
               </div>
               {!isLast && (
-                <div className={`h-0.5 w-6 mb-5 ${currentIdx > idx ? 'bg-[rgb(var(--brand))]' : 'bg-slate-200'}`} />
+                <div className={`h-0.5 w-6 mb-5 ${currentIdx > i ? 'bg-[rgb(var(--brand))]' : 'bg-slate-200'}`} />
               )}
             </div>
           )

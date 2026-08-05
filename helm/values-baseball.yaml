@@ -10,9 +10,9 @@ industry:
       persona: "the Marauders fan experience assistant"
       supportPhone: "1-800-MARAUDERS"
       systemPrompt: |-
-        You are Slugger, the virtual assistant for the Meridian Marauders baseball team. 
-        Help fans buy or renew season tickets, find stadium parking, check game schedules, 
-        and report issues at the ballpark (like spills or broken seats). Be energetic, 
+        You are Slugger, the virtual assistant for the Meridian Marauders baseball team.
+        Help fans buy or renew season tickets, find stadium parking, check game schedules,
+        and report issues at the ballpark (like spills or broken seats). Be energetic,
         fan-friendly, and always show team spirit!
   theme:
     colors:
@@ -41,16 +41,58 @@ industry:
       - { id: billing, label: "Season Tickets" }
       - { id: service-requests, label: "Guest Services" }
       - messages
+      - id: my-order
+        template: entity-journey
+        entityType: concession_order
+        label: "Track My Order"
+        icon: "🌭"
+        ownerField: fan_name
+        steps:
+          - { state: order_placed, label: "Order Placed" }
+          - { state: sent_to_stand, label: "Sent to Stand" }
+          - { state: preparing, label: "Preparing" }
+          - { state: ready, label: "Ready for Pickup" }
+          - { state: delivered, label: "Delivered ⚾" }
+        description: "Track your mobile concession order from the stand to your seat."
     ops:
       - overview
+      - id: order-queue
+        template: entity-list
+        entityType: concession_order
+        label: "Order Queue"
+        icon: "🌭"
       - { id: requests, label: "Dispatch Queue" }
       - { id: incidents, label: "Stadium Incidents" }
       - { id: iot, label: "Turnstiles & POS" }
       - { id: analytics, label: "Attendance & Sales" }
       - demo-control
   home:
-    public: ["city-home", "quick-actions"]
-    ops: ["ops-overview"]
+    public:
+      - id: score-ticker
+        template: ticker
+        height: slim
+        label: "⚾ MARAUDERS"
+        items:
+          - "FINAL: Marauders 7 · Riverside Raptors 3 — HR: Juárez (2), McNally (18)"
+          - "UPCOMING: Marauders vs. Northside Narwhals — Sat @ 7:05 PM"
+          - "UPCOMING: Marauders vs. East Bay Bombers — Sun @ 1:35 PM"
+          - "SERIES: Marauders lead Eastside 2-1 — Game 4 Tue @ 7:05 PM"
+          - "STANDINGS: Marauders 14-8 · 1st Place, Metro Division · 3 GB of Wild Card"
+          - "TRANSACTIONS: Marauders acquire CF Dmitri Volkov from Westside on waivers"
+      - welcome-hero
+      - quick-actions
+      - id: gameday-notices
+        template: announcements
+        title: "Gameday Info"
+        items:
+          - "Gates open 90 minutes before first pitch. Gate 3 (Left Field) recommended for sections 201–240."
+          - "Mobile ordering is live! Order food and drinks from your seat via the Marauders app."
+          - "Playoff tickets go on sale to season-ticket holders Friday at 10 AM — check your email."
+    ops:
+      - id: concession-kpi
+        template: entity-kpi-row
+        entityTypes: [concession_order]
+      - ops-overview
   data:
     zones: ["home-plate-gate", "left-field-bleachers", "upper-deck", "concourse-a", "clubhouse", "parking-lot"]
     requestTemplates:
@@ -65,6 +107,7 @@ industry:
       - "Where is the nearest restroom to section 112?"
       - "I spilled my drink, can someone clean it up?"
       - "Where can I pick up my will-call tickets?"
+      - "How do I track my concession order?"
   routing:
     box-office: "Box Office & Ticketing"
     facilities: "Stadium Maintenance"
@@ -84,9 +127,52 @@ industry:
       account-creation: "Fan Club Registration"
       iot-incident: "Turnstile Outage"
       tax-payment: "Season Ticket Payment"
+      concession_order: "Mobile Concession Order"
     flows:
       - service-request
       - account-creation
       - iot-incident
       - tax-payment
-
+  entities:
+    # -----------------------------------------------------------------------
+    # CONCESSION ORDER — fan mobile food order lifecycle
+    # Fans order from their seat via the app; they can track their order
+    # through the my-order entity-journey screen (ownerField: fan_name).
+    # Stand operators see the live queue in the order-queue ops screen.
+    # -----------------------------------------------------------------------
+    concession_order:
+      displayName: "Concession Order"
+      displayNamePlural: "Concession Orders"
+      idPrefix: "ord"
+      fields:
+        fan_name: { type: string }
+        stand_id: { type: string }
+        section: { type: string }
+        items: { type: string }
+        total: { type: number }
+      initial: order_placed
+      states:
+        order_placed: { label: "Order Placed", tone: blue }
+        sent_to_stand: { label: "Sent to Stand", tone: amber }
+        preparing: { label: "Preparing", tone: amber }
+        ready: { label: "Ready for Pickup", tone: green }
+        delivered: { label: "Delivered", tone: green, terminal: true, isKpi: true }
+        cancelled: { label: "Cancelled", tone: red, terminal: true, isError: true }
+      transitions:
+        - from: order_placed
+          to: sent_to_stand
+          timer: { minSeconds: 15, maxSeconds: 45 }
+        - from: sent_to_stand
+          to: cancelled
+          when: { faultGate: "concession-item-unavailable", probability: 0.05 }
+          timer: { minSeconds: 30, maxSeconds: 90 }
+        - from: sent_to_stand
+          to: preparing
+          timer: { minSeconds: 30, maxSeconds: 90 }
+        - from: preparing
+          to: ready
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: ready
+          to: delivered
+          timer: { minSeconds: 120, maxSeconds: 600 }
+      generator: { strategy: simpleSteadyState, intervalMs: 30000, maxActive: 20 }
