@@ -10,9 +10,33 @@ export function getStateMeta(def, state) {
   return def?.states?.[state] ?? {}
 }
 
-// Ordered list of state ids as declared in config -- drives the timeline/stepper.
+// Ordered list of state ids -- drives the timeline/stepper.
+// JSON object keys are sorted alphabetically by Go/Helm serialization, so
+// Object.keys(states) gives wrong order. The transitions array is order-stable
+// (JSON arrays preserve insertion order), so BFS from `initial` via transitions
+// reconstructs the declaration order the author intended.
 export function getStateOrder(def) {
-  return def?.states ? Object.keys(def.states) : []
+  if (!def?.states) return []
+  const initial = def.initial
+  if (!initial) return Object.keys(def.states)
+  const visited = new Set()
+  const order = []
+  const queue = [initial]
+  while (queue.length > 0) {
+    const state = queue.shift()
+    if (visited.has(state)) continue
+    visited.add(state)
+    order.push(state)
+    for (const t of def.transitions ?? []) {
+      if (t.from === state && !visited.has(t.to) && def.states[t.to]) {
+        queue.push(t.to)
+      }
+    }
+  }
+  for (const s of Object.keys(def.states)) {
+    if (!visited.has(s)) order.push(s)
+  }
+  return order
 }
 
 const TONE_CLASSES = {
