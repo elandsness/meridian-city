@@ -223,6 +223,21 @@ industry:
       - flight_departure
       - flight_arrival
       - passenger
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - flight_departure
+      - flight_arrival
+      - passenger
+    flowLabels:
+      service-request: "Maintenance Request Lifecycle"
+      account-creation: "Passenger Registration"
+      iot-incident: "Ground Equipment Incident Resolution"
+      flight_departure: "Aircraft Turnaround"
+      flight_arrival: "Arrival & Gate Assignment"
+      passenger: "Passenger Journey"
 
   # =========================================================================
   # Entity engine config — airport aviation entities.

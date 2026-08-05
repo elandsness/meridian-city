@@ -160,6 +160,19 @@ industry:
       - account-creation
       - iot-incident
       - tax-payment
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+      - patient_admission
+    flowLabels:
+      service-request: "Care Request Resolution"
+      account-creation: "Patient Registration"
+      iot-incident: "Medical Equipment Fault"
+      tax-payment: "Patient Bill Payment"
+      patient_admission: "Patient Care Journey"
   entities:
     # -----------------------------------------------------------------------
     # PATIENT ADMISSION — end-to-end inpatient care journey

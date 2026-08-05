@@ -142,6 +142,19 @@ industry:
       - account-creation
       - iot-incident
       - tax-payment
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+      - concession_order
+    flowLabels:
+      service-request: "Guest Issue Resolution"
+      account-creation: "Fan Club Registration"
+      iot-incident: "Turnstile Outage"
+      tax-payment: "Season Ticket Payment"
+      concession_order: "Mobile Concession Order"
   entities:
     # -----------------------------------------------------------------------
     # CONCESSION ORDER — fan mobile food order lifecycle

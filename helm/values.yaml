@@ -107,6 +107,21 @@ industry:
   # Per-industry Dynatrace: {serviceNames: {deployment: displayName}, flowLabels: {flowKey: name}}.
   # Applied by the provisioner Job, scoped to this instance's namespace. Empty = City defaults.
   dynatrace: {}
+  # Browser-visible analytics config: which Business Flow funnels to show and their labels.
+  # NOT omitted from config.json (unlike `dynatrace` which is backend-only provisioner data).
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - purchase
+      - tax-payment
+    flowLabels:
+      service-request: "Service Request"
+      account-creation: "Account Creation"
+      iot-incident: "IoT Incident"
+      purchase: "Purchase"
+      tax-payment: "Tax Payment"
   # Config-driven entity/lifecycle definitions for the generic entity engine.
   # customer-entity-service owns: citizen, service_request, bill, cart
   # ops-entity-service owns: incident, work_order
@@ -219,6 +234,23 @@ industry:
           isKpi: true
         abandoned: { label: "Abandoned", tone: slate, terminal: true }
       transitions:
+        # Manual advancement by ops-dashboard operators — these are user-triggerable
+        # only; the scheduler never picks them up (it skips userTriggerable transitions).
+        # Effects are intentionally omitted here so the auto-timer path (below) is the
+        # one that runs routing + work_order creation; ops advancement just moves state.
+        - from: submitted
+          to: validated
+          userTriggerable: true
+          label: "Start"
+        - from: validated
+          to: in_progress
+          userTriggerable: true
+          label: "Start"
+        - from: in_progress
+          to: resolved
+          userTriggerable: true
+          label: "Resolve"
+        # Auto-advancement via scheduler
         - from: submitted
           to: rejected
           when: { faultGate: "service-request-rejected", probability: 0.1 }
@@ -436,6 +468,12 @@ industry:
           isKpi: true
           externallyTriggered: true  # reached via work_order completion callService, not a local transition
       transitions:
+        # Manual resolution by ops-dashboard operators
+        - from: open
+          to: resolved
+          userTriggerable: true
+          label: "Resolve"
+        # Auto-detection → open
         - from: detecting
           to: open
           timer: { minSeconds: 5, maxSeconds: 30 }

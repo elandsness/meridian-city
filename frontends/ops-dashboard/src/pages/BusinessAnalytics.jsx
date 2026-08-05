@@ -50,8 +50,8 @@ function toTitleCase(str) {
 
 export default function BusinessAnalytics() {
   const config = useConfig();
-  const flowLabels = config?.dynatrace?.flowLabels ?? {};
-  const flows = config?.dynatrace?.flows ?? ['service-request', 'account-creation', 'iot-incident', 'purchase', 'tax-payment'];
+  const flowLabels = config?.analytics?.flowLabels ?? {};
+  const flows = config?.analytics?.flows ?? ['service-request', 'account-creation', 'iot-incident', 'purchase', 'tax-payment'];
 
   return (
     <div className="space-y-6">

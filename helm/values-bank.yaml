@@ -141,6 +141,19 @@ industry:
       - account-creation
       - iot-incident
       - tax-payment
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+      - loan_application
+    flowLabels:
+      service-request: "Customer Support Resolution"
+      account-creation: "Digital Account Opening"
+      iot-incident: "ATM Network Outage"
+      tax-payment: "Credit Card Bill Payment"
+      loan_application: "Loan Application Journey"
   entities:
     # -----------------------------------------------------------------------
     # LOAN APPLICATION — customer-facing loan lifecycle

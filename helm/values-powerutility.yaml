@@ -139,6 +139,19 @@ industry:
       - account-creation
       - iot-incident
       - tax-payment
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+      - outage_restoration
+    flowLabels:
+      service-request: "Outage Report Lifecycle"
+      account-creation: "New Customer Registration"
+      iot-incident: "Smart Asset Fault Resolution"
+      tax-payment: "Utility Bill Payment"
+      outage_restoration: "Power Restoration Journey"
   entities:
     # -----------------------------------------------------------------------
     # OUTAGE RESTORATION — customer-facing power restoration lifecycle
