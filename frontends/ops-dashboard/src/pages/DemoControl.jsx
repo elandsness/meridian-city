@@ -374,6 +374,18 @@ function FleetCard() {
   const cat1 = term.iotCategory1 ?? 'Vehicles';
   const cat2 = term.iotCategory2 ?? 'Buildings';
   const cat3 = term.iotCategory3 ?? 'Machines';
+  const categoryLabel = { vehicle: cat1, building: cat2, machine: cat3 };
+  const pfx1 = term.iotIdPrefix1 ?? 'veh';
+  const pfx2 = term.iotIdPrefix2 ?? 'bldg';
+  const pfx3 = term.iotIdPrefix3 ?? 'mach';
+
+  function displayDeviceId(deviceId) {
+    if (!deviceId) return deviceId;
+    if (deviceId.startsWith('veh-')) return pfx1 + deviceId.slice(3);
+    if (deviceId.startsWith('bldg-')) return pfx2 + deviceId.slice(4);
+    if (deviceId.startsWith('mach-')) return pfx3 + deviceId.slice(4);
+    return deviceId;
+  }
   const { data: fleetStatus, isLoading } = useQuery({
     queryKey: ['fleet-status'],
     queryFn: getFleetStatus,
@@ -544,10 +556,10 @@ function FleetCard() {
                 const inCat = devices.filter((d) => d.category === cat);
                 if (inCat.length === 0) return null;
                 return (
-                  <optgroup key={cat} label={`${cat[0].toUpperCase()}${cat.slice(1)}s`}>
+                  <optgroup key={cat} label={categoryLabel[cat] ?? cat}>
                     {inCat.map((d) => (
                       <option key={d.device_id} value={d.device_id}>
-                        {d.device_id}
+                        {displayDeviceId(d.device_id)}
                         {d.status && d.status !== 'ok' ? ` — ${d.status}` : ''}
                       </option>
                     ))}
