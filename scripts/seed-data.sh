@@ -50,6 +50,7 @@ error()   { echo -e "${RED}[ERR]${NC}   $*" >&2; }
 
 RESET=false
 CHECK_ONLY=false
+CITY_DEPLOY=false   # resolved after DB pod is found; default safe for check_counts
 for arg in "$@"; do
   case $arg in
     --reset)  RESET=true ;;
@@ -89,9 +90,10 @@ run_sql() {
 }
 
 check_counts() {
-  info "Verifying seed data counts..."
-  # -i: forward stdin so psql receives the heredoc SQL
-  kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
+  if $CITY_DEPLOY; then
+    info "Verifying seed data counts..."
+    # -i: forward stdin so psql receives the heredoc SQL
+    kubectl exec -i -n "$NAMESPACE" "$DB_POD" -- psql -U "$PG_USER" -d "$PG_DB" -q <<'EOF'
 SELECT 'zones'            AS "table", COUNT(*)::int AS rows FROM city.zones
 UNION ALL
 SELECT 'buildings',        COUNT(*)::int FROM city.assets WHERE asset_type = 'building'
@@ -106,6 +108,7 @@ SELECT 'service_requests', COUNT(*)::int FROM requests.service_requests
 UNION ALL
 SELECT 'incidents',        COUNT(*)::int FROM incidents.incidents;
 EOF
+  fi
 }
 
 if $CHECK_ONLY; then
@@ -132,6 +135,49 @@ EOF
   success "Data reset."
 fi
 
+# ---------------------------------------------------------------------------
+# Detect whether this is a city-schema deploy (city.zones exists).
+# Non-city industries (bank, airport, etc.) use the entity engine exclusively
+# and don't create the city/requests/incidents schemas at all — skip all
+# city-specific seeding silently for those deploys.
+# ---------------------------------------------------------------------------
+CITY_SCHEMA=$(kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
+  psql -U "$PG_USER" -d "$PG_DB" -tAq \
+  -c "SELECT COUNT(*)::int FROM information_schema.schemata WHERE schema_name = 'city';" 2>/dev/null || echo "0")
+CITY_DEPLOY=false
+[[ "${CITY_SCHEMA:-0}" -gt 0 ]] && CITY_DEPLOY=true
+if $CITY_DEPLOY; then
+  info "City schema detected — seeding city-specific data."
+else
+  info "No city schema — skipping city-specific seed data (entity engine populates data at runtime)."
+fi
+
+# ---------------------------------------------------------------------------
+# Entity-engine seed data: test citizen accounts with known passwords.
+# These are present for every entity-engine deploy (city AND non-city) so
+# the demo login works out of the box. Password hash is BCrypt rounds=10
+# for "test123" — generated offline, not computed at seed time.
+# Only seeds if the entities schema exists (i.e. entity-engine is deployed).
+# ---------------------------------------------------------------------------
+ENTITY_SCHEMA=$(kubectl exec -n "$NAMESPACE" "$DB_POD" -- \
+  psql -U "$PG_USER" -d "$PG_DB" -tAq \
+  -c "SELECT COUNT(*)::int FROM information_schema.schemata WHERE schema_name = 'entities';" 2>/dev/null || echo "0")
+if [[ "${ENTITY_SCHEMA:-0}" -gt 0 ]]; then
+  info "Seeding test citizen accounts (entity engine)..."
+  run_sql "
+INSERT INTO entities.entity (id, entity_type, state, data, links, created_at, updated_at, state_entered_at)
+VALUES
+  ('cit-test01', 'citizen', 'active',
+   '{\"name\":\"Jane Doe\",\"email\":\"janedoe_test@example.com\",\"password\":\"\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy\"}',
+   '{}', NOW(), NOW(), NOW()),
+  ('cit-test02', 'citizen', 'active',
+   '{\"name\":\"John Smith\",\"email\":\"johnsmith_test@example.com\",\"password\":\"\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy\"}',
+   '{}', NOW(), NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;" && success "Test citizen accounts seeded (email: janedoe_test@example.com / test123)." \
+  || warn "Test citizen seed skipped (may already exist)."
+fi
+
+if $CITY_DEPLOY; then
 # ---------------------------------------------------------------------------
 # Schema bridge: ensure any tables that Flyway might not yet have created
 # exist before we try to insert data.  The IF NOT EXISTS makes this idempotent
@@ -301,6 +347,8 @@ success "Request lifecycle events seeded."
 # so the incident UIs (public-portal Home + map, ops Incidents page) populate
 # organically. Hardcoded seeds previously never aged (they had no work orders) and
 # so permanently dominated the active-incident views, masking the live flow.
+
+fi  # end CITY_DEPLOY
 
 # ---------------------------------------------------------------------------
 check_counts
