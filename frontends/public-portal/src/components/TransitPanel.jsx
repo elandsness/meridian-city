@@ -9,37 +9,17 @@ const MODE_LABEL = { rail: 'Regional rail', subway: 'Subway', bus: 'Bus' }
 // minute, so there's nothing to gain from polling faster.
 const STATUS_REFETCH_MS = 60000
 
-function statusFor(v) {
-  if (!v) return { text: '—', tone: 'slate' }
-  if (v.status === 'late') return { text: `${v.delay_minutes} min late`, tone: 'amber' }
-  if (v.status === 'early') return { text: `${v.delay_minutes} min early`, tone: 'blue' }
+function statusFor(vehicles, lineId) {
+  const vs = vehicles.filter((v) => v.line_id === lineId)
+  if (vs.length === 0) return { text: '—', tone: 'slate' }
+  // Worst status wins (late > early > on_time).
+  const worst = vs.sort((a, b) =>
+    (a.status === 'late' ? 0 : a.status === 'early' ? 1 : 2) -
+    (b.status === 'late' ? 0 : b.status === 'early' ? 1 : 2)
+  )[0]
+  if (worst.status === 'late') return { text: `${worst.delay_minutes} min late`, tone: 'amber' }
+  if (worst.status === 'early') return { text: `${worst.delay_minutes} min early`, tone: 'blue' }
   return { text: 'On time', tone: 'green' }
-}
-
-/**
- * Smooth SVG path through a list of {x,y} points using a Catmull-Rom spline
- * converted to cubic Béziers. Colinear points yield straight segments, bends
- * yield gentle curves — so routes read like a real transit diagram instead of
- * connect-the-dots polylines.
- */
-function smoothPath(points) {
-  if (points.length < 2) return ''
-  if (points.length === 2) {
-    return `M ${points[0].x},${points[0].y} L ${points[1].x},${points[1].y}`
-  }
-  const d = [`M ${points[0].x},${points[0].y}`]
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? 0 : i - 1]
-    const p1 = points[i]
-    const p2 = points[i + 1]
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1]
-    const cp1x = p1.x + (p2.x - p0.x) / 6
-    const cp1y = p1.y + (p2.y - p0.y) / 6
-    const cp2x = p2.x - (p3.x - p1.x) / 6
-    const cp2y = p2.y - (p3.y - p1.y) / 6
-    d.push(`C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`)
-  }
-  return d.join(' ')
 }
 
 /**
@@ -84,19 +64,22 @@ export default function TransitPanel() {
     <div className="space-y-4">
       <div className="rounded-xl bg-slate-50 border border-slate-100 p-2">
         <svg viewBox="0 0 720 470" className="w-full h-auto" role="img" aria-label="Meridian City transit map">
-          {lines.map((line) => (
-            <path
-              key={line.id}
-              d={smoothPath(line.stops)}
-              fill="none"
-              stroke={line.color}
-              strokeWidth={STROKE_WIDTH[line.mode] || 4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={line.mode === 'bus' ? '7 6' : undefined}
-              opacity={line.mode === 'bus' ? 0.85 : 1}
-            />
-          ))}
+          {lines.map((line) => {
+            const d = line.stops.map((s, i) => `${i === 0 ? 'M' : 'L'} ${s.x},${s.y}`).join(' ')
+            return (
+              <path
+                key={line.id}
+                d={d}
+                fill="none"
+                stroke={line.color}
+                strokeWidth={STROKE_WIDTH[line.mode] || 4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={line.mode === 'bus' ? '7 6' : undefined}
+                opacity={line.mode === 'bus' ? 0.85 : 1}
+              />
+            )
+          })}
 
           {Object.values(stopById).map((s) => {
             const colors = [...stopColors[s.id]]
@@ -125,7 +108,7 @@ export default function TransitPanel() {
             const color = colorByLine[v.line_id] || '#475569'
             return (
               <g
-                key={v.line_id}
+                key={`${v.line_id}-${v.direction}`}
                 style={{ transform: `translate(${stop.x}px, ${stop.y}px)`, transition: 'transform 1.6s ease-in-out' }}
               >
                 <circle r={10} fill="none" stroke={color} strokeWidth={2} opacity={0.5}>
@@ -140,7 +123,7 @@ export default function TransitPanel() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
         {lines.map((line) => {
-          const st = statusFor(vehicles.find((x) => x.line_id === line.id))
+          const st = statusFor(vehicles, line.id)
           return (
             <div
               key={line.id}

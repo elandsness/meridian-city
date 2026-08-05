@@ -130,14 +130,19 @@ const LINES = [
   },
 ]
 
-// One vehicle per line; staggered starting positions so they don't all move in sync.
-const vehicles = LINES.map((line, i) => ({
-  lineId: line.id,
-  stopIndex: i % line.stops.length,
-  direction: 1,
-  status: 'on_time',
-  delayMinutes: 0,
-}))
+// Two vehicles per line: one outbound (terminus A → B) and one inbound (B → A).
+// Outbound starts at stop 0, inbound starts midway so they're never co-located.
+// When a vehicle reaches its terminus it wraps back to the opposite terminus,
+// producing a continuous one-way flow — the same pattern the airport tracker uses
+// for departures vs. arrivals, not a bouncing cursor.
+const LINE_MAP = Object.fromEntries(LINES.map((l) => [l.id, l]))
+const vehicles = LINES.flatMap((line) => {
+  const mid = Math.floor(line.stops.length / 2)
+  return [
+    { lineId: line.id, stopIndex: 0,   direction: 'outbound', status: 'on_time', delayMinutes: 0 },
+    { lineId: line.id, stopIndex: mid, direction: 'inbound',  status: 'on_time', delayMinutes: 0 },
+  ]
+})
 
 function rerollStatus (v) {
   const r = Math.random()
@@ -154,17 +159,14 @@ function rerollStatus (v) {
 }
 
 function tick () {
-  for (let i = 0; i < vehicles.length; i++) {
-    const v = vehicles[i]
-    const len = LINES[i].stops.length
-    // Bounce back and forth along the line.
-    if (v.stopIndex + v.direction < 0 || v.stopIndex + v.direction > len - 1) {
-      v.direction *= -1
+  for (const v of vehicles) {
+    const len = LINE_MAP[v.lineId].stops.length
+    if (v.direction === 'outbound') {
+      v.stopIndex = v.stopIndex < len - 1 ? v.stopIndex + 1 : 0
+    } else {
+      v.stopIndex = v.stopIndex > 0 ? v.stopIndex - 1 : len - 1
     }
-    v.stopIndex += v.direction
-    if (Math.random() < STATUS_REROLL_CHANCE) {
-      rerollStatus(v)
-    }
+    if (Math.random() < STATUS_REROLL_CHANCE) rerollStatus(v)
   }
 }
 
@@ -181,9 +183,10 @@ function getLines () {
 
 function getStatus () {
   return {
-    lines: vehicles.map((v, i) => ({
+    lines: vehicles.map((v) => ({
       line_id: v.lineId,
-      current_stop_id: LINES[i].stops[v.stopIndex].id,
+      direction: v.direction,
+      current_stop_id: LINE_MAP[v.lineId].stops[v.stopIndex].id,
       status: v.status,
       delay_minutes: v.delayMinutes,
     })),

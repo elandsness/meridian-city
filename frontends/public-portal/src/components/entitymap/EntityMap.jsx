@@ -89,21 +89,12 @@ function Shape({ shape }) {
   return null
 }
 
-// Generalizes TransitPanel's smoothPath(): a curved line through an ordered
-// list of waypoints, Catmull-Rom-ish via quadratic midpoints (good enough for
-// schematic diagrams, not a geographic map).
+// Straight polyline through an ordered list of waypoints — schematic transit-map
+// style where each segment reads clearly, without decorative curves.
 function Guide({ guide }) {
   const pts = guide.waypoints || []
   if (pts.length < 2) return null
-  let d = `M ${pts[0].x} ${pts[0].y}`
-  for (let i = 1; i < pts.length; i++) {
-    const prev = pts[i - 1]
-    const cur = pts[i]
-    const midX = (prev.x + cur.x) / 2
-    const midY = (prev.y + cur.y) / 2
-    d += ` Q ${prev.x} ${prev.y}, ${midX} ${midY}`
-  }
-  d += ` T ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`
+  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
   return (
     <path
       d={d}
@@ -112,6 +103,7 @@ function Guide({ guide }) {
       strokeWidth={guide.width || 3}
       strokeDasharray={guide.dash}
       strokeLinecap="round"
+      strokeLinejoin="round"
     />
   )
 }
