@@ -361,6 +361,19 @@ install_or_upgrade() {
     info "This instance will own cluster monitoring (Log Module + ActiveGate) for the cluster."
   fi
 
+  # Auto-detect image tag for branch deploys. On main the default :latest is used.
+  # On any other branch, CI pushes a floating branch-<safe-ref> tag that always
+  # points to the latest build for that branch -- no SHA to look up or pass manually.
+  local branch_args=()
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+  if [[ -n "$current_branch" && "$current_branch" != "main" && "$current_branch" != "HEAD" ]]; then
+    local safe_ref
+    safe_ref=$(echo "$current_branch" | tr -c 'a-zA-Z0-9' '-')
+    branch_args=(--set "global.imageTag=branch-${safe_ref}" --set "global.imagePullPolicy=Always")
+    info "Branch '${current_branch}' — using image tag: branch-${safe_ref}"
+  fi
+
   info "Running: helm $cmd $RELEASE_NAME ..."
   # --wait is intentionally omitted: Java services crash-loop until DB is ready,
   # which would deadlock the post-install hooks. The shared operators are already
@@ -372,6 +385,7 @@ install_or_upgrade() {
     --timeout 20m \
     --set global.instanceHash="$INSTANCE_HASH" \
     --set dynatrace.clusterMonitoring.enabled="$cluster_mon" \
+    "${branch_args[@]}" \
     "$@"
 
   # Helm has submitted resources and hooks are running. Wait for everything to converge.

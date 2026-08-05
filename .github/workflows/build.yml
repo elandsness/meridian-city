@@ -84,7 +84,7 @@ jobs:
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
             SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -157,7 +157,7 @@ jobs:
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
             SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -228,7 +228,7 @@ jobs:
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
             SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -301,7 +301,7 @@ jobs:
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
             SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -371,7 +371,7 @@ jobs:
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
             SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.app }} image
