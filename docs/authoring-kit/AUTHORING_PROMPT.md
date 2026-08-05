@@ -219,22 +219,37 @@ a **template object** (dynamic module with config props).
 **Portal — template modules (use `{ id, template, ...props }`):**
 | template | What it is | Props |
 |---------|-----------|-------|
-| `news-ticker` | Scrolling news headlines | `height: slim\|half\|full`, `items: [...]` |
+| `ticker` | Scrolling content bar — any strings | `height: slim\|half\|full`, `items: [...]`, `label?`, `title?`, `preset?: stocks\|sports` |
 | `weather-widget` | Weather card | `mode: perfect\|forecast` |
-| `stock-ticker` | Stock price ticker | `height: slim\|half\|full`, `symbols?: [...]` |
-| `sports-ticker` | Sports scores ticker | `height: slim\|half\|full`, `sport?`, `league?` |
 | `clock-widget` | Live clock(s) | `timezones?: [{tz, label}]` |
+| `announcements` | Bulletin board | `items: [{title, body, tone?}]`, `title?` |
 | `entity-map` | Entity moving-map card | `entityType`, `viewBox`, `background`, `legend?` |
 | `entity-summary-card` | KPI strip for an entity type | `entityType`, `label?` |
+
+**`ticker` is a single generic component — the content is what you configure.**
+Write `items` as whatever strings make sense for the industry from your research:
+- Departure board: `"MC501  New York JFK  14:30  ON TIME"`, `"MC302  Chicago ORD  15:00  BOARDING"`
+- Commodity prices: `"Gold  $2,341  ▲0.4%"`, `"WTI Crude  $78.20  ▼1.1%"`, `"Natural Gas  $2.88  ▲2.3%"`
+- Ops metrics: `"ICU capacity 87%"`, `"OR utilization 92%"`, `"ED wait: 42 min"`
+- News: `"New sustainability initiative announced"`, `"Q3 earnings beat estimates by 8%"`
+
+If the LLM does not provide `items`, the component falls back to `preset: stocks` or `preset: sports`
+for plausible placeholder content — but industry-specific items are always better.
 
 Example ticker configuration:
 ```yaml
 home:
   public:
     - welcome-hero
-    - { id: ticker1, template: news-ticker, height: slim, items:
-        - "City Hall Announces New Sustainability Initiative"
-        - "Transit Extension Approved for 2026 Opening" }
+    - id: departures
+      template: ticker
+      height: slim
+      label: "✈️ DEPARTURES"
+      items:
+        - "MC501  New York JFK  14:30  ON TIME"
+        - "MC302  Chicago ORD  15:00  BOARDING"
+        - "MC817  Los Angeles LAX  16:45  ON TIME"
+        - "MC204  Miami MIA  17:00  DELAYED 20 min"
     - { id: weather, template: weather-widget, mode: forecast }
     - quick-actions
 ```
@@ -248,11 +263,10 @@ home:
 **Ops — template modules:**
 | template | What it is | Props |
 |---------|-----------|-------|
-| `news-ticker` | Scrolling news headlines | `height: slim\|half\|full`, `items: [...]` |
+| `ticker` | Scrolling content bar — any strings | `height: slim\|half\|full`, `items: [...]`, `label?`, `title?` |
 | `weather-widget` | Weather card | `mode: perfect\|forecast` |
-| `stock-ticker` | Stock price ticker | `height: slim\|half\|full` |
-| `sports-ticker` | Sports scores ticker | `height: slim\|half\|full`, `sport?` |
 | `clock-widget` | Live clock(s) | `timezones?: [{tz, label}]` |
+| `announcements` | Bulletin board | `items: [{title, body, tone?}]` |
 | `entity-map` | Entity moving-map card | `entityType`, `viewBox`, `background`, `legend?` |
 | `entity-summary-card` | KPI strip for one entity type | `entityType`, `label?` |
 | `entity-kpi-row` | KPI row across multiple entity types | `entityTypes: [...]`, `label?` |
@@ -416,9 +430,14 @@ industry:
       - demo-control
   home:
     public:
-      - { id: news, template: news-ticker, height: slim, items:
-          - "Gate B12 now boarding Flight MC501 to New York"
-          - "Security wait times: Terminal 1 approx 8 min, Terminal 2 approx 14 min" }
+      - id: departures
+        template: ticker
+        height: slim
+        label: "✈️ DEPARTURES"
+        items:
+          - "MC501  New York JFK  14:30  BOARDING"
+          - "MC302  Chicago ORD  15:00  ON TIME"
+          - "MC817  Los Angeles LAX  16:45  DELAYED 20 min"
       - flight-status
       - airfield-map
       - my-journey

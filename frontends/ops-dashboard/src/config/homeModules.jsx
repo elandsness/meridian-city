@@ -7,10 +7,8 @@ import FlightSummary from '../components/home/FlightSummary.jsx';
 import EntityMapCard from '../components/entity/EntityMapCard.jsx';
 import WelcomeHero from '../components/home/WelcomeHero.jsx';
 import Announcements from '../components/home/Announcements.jsx';
-import NewsTicker from '../components/home/NewsTicker.jsx';
+import Ticker from '../components/home/Ticker.jsx';
 import WeatherWidget from '../components/home/WeatherWidget.jsx';
-import StockTicker from '../components/home/StockTicker.jsx';
-import SportsTicker from '../components/home/SportsTicker.jsx';
 import ClockWidget from '../components/home/ClockWidget.jsx';
 import EntitySummaryCard from '../components/home/EntitySummaryCard.jsx';
 import EntityKpiRow from '../components/home/EntityKpiRow.jsx';
@@ -30,10 +28,8 @@ export const HOME_MODULES = {
 // { id, template, ...props } in config.home.ops).
 const TEMPLATES = {
   'entity-map': EntityMapCard,
-  'news-ticker': NewsTicker,
+  'ticker': Ticker,
   'weather-widget': WeatherWidget,
-  'stock-ticker': StockTicker,
-  'sports-ticker': SportsTicker,
   'clock-widget': ClockWidget,
   'announcements': Announcements,
   'entity-summary-card': EntitySummaryCard,

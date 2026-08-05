@@ -9,17 +9,16 @@ import FlightStatus from '../components/home/FlightStatus.jsx'
 import AirfieldMapCard from '../components/home/AirfieldMapCard.jsx'
 import MyJourneyCard from '../components/home/MyJourneyCard.jsx'
 import WelcomeHero from '../components/home/WelcomeHero.jsx'
-import Announcements from '../components/home/Announcements.jsx'
 import ChatTeaser from '../components/home/ChatTeaser.jsx'
 import EntityMapCard from '../components/entity/EntityMapCard.jsx'
-import NewsTicker from '../components/home/NewsTicker.jsx'
+import Ticker from '../components/home/Ticker.jsx'
 import WeatherWidget from '../components/home/WeatherWidget.jsx'
-import StockTicker from '../components/home/StockTicker.jsx'
-import SportsTicker from '../components/home/SportsTicker.jsx'
 import ClockWidget from '../components/home/ClockWidget.jsx'
+import Announcements from '../components/home/Announcements.jsx'
 import EntitySummaryCard from '../components/home/EntitySummaryCard.jsx'
 
-// Static modules (no config props needed).
+// Static modules (no config props needed — component reads config internally or has
+// sensible defaults that don't require per-instance configuration).
 export const HOME_MODULES = {
   'city-home': CityHome,
   'transit-map': TransitMapCard,
@@ -35,10 +34,8 @@ export const HOME_MODULES = {
 // { id, template, ...props } in config.home.public).
 const TEMPLATES = {
   'entity-map': EntityMapCard,
-  'news-ticker': NewsTicker,
+  'ticker': Ticker,
   'weather-widget': WeatherWidget,
-  'stock-ticker': StockTicker,
-  'sports-ticker': SportsTicker,
   'clock-widget': ClockWidget,
   'announcements': Announcements,
   'entity-summary-card': EntitySummaryCard,
