@@ -1,4 +1,27 @@
 {{- if .Values.publicPortal.enabled }}
+{{- $hash := include "meridian.instanceHash" . -}}
+
+{{- /* Collect remote image URLs that need to be downloaded at pod startup.
+     Each entry: {url, file}. Mirrors the URL-replacement logic in
+     industry-configmap.yaml — the two must stay in sync. */ -}}
+{{- $assets := list -}}
+{{- if hasPrefix "http" (default "" .Values.industry.theme.heroImage) -}}
+{{- $assets = append $assets (dict "url" .Values.industry.theme.heroImage "file" (printf "hero-%s.jpg" $hash)) -}}
+{{- end -}}
+{{- if hasPrefix "http" (default "" .Values.industry.theme.favicon) -}}
+{{- $assets = append $assets (dict "url" .Values.industry.theme.favicon "file" (printf "favicon-%s.png" $hash)) -}}
+{{- end -}}
+{{- if hasPrefix "http" (default "" .Values.industry.theme.logo) -}}
+{{- $assets = append $assets (dict "url" .Values.industry.theme.logo "file" (printf "logo-%s.png" $hash)) -}}
+{{- end -}}
+{{- range ((.Values.industry.screens).public | default list) -}}
+{{- if and (eq (default "" .template) "status-map") ((.background).src) -}}
+{{- if hasPrefix "http" (default "" .background.src) -}}
+{{- $assets = append $assets (dict "url" .background.src "file" (printf "mapbg-%s-%s.jpg" .id $hash)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +52,27 @@ spec:
         - name: industry-config
           configMap:
             name: industry-config
+        {{- if $assets }}
+        - name: industry-assets
+          emptyDir: {}
+        {{- end }}
+      {{- if $assets }}
+      initContainers:
+        - name: fetch-industry-assets
+          image: curlimages/curl:8
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              {{- range $assets }}
+              curl -sLf {{ .url | quote }} -o "/assets/{{ .file }}" \
+                && echo "OK: {{ .file }}" \
+                || echo "WARN: download failed, {{ .file }} will be missing"
+              {{- end }}
+          volumeMounts:
+            - name: industry-assets
+              mountPath: /assets
+      {{- end }}
       containers:
         - name: public-portal
           image: {{ include "meridian.image" (dict "repository" .Values.publicPortal.image.repository "tag" .Values.publicPortal.image.tag "context" $) }}
@@ -43,6 +87,10 @@ spec:
             - name: industry-config
               mountPath: /usr/share/nginx/html/config.json
               subPath: config.json
+            {{- if $assets }}
+            - name: industry-assets
+              mountPath: /usr/share/nginx/html/industry-assets
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /

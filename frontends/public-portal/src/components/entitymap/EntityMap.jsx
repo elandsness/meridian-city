@@ -65,8 +65,7 @@ function Background({ background }) {
   if (!background || background.kind === 'none') return null
   if (background.kind === 'image') {
     return <image href={background.src} x="0" y="0" width="100%" height="100%"
-                  preserveAspectRatio="xMidYMid slice"
-                  style={{ filter: `brightness(${background.brightness ?? 0.4}) saturate(${background.saturate ?? 0.7})` }} />
+                  preserveAspectRatio="xMidYMid slice" />
   }
   if (background.kind === 'shapes') {
     return (

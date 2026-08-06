@@ -166,6 +166,30 @@ Each screen entry is either `"<id>"` or `{ id: <id>, label: "Nav label", icon: "
 | `{ template: 'entity-map', entityType: '<type>' }` | Moving-sprite map for any type | entities with `computed.position` |
 | `{ template: 'entity-analytics', entityType: '<type>' }` | KPI + chart for any type | any custom entity |
 | `{ template: 'entity-journey', entityType: '<type>', ownerField: '<field>', steps: [...] }` | Generic journey tracker | entities with a step-based lifecycle |
+| `{ template: 'status-map', source: 'devices', background: {...}, ... }` | Static-location asset map with live status dots | IoT fleets, ATM networks, parking lots, seating charts |
+
+**`status-map` config shape:**
+```yaml
+- id: atm-network-map          # unique id, lowercase-hyphen
+  template: status-map
+  label: "Find ATM & Branch"   # nav label shown to users
+  icon: "🏧"
+  title: "ATM & Branch Network"  # card heading inside the page
+  source: devices              # 'devices' = IoT device fleet (status from IoT API)
+  viewBox: "0 0 1000 580"      # SVG coordinate space; match the background image proportions
+  background:
+    kind: image                # 'image' renders a full-canvas background image
+    src: /bank_atm_bg.png      # local static file committed to frontends/public-portal/public/
+    # — OR — supply an HTTPS URL; the deploy script fetches and stores it locally:
+    # src: "https://images.unsplash.com/photo-xxx?w=1600&q=80"
+```
+
+The map overlays colored dots (green = ok, amber = degraded, red = out of service) on the
+background image — one dot per device, scattered deterministically by device_id. Dots update
+every 15 s from the live device fleet. No explicit dot positions are needed; they are
+auto-scattered across the canvas. For a `background.src` HTTPS URL, the deploy script
+downloads the image at `helm install`/`upgrade` time and rewrites the ConfigMap to reference
+a local `/industry-assets/` path, so the browser always loads from the same origin.
 
 **Ops dashboard (`screens.ops`):**
 | id | What it is | When to use |
@@ -304,6 +328,22 @@ noun for a bill/statement/invoice used in notification messages — e.g. `"payme
 `accentInk` — all hex (`#RGB` or `#RRGGBB`). All color tokens should form a coherent
 palette: `brandDeep` darker than `brand`, `brandSoft` lighter, `brandTint` very light.
 
+**Image fields** (`theme.heroImage`, `theme.favicon`, `theme.logo`):
+
+Supply either a local path (file committed to `frontends/public-portal/public/`) or a
+fully-qualified HTTPS URL. When a URL is given, `deploy.sh install`/`upgrade` fetches
+the image at deploy time, stores it under `/industry-assets/` inside the pod, and
+rewrites the ConfigMap to reference the local path — so the app always loads images
+from the same origin with no external dependency at runtime.
+
+- `theme.heroImage` — full-bleed background for the `welcome-hero` home module. Use a
+  top-down or wide-angle photo that makes sense as a banner (city skyline, retail
+  floor, hospital corridor). Unsplash URLs work well: `https://images.unsplash.com/photo-xxx?w=1600&q=80`
+- `theme.favicon` — browser tab icon. Supply a PNG or ICO URL, or omit to use the
+  built-in Meridian mark recolored to `brand`.
+- `theme.logo` — navbar logo image. Supply a PNG/SVG URL, or omit to use the built-in
+  Meridian mark recolored to `brand`.
+
 ### 4e. Company
 ```yaml
 company:
@@ -373,6 +413,7 @@ dynatrace:
 6. All `dynatrace.flows` entries are from the known list; aviation flows excluded for non-transport industries.
 7. `idPrefix` values contain no hyphens: `[a-z][a-z0-9]*`.
 8. All `"y"` keys in `waypoints` blocks are quoted.
+8b. `status-map` screens: `source` is `devices`, `viewBox` matches the background image's aspect ratio, `background.kind` is `image`, `background.src` is either a committed local file path or an HTTPS URL (not a relative path to an external asset).
 9. State `tone` values are one of: `slate`, `blue`, `amber`, `orange`, `green`, `red`.
 10. All state keys referenced in `transitions.from`/`to` and `steps` lists exist in `states`.
 11. `version: 1` at the top.
