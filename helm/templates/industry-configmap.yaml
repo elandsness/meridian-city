@@ -46,12 +46,15 @@ refs) and means the browser never depends on an external image host at runtime.
 {{- $screensBlock := deepCopy $ind.screens -}}
 {{- $newPublic := list -}}
 {{- range $screensBlock.public -}}
-{{- $screen := deepCopy . -}}
+{{- $screen := . -}}
+{{- if kindIs "map" . -}}
+{{- $screen = deepCopy . -}}
 {{- if and (eq (default "" .template) "status-map") ((.background).src) -}}
 {{- if hasPrefix "http" (default "" .background.src) -}}
 {{- $newBg := deepCopy .background -}}
 {{- $_ := set $newBg "src" (printf "/industry-assets/mapbg-%s-%s.jpg" .id $hash) -}}
 {{- $_ = set $screen "background" $newBg -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- $newPublic = append $newPublic $screen -}}

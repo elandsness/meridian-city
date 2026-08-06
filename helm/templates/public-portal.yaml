@@ -15,9 +15,11 @@
 {{- $assets = append $assets (dict "url" .Values.industry.theme.logo "file" (printf "logo-%s.png" $hash)) -}}
 {{- end -}}
 {{- range ((.Values.industry.screens).public | default list) -}}
+{{- if kindIs "map" . -}}
 {{- if and (eq (default "" .template) "status-map") ((.background).src) -}}
 {{- if hasPrefix "http" (default "" .background.src) -}}
 {{- $assets = append $assets (dict "url" .background.src "file" (printf "mapbg-%s-%s.jpg" .id $hash)) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
