@@ -20,8 +20,7 @@ const DEFAULT_STATUS_COLORS = {
   reserved: '#d97706',
 }
 
-// Deterministic scatter: each device gets a consistent position within its zone
-// based on a hash of its ID — looks organic rather than grid-like.
+// Scatter by device ID hash — zone-relative or canvas-wide depending on args.
 function scatterPosition(center, deviceId, radius = 75) {
   let h = 5381
   for (let i = 0; i < deviceId.length; i++) {
@@ -29,10 +28,14 @@ function scatterPosition(center, deviceId, radius = 75) {
   }
   const angle = ((h >>> 0) % 3600) / 3600 * Math.PI * 2
   const r = Math.sqrt(((h >>> 12) % 1000) / 1000) * radius
-  return {
-    x: center.x + Math.cos(angle) * r,
-    y: center.y + Math.sin(angle) * r,
-  }
+  return { x: center.x + Math.cos(angle) * r, y: center.y + Math.sin(angle) * r }
+}
+
+function scatterFull(deviceId, w = 960, h = 540, margin = 35) {
+  let a = 5381
+  for (let i = 0; i < deviceId.length; i++) a = ((a << 5) + a + deviceId.charCodeAt(i)) & 0xffffffff
+  const b = (a * 1664525 + 1013904223) & 0xffffffff
+  return { x: margin + ((a >>> 0) % (w - margin * 2)), y: margin + ((b >>> 0) % (h - margin * 2)) }
 }
 
 // Generic `status-map` public-portal screen template. Static item positions
@@ -113,6 +116,15 @@ export default function StatusMapPage({
           color: colorMap[d.status] ?? colorMap.slate,
         })
       }
+    }
+  } else if (isDevices) {
+    const devices = Array.isArray(devicesData?.items) ? devicesData.items : []
+    for (const d of devices) {
+      sprites.push({
+        id: d.device_id,
+        coordinate: scatterFull(d.device_id),
+        color: colorMap[d.status] ?? colorMap.slate,
+      })
     }
   }
 
