@@ -58,6 +58,14 @@ industry:
       high_co2: "Branch Air Quality Alert"
       high_vibration: "ATM Mechanical Vibration"
       high_error_rate: "ATM Transaction Error Rate"
+    # Zone cluster centers for the ATM network status map (1000×580 viewBox,
+    # US-region layout). Devices auto-spread in a compact grid around each center.
+    iotZonePositions:
+      zone-north: {x: 810, y: 130}
+      zone-south: {x: 700, y: 410}
+      zone-east: {x: 510, y: 185}
+      zone-west: {x: 130, y: 240}
+      zone-central: {x: 430, y: 310}
   screens:
     public:
       - home
@@ -85,7 +93,29 @@ industry:
         icon: "📋"
       - { id: requests, label: "Support Queue" }
       - { id: incidents, label: "IT Incidents" }
-      - { id: iot, label: "ATM Network" }
+      - id: atm-network-map
+        template: status-map
+        label: "ATM Network Map"
+        icon: "🗺️"
+        title: "ATM & Branch Network"
+        source: devices
+        clusterBy: zone
+        viewBox: "0 0 1000 580"
+        background:
+          kind: shapes
+          shapes:
+            - { type: rect, x: 0, y: 0, width: 1000, height: 580, fill: "#0f172a", rx: 6 }
+            # Subtle region dividers
+            - { type: line, x1: 300, y1: 40, x2: 300, y2: 540, stroke: "#1e293b", strokeWidth: 1 }
+            - { type: line, x1: 620, y1: 40, x2: 620, y2: 540, stroke: "#1e293b", strokeWidth: 1 }
+            - { type: line, x1: 620, y1: 290, x2: 990, y2: 290, stroke: "#1e293b", strokeWidth: 1 }
+            # Zone region labels
+            - { type: text, x: 155, y: 530, textAnchor: "middle", fontSize: 11, fill: "#334155", text: "WEST COAST" }
+            - { type: text, x: 460, y: 530, textAnchor: "middle", fontSize: 11, fill: "#334155", text: "MIDWEST" }
+            - { type: text, x: 810, y: 80, textAnchor: "middle", fontSize: 11, fill: "#334155", text: "NORTHEAST" }
+            - { type: text, x: 810, y: 530, textAnchor: "middle", fontSize: 11, fill: "#334155", text: "SOUTHEAST" }
+            - { type: text, x: 460, y: 368, textAnchor: "middle", fontSize: 11, fill: "#334155", text: "DIGITAL CHANNELS" }
+      - { id: iot, label: "ATM Fleet" }
       - { id: analytics, label: "Transaction Analytics" }
       - demo-control
   home:

@@ -5,6 +5,7 @@
 import OpsOverview from '../components/home/OpsOverview.jsx';
 import FlightSummary from '../components/home/FlightSummary.jsx';
 import EntityMapCard from '../components/entity/EntityMapCard.jsx';
+import StatusMapPage from '../components/entity/StatusMapPage.jsx';
 import WelcomeHero from '../components/home/WelcomeHero.jsx';
 import Announcements from '../components/home/Announcements.jsx';
 import Ticker from '../components/home/Ticker.jsx';
@@ -28,6 +29,7 @@ export const HOME_MODULES = {
 // { id, template, ...props } in config.home.ops).
 const TEMPLATES = {
   'entity-map': EntityMapCard,
+  'status-map': StatusMapPage,
   'ticker': Ticker,
   'weather-widget': WeatherWidget,
   'clock-widget': ClockWidget,

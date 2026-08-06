@@ -58,7 +58,8 @@
           }
         },
         "logo": { "type": "string", "description": "URL or path to the brand logo." },
-        "favicon": { "type": "string", "description": "URL or path to the favicon." }
+        "favicon": { "type": "string", "description": "URL or path to the favicon." },
+        "heroImage": { "type": "string", "description": "URL to a background photo shown behind the brand gradient in the WelcomeHero card." }
       }
     },
     "terminology": {
@@ -79,6 +80,19 @@
           "type": "object",
           "additionalProperties": { "type": "string" },
           "description": "Maps raw anomaly_type values (e.g. 'engine_overtemp') to industry-appropriate display labels."
+        },
+        "iotZonePositions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "description": "Maps zone IDs to {x,y} cluster centers on the status-map viewBox for auto-clustering IoT devices."
         }
       },
       "additionalProperties": { "type": "string" }
@@ -223,10 +237,10 @@
                   }
                 }
               },
-              "viewBox": { "type": "string", "description": "entity-map only: SVG viewBox string (e.g. '0 0 900 520')." },
-              "background": { "type": "object", "description": "entity-map only: { kind: 'image'|'preset'|'shapes'|'none', ... }." },
+              "viewBox": { "type": "string", "description": "entity-map: SVG viewBox string (e.g. '0 0 900 520')." },
+              "background": { "type": "object", "description": "entity-map: { kind: 'image'|'shapes'|'none', ... }." },
               "legend": { "type": "array", "description": "entity-map only." },
-              "labelField": { "type": "string", "description": "entity-map only: which field to show next to each sprite." },
+              "labelField": { "type": "string", "description": "entity-map: which field to show next to each sprite." },
               "steps": {
                 "type": "array",
                 "description": "entity-journey only: ordered list of steps to show. Each item is either a state key string or an object with `state` (key) and `label` (display text) — use object form to override the state's default label.",
@@ -247,6 +261,41 @@
               },
               "ownerField": { "type": "string", "description": "entity-journey only (portal): entity field whose value matches the logged-in user's id. When set, shows the personal journey view for authenticated users." },
               "description": { "type": "string", "description": "entity-journey: subtitle shown below the page heading." }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A status-map page: static per-location coordinates with real-time status coloring. entityType optional when source=devices.",
+            "required": ["id", "template"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "label": { "type": "string" },
+              "icon": { "type": "string" },
+              "title": { "type": "string", "description": "Heading shown above the map." },
+              "template": { "const": "status-map" },
+              "entityType": { "type": "string", "description": "Entity type to fetch status from. Omit when source='devices'." },
+              "source": { "type": "string", "description": "'devices' fetches from the IoT devices API. Omit for entity engine." },
+              "clusterBy": { "type": "string", "enum": ["zone"], "description": "'zone' auto-spreads devices around iotZonePositions cluster centers (uses IoT devices API)." },
+              "locations": {
+                "type": "array",
+                "description": "Explicit per-item positions (seating chart, parking lot). Each entry is { id, x, y, label? }.",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "x", "y"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": { "type": "string" },
+                    "x": { "type": "number" },
+                    "y": { "type": "number" },
+                    "label": { "type": "string" }
+                  }
+                }
+              },
+              "viewBox": { "type": "string", "description": "SVG viewBox string (e.g. '0 0 1000 580')." },
+              "background": { "type": "object", "description": "{ kind: 'image'|'shapes'|'none', ... }." },
+              "statusColors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Overrides the default ok/warning/alert/available/occupied color map." },
+              "labelField": { "type": "string", "description": "Which field to show next to each dot." }
             }
           }
         ]

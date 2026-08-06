@@ -14,6 +14,7 @@ import EntityDetailPage from '../components/entity/EntityDetailPage.jsx';
 import EntityMapPage from '../components/entity/EntityMapPage.jsx';
 import EntityAnalyticsPage from '../components/entity/EntityAnalyticsPage.jsx';
 import EntityJourneyPage from '../components/entity/EntityJourneyPage.jsx';
+import StatusMapPage from '../components/entity/StatusMapPage.jsx';
 
 // Generic entity-template registry (generic-entity-engine initiative). A
 // screens.ops entry of the form {id, template, entityType, ...} resolves
@@ -25,6 +26,7 @@ const TEMPLATES = {
   'entity-map': EntityMapPage,
   'entity-analytics': EntityAnalyticsPage,
   'entity-journey': EntityJourneyPage,
+  'status-map': StatusMapPage,
 };
 
 export const SCREENS = {

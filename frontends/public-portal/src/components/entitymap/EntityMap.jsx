@@ -81,11 +81,11 @@ function Background({ background }) {
 }
 
 function Shape({ shape }) {
-  const { type, ...attrs } = shape
+  const { type, text: textContent, ...attrs } = shape
   if (type === 'rect') return <rect {...attrs} />
   if (type === 'line') return <line {...attrs} />
   if (type === 'circle') return <circle {...attrs} />
-  if (type === 'text') return <text {...attrs}>{shape.text}</text>
+  if (type === 'text') return <text {...attrs}>{textContent}</text>
   return null
 }
 

@@ -4,14 +4,26 @@ export default function WelcomeHero() {
   const cfg = useConfig()
   const name = cfg.company?.name ?? 'Welcome'
   const tagline = cfg.company?.tagline ?? ''
+  const heroImage = cfg.theme?.heroImage
 
   return (
     <div
       className="rounded-2xl px-8 py-12 text-white text-center relative overflow-hidden"
-      style={{
+      style={heroImage ? {
+        backgroundImage: `url(${heroImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      } : {
         background: 'linear-gradient(135deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 60%, var(--accent, #0ea5e9)) 100%)',
       }}
     >
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'linear-gradient(135deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 60%, var(--accent, #0ea5e9)) 100%)',
+          opacity: heroImage ? 0.82 : 1,
+        }}
+      />
       <div
         className="absolute inset-0 opacity-10 pointer-events-none"
         style={{
