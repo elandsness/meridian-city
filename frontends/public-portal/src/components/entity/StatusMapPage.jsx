@@ -20,20 +20,19 @@ const DEFAULT_STATUS_COLORS = {
   reserved: '#d97706',
 }
 
-function gridPositions(center, count, spacing = 30) {
-  const cols = Math.ceil(Math.sqrt(count * 1.5))
-  const rows = Math.ceil(count / cols)
-  const positions = []
-  for (let i = 0; i < count; i++) {
-    const row = Math.floor(i / cols)
-    const col = i % cols
-    const rowCount = Math.min(count - row * cols, cols)
-    positions.push({
-      x: center.x + (col - (rowCount - 1) / 2) * spacing,
-      y: center.y + (row - (rows - 1) / 2) * spacing,
-    })
+// Deterministic scatter: each device gets a consistent position within its zone
+// based on a hash of its ID — looks organic rather than grid-like.
+function scatterPosition(center, deviceId, radius = 75) {
+  let h = 5381
+  for (let i = 0; i < deviceId.length; i++) {
+    h = ((h << 5) + h + deviceId.charCodeAt(i)) & 0xffffffff
   }
-  return positions
+  const angle = ((h >>> 0) % 3600) / 3600 * Math.PI * 2
+  const r = Math.sqrt(((h >>> 12) % 1000) / 1000) * radius
+  return {
+    x: center.x + Math.cos(angle) * r,
+    y: center.y + Math.sin(angle) * r,
+  }
 }
 
 // Generic `status-map` public-portal screen template. Static item positions
@@ -107,14 +106,13 @@ export default function StatusMapPage({
     for (const [zone, devs] of Object.entries(byZone)) {
       const center = zonePositions[zone]
       if (!center) continue
-      const positions = gridPositions(center, devs.length, 32)
-      devs.forEach((d, i) => {
+      for (const d of devs) {
         sprites.push({
           id: d.device_id,
-          coordinate: positions[i],
+          coordinate: scatterPosition(center, d.device_id),
           color: colorMap[d.status] ?? colorMap.slate,
         })
-      })
+      }
     }
   }
 
