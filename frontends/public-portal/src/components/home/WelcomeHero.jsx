@@ -14,14 +14,14 @@ export default function WelcomeHero() {
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       } : {
-        background: 'linear-gradient(135deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 60%, var(--accent, #0ea5e9)) 100%)',
+        background: 'linear-gradient(135deg, rgb(var(--brand)) 0%, color-mix(in srgb, rgb(var(--brand)) 60%, rgb(var(--accent, 14 165 233))) 100%)',
       }}
     >
       {/* Brand gradient overlay — always present; translucent over a photo, opaque otherwise */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(135deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 60%, var(--accent, #0ea5e9)) 100%)',
+          background: 'linear-gradient(135deg, rgb(var(--brand)) 0%, color-mix(in srgb, rgb(var(--brand)) 60%, rgb(var(--accent, 14 165 233))) 100%)',
           opacity: heroImage ? 0.82 : 1,
         }}
       />
