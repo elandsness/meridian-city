@@ -10,6 +10,7 @@ import MyJourneyCard from '../components/home/MyJourneyCard.jsx'
 import WelcomeHero from '../components/home/WelcomeHero.jsx'
 import ChatTeaser from '../components/home/ChatTeaser.jsx'
 import EntityMapCard from '../components/entity/EntityMapCard.jsx'
+import StatusMapPage from '../components/entity/StatusMapPage.jsx'
 import Ticker from '../components/home/Ticker.jsx'
 import WeatherWidget from '../components/home/WeatherWidget.jsx'
 import ClockWidget from '../components/home/ClockWidget.jsx'
@@ -32,6 +33,7 @@ export const HOME_MODULES = {
 // { id, template, ...props } in config.home.public).
 const TEMPLATES = {
   'entity-map': EntityMapCard,
+  'status-map': StatusMapPage,
   'ticker': Ticker,
   'weather-widget': WeatherWidget,
   'clock-widget': ClockWidget,
