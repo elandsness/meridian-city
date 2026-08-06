@@ -1,31 +1,136 @@
 <svg viewBox="0 0 1000 580" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1000" height="580" fill="#0f172a" rx="6"/>
-  <!-- major avenues (horizontal) -->
-  <line x1="0" y1="116" x2="1000" y2="116" stroke="#1e293b" stroke-width="2"/>
-  <line x1="0" y1="232" x2="1000" y2="232" stroke="#1e293b" stroke-width="2"/>
-  <line x1="0" y1="348" x2="1000" y2="348" stroke="#1e293b" stroke-width="2"/>
-  <line x1="0" y1="464" x2="1000" y2="464" stroke="#1e293b" stroke-width="2"/>
-  <!-- side streets (horizontal) -->
-  <line x1="0" y1="58"  x2="1000" y2="58"  stroke="#172030" stroke-width="1"/>
-  <line x1="0" y1="174" x2="1000" y2="174" stroke="#172030" stroke-width="1"/>
-  <line x1="0" y1="290" x2="1000" y2="290" stroke="#172030" stroke-width="1"/>
-  <line x1="0" y1="406" x2="1000" y2="406" stroke="#172030" stroke-width="1"/>
-  <line x1="0" y1="522" x2="1000" y2="522" stroke="#172030" stroke-width="1"/>
-  <!-- major avenues (vertical) -->
-  <line x1="125" y1="0" x2="125" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <line x1="250" y1="0" x2="250" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <line x1="375" y1="0" x2="375" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <line x1="500" y1="0" x2="500" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <line x1="625" y1="0" x2="625" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <line x1="750" y1="0" x2="750" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <line x1="875" y1="0" x2="875" y2="580" stroke="#1e293b" stroke-width="2"/>
-  <!-- side streets (vertical) -->
-  <line x1="62"  y1="0" x2="62"  y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="187" y1="0" x2="187" y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="312" y1="0" x2="312" y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="437" y1="0" x2="437" y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="562" y1="0" x2="562" y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="687" y1="0" x2="687" y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="812" y1="0" x2="812" y2="580" stroke="#172030" stroke-width="1"/>
-  <line x1="937" y1="0" x2="937" y2="580" stroke="#172030" stroke-width="1"/>
+  <!-- city block base -->
+  <rect width="1000" height="580" fill="#0d1b2a" rx="6"/>
+
+  <!-- West River -->
+  <rect x="140" y="0" width="75" height="580" fill="#091825"/>
+  <rect x="155" y="0" width="45" height="580" fill="#08162200" opacity="0.0"/>
+  <line x1="140" y1="0" x2="140" y2="580" stroke="#0f2238" stroke-width="2"/>
+  <line x1="215" y1="0" x2="215" y2="580" stroke="#0f2238" stroke-width="2"/>
+  <text x="177" y="300" text-anchor="middle" font-size="9" fill="#0f2a42"
+        font-family="system-ui" letter-spacing="1" transform="rotate(-90,177,300)">WEST RIVER</text>
+
+  <!-- East River -->
+  <rect x="790" y="0" width="70" height="580" fill="#091825"/>
+  <line x1="790" y1="0" x2="790" y2="580" stroke="#0f2238" stroke-width="2"/>
+  <line x1="860" y1="0" x2="860" y2="580" stroke="#0f2238" stroke-width="2"/>
+  <text x="825" y="300" text-anchor="middle" font-size="9" fill="#0f2a42"
+        font-family="system-ui" letter-spacing="1" transform="rotate(-90,825,300)">EAST RIVER</text>
+
+  <!-- Bridges -->
+  <rect x="140" y="170" width="75" height="10" fill="#1a3050"/>
+  <rect x="140" y="380" width="75" height="10" fill="#1a3050"/>
+  <rect x="790" y="200" width="70" height="10" fill="#1a3050"/>
+  <rect x="790" y="410" width="70" height="10" fill="#1a3050"/>
+
+  <!-- Central Park -->
+  <rect x="378" y="8" width="204" height="132" fill="#0c2218" rx="4"/>
+  <rect x="384" y="14" width="192" height="120" fill="#0e2a1e" rx="3"/>
+  <text x="480" y="82" text-anchor="middle" font-size="10" fill="#1a4530"
+        font-family="system-ui" letter-spacing="2" font-style="italic">Central Park</text>
+
+  <!-- Waterfront Park (left) -->
+  <rect x="215" y="85" width="58" height="80" fill="#0c2218" rx="3"/>
+  <text x="244" y="132" text-anchor="middle" font-size="7" fill="#1a3f28"
+        font-family="system-ui" letter-spacing="1">Waterfront</text>
+
+  <!-- Small park (right center) -->
+  <rect x="730" y="310" width="55" height="60" fill="#0c2218" rx="3"/>
+
+  <!-- MAJOR HORIZONTAL AVENUES (full width of main city) -->
+  <rect x="215" y="152" width="575" height="14" fill="#152540"/>
+  <rect x="215" y="285" width="575" height="16" fill="#172844"/>
+  <rect x="215" y="420" width="575" height="14" fill="#152540"/>
+  <!-- WESTSIDE horizontals -->
+  <rect x="0"   y="154" width="140" height="10" fill="#11202f"/>
+  <rect x="0"   y="287" width="140" height="10" fill="#11202f"/>
+  <rect x="0"   y="422" width="140" height="10" fill="#11202f"/>
+  <!-- EASTSIDE horizontals -->
+  <rect x="860" y="154" width="140" height="10" fill="#11202f"/>
+  <rect x="860" y="287" width="140" height="10" fill="#11202f"/>
+  <rect x="860" y="422" width="140" height="10" fill="#11202f"/>
+
+  <!-- MAJOR VERTICAL AVENUES -->
+  <rect x="276" y="0" width="12" height="580" fill="#152540"/>
+  <rect x="370" y="140" width="10" height="440" fill="#152540"/><!-- below park -->
+  <rect x="480" y="140" width="10" height="440" fill="#152540"/>
+  <rect x="582" y="140" width="10" height="440" fill="#152540"/>
+  <rect x="680" y="0"   width="12" height="580" fill="#152540"/>
+  <rect x="750" y="0"   width="8"  height="580" fill="#132035"/>
+
+  <!-- SIDE STREETS (horizontal) -->
+  <g stroke="#111d30" stroke-width="1.5" fill="none">
+    <line x1="215" y1="52"  x2="790" y2="52"/>
+    <line x1="215" y1="100" x2="370" y2="100"/><line x1="582" y1="100" x2="790" y2="100"/>
+    <!-- skip park area 370-582 -->
+    <line x1="215" y1="205" x2="790" y2="205"/>
+    <line x1="215" y1="245" x2="790" y2="245"/>
+    <line x1="215" y1="335" x2="790" y2="335"/>
+    <line x1="215" y1="375" x2="790" y2="375"/>
+    <line x1="215" y1="467" x2="790" y2="467"/>
+    <line x1="215" y1="510" x2="790" y2="510"/>
+    <line x1="215" y1="550" x2="790" y2="550"/>
+    <!-- WESTSIDE side streets -->
+    <line x1="0" y1="52"  x2="140" y2="52"/>
+    <line x1="0" y1="205" x2="140" y2="205"/>
+    <line x1="0" y1="335" x2="140" y2="335"/>
+    <line x1="0" y1="467" x2="140" y2="467"/>
+    <!-- EASTSIDE side streets -->
+    <line x1="860" y1="52"  x2="1000" y2="52"/>
+    <line x1="860" y1="205" x2="1000" y2="205"/>
+    <line x1="860" y1="335" x2="1000" y2="335"/>
+    <line x1="860" y1="467" x2="1000" y2="467"/>
+  </g>
+
+  <!-- SIDE STREETS (vertical) -->
+  <g stroke="#111d30" stroke-width="1.5" fill="none">
+    <line x1="245" y1="0" x2="245" y2="580"/>
+    <line x1="315" y1="0" x2="315" y2="580"/>
+    <line x1="340" y1="140" x2="340" y2="580"/>
+    <line x1="412" y1="140" x2="412" y2="580"/>
+    <line x1="445" y1="140" x2="445" y2="580"/>
+    <line x1="515" y1="140" x2="515" y2="580"/>
+    <line x1="548" y1="140" x2="548" y2="580"/>
+    <line x1="615" y1="140" x2="615" y2="580"/>
+    <line x1="648" y1="0" x2="648" y2="580"/>
+    <line x1="715" y1="0" x2="715" y2="580"/>
+    <line x1="775" y1="0" x2="775" y2="580"/>
+    <!-- WESTSIDE verticals -->
+    <line x1="48"  y1="0" x2="48"  y2="580"/>
+    <line x1="95"  y1="0" x2="95"  y2="580"/>
+    <!-- EASTSIDE verticals -->
+    <line x1="900" y1="0" x2="900" y2="580"/>
+    <line x1="945" y1="0" x2="945" y2="580"/>
+  </g>
+
+  <!-- Street name labels -->
+  <g font-size="8" fill="#1a3252" font-family="system-ui" letter-spacing="0.5">
+    <text x="278" y="150" text-anchor="middle">Broadway</text>
+    <text x="682" y="150" text-anchor="middle">5th Ave</text>
+    <text x="480" y="150" text-anchor="middle">Market St</text>
+    <text x="680" y="283">Elm St</text>
+    <text x="680" y="418">Oak Ave</text>
+    <text x="218" y="150">Main St</text>
+    <text x="218" y="283">Blont St</text>
+  </g>
+
+  <!-- Landmark dots -->
+  <g fill="#1a3252" font-size="9" font-family="system-ui">
+    <!-- City Hall -->
+    <rect x="488" y="276" width="34" height="16" rx="2" fill="#152035"/>
+    <text x="505" y="288" text-anchor="middle" font-size="7" fill="#253d60">City Hall</text>
+    <!-- Central Station -->
+    <rect x="395" y="276" width="44" height="16" rx="2" fill="#152035"/>
+    <text x="417" y="288" text-anchor="middle" font-size="7" fill="#253d60">Central Station</text>
+  </g>
+
+  <!-- District labels -->
+  <text x="70"  y="298" text-anchor="middle" font-size="11" fill="#1e3555"
+        font-family="system-ui" letter-spacing="2" font-weight="600">WESTSIDE</text>
+  <text x="340" y="530" text-anchor="middle" font-size="11" fill="#1e3555"
+        font-family="system-ui" letter-spacing="2" font-weight="600">DOWNTOWN</text>
+  <text x="630" y="245" text-anchor="middle" font-size="11" fill="#1e3555"
+        font-family="system-ui" letter-spacing="2" font-weight="600">OLD TOWN</text>
+  <text x="930" y="298" text-anchor="middle" font-size="11" fill="#1e3555"
+        font-family="system-ui" letter-spacing="2" font-weight="600">EASTSIDE</text>
 </svg>

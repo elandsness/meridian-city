@@ -31,7 +31,7 @@ function scatterPosition(center, deviceId, radius = 75) {
   return { x: center.x + Math.cos(angle) * r, y: center.y + Math.sin(angle) * r }
 }
 
-function scatterFull(deviceId, w = 960, h = 540, margin = 35) {
+function scatterFull(deviceId, w = 1000, h = 580, margin = 30) {
   let a = 5381
   for (let i = 0; i < deviceId.length; i++) a = ((a << 5) + a + deviceId.charCodeAt(i)) & 0xffffffff
   const b = (a * 1664525 + 1013904223) & 0xffffffff
