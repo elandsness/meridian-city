@@ -7,6 +7,7 @@ import com.meridian.entityengine.domain.EntityRecord;
 import com.meridian.entityengine.repository.EntityRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -43,12 +44,18 @@ public class TransitionScheduler {
     private final EntityFactory entityFactory;
     private final EntityKafkaPublisher kafkaPublisher;
 
+    private static final int TICK_BATCH_SIZE = 200;
+    private static final int BACKFILL_OWNER_BATCH = 300;
+    private static final int BACKFILL_RECORD_BATCH = 2000;
+
     @Scheduled(fixedDelayString = "${entity-engine.scheduler-fixed-delay-ms:5000}")
     public void tick() {
         Map<String, EntityDefinition> owned = configLoader.getOwnedDefinitions();
         if (owned.isEmpty()) return;
 
         for (Map.Entry<String, EntityDefinition> entry : owned.entrySet()) {
+            EntityDefinition.GeneratorDef gen = entry.getValue().getGenerator();
+            if (gen != null && "periodicHistoryBackfill".equals(gen.getStrategy())) continue;
             try {
                 runGenerator(entry.getKey(), entry.getValue());
             } catch (RuntimeException ex) {
@@ -57,7 +64,8 @@ public class TransitionScheduler {
         }
 
         Set<String> ownedTypes = owned.keySet();
-        List<EntityRecord> due = repository.findByEntityTypeInAndNextTransitionAtLessThanEqual(ownedTypes, OffsetDateTime.now());
+        List<EntityRecord> due = repository.findByEntityTypeInAndNextTransitionAtLessThanEqual(
+                ownedTypes, OffsetDateTime.now(), PageRequest.of(0, TICK_BATCH_SIZE));
         for (EntityRecord record : due) {
             try {
                 service.advanceIfDue(record.getEntityType(), record);
@@ -67,12 +75,26 @@ public class TransitionScheduler {
         }
     }
 
+    @Scheduled(fixedDelay = 300_000)
+    public void backfillTick() {
+        Map<String, EntityDefinition> owned = configLoader.getOwnedDefinitions();
+        for (Map.Entry<String, EntityDefinition> entry : owned.entrySet()) {
+            EntityDefinition.GeneratorDef gen = entry.getValue().getGenerator();
+            if (gen == null || !"periodicHistoryBackfill".equals(gen.getStrategy())) continue;
+            try {
+                runPeriodicHistoryBackfill(entry.getKey(), entry.getValue(), gen);
+            } catch (RuntimeException ex) {
+                log.warn("Backfill failed for entityType={}: {}", entry.getKey(), ex.getMessage());
+            }
+        }
+    }
+
     private void runGenerator(String entityType, EntityDefinition def) {
         EntityDefinition.GeneratorDef gen = def.getGenerator();
         if (gen == null || gen.getStrategy() == null) return;
         switch (gen.getStrategy()) {
             case "simpleSteadyState" -> runSimpleSteadyState(entityType, def, gen);
-            case "periodicHistoryBackfill" -> runPeriodicHistoryBackfill(entityType, def, gen);
+            case "periodicHistoryBackfill" -> { /* handled by backfillTick() on a slower cadence */ }
             default -> log.warn("Unknown generator strategy \"{}\" for entityType={}", gen.getStrategy(), entityType);
         }
     }
@@ -119,8 +141,10 @@ public class TransitionScheduler {
         boolean monthly = "monthly".equalsIgnoreCase(gen.getPeriodFrequency());
         String currentPeriod = monthly ? monthPeriod(OffsetDateTime.now()) : quarterPeriod(OffsetDateTime.now());
 
-        List<EntityRecord> owners = repository.findByEntityType(gen.getOwnerEntityType());
-        Map<String, List<EntityRecord>> existingByOwner = repository.findByEntityType(entityType).stream()
+        List<EntityRecord> owners = repository.findByEntityType(
+                gen.getOwnerEntityType(), PageRequest.of(0, BACKFILL_OWNER_BATCH));
+        Map<String, List<EntityRecord>> existingByOwner = repository.findByEntityType(
+                entityType, PageRequest.of(0, BACKFILL_RECORD_BATCH)).stream()
                 .collect(Collectors.groupingBy(r -> String.valueOf(r.getField(gen.getOwnerField()))));
 
         for (EntityRecord owner : owners) {
