@@ -31,35 +31,18 @@ function scatterPosition(center, deviceId, radius = 75) {
   return { x: center.x + Math.cos(angle) * r, y: center.y + Math.sin(angle) * r }
 }
 
-// Assign each device its own grid cell sized to the canvas, then jitter
-// within the cell using the device ID hash. Grid sizing guarantees no two
-// dots ever share a cell, so stacking is impossible regardless of ID patterns.
-function gridScatterPositions(devices, w = 1000, h = 580, margin = 40) {
-  const n = devices.length
-  if (n === 0) return new Map()
-  const sorted = [...devices].sort((a, b) => a.device_id.localeCompare(b.device_id))
-  const cols = Math.ceil(Math.sqrt(n * w / h))
-  const rows = Math.ceil(n / cols)
-  const cellW = (w - margin * 2) / cols
-  const cellH = (h - margin * 2) / rows
-  const out = new Map()
-  sorted.forEach((d, i) => {
-    const col = i % cols
-    const row = Math.floor(i / cols)
-    let h1 = 5381
-    for (let j = 0; j < d.device_id.length; j++) {
-      h1 = ((h1 << 5) + h1 + d.device_id.charCodeAt(j)) & 0xffffffff
-    }
-    // second independent hash via finalizer step (avalanches bits fully)
-    const h2 = Math.imul(h1 ^ (h1 >>> 16), 0x45d9f3b)
-    const jx = ((h1 >>> 0) % Math.round(cellW * 0.5)) - cellW * 0.25
-    const jy = ((h2 >>> 0) % Math.round(cellH * 0.5)) - cellH * 0.25
-    out.set(d.device_id, {
-      x: Math.round(margin + (col + 0.5) * cellW + jx),
-      y: Math.round(margin + (row + 0.5) * cellH + jy),
-    })
-  })
-  return out
+// Two independent hashes of the same device ID: forward pass → x, reverse
+// pass → y. Uncorrelated so dots scatter organically; overlaps are accepted.
+function scatterFull(deviceId, w = 1000, h = 580, margin = 30) {
+  let hx = 5381, hy = 5381
+  for (let i = 0; i < deviceId.length; i++)
+    hx = ((hx << 5) + hx + deviceId.charCodeAt(i)) & 0xffffffff
+  for (let i = deviceId.length - 1; i >= 0; i--)
+    hy = ((hy << 5) + hy + deviceId.charCodeAt(i)) & 0xffffffff
+  return {
+    x: margin + ((hx >>> 0) % (w - margin * 2)),
+    y: margin + ((hy >>> 0) % (h - margin * 2)),
+  }
 }
 
 // Generic `status-map` public-portal screen template. Static item positions
@@ -144,11 +127,10 @@ export default function StatusMapPage({
   } else if (isDevices) {
     const devices = Array.isArray(devicesData?.items) ? devicesData.items : []
     const [,, vbW, vbH] = (viewBox ?? '0 0 1000 580').split(' ').map(Number)
-    const positions = gridScatterPositions(devices, vbW, vbH)
     for (const d of devices) {
       sprites.push({
         id: d.device_id,
-        coordinate: positions.get(d.device_id) ?? { x: vbW / 2, y: vbH / 2 },
+        coordinate: scatterFull(d.device_id, vbW, vbH),
         color: colorMap[d.status] ?? colorMap.slate,
       })
     }
