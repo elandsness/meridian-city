@@ -264,33 +264,13 @@ a local `/industry-assets/` path, so the browser always loads from the same orig
 | "Track *my* loan / claim / order" | `entity-list` (no ownerField) | `entity-journey` with ownerField |
 | "See live activity for admissions / flights / repairs" | `entity-list` (no ownerField) | `entity-journey` with ownerField |
 
-**The portal has no mechanism to create custom entity types from user actions.** "Track my X" is a natural instinct but it requires a custom form → custom entity creation path that doesn't exist. Use `entity-list` (shows all entities as a live feed) — it's visible, real-time, and actually works.
+**`ownerField` does not work for any custom entity type. Do not use it.**
 
-**⚠️ Critical constraint — `entity-journey` + `ownerField` only works when the user creates the entity.**
+`ownerField` is not a supported feature for custom entity types. Do not include it in any public portal screen. Writing a comment like "user submits form → sets account_id" does not make it work — the platform code determines entity creation, not YAML comments. There is no form, API, or flow in this platform that creates a custom entity instance on behalf of a logged-in user. Whether the entity has a generator or not makes no difference: the result is always an empty journey for every user.
 
-`ownerField` tells the journey screen which entities belong to the logged-in user: it filters entities where `ownerField == user.id`. This only returns results when the entity was created with that field set to a real citizen ID — which only happens through **user-initiated actions** (submitting a form, placing an order, completing a registration).
+**The only valid personal tracker in the public portal is `my-journey` (aviation built-in, not configurable).**
 
-**Hard platform constraint — `ownerField` only ever works for the built-in `my-journey` (aviation).**
-
-In the current platform, the public portal form (`NewRequest`) creates `service_request` records — it does NOT create custom entity type instances. There is no API, form, or flow that creates a custom entity (like `billing_dispute`, `loan_application`, `service_interruption`) on behalf of a logged-in user. This means:
-
-- **Generator-driven entity + ownerField** → generator never populates ownerField → empty journey. ❌
-- **No-generator entity + ownerField** → entity never gets created at all → still empty journey. ❌
-- **Both are permanently broken for all custom entity types.**
-
-The only working `entity-journey` + `ownerField` in the public portal is the built-in `my-journey` screen (aviation-specific, not configurable here).
-
-**For all other industries:** if you want a personal-looking journey tracker, use `entity-list` with no `ownerField` — it shows the live entity pipeline for all users as a real-time feed, which is still compelling and actually works.
-
-✅ **Good uses of `entity-journey` (ops dashboard, no ownerField):**
-- Flight board showing all flights in each boarding state
-- All claims being processed in the ops view
-- All admissions in the patient pipeline
-
-❌ **Never use `entity-journey` + `ownerField` for a custom entity type, generator or not:**
-- "No generator + ownerField" is not a workaround — entities still won't exist because there is no creation path.
-- "User-created" does not describe ANY custom entity type in this platform. The only user-created data is `service_request` records (built-in), not custom entities.
-- The test is simple: if you wrote the entity in the `entities:` block yourself, it cannot be owner-filtered. Use `entity-list`.
+For all other industries, use `entity-list` (no `ownerField`) — shows the live entity pipeline as a real-time feed, which is compelling and actually works.
 
 **`entity-journey` for the ops dashboard (no `ownerField`) — valid and useful:**
 ```yaml
@@ -409,17 +389,27 @@ error. Rules:
 - The default when omitted is the city list (`infrastructure`, `utilities`, `safety`,
   `environment`, `transport`, `other`) — meaningless for non-city contexts.
 
+**⚠️ `routing` is a TOP-LEVEL key — same indentation as `terminology`, `entities`, `data`, `dynatrace`.
+Never nest `routing` inside `terminology`. They are siblings, not parent/child.**
+
 ```yaml
-# Good: categories ↔ routing are in sync — including 'other'
-terminology:
+# Good: terminology and routing at the same level (both top-level)
+terminology:                          # ← top-level
   requestCategories: [account-issue, card-dispute, loan-inquiry, fraud-report, password-reset, other]
-routing:
+
+routing:                              # ← top-level (NOT indented under terminology)
   account-issue: "Retail Banking"
   card-dispute: "Card Operations"
   loan-inquiry: "Lending"
   fraud-report: "Fraud Detection"
   password-reset: "Digital Support"
   other: "General Support"           # always include 'other' — it's in every requestCategories list
+
+# ❌ WRONG — routing is nested inside terminology (silently ignored)
+terminology:
+  requestCategories: [account-issue, ...]
+  routing:                            # ← THIS IS WRONG
+    account-issue: "Retail Banking"
 ```
 
 **`billingTitle`, `billingSubtitle`, `billNoun` — REQUIRED if `billing` is in `screens.public`.**
@@ -573,9 +563,20 @@ dynatrace:
 
 ## Step 5 — Validate before outputting
 
-**Do this first — look at your `routing:` block right now and find the line `other: ...`.**
-If it is not there, add it: `other: "General Support"`. This single line is missing in the
-majority of generated configs. Do not proceed until `other` is in `routing`.
+**Do these two things first, before all other checks:**
+
+1. **Find `routing:` in your output. It must be a TOP-LEVEL key** (zero indent, same level as
+   `terminology:`, `entities:`, `data:`, `dynatrace:`). If it is indented under `terminology:`,
+   move it out to the top level.
+
+2. **Look at your `routing:` block and find the line `other: ...`.** If it is not there, add it
+   now: `other: "General Support"`. This line is missing in the majority of generated configs.
+   Do not proceed until `other` is present in the top-level `routing:` block.
+
+3. **Look at your `dynatrace.serviceNames` keys.** Delete any key that is not exactly one of:
+   `citizen-service`, `city-operations`, `service-dispatch`, `api-gateway`,
+   `notification-service`, `billing-service`. Common mistakes: `grid-operations` (must be
+   `city-operations`), `field-service` (must be `service-dispatch`).
 
 1. All `screens.public` / `screens.ops` ids are from the catalog (or use a valid `template`).
 2. All `home.public` / `home.ops` ids are from the catalog (or use a valid `template`).
