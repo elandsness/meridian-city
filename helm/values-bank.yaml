@@ -74,17 +74,10 @@ industry:
       - { id: service-requests, label: "Help & Support" }
       - messages
       - id: loan-tracker
-        template: entity-journey
+        template: entity-list
         entityType: loan_application
-        label: "My Loan Application"
+        label: "Loan Applications"
         icon: "🏦"
-        ownerField: applicant_name
-        steps:
-          - { state: submitted, label: "Application Received" }
-          - { state: credit_check, label: "Credit Check" }
-          - { state: underwriting, label: "Underwriting Review" }
-          - { state: approved, label: "Approved ✓" }
-        description: "Track your loan application through each review stage in real time."
       - id: atm-network-map
         template: status-map
         label: "Find ATM & Branch"
@@ -137,11 +130,11 @@ industry:
   data:
     zones: ["northeast-region", "midwest-region", "south-region", "west-coast", "digital-channels"]
     requestTemplates:
-      - { category: card-services, title: "Report Lost or Stolen Card", description: "Customer reported missing credit or debit card. Needs immediate freeze and replacement issuance." }
-      - { category: card-services, title: "Credit Card Billing Dispute", description: "Customer is contesting a recent credit card charge as fraudulent or unrecognized." }
-      - { category: digital-banking, title: "Mobile App Login Issue", description: "Customer is locked out of the mobile banking app or experiencing biometric login failures." }
-      - { category: branch-ops, title: "ATM Cash Dispense Error", description: "ATM debited account but did not dispense physical cash." }
-      - { category: fraud-claims, title: "Suspicious Wire Transfer", description: "Flagged outbound wire transfer requiring secondary customer verification." }
+      - { category: card-dispute, title: "Report Lost or Stolen Card", description: "Customer reported missing credit or debit card. Needs immediate freeze and replacement issuance." }
+      - { category: card-dispute, title: "Credit Card Billing Dispute", description: "Customer is contesting a recent credit card charge as fraudulent or unrecognized." }
+      - { category: account-issue, title: "Mobile App Login Issue", description: "Customer is locked out of the mobile banking app or experiencing biometric login failures." }
+      - { category: account-issue, title: "ATM Cash Dispense Error", description: "ATM debited account but did not dispense physical cash." }
+      - { category: fraud-report, title: "Suspicious Wire Transfer", description: "Flagged outbound wire transfer requiring secondary customer verification." }
     chatQuestions:
       - "How do I pay my credit card bill?"
       - "I lost my debit card, what should I do?"
@@ -151,10 +144,12 @@ industry:
       - "What is my current mortgage rate?"
       - "How do I apply for a personal loan?"
   routing:
-    card-services: "Card Operations"
-    digital-banking: "Digital Channel Support"
-    branch-ops: "Branch & ATM Network"
-    fraud-claims: "Fraud Detection Unit"
+    account-issue: "Retail Banking"
+    card-dispute: "Card Operations"
+    loan-inquiry: "Lending"
+    fraud-report: "Fraud Detection Unit"
+    password-reset: "Digital Channel Support"
+    other: "General Support"
   dynatrace:
     serviceNames:
       citizen-service: "Digital Banking Portal"
@@ -191,8 +186,8 @@ industry:
     # -----------------------------------------------------------------------
     # LOAN APPLICATION — customer-facing loan lifecycle
     # Tracks a loan from submission through credit check, underwriting,
-    # and final approval or denial. Customers can track their own application
-    # via the loan-tracker entity-journey screen (ownerField: applicant_name).
+    # and final approval or denial. Surfaced in the public portal as a live
+    # entity-list feed (loan-tracker) and in ops as the loan-pipeline view.
     # -----------------------------------------------------------------------
     loan_application:
       displayName: "Loan Application"

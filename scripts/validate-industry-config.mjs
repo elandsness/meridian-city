@@ -229,13 +229,22 @@ function checkScreens(cfg) {
     }
   }
 
-  // generator entities must appear in at least one screen or home module
+  // generator entities must appear in at least one screen or home module.
+  // Exception: periodicHistoryBackfill is the billing system's generator — its
+  // entities are surfaced through the built-in `billing` screen, not a custom screen.
   const screenTypes = collectScreenEntityTypes(allScreens)
   const homeTypes = collectHomeEntityTypes(cfg.home)
   const surfacedTypes = new Set([...screenTypes, ...homeTypes])
 
+  const publicScreenIds = new Set(
+    (cfg.screens?.public ?? []).map((s) => (typeof s === 'string' ? s : s?.id))
+  )
+  const billingScreenActive = publicScreenIds.has('billing')
+
   for (const [entityId, def] of Object.entries(cfg.entities ?? {})) {
-    if (def.generator && !surfacedTypes.has(entityId)) {
+    if (!def.generator) continue
+    if (def.generator.strategy === 'periodicHistoryBackfill' && billingScreenActive) continue
+    if (!surfacedTypes.has(entityId)) {
       errors.push(
         `entities.${entityId} has a generator but does not appear in any screen or home module — ` +
         `the engine creates entities that are invisible to users. ` +
