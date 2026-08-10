@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120" width="500" height="120">
+  <defs>
+    <!-- 80s Retro Orange Gradient -->
+    <linearGradient id="gradOrange" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF983D" />
+      <stop offset="100%" stop-color="#CC5F00" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Retro Teal Neon Triangle -->
+  <polygon points="65,15 15,100 115,100" fill="none" stroke="#2EC4B6" stroke-width="8" />
+  
+  <!-- Classic 80s Lightning Bolt -->
+  <polygon points="75,5 45,60 70,60 55,115 105,45 75,45" fill="url(#gradOrange)" />
+  
+  <!-- Typography -->
+  <text x="135" y="65" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="48" fill="#FF7A00" font-style="italic">POWER</text>
+  <text x="135" y="105" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="32" fill="#2EC4B6" letter-spacing="4">UNLIMITED</text>
+</svg>
+

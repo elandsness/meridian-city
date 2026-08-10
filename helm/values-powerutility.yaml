@@ -1,145 +1,276 @@
 industry:
   version: 1
-  id: power-utility
+  id: power-unlimited
+
   company:
     name: "PowerUnlimited"
     short: "PowerUnlimited"
-    tagline: "Powering your life. Safely and reliably."
+    tagline: "Energy that never sleeps."
     assistant:
       name: "Volt"
-      persona: "the PowerUnlimited virtual assistant"
-      supportPhone: "1-800-436-PWR-U"
+      persona: "your smart energy assistant — outage help, billing, and grid insights"
+      supportPhone: "1-800-PWR-LINE"
       systemPrompt: |-
-        You are Volt, the virtual assistant for PowerUnlimited, an electric utility company.
-        Help customers report power outages, check restoration times, report downed lines, 
-        and view their bills. Prioritize safety—if a user mentions a downed wire, instruct 
-        them to stay 30 feet away and call emergency services immediately. Be reassuring, 
-        concise, and professional.
+        You are Volt, the virtual assistant for PowerUnlimited. Help customers
+        report outages, check restoration estimates, review their bill, or ask about
+        solar/battery programs. Be upbeat, efficient, and human — no robotic jargon.
+        Never give medical, legal, or engineering advice.
+
   theme:
     colors:
-      brand: "#005A3C"
-      brandDeep: "#003E29"
-      brandSoft: "#008253"
-      brandTint: "#E5F2EC"
-      accent: "#F37021"
-      accentSoft: "#F79459"
-      accentInk: "#4A1E00"
-    heroImage: "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1600&q=80"
-    logo: "https://drive.usercontent.google.com/u/0/uc?id=1lVEsF1Ol8bwuua0DXVXaqZvkPI01GvsD&export=download"
-    favicon: "https://drive.usercontent.google.com/u/0/uc?id=1vA_VHAnU0Q90KcQJPJopUggTZpH9KF9C&export=download"
+      brand: "#FF7A00"
+      brandDeep: "#CC5F00"
+      brandSoft: "#FF983D"
+      brandTint: "#FFF4E6"
+      accent: "#2EC4B6"
+      accentSoft: "#5DE4D1"
+      accentInk: "#1A7A6F"
+
+    heroImage: "https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1600&q=80"
+    logo: "/powerunlimited_logo.svg"
+    favicon: "/powerunlimited_ico.svg"
+
   terminology:
     customer: "Customer"
     customerPlural: "Customers"
-    request: "Service Request"
-    requestPlural: "Service Requests"
-    incident: "Grid Fault"
-    incidentPlural: "Grid Faults"
-    workOrder: "Field Work Order"
-    asset: "Grid Asset"
-    assetPlural: "Grid Assets"
-    requestCategories: [outage-report, billing, tree-trimming, streetlights, safety-hazard, other]
-    billingTitle: "Billing & Payments"
-    billingSubtitle: "Your PowerUnlimited energy statements and payment history."
-    billNoun: "energy bill"
+    request: "Service request"
+    requestPlural: "Service requests"
+    incident: "Outage event"
+    incidentPlural: "Grid outages"
+    asset: "Device"
+    assetPlural: "Devices"
+
+    requestCategories:
+      - power-outage
+      - billing-question
+      - meter-service
+      - solar-battery
+      - connection-request
+      - other
+
+    billingTitle: "My Energy Bill"
+    billingSubtitle: "Your monthly electricity usage, charges, and payment history."
+    billNoun: "electric bill"
+
   screens:
     public:
       - home
-      - id: outage-tracker
-        template: status-map
-        label: "Outage Map"
-        icon: "⚡"
-        title: "Regional Grid Status"
-        source: devices
-        viewBox: "0 0 1600 900"
-        background:
-          kind: image
-          src: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1600&q=80"
-      - { id: service-requests, label: "Help & Support" }
+      - { id: outages, template: entity-list,
+          entityType: outage,
+          label: "Outage Reports", icon: "⚡" }
+      - { id: service-requests, label: "Report & Track" }
       - billing
       - messages
+
     ops:
       - overview
-      - { id: grid-map, template: status-map, label: "Live Grid Map", icon: "🗺️", title: "Infrastructure Grid Status", source: devices, viewBox: "0 0 1600 1067", background: { kind: image, src: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1600&q=80" } }
-      - { id: active-outages, template: entity-list, entityType: outage_event, label: "Active Outages" }
-      - { id: requests, label: "Field Dispatch" }
-      - { id: incidents, label: "Grid Faults" }
-      - { id: iot, label: "Asset Fleet" }
-      - { id: analytics, label: "Reliability (SAIDI)" }
+      - { id: grid-map, template: status-map,
+          label: "Grid Status", icon: "🗺️",
+          title: "Power Grid Overview",
+          source: devices,
+          viewBox: "0 0 1200 650" }
+      - { id: repair-tasks, template: entity-list,
+          entityType: repair_task,
+          label: "Field Crew Queue" }
+      - { id: outages-map, template: entity-map,
+          entityType: outage,
+          viewBox: "0 0 1200 650",
+          label: "Outage Map" }
+      - { id: outages-kpi, template: entity-summary-card,
+          entityType: outage,
+          label: "Active Outages Today" }
+      - { id: demand-kpi, template: entity-analytics,
+          entityType: meter_reading,
+          label: "Grid Health & Demand" }
       - demo-control
+
   home:
     public:
       - welcome-hero
-      - id: grid-news
+      - id: latest-outages
         template: ticker
         height: slim
-        label: "⚡ GRID STATUS"
+        label: "⚡ ACTIVE OUTAGES"
         items:
-          - "System operating normally. No major outages reported."
-          - "Scheduled maintenance in Valley Substation at 11:00 PM."
-          - "Hot weather alert: See our tips to reduce cooling costs."
+          - "Downtown District — 142 customers affected (est. restoration: 25 min)"
+          - "Riverview Substation — Crew en route, ETA 10 min"
+          - "Northridge Loop — Partial outage, engineers on site"
       - quick-actions
-      - { id: weather, template: weather-widget, mode: forecast }
       - chat-teaser
+
     ops:
-      - { id: outage-kpi, template: entity-summary-card, entityType: outage_event, label: "Outage Events Today" }
+      - { id: outages-kpi, template: entity-summary-card,
+          entityType: outage,
+          label: "Active Outages Today" }
+      - { id: demand-kpi, template: entity-analytics,
+          entityType: meter_reading,
+          label: "Peak Demand Trend" }
       - ops-overview
-      - { id: outage-feed, template: activity-feed, entityTypes: [outage_event], maxItems: 8 }
+      - { id: feed, template: activity-feed,
+          entityTypes: [outage, repair_task],
+          maxItems: 8 }
+
   entities:
-    outage_event:
-      displayName: "Outage Event"
-      displayNamePlural: "Outage Events"
-      idPrefix: out
+    outage:
+      displayName: "Outage"
+      displayNamePlural: "Outages"
+      idPrefix: outg
       fields:
-        customer_id: { type: string }
-        location:    { type: string }
-        severity:    { type: enum, values: [minor, major, critical] }
+        customer_id:        { type: string }
+        location_id:        { type: string }
+        cause:              { type: enum, values: ["weather", "equipment-fail", "animal", "vehicle-accident", "planned-outage", "unknown"] }
+        customers_affected: { type: number }
       initial: reported
+
       states:
-        reported:         { label: "Reported", tone: slate }
-        investigating:    { label: "Investigating", tone: amber }
-        crew_dispatched:  { label: "Crew Dispatched", tone: blue }
-        on_site:          { label: "Crew On Site", tone: orange }
-        restored:         { label: "Power Restored", tone: green, terminal: true, isKpi: true }
+        reported:      { label: "Reported",         tone: slate, isKpi: true }
+        estimated:     { label: "Est. Restoration", tone: amber }
+        dispatched:    { label: "Crew Dispatched",  tone: orange }
+        restored:      { label: "Restored",         tone: green, terminal: true, isKpi: true }
+        false-positve: { label: "False Alarm",      tone: slate, terminal: true }
+
       transitions:
-        - { from: reported,        to: investigating,   timer: { minSeconds: 15, maxSeconds: 45 } }
-        - { from: investigating,   to: crew_dispatched, timer: { minSeconds: 30, maxSeconds: 90 } }
-        - { from: crew_dispatched, to: on_site,         timer: { minSeconds: 45, maxSeconds: 120 } }
-        - { from: on_site,         to: restored,        timer: { minSeconds: 60, maxSeconds: 180 } }
-      generator: { strategy: simpleSteadyState, intervalMs: 35000, maxActive: 8 }
+        - from: reported
+          to: estimated
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: estimated
+          to: dispatched
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: dispatched
+          to: restored
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: estimated
+          to: false-positve
+          when: { faultGate: true, probability: 0.03 }
+          timer: { minSeconds: 1800, maxSeconds: 7200 }
+        - from: restored
+          to: restored
+          timer: { minSeconds: 60, maxSeconds: 180 }
+        - from: false-positve
+          to: false-positve
+          timer: { minSeconds: 60, maxSeconds: 180 }
+
+      computed:
+        position:
+          type: point2d
+          interpolation: linear
+          waypoints:
+            reported:      { x: 435, "y": 292 }
+            estimated:     { x: 542, "y": 307 }
+            dispatched:    { x: 689, "y": 198 }
+            restored:      { x: 920, "y": 310 }
+            false-positve: { x: 435, "y": 378 }
+
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 35000
+        maxActive: 6
+
+    repair_task:
+      displayName: "Repair Task"
+      displayNamePlural: "Repair Tasks"
+      idPrefix: rprt
+      fields:
+        task_type: { type: enum, values: ["pole-repair", "transformer-fail", "vegetation-clear", "meter-install", "post-storm"] }
+        crew_id:   { type: string }
+        priority:  { type: enum, values: ["critical", "high", "routine"] }
+      initial: assigned
+
+      states:
+        assigned:    { label: "Assigned",    tone: slate }
+        enroute:     { label: "En Route",    tone: amber }
+        onsite:      { label: "On Site",     tone: blue }
+        in_progress: { label: "In Progress", tone: orange }
+        completed:   { label: "Completed",   tone: green, terminal: true }
+
+      transitions:
+        - from: assigned
+          to: enroute
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: enroute
+          to: onsite
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: onsite
+          to: in_progress
+          timer: { minSeconds: 180, maxSeconds: 900 }
+        - from: in_progress
+          to: completed
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: completed
+          to: completed
+          timer: { minSeconds: 60, maxSeconds: 180 }
+
+      computed:
+        position:
+          type: point2d
+          interpolation: easeInOut
+          waypoints:
+            assigned:    { x: 400, "y": 50 }
+            enroute:     { x: 650, "y": 180 }
+            onsite:      { x: 920, "y": 310 }
+            in_progress: { x: 950, "y": 320 }
+            completed:   { x: 1080, "y": 460 }
+
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 45000
+        maxActive: 5
+
+    meter_reading:
+      displayName: "Meter Reading"
+      displayNamePlural: "Readings"
+      idPrefix: mtrd
+      fields:
+        device_id:      { type: string }
+        consumption_kw: { type: number }
+        voltage_v:      { type: number }
+        status:         { type: enum, values: ["online", "offline", "low-battery"] }
+      initial: processed
+
+      states:
+        processed: { label: "Processed", tone: slate, terminal: true }
+
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 15000
+        maxActive: 25
+
   data:
-    zones: [metro-substation, valley-substation, north-region, south-region, industrial-park]
+    zones: ["downtown", "north-district", "river-ward", "industrial-park", "suburb-east"]
     requestTemplates:
-      - { category: outage-report, title: "Total Power Loss", description: "Entire neighborhood has been without power since 2:00 PM." }
-      - { category: safety-hazard, title: "Downed Power Line", description: "Tree branch fell and took down a line across the driveway on Elm St. Sparks visible." }
-      - { category: safety-hazard, title: "Transformer Sparking", description: "Loud pop and sparks coming from the pole-mounted transformer at the corner." }
-      - { category: streetlights, title: "Streetlight Outage", description: "Three consecutive streetlights on Maple Ave are completely dark." }
-      - { category: tree-trimming, title: "Tree near power line", description: "Branches are resting heavily on the secondary line behind the house." }
-      - { category: billing, title: "Unusually high bill", description: "My bill doubled this month despite no changes in usage." }
-      - { category: other, title: "Smart Meter Display Blank", description: "The digital display on my new smart meter is completely off." }
+      - { category: power-outage,       title: "Power out in my area",              description: "Lights out for multiple homes. No downed lines visible." }
+      - { category: billing-question,   title: "Unusual high bill this month",       description: "Usage is 3x normal — meter might be faulty." }
+      - { category: meter-service,      title: "Request new smart meter install",    description: "Moving into new house; meter not yet active." }
+      - { category: solar-battery,      title: "Inquiry about home battery program", description: "Want to know if my roof gets enough sun for solar." }
+      - { category: connection-request, title: "New service connection request",     description: "Building a workshop; need temporary power pole." }
+      - { category: other,              title: "General inquiry",                    description: "Other issue not covered above." }
     chatQuestions:
-      - "Is there a known power outage in my area?"
-      - "How do I report a downed power line?"
-      - "When will my power be restored?"
-      - "Can I get an extension on my electric bill?"
+      - "How do I report an outage?"
+      - "What's the estimated restoration time?"
+      - "Why is my bill so high this month?"
+      - "Can I get solar on my roof?"
+
   routing:
-    outage-report: "Grid Operations"
-    billing: "Customer Accounting"
-    tree-trimming: "Vegetation Management"
-    streetlights: "Municipal Services"
-    safety-hazard: "Emergency Response"
-    other: "General Support"
+    power-outage:       "Grid Operations"
+    billing-question:   "Billing & Accounts"
+    meter-service:      "Field Services"
+    solar-battery:      "Renewables Program"
+    connection-request: "New Development"
+    other:              "General Support"
+
   dynatrace:
     serviceNames:
-      citizen-service: "Customer Experience Portal"
-      city-operations: "Grid Operations Center"
-      service-dispatch: "Field Dispatch Service"
-      api-gateway: "Utility API Gateway"
-      notification-service: "Outage Notification Engine"
-      billing-service: "CIS Billing Service"
-    flowLabels:
-      service-request: "Maintenance Request Lifecycle"
-      account-creation: "New Customer Move-in"
-      iot-incident: "Smart Grid Fault Resolution"
-      tax-payment: "Utility Bill Payment"
-    flows: [service-request, account-creation, iot-incident, tax-payment]
+      citizen-service:      "Customer Energy Portal"
+      city-operations:      "Grid Management System"
+      service-dispatch:     "Field Crew Dispatch"
+      api-gateway:          "PowerUnlimited API Gateway"
+      notification-service: "Outage Alerts Service"
+      billing-service:      "Bill & Meter Processing"
 
+    flowLabels:
+      service-request: "Customer Outage Lifecycle"
+      account-creation: "Customer Onboarding Flow"
+      iot-incident:    "Grid Fault → Crew Dispatch"
+      tax-payment:     "Electric Bill Payment Flow"
+
+    flows: [service-request, account-creation, iot-incident, tax-payment]
