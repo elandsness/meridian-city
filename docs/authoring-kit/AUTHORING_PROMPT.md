@@ -205,8 +205,12 @@ Each screen entry is either `"<id>"` or `{ id: <id>, label: "Nav label", icon: "
 | `{ template: 'entity-detail', entityType: '<type>' }` | Generic entity detail + timeline | any custom entity |
 | `{ template: 'entity-map', entityType: '<type>' }` | Moving-sprite map for any type | entities with `computed.position` |
 | `{ template: 'entity-analytics', entityType: '<type>' }` | KPI + chart for any type | any custom entity |
-| `{ template: 'entity-journey', entityType: '<type>', ownerField: '<field>', steps: [...] }` | Personal journey tracker — shows the logged-in user's own entities | **Only when the entity is created by the user** (form submission, purchase, registration). Never for generator-driven entities — see warning below. |
 | `{ template: 'status-map', source: 'devices', background: {...}, ... }` | Geographic/infrastructure status map with live colored dots | "Show me what's happening in my area" — outage maps, ATM finders, parking lots, grid status |
+
+> ❌ **`entity-journey` with `ownerField` is NOT in this table.** It is not a valid option for the
+> public portal with custom entity types. The only personal journey tracker in the public portal
+> is the built-in `my-journey` (aviation only, listed separately above). For all other industries,
+> use `entity-list` to show the live pipeline of entities. See the full constraint explanation below.
 
 **`status-map` config shape — `background` is REQUIRED:**
 ```yaml
@@ -251,14 +255,16 @@ a local `/industry-assets/` path, so the browser always loads from the same orig
 | `{ template: 'entity-analytics', entityType: '<type>' }` | KPI + chart | any custom entity |
 | `{ template: 'entity-journey', entityType: '<type>', steps: [...] }` | Journey board | any step-based entity |
 
-**Choosing between `entity-journey` and `status-map` for a public portal screen:**
+**Choosing the right public portal screen for infrastructure/area views:**
 
 | User intent | Right template | Wrong template |
 |-------------|---------------|----------------|
-| "Track *my* loan / claim / order" | `entity-journey` | `status-map` |
 | "See where outages are happening near me" | `status-map` | `entity-journey` |
 | "Check the status of grid/ATM/parking infrastructure" | `status-map` | `entity-journey` |
-| "See my appointment / admission status" | `entity-journey` | `status-map` |
+| "Track *my* loan / claim / order" | `entity-list` (no ownerField) | `entity-journey` with ownerField |
+| "See live activity for admissions / flights / repairs" | `entity-list` (no ownerField) | `entity-journey` with ownerField |
+
+**The portal has no mechanism to create custom entity types from user actions.** "Track my X" is a natural instinct but it requires a custom form → custom entity creation path that doesn't exist. Use `entity-list` (shows all entities as a live feed) — it's visible, real-time, and actually works.
 
 **⚠️ Critical constraint — `entity-journey` + `ownerField` only works when the user creates the entity.**
 
@@ -512,14 +518,19 @@ routing:
 ```
 
 **`dynatrace`** — service naming + business flow config:
+
+**`serviceNames` uses FIXED keys — the left side is the platform's internal service name, you only change the right side (the display label).** Do not invent left-side keys. Using `grid-operations` instead of `city-operations` silently renames nothing.
+
 ```yaml
 dynatrace:
   serviceNames:
-    citizen-service: "<display name>"     # the customer-facing backend
-    city-operations: "<display name>"     # the ops/incident backend
-    service-dispatch: "<display name>"    # the routing/dispatch backend
-    api-gateway: "<display name>"
-    notification-service: "<display name>"
+    # KEY (left side) = fixed platform name — NEVER change these
+    # VALUE (right side) = your industry label — change these freely
+    citizen-service: "<Customer Portal display name>"  # customer-facing backend
+    city-operations: "<Ops Center display name>"       # ops/incident backend
+    service-dispatch: "<Dispatch display name>"        # routing/dispatch backend
+    api-gateway: "<API Gateway display name>"
+    notification-service: "<Notifications display name>"
   flowLabels:
     service-request: "<flow title>"
     account-creation: "<flow title>"
@@ -744,6 +755,10 @@ industry:
   routing:
     airfield: "Airfield Operations"
     baggage: "Baggage Handling"
+    lost-item: "Lost & Found"
+    accessibility: "Passenger Assistance"
+    flight-query: "Passenger Services"
+    other: "General Support"
   dynatrace:
     serviceNames:
       citizen-service: "Passenger Services"
