@@ -305,23 +305,50 @@ home:
 - Portal: at least 2 modules in `home.public` (the `home` screen is always blank without them).
 - Ops: at least 1 module in `home.ops`.
 
-### 4c. Terminology (all optional)
-Map generic nouns to industry-specific ones:
+### 4c. Terminology
+
+Rename generic nouns to industry-specific ones. The fields below are **always optional**:
 `customer`, `customerPlural`, `request`, `requestPlural`, `incident`, `incidentPlural`,
 `workOrder`, `asset`, `assetPlural`.
 
-**`requestCategories`** — the dropdown options shown on the "Submit a request" form.
-Always provide an industry-specific list; the default is city infrastructure categories
-which make no sense for non-city contexts. Each entry is a short lowercase slug (use
-hyphens for multi-word values). Always end with `other`. Example for a bank:
+The following fields look optional but are **effectively required** when the named screen
+is active — omitting them causes the UI to fall back to city-specific defaults that will
+look broken for any non-city industry.
+
+**`requestCategories` — REQUIRED for any non-city industry.** These are the dropdown
+options on the "Submit a request" form AND they must exactly match the keys in `routing`.
+If the two lists diverge, form submissions with unrouted categories will produce a 500
+error. Rules:
+- Every key in `routing` must appear in `requestCategories`.
+- Each entry is a short lowercase slug (hyphens OK for multi-word: `card-dispute`).
+- Always end with `other`.
+- The default when omitted is the city list (`infrastructure`, `utilities`, `safety`,
+  `environment`, `transport`, `other`) — meaningless for non-city contexts.
+
 ```yaml
-requestCategories: [account-issue, card-dispute, loan-inquiry, fraud-report, password-reset, other]
+# Good: categories ↔ routing are in sync
+terminology:
+  requestCategories: [account-issue, card-dispute, loan-inquiry, fraud-report, password-reset, other]
+routing:
+  account-issue: "Retail Banking"
+  card-dispute: "Card Operations"
+  loan-inquiry: "Lending"
+  fraud-report: "Fraud Detection"
+  password-reset: "Digital Support"
 ```
 
-**Billing terminology** (required if the `billing` screen is enabled):
-`billingTitle` (nav label), `billingSubtitle` (page subtitle), `billNoun` (singular
-noun for a bill/statement/invoice used in notification messages — e.g. `"payment"`,
-`"credit card statement"`, `"energy bill"`).
+**`billingTitle`, `billingSubtitle`, `billNoun` — REQUIRED if `billing` is in `screens.public`.**
+Without them the billing page shows the hardcoded city fallbacks ("Tax & billing", "tax bill").
+- `billingTitle` — page heading / nav label (e.g. `"Pay My Bill"`, `"Billing & Payments"`)
+- `billingSubtitle` — subtitle beneath the heading (e.g. `"Your PowerUnlimited electricity bills and payment history."`)
+- `billNoun` — singular noun for one bill shown inline (e.g. `"electric bill"`, `"credit card statement"`, `"invoice"`)
+
+```yaml
+terminology:
+  billingTitle: "Billing & Payments"
+  billingSubtitle: "Your PowerUnlimited electricity bills and payment history."
+  billNoun: "electric bill"
+```
 
 ### 4d. Theme
 `theme.colors`: `brand`, `brandDeep`, `brandSoft`, `brandTint`, `accent`, `accentSoft`,
@@ -336,13 +363,26 @@ the image at deploy time, stores it under `/industry-assets/` inside the pod, an
 rewrites the ConfigMap to reference the local path — so the app always loads images
 from the same origin with no external dependency at runtime.
 
+**URL requirements — the download URL must serve the raw file bytes directly, with no
+redirect to a login page or HTML preview.** These URL types do NOT work:
+- ❌ Google Drive share links: `https://drive.google.com/file/d/.../view` — serves HTML
+- ❌ Dropbox share links: `?dl=0` suffix — serves HTML preview
+- ❌ Any URL requiring a cookie / session to download
+
+Use one of these reliable sources instead:
+- ✅ **Unsplash** (photos): `https://images.unsplash.com/photo-<id>?w=1600&q=80`
+- ✅ **GitHub raw**: `https://raw.githubusercontent.com/<user>/<repo>/main/path/to/image.png`
+- ✅ **Imgur direct**: `https://i.imgur.com/<id>.png`
+- ✅ Any CDN or object storage URL that returns the raw file with no auth gate
+
+Specific fields:
 - `theme.heroImage` — full-bleed background for the `welcome-hero` home module. Use a
-  top-down or wide-angle photo that makes sense as a banner (city skyline, retail
-  floor, hospital corridor). Unsplash URLs work well: `https://images.unsplash.com/photo-xxx?w=1600&q=80`
-- `theme.favicon` — browser tab icon. Supply a PNG or ICO URL, or omit to use the
+  wide landscape photo (city skyline, hospital corridor, factory floor). Unsplash URLs
+  work perfectly: `https://images.unsplash.com/photo-xxx?w=1600&q=80`
+- `theme.favicon` — browser tab icon. Supply a PNG or ICO direct URL, or omit to use
+  the built-in Meridian mark recolored to `brand`.
+- `theme.logo` — navbar logo image. Supply a PNG/SVG direct URL, or omit to use the
   built-in Meridian mark recolored to `brand`.
-- `theme.logo` — navbar logo image. Supply a PNG/SVG URL, or omit to use the built-in
-  Meridian mark recolored to `brand`.
 
 ### 4e. Company
 ```yaml
@@ -418,6 +458,15 @@ dynatrace:
 10. All state keys referenced in `transitions.from`/`to` and `steps` lists exist in `states`.
 11. `version: 1` at the top.
 12. YAML is valid with 2-space indent and a single top-level `industry:` block.
+13. **Routing ↔ categories sync:** every key in `routing` appears in `terminology.requestCategories`.
+    A routing key with no matching category means users can never submit that category through the
+    form — and the default city categories will be shown, which make no sense for non-city industries.
+14. **Billing terminology present:** if `billing` appears in `screens.public`, then
+    `terminology.billingTitle`, `terminology.billingSubtitle`, and `terminology.billNoun` are all
+    defined. Without them the page shows "Tax & billing" and "tax bill" regardless of industry.
+15. **Image URLs serve raw bytes:** `theme.heroImage`, `theme.logo`, and `theme.favicon` (when
+    set) are direct-download URLs, not Google Drive/Dropbox share links. The init container uses
+    `curl` without a browser session — share-link redirects produce broken images.
 
 ---
 
@@ -467,7 +516,7 @@ industry:
     customerPlural: "Passengers"
     asset: "Ground equipment"
     assetPlural: "Ground equipment"
-    requestCategories: [lost-item, accessibility, flight-query, lounge-access, baggage, other]
+    requestCategories: [airfield, baggage, lost-item, accessibility, flight-query, other]
   screens:
     public:
       - home
@@ -600,7 +649,10 @@ industry:
     incidentPlural: "Clinical incidents"
     asset: "Medical equipment"
     assetPlural: "Medical equipment"
-    requestCategories: [care-concern, billing-query, appointment, dietary, environment, other]
+    requestCategories: [billing, facilities, equipment, administrative, care-concern, other]
+    billingTitle: "Billing & Accounts"
+    billingSubtitle: "Your Meridian Health invoices and payment history."
+    billNoun: "invoice"
   screens:
     public:
       - home
