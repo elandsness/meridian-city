@@ -44,14 +44,14 @@ function scatterFull(deviceId, vbW = 1000, vbH = 580, margin = 30) {
   base = base >>> 0
 
   let hx = base
-  hx ^= hx >>> 16
-  hx = Math.imul(hx, 0x45d9f3b) >>> 0
-  hx ^= hx >>> 16
+  hx = ((hx ^ (hx >>> 16)) >>> 0)
+  hx = (Math.imul(hx, 0x45d9f3b) >>> 0)
+  hx = ((hx ^ (hx >>> 16)) >>> 0)
 
   let hy = base
-  hy ^= hy >>> 17
-  hy = Math.imul(hy, 0x9e3779b9) >>> 0
-  hy ^= hy >>> 15
+  hy = ((hy ^ (hy >>> 17)) >>> 0)
+  hy = (Math.imul(hy, 0x9e3779b9) >>> 0)
+  hy = ((hy ^ (hy >>> 15)) >>> 0)
 
   return {
     x: margin + (hx % (vbW - margin * 2)),

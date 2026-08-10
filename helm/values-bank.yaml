@@ -290,6 +290,9 @@ industry:
           to: resolved
           userTriggerable: true
           label: "Resolve"
+        - from: open
+          to: resolved
+          timer: { minSeconds: 3600, maxSeconds: 7200 }
         - from: detecting
           to: open
           timer: { minSeconds: 5, maxSeconds: 30 }

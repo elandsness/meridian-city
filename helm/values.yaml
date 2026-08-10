@@ -474,6 +474,12 @@ industry:
           to: resolved
           userTriggerable: true
           label: "Resolve"
+        # Safety-net auto-resolve: incidents that aren't manually resolved (or
+        # whose work_order escalated without cascading) close after 1-2 hours so
+        # the device map doesn't accumulate permanent "warning" dots.
+        - from: open
+          to: resolved
+          timer: { minSeconds: 3600, maxSeconds: 7200 }
         # Auto-detection → open
         - from: detecting
           to: open
@@ -568,6 +574,10 @@ industry:
           to: escalated
           when: { faultGate: "work-order-escalated", probability: 0.1 }
           timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            - action: transition
+              target: link.incident_id
+              to: resolved
         - from: acknowledged
           to: resolved
           when: { probability: 0.85 }
