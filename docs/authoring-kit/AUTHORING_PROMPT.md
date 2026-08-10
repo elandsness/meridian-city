@@ -261,7 +261,11 @@ a local `/industry-assets/` path, so the browser always loads from the same orig
 
 `ownerField` tells the journey screen which entities belong to the logged-in user: it filters entities where `ownerField == user.id`. This only returns results when the entity was created with that field set to a real citizen ID — which only happens through **user-initiated actions** (submitting a form, placing an order, completing a registration).
 
-If the entity uses `generator: { strategy: simpleSteadyState }`, the generator creates entities with no knowledge of any citizen ID, so `ownerField` is never populated. Every logged-in user sees an empty journey. **Do not combine `entity-journey` + `ownerField` with a generator-driven entity type.**
+**Two rules that must both be true for `ownerField` to work:**
+1. The field named in `ownerField` must be explicitly declared in the entity's `fields:` block.
+2. Entities must be created by user action (form submit, purchase, registration) — not by `generator`. The generator creates entities with no knowledge of any citizen ID. There is no "assume users have matching IDs" workaround — the engine has no such concept. Every logged-in user sees an empty journey when the entity is generator-driven.
+
+**Do not combine `entity-journey` + `ownerField` with a generator-driven entity type.** No amount of commenting or documentation inside the YAML changes this — it is a hard engine constraint.
 
 ✅ **Good `entity-journey` candidates** (user-created entities):
 - Loan application (user fills the form → entity created with their ID)
@@ -272,6 +276,7 @@ If the entity uses `generator: { strategy: simpleSteadyState }`, the generator c
 ❌ **Bad `entity-journey` candidates** (backend-generated, no owner link):
 - Outage event, grid fault, IoT incident → use `status-map` instead
 - Flight / shipment / work order → ops-side only, use `entity-list` or `entity-map`
+- Any entity where you must "assume" or "infer" owner IDs — the assumption will always be wrong
 
 **Template screen extra props (entity-journey):**
 ```yaml
@@ -449,10 +454,13 @@ Specific fields:
 - `theme.heroImage` — full-bleed background for the `welcome-hero` home module. Use a
   wide landscape photo (city skyline, hospital corridor, factory floor). Unsplash URLs
   work perfectly: `https://images.unsplash.com/photo-xxx?w=1600&q=80`
-- `theme.favicon` — browser tab icon. Supply a PNG or ICO direct URL, or omit to use
-  the built-in Meridian mark recolored to `brand`.
-- `theme.logo` — navbar logo image. Supply a PNG/SVG direct URL, or omit to use the
-  built-in Meridian mark recolored to `brand`.
+- `theme.favicon` — browser tab icon. Supply a PNG or ICO direct URL, **or omit entirely
+  to use the built-in Meridian mark recolored to `brand`.** Omitting is better than
+  supplying a URL you cannot verify — a 404 produces a broken favicon while the default
+  looks correct.
+- `theme.logo` — navbar logo image. Supply a PNG/SVG direct URL, **or omit entirely to use
+  the built-in Meridian mark recolored to `brand`.** Same rule: if you do not have a
+  verified URL, omit the field. Do not invent a URL for a logo that does not exist online.
 
 ### 4e. Company
 ```yaml
@@ -528,9 +536,11 @@ dynatrace:
 10. All state keys referenced in `transitions.from`/`to` and `steps` lists exist in `states`.
 11. `version: 1` at the top.
 12. YAML is valid with 2-space indent and a single top-level `industry:` block.
-13. **Routing ↔ categories sync:** every key in `routing` appears in `terminology.requestCategories`.
-    A routing key with no matching category means users can never submit that category through the
-    form — and the default city categories will be shown, which make no sense for non-city industries.
+13. **Routing ↔ categories sync — bidirectional:** every key in `routing` must appear in
+    `terminology.requestCategories`, AND every value in `terminology.requestCategories` must
+    appear in `routing`. This includes `other` — if `other` is in categories (it always should be),
+    it must also be in routing (e.g. `other: "General Support"`). A category with no routing key
+    causes a 500 on form submit; a routing key with no matching category is dead config.
 14. **Billing terminology present:** if `billing` appears in `screens.public`, then
     `terminology.billingTitle`, `terminology.billingSubtitle`, and `terminology.billNoun` are all
     defined. Without them the page shows "Tax & billing" and "tax bill" regardless of industry.
@@ -557,7 +567,20 @@ dynatrace:
 21. **Never fabricate image URLs.** Only use URLs you know exist: Unsplash photo IDs you've
     verified, GitHub raw URLs for repos that actually exist, or other known CDN URLs. An invented
     `raw.githubusercontent.com/org/repo/...` that 404s produces the same broken image as a
-    Drive share link.
+    Drive share link. **When in doubt, omit `theme.logo` and `theme.favicon`** — the platform's
+    built-in defaults look correct; a 404 looks broken.
+22. **No fabricated top-level keys.** The only valid top-level keys inside `industry:` are:
+    `version`, `id`, `company`, `theme`, `terminology`, `screens`, `home`, `entities`, `data`,
+    `routing`, `dynatrace`. Keys like `dynatraceFlowConfig`, `aiFeatures`, `businessFlows`,
+    `deployConfig`, or any other invented section are silently ignored by the platform. Do not
+    include them — they waste space and mislead readers.
+23. **`ownerField` must reference a declared field.** If an `entity-journey` screen uses
+    `ownerField: some_field`, verify that `some_field` exists in the entity type's `fields:` block.
+    The engine does not add any implicit owner field — you must declare it explicitly.
+24. **`tax-payment` flow when `billing` is in `screens.public`.** The flow that tracks bill payment
+    is named `tax-payment` in the platform regardless of industry terminology. If `billing` is an
+    active public screen, add `tax-payment` to `dynatrace.flows` and add a `flowLabels.tax-payment`
+    entry with an industry-appropriate label (e.g. `"Electric Bill Payment"`, `"Invoice Payment"`).
 
 ---
 
