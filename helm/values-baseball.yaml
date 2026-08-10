@@ -52,18 +52,10 @@ industry:
       - { id: service-requests, label: "Guest Services" }
       - messages
       - id: my-order
-        template: entity-journey
+        template: entity-list
         entityType: concession_order
-        label: "Track My Order"
+        label: "My Orders"
         icon: "🌭"
-        ownerField: fan_name
-        steps:
-          - { state: order_placed, label: "Order Placed" }
-          - { state: sent_to_stand, label: "Sent to Stand" }
-          - { state: preparing, label: "Preparing" }
-          - { state: ready, label: "Ready for Pickup" }
-          - { state: delivered, label: "Delivered ⚾" }
-        description: "Track your mobile concession order from the stand to your seat."
     ops:
       - overview
       - id: order-queue
@@ -106,11 +98,11 @@ industry:
   data:
     zones: ["home-plate-gate", "left-field-bleachers", "upper-deck", "concourse-a", "clubhouse", "parking-lot"]
     requestTemplates:
-      - { category: box-office, title: "Season Ticket Payment Issue", description: "Fan cannot access digital season tickets or process their renewal payment for the playoffs." }
-      - { category: facilities, title: "Broken Seat Back", description: "Seat 12 in Section 104, Row G is loose and needs immediate repair." }
-      - { category: cleaning, title: "Spill in Concourse", description: "Large soda spill near the main concession stand in Concourse A." }
-      - { category: security, title: "Lost Child", description: "Parent separated from child near the left-field bleachers." }
-      - { category: iot-maintenance, title: "Ticket Scanner Offline", description: "Digital ticket scanner at Home Plate Gate is unresponsive." }
+      - { category: other,        title: "Season Ticket Payment Issue", description: "Fan cannot access digital season tickets or process their renewal payment for the playoffs." }
+      - { category: seating-issue, title: "Broken Seat Back",           description: "Seat 12 in Section 104, Row G is loose and needs immediate repair." }
+      - { category: food-beverage, title: "Spill in Concourse",         description: "Large soda spill near the main concession stand in Concourse A." }
+      - { category: venue-safety,  title: "Lost Child",                 description: "Parent separated from child near the left-field bleachers." }
+      - { category: other,         title: "Ticket Scanner Offline",     description: "Digital ticket scanner at Home Plate Gate is unresponsive." }
     chatQuestions:
       - "How do I pay for my season tickets?"
       - "What time do the gates open today?"
@@ -119,11 +111,12 @@ industry:
       - "Where can I pick up my will-call tickets?"
       - "How do I track my concession order?"
   routing:
-    box-office: "Box Office & Ticketing"
-    facilities: "Stadium Maintenance"
-    cleaning: "Custodial Services"
-    security: "Stadium Security"
-    iot-maintenance: "IT & Venue Technology"
+    seating-issue: "Guest Services & Seating"
+    food-beverage: "Concessions & Food Services"
+    lost-item: "Lost & Found"
+    accessibility: "Accessibility & Mobility Services"
+    venue-safety: "Stadium Security & Safety"
+    other: "General Operations"
   dynatrace:
     serviceNames:
       citizen-service: "Fan Portal App"

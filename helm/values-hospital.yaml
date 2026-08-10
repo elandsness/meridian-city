@@ -65,19 +65,10 @@ industry:
       - { id: billing, label: "My Bills" }
       - messages
       - id: my-admission
-        template: entity-journey
+        template: entity-list
         entityType: patient_admission
         label: "My Care Journey"
         icon: "🏥"
-        ownerField: patient_name
-        steps:
-          - { state: registered, label: "Registered" }
-          - { state: triage, label: "Triage" }
-          - { state: assessment, label: "Assessment" }
-          - { state: treatment, label: "Treatment" }
-          - { state: observation, label: "Under Observation" }
-          - { state: discharged, label: "Discharged ✓" }
-        description: "Track your care journey from check-in through discharge, updated in real time."
     ops:
       - overview
       - id: admissions
@@ -122,12 +113,12 @@ industry:
   data:
     zones: ["Emergency Department", "ICU", "Surgical Suite", "Oncology Wing", "Pediatrics", "Outpatient Clinic"]
     requestTemplates:
-      - { category: patient-services, title: "Medication Question", description: "Patient requesting clarification on discharge medication instructions and dosage schedule." }
-      - { category: patient-services, title: "Pain Management Concern", description: "Patient reporting pain level above 6/10 and requesting review from care team." }
-      - { category: facilities, title: "Room Temperature Issue", description: "Patient reports room is too cold and thermostat is unresponsive." }
-      - { category: equipment, title: "IV Pump Alarm", description: "IV infusion pump alarming repeatedly in room 412 — nursing staff unavailable." }
-      - { category: billing, title: "Insurance Verification Needed", description: "Patient needs assistance confirming their insurance coverage before scheduled procedure." }
-      - { category: dietary, title: "Special Diet Request", description: "Patient has not received a low-sodium meal per physician dietary order." }
+      - { category: care-concern,  title: "Medication Question",          description: "Patient requesting clarification on discharge medication instructions and dosage schedule." }
+      - { category: care-concern,  title: "Pain Management Concern",      description: "Patient reporting pain level above 6/10 and requesting review from care team." }
+      - { category: environment,   title: "Room Temperature Issue",        description: "Patient reports room is too cold and thermostat is unresponsive." }
+      - { category: other,         title: "IV Pump Alarm",                 description: "IV infusion pump alarming repeatedly in room 412 — nursing staff unavailable." }
+      - { category: billing-query, title: "Insurance Verification Needed", description: "Patient needs assistance confirming their insurance coverage before scheduled procedure." }
+      - { category: dietary,       title: "Special Diet Request",          description: "Patient has not received a low-sodium meal per physician dietary order." }
     chatQuestions:
       - "How do I view my test results online?"
       - "What are visiting hours for the ICU?"
@@ -137,11 +128,12 @@ industry:
       - "How do I track my care journey?"
       - "How do I pay my hospital bill?"
   routing:
-    patient-services: "Patient Care Coordination"
-    facilities: "Facilities & Environmental Services"
-    equipment: "Biomedical Engineering"
-    billing: "Patient Financial Services"
+    care-concern: "Patient Care Coordination"
+    billing-query: "Patient Financial Services"
+    appointment: "Scheduling & Appointments"
     dietary: "Nutrition & Food Services"
+    environment: "Facilities & Environmental Services"
+    other: "General Patient Services"
   dynatrace:
     serviceNames:
       citizen-service: "Patient Portal Services"
