@@ -144,6 +144,43 @@ entities:
 
 7. **`entity-journey` screen `steps` list must use state keys (snake_case), not labels.**
 
+8. **`when: { probability }` alone does NOT make a transition fire automatically.**
+   `when` is a filter that selects *which* branch to take when the timer fires — it
+   is not a trigger by itself. A transition with no `timer` block will never be
+   scheduled by the engine, so entities in that state will never advance. Every
+   auto-advancing transition must have a `timer`:
+   ```yaml
+   # WRONG — probability only, entity stays stuck forever
+   - from: normal
+     to: degraded
+     when: { probability: 0.04 }
+
+   # CORRECT — timer fires periodically; probability determines which branch wins
+   - from: normal
+     to: degraded
+     when: { probability: 0.04 }
+     timer: { minSeconds: 3600, maxSeconds: 14400 }
+   - from: normal
+     to: normal   # no-op loop back, the other 96% of the time
+     timer: { minSeconds: 3600, maxSeconds: 14400 }
+   ```
+   A cleaner pattern for infrequent failures: put the fault on a separate timed
+   transition that only fires sometimes, and let the happy path be the default.
+
+9. **`work_order` is a reserved entity name — do not redefine it.** The platform's
+   built-in `work_order` has cascade effects that auto-resolve linked incidents when
+   the work order closes. If you define your own `work_order` entity you replace those
+   effects, breaking the IoT incident → work order → incident resolved chain and
+   causing permanent "degraded" dots on every device map. If you need a domain-specific
+   field-work entity (crew dispatch, maintenance job, field ticket), use a different
+   name: `field_order`, `crew_job`, `repair_ticket`, etc.
+
+10. **Every entity type with a generator must appear in at least one screen or home
+    module.** If you define an entity and give it a `generator` but don't surface it
+    anywhere in `screens` or `home`, the engine creates entities that are invisible to
+    users. Either add a screen (`entity-list`, `entity-map`, or `entity-journey`) or
+    remove the generator.
+
 ---
 
 ## Step 4 — Compose the config using the catalog
@@ -168,7 +205,7 @@ Each screen entry is either `"<id>"` or `{ id: <id>, label: "Nav label", icon: "
 | `{ template: 'entity-journey', entityType: '<type>', ownerField: '<field>', steps: [...] }` | Personal journey tracker — shows the logged-in user's own entities | **Only when the entity is created by the user** (form submission, purchase, registration). Never for generator-driven entities — see warning below. |
 | `{ template: 'status-map', source: 'devices', background: {...}, ... }` | Geographic/infrastructure status map with live colored dots | "Show me what's happening in my area" — outage maps, ATM finders, parking lots, grid status |
 
-**`status-map` config shape:**
+**`status-map` config shape — `background` is REQUIRED:**
 ```yaml
 - id: atm-network-map          # unique id, lowercase-hyphen
   template: status-map
@@ -177,12 +214,16 @@ Each screen entry is either `"<id>"` or `{ id: <id>, label: "Nav label", icon: "
   title: "ATM & Branch Network"  # card heading inside the page
   source: devices              # 'devices' = IoT device fleet (status from IoT API)
   viewBox: "0 0 1000 580"      # SVG coordinate space; match the background image proportions
-  background:
+  background:                  # REQUIRED — omitting this renders a blank map with no context
     kind: image                # 'image' renders a full-canvas background image
     src: /bank_atm_bg.png      # local static file committed to frontends/public-portal/public/
-    # — OR — supply an HTTPS URL; the deploy script fetches and stores it locally:
-    # src: "https://images.unsplash.com/photo-xxx?w=1600&q=80"
+    # — OR — supply an HTTPS Unsplash URL; the deploy script fetches and stores it locally:
+    # src: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1600&q=80"
 ```
+
+A `status-map` without a `background` is a blank canvas — dots float on white with no
+geographic or spatial context. Always supply a background image. Unsplash works well;
+use a photo that makes spatial sense for the domain (aerial city, power grid, port, campus).
 
 The map overlays colored dots (green = ok, amber = degraded, red = out of service) on the
 background image — one dot per device, scattered deterministically by device_id. Dots update
@@ -391,7 +432,9 @@ rewrites the ConfigMap to reference the local path — so the app always loads i
 from the same origin with no external dependency at runtime.
 
 **URL requirements — the download URL must serve the raw file bytes directly, with no
-redirect to a login page or HTML preview.** These URL types do NOT work:
+redirect to a login page or HTML preview.** Never invent or guess a URL — only use URLs
+you can verify actually exist and return the image. A 404 from a fabricated GitHub raw
+URL is just as broken as an HTML page from a Drive share link. These URL types do NOT work:
 - ❌ Google Drive share links: `https://drive.google.com/file/d/.../view` — serves HTML
 - ❌ Dropbox share links: `?dl=0` suffix — serves HTML preview
 - ❌ Any URL requiring a cookie / session to download
@@ -500,6 +543,21 @@ dynatrace:
     A generator never populates `ownerField`, so every user sees an empty journey. If the entity
     is generator-driven, replace the public screen with `status-map` (geographic/infrastructure
     view) or remove the `ownerField` and show all entities instead.
+17. **Every `status-map` screen has a `background: { kind: image, src: ... }` block.** A
+    status-map without a background renders blank — dots floating on white with no spatial context.
+18. **`work_order` is reserved — do not define it as a custom entity.** Redefining it silently
+    drops the incident-cascade effects that auto-resolve linked incidents when a work order closes,
+    causing all device-map dots to accumulate permanently in "warning" state. Use a different name.
+19. **Every auto-advancing transition has a `timer`.** A transition with only `when: { probability }`
+    and no `timer` will never fire — the scheduler only processes records with `nextTransitionAt`
+    set. Check every state: if it's not terminal and not `userTriggerable`-only, at least one
+    outgoing transition must have a `timer`.
+20. **Every entity type with a `generator` appears in at least one `screens` entry or `home`
+    module.** A generator that creates invisible entities is wasted CPU. Surface it or remove it.
+21. **Never fabricate image URLs.** Only use URLs you know exist: Unsplash photo IDs you've
+    verified, GitHub raw URLs for repos that actually exist, or other known CDN URLs. An invented
+    `raw.githubusercontent.com/org/repo/...` that 404s produces the same broken image as a
+    Drive share link.
 
 ---
 
