@@ -410,7 +410,7 @@ jobs:
         # real industry -- it will never have its own company/theme/screens.
         working-directory: scripts
         run: |
-          node validate-industry-config.mjs ../helm/values.yaml $(ls ../helm/values-*.yaml | grep -v synthetic-test)
+          node validate-industry-config.mjs $(ls ../helm/values-*.yaml | grep -v synthetic-test)
 
   # -------------------------------------------------------------------------
   # Helm chart lint
