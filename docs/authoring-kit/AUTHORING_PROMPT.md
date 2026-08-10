@@ -165,8 +165,8 @@ Each screen entry is either `"<id>"` or `{ id: <id>, label: "Nav label", icon: "
 | `{ template: 'entity-detail', entityType: '<type>' }` | Generic entity detail + timeline | any custom entity |
 | `{ template: 'entity-map', entityType: '<type>' }` | Moving-sprite map for any type | entities with `computed.position` |
 | `{ template: 'entity-analytics', entityType: '<type>' }` | KPI + chart for any type | any custom entity |
-| `{ template: 'entity-journey', entityType: '<type>', ownerField: '<field>', steps: [...] }` | Generic journey tracker | entities with a step-based lifecycle |
-| `{ template: 'status-map', source: 'devices', background: {...}, ... }` | Static-location asset map with live status dots | IoT fleets, ATM networks, parking lots, seating charts |
+| `{ template: 'entity-journey', entityType: '<type>', ownerField: '<field>', steps: [...] }` | Personal journey tracker — shows the logged-in user's own entities | **Only when the entity is created by the user** (form submission, purchase, registration). Never for generator-driven entities — see warning below. |
+| `{ template: 'status-map', source: 'devices', background: {...}, ... }` | Geographic/infrastructure status map with live colored dots | "Show me what's happening in my area" — outage maps, ATM finders, parking lots, grid status |
 
 **`status-map` config shape:**
 ```yaml
@@ -207,6 +207,31 @@ a local `/industry-assets/` path, so the browser always loads from the same orig
 | `{ template: 'entity-analytics', entityType: '<type>' }` | KPI + chart | any custom entity |
 | `{ template: 'entity-journey', entityType: '<type>', steps: [...] }` | Journey board | any step-based entity |
 
+**Choosing between `entity-journey` and `status-map` for a public portal screen:**
+
+| User intent | Right template | Wrong template |
+|-------------|---------------|----------------|
+| "Track *my* loan / claim / order" | `entity-journey` | `status-map` |
+| "See where outages are happening near me" | `status-map` | `entity-journey` |
+| "Check the status of grid/ATM/parking infrastructure" | `status-map` | `entity-journey` |
+| "See my appointment / admission status" | `entity-journey` | `status-map` |
+
+**⚠️ Critical constraint — `entity-journey` + `ownerField` only works when the user creates the entity.**
+
+`ownerField` tells the journey screen which entities belong to the logged-in user: it filters entities where `ownerField == user.id`. This only returns results when the entity was created with that field set to a real citizen ID — which only happens through **user-initiated actions** (submitting a form, placing an order, completing a registration).
+
+If the entity uses `generator: { strategy: simpleSteadyState }`, the generator creates entities with no knowledge of any citizen ID, so `ownerField` is never populated. Every logged-in user sees an empty journey. **Do not combine `entity-journey` + `ownerField` with a generator-driven entity type.**
+
+✅ **Good `entity-journey` candidates** (user-created entities):
+- Loan application (user fills the form → entity created with their ID)
+- Patient admission (check-in creates the entity)
+- Insurance claim (user submits → entity created)
+- Store order (purchase flow creates the entity)
+
+❌ **Bad `entity-journey` candidates** (backend-generated, no owner link):
+- Outage event, grid fault, IoT incident → use `status-map` instead
+- Flight / shipment / work order → ops-side only, use `entity-list` or `entity-map`
+
 **Template screen extra props (entity-journey):**
 ```yaml
 - id: my-claims              # unique id, lowercase-hyphen
@@ -215,6 +240,8 @@ a local `/industry-assets/` path, so the browser always loads from the same orig
   label: "My Claims"         # nav label
   icon: "📋"
   ownerField: owner_id       # portal only: entity field = current user's id
+                             # ONLY works if entities are created with this field
+                             # set to the user's citizen ID (e.g. via a form submission)
   steps:                     # optional: only these states shown as journey steps
     - submitted
     - under_review
@@ -467,6 +494,12 @@ dynatrace:
 15. **Image URLs serve raw bytes:** `theme.heroImage`, `theme.logo`, and `theme.favicon` (when
     set) are direct-download URLs, not Google Drive/Dropbox share links. The init container uses
     `curl` without a browser session — share-link redirects produce broken images.
+16. **`entity-journey` + `ownerField` only on user-created entity types.** If any `screens.public`
+    entry uses `template: entity-journey` with an `ownerField`, verify that the same entity type
+    does NOT rely solely on `generator: { strategy: simpleSteadyState }` to create instances.
+    A generator never populates `ownerField`, so every user sees an empty journey. If the entity
+    is generator-driven, replace the public screen with `status-map` (geographic/infrastructure
+    view) or remove the `ownerField` and show all entities instead.
 
 ---
 
