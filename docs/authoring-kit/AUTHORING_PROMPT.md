@@ -288,25 +288,19 @@ The only working `entity-journey` + `ownerField` in the public portal is the bui
 - All admissions in the patient pipeline
 
 ❌ **Never use `entity-journey` + `ownerField` for a custom entity type, generator or not:**
-- Loan application, outage report, billing dispute, service interruption, etc. → always empty
-- If the user wants "track my own X", use `entity-list` instead (shows all entities as a feed)
+- "No generator + ownerField" is not a workaround — entities still won't exist because there is no creation path.
+- "User-created" does not describe ANY custom entity type in this platform. The only user-created data is `service_request` records (built-in), not custom entities.
+- The test is simple: if you wrote the entity in the `entities:` block yourself, it cannot be owner-filtered. Use `entity-list`.
 
-**Template screen extra props (entity-journey):**
+**`entity-journey` for the ops dashboard (no `ownerField`) — valid and useful:**
 ```yaml
-- id: my-claims              # unique id, lowercase-hyphen
+# Ops dashboard: show all entities of this type in their current state (no ownerField)
+- id: claims-board
   template: entity-journey
-  entityType: claim          # must be a key in top-level entities
-  label: "My Claims"         # nav label
-  icon: "📋"
-  ownerField: owner_id       # portal only: entity field = current user's id
-                             # ONLY works if entities are created with this field
-                             # set to the user's citizen ID (e.g. via a form submission)
-  steps:                     # optional: only these states shown as journey steps
-    - submitted
-    - under_review
-    - approved
-    - paid
-  description: "Track your insurance claim, step by step."
+  entityType: claim
+  label: "Claims Pipeline"
+  steps: [submitted, under_review, approved, paid]
+  # No ownerField — shows ALL entities, appropriate for ops staff
 ```
 
 ### 4b. Home modules
@@ -539,16 +533,23 @@ routing:
 
 **`dynatrace`** — service naming + business flow config:
 
-**`serviceNames` uses FIXED keys — the left side is the platform's internal service name, you only change the right side (the display label).** Do not invent left-side keys. Using `grid-operations` instead of `city-operations` silently renames nothing.
+**`serviceNames` uses FIXED keys — the left side is the platform's internal service name, you only change the right side (the display label).** Do not invent left-side keys. The most commonly invented wrong keys are `grid-operations` (correct: `city-operations`) and `field-service` (correct: `service-dispatch`). Using an invented key silently renames nothing.
 
 ```yaml
+# ❌ WRONG — invented keys are silently ignored
 dynatrace:
   serviceNames:
-    # KEY (left side) = fixed platform name — NEVER change these
-    # VALUE (right side) = your industry label — change these freely
+    grid-operations: "Grid Control Center"   # ← wrong key, does nothing
+    field-service: "Field Crew Dispatch"     # ← wrong key, does nothing
+
+# ✅ CORRECT — use the fixed platform keys, customize the right side
+dynatrace:
+  serviceNames:
+    # KEY (left side) = fixed platform name — copy these exactly
+    # VALUE (right side) = your industry label — change freely
     citizen-service: "<Customer Portal display name>"  # customer-facing backend
-    city-operations: "<Ops Center display name>"       # ops/incident backend
-    service-dispatch: "<Dispatch display name>"        # routing/dispatch backend
+    city-operations: "<Ops Center display name>"       # ops/incident backend — NOT grid-operations
+    service-dispatch: "<Dispatch display name>"        # routing/dispatch — NOT field-service
     api-gateway: "<API Gateway display name>"
     notification-service: "<Notifications display name>"
   flowLabels:
@@ -571,6 +572,10 @@ dynatrace:
 ---
 
 ## Step 5 — Validate before outputting
+
+**Do this first — look at your `routing:` block right now and find the line `other: ...`.**
+If it is not there, add it: `other: "General Support"`. This single line is missing in the
+majority of generated configs. Do not proceed until `other` is in `routing`.
 
 1. All `screens.public` / `screens.ops` ids are from the catalog (or use a valid `template`).
 2. All `home.public` / `home.ops` ids are from the catalog (or use a valid `template`).
