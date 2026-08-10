@@ -103,6 +103,9 @@ entities:
           probability: 0.15        # random chance this transition fires
           # OR: { field: amount, equals: 0 }
           # OR: { faultGate: true, probability: 0.08 }
+          # ⚠️ ONLY these three forms of 'when' are valid. Do NOT invent others —
+          # e.g. stateTransitionEvent, fieldEvent, ruleEngine, externalTrigger, etc.
+          # are not platform features and will be silently ignored or crash the engine.
     computed:
       position:
         type: point2d
@@ -457,10 +460,12 @@ Specific fields:
 - `theme.favicon` — browser tab icon. Supply a PNG or ICO direct URL, **or omit entirely
   to use the built-in Meridian mark recolored to `brand`.** Omitting is better than
   supplying a URL you cannot verify — a 404 produces a broken favicon while the default
-  looks correct.
+  looks correct. Do NOT output a URL with a comment like `# ⚠️ replace if needed` — that
+  comment will be stripped at deploy time and the broken URL deployed as-is.
 - `theme.logo` — navbar logo image. Supply a PNG/SVG direct URL, **or omit entirely to use
   the built-in Meridian mark recolored to `brand`.** Same rule: if you do not have a
-  verified URL, omit the field. Do not invent a URL for a logo that does not exist online.
+  verified URL, omit the field entirely. A fabricated URL with a caveat comment is not better
+  than omitting — it is worse, because the comment disappears but the 404 stays.
 
 ### 4e. Company
 ```yaml
@@ -581,6 +586,14 @@ dynatrace:
     is named `tax-payment` in the platform regardless of industry terminology. If `billing` is an
     active public screen, add `tax-payment` to `dynatrace.flows` and add a `flowLabels.tax-payment`
     entry with an industry-appropriate label (e.g. `"Electric Bill Payment"`, `"Invoice Payment"`).
+25. **Bare screen/module ids must be from the catalog.** A bare string entry like `"outage-map"` or
+    `{ id: "grid-map", label: "..." }` with no `template` key looks up a built-in screen by id.
+    If that id isn't in the catalog table, the screen renders blank or errors. Always use a
+    `template:` key for any domain-specific screen that isn't in the catalog.
+26. **`dynatrace.serviceNames` keys are fixed — do not invent them.** The valid keys are exactly:
+    `citizen-service`, `city-operations`, `service-dispatch`, `api-gateway`,
+    `notification-service`, `billing-service`. A key like `grid-operations` or `analytics-engine`
+    won't rename anything — it's silently ignored. Map your industry labels to these fixed keys.
 
 ---
 
@@ -770,10 +783,11 @@ industry:
   screens:
     public:
       - home
-      - { id: my-admission, template: entity-journey, entityType: patient_admission,
-          label: "My Admission", icon: "🏥", ownerField: patient_id,
-          steps: [registered, triage, admitted, in_treatment, ready_for_discharge, discharged],
-          description: "Track your care journey from registration to discharge." }
+      # entity-journey with ownerField CANNOT be used here: patient_admission is generator-driven
+      # and generators never populate patient_id with a citizen ID. Use entity-list instead to show
+      # the live admission pipeline as a public-facing activity feed.
+      - { id: admissions-live, template: entity-list, entityType: patient_admission,
+          label: "Admissions Today", icon: "🏥" }
       - { id: service-requests, label: "Support" }
       - billing
       - messages
@@ -817,7 +831,7 @@ industry:
       transitions:
         - { from: registered, to: triage,              timer: { minSeconds: 60, maxSeconds: 300 } }
         - { from: triage,     to: admitted,            timer: { minSeconds: 120, maxSeconds: 600 } }
-        - { from: triage,     to: transferred,         when: { faultGate: true, probability: 0.05 } }
+        - { from: triage,     to: transferred,         when: { faultGate: true, probability: 0.05 }, timer: { minSeconds: 120, maxSeconds: 600 } }
         - { from: admitted,   to: in_treatment,        timer: { minSeconds: 300, maxSeconds: 900 } }
         - { from: in_treatment, to: ready_for_discharge, timer: { minSeconds: 600, maxSeconds: 3600 } }
         - { from: ready_for_discharge, to: discharged, timer: { minSeconds: 120, maxSeconds: 600 } }
@@ -839,6 +853,8 @@ industry:
     facilities: "Facilities Management"
     equipment: "Clinical Equipment Services"
     administrative: "Patient Relations"
+    care-concern: "Clinical Quality"
+    other: "General Support"         # 'other' is in requestCategories so it must be here too
   dynatrace:
     serviceNames:
       citizen-service: "Patient Services"
