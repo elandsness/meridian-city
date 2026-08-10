@@ -85,16 +85,166 @@ function checkEntities(entities) {
   return errors
 }
 
+const VALID_SERVICE_NAME_KEYS = new Set([
+  'citizen-service', 'city-operations', 'service-dispatch',
+  'api-gateway', 'notification-service', 'billing-service',
+])
+
+const VALID_FLOW_IDS = new Set([
+  'service-request', 'account-creation', 'iot-incident',
+  'tax-payment', 'aircraft-turnaround', 'passenger-journey',
+])
+
 function checkRouting(cfg) {
   const errors = []
-  if (!cfg.routing || !cfg.data?.requestTemplates) return errors
+
+  // Detect routing nested under terminology (a common authoring mistake)
+  if (cfg.terminology?.routing) {
+    errors.push(
+      'terminology.routing is not a valid key — routing must be a TOP-LEVEL key ' +
+      '(same level as terminology, entities, data, dynatrace). ' +
+      'The nested block is silently ignored; move it to the top level.'
+    )
+  }
+
+  if (!cfg.routing) return errors
+
   const routingKeys = new Set(Object.keys(cfg.routing))
-  for (const [i, tmpl] of cfg.data.requestTemplates.entries()) {
+
+  // requestCategories → routing: every category must have a routing key
+  const categories = cfg.terminology?.requestCategories ?? []
+  for (const cat of categories) {
+    if (!routingKeys.has(cat)) {
+      errors.push(
+        `terminology.requestCategories contains "${cat}" but routing has no matching key. ` +
+        `Add: routing.${cat}: "<department name>". ` +
+        (cat === 'other' ? '(tip: other: "General Support" is always required)' : '')
+      )
+    }
+  }
+
+  // routing → requestTemplates: every template category must have a routing key
+  for (const [i, tmpl] of (cfg.data?.requestTemplates ?? []).entries()) {
     if (tmpl.category && !routingKeys.has(tmpl.category)) {
       errors.push(`data.requestTemplates[${i}].category "${tmpl.category}" has no matching key in routing`)
     }
   }
+
+  // routing → categories: every routing key should appear in requestCategories (dead config if not)
+  const catSet = new Set(categories)
+  for (const key of routingKeys) {
+    if (catSet.size > 0 && !catSet.has(key)) {
+      errors.push(
+        `routing has key "${key}" but it does not appear in terminology.requestCategories — dead config`
+      )
+    }
+  }
+
   return errors
+}
+
+function checkDynatrace(cfg) {
+  const errors = []
+  const dt = cfg.dynatrace
+  if (!dt) return errors
+
+  // serviceNames: only valid platform keys allowed
+  for (const key of Object.keys(dt.serviceNames ?? {})) {
+    if (!VALID_SERVICE_NAME_KEYS.has(key)) {
+      const suggestion = key === 'grid-operations' ? ' (did you mean city-operations?)'
+        : key === 'field-service' || key === 'field-operations' ? ' (did you mean service-dispatch?)'
+        : ''
+      errors.push(
+        `dynatrace.serviceNames has invalid key "${key}"${suggestion}. ` +
+        `Valid keys: ${[...VALID_SERVICE_NAME_KEYS].join(', ')}`
+      )
+    }
+  }
+
+  // flows: only valid ids allowed
+  for (const [i, flow] of (dt.flows ?? []).entries()) {
+    if (!VALID_FLOW_IDS.has(flow)) {
+      errors.push(
+        `dynatrace.flows[${i}] "${flow}" is not a valid flow id. ` +
+        `Valid ids: ${[...VALID_FLOW_IDS].join(', ')}`
+      )
+    }
+  }
+
+  // tax-payment required when billing screen is active
+  const publicScreenIds = (cfg.screens?.public ?? []).map((s) =>
+    typeof s === 'string' ? s : s?.id
+  )
+  if (publicScreenIds.includes('billing') && !(dt.flows ?? []).includes('tax-payment')) {
+    errors.push(
+      'billing is in screens.public but tax-payment is not in dynatrace.flows — ' +
+      'add tax-payment to flows and add a flowLabels.tax-payment entry'
+    )
+  }
+
+  return errors
+}
+
+function collectScreenEntityTypes(screens) {
+  const types = new Set()
+  for (const screen of screens ?? []) {
+    if (typeof screen === 'object' && screen?.entityType) types.add(screen.entityType)
+    if (typeof screen === 'object' && Array.isArray(screen?.entityTypes)) {
+      for (const t of screen.entityTypes) types.add(t)
+    }
+  }
+  return types
+}
+
+function collectHomeEntityTypes(home) {
+  const types = new Set()
+  const allModules = [...(home?.public ?? []), ...(home?.ops ?? [])]
+  for (const mod of allModules) {
+    if (typeof mod === 'object' && mod?.entityType) types.add(mod.entityType)
+    if (typeof mod === 'object' && Array.isArray(mod?.entityTypes)) {
+      for (const t of mod.entityTypes) types.add(t)
+    }
+  }
+  return types
+}
+
+function checkScreens(cfg) {
+  const errors = []
+  const warnings = []
+
+  const allScreens = [
+    ...(cfg.screens?.public ?? []),
+    ...(cfg.screens?.ops ?? []),
+  ]
+
+  // entity-journey + ownerField in the public portal
+  for (const screen of cfg.screens?.public ?? []) {
+    if (typeof screen === 'object' && screen?.template === 'entity-journey' && screen?.ownerField) {
+      errors.push(
+        `screens.public[id="${screen.id}"]: entity-journey with ownerField is not supported for custom entities. ` +
+        `The portal has no mechanism to create custom entity instances on behalf of a logged-in user, ` +
+        `so every user sees an empty journey. ` +
+        `Replace with template: entity-list (remove ownerField — shows all entities as a live feed).`
+      )
+    }
+  }
+
+  // generator entities must appear in at least one screen or home module
+  const screenTypes = collectScreenEntityTypes(allScreens)
+  const homeTypes = collectHomeEntityTypes(cfg.home)
+  const surfacedTypes = new Set([...screenTypes, ...homeTypes])
+
+  for (const [entityId, def] of Object.entries(cfg.entities ?? {})) {
+    if (def.generator && !surfacedTypes.has(entityId)) {
+      errors.push(
+        `entities.${entityId} has a generator but does not appear in any screen or home module — ` +
+        `the engine creates entities that are invisible to users. ` +
+        `Add a screen (entity-list, entity-map, entity-journey) or remove the generator.`
+      )
+    }
+  }
+
+  return [...errors, ...warnings]
 }
 
 let failures = 0
@@ -135,8 +285,26 @@ for (const path of files) {
   }
 
   const structurallyValid = validateSchema(cfg)
-  const semanticErrors = structurallyValid ? [...checkEntities(cfg.entities), ...checkRouting(cfg)] : []
-  const ajvErrors = structurallyValid ? [] : validateSchema.errors.map((e) => `${e.instancePath || '(root)'} ${e.message}`)
+  // Always run semantic checks — they produce more actionable messages than raw schema errors
+  // and some (like routing-inside-terminology) are the root cause of schema failures.
+  const semanticErrors = [
+    ...checkEntities(cfg.entities),
+    ...checkRouting(cfg),
+    ...checkDynatrace(cfg),
+    ...checkScreens(cfg),
+  ]
+  // Only surface raw AJV errors that aren't already explained by a semantic check.
+  const semanticPaths = new Set(semanticErrors.map((e) => e.split(':')[0].trim()))
+  const ajvErrors = structurallyValid
+    ? []
+    : (validateSchema.errors ?? [])
+        .map((e) => `${e.instancePath || '(root)'} ${e.message}`)
+        .filter((msg) => {
+          // Suppress the raw AJV error for terminology.routing — our semantic check
+          // explains it more clearly.
+          if (msg.includes('/terminology/routing')) return false
+          return true
+        })
   const allErrors = [...ajvErrors, ...semanticErrors]
 
   if (allErrors.length) {
