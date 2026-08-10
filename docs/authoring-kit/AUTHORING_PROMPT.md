@@ -454,33 +454,53 @@ the image at deploy time, stores it under `/industry-assets/` inside the pod, an
 rewrites the ConfigMap to reference the local path — so the app always loads images
 from the same origin with no external dependency at runtime.
 
-**URL requirements — the download URL must serve the raw file bytes directly, with no
-redirect to a login page or HTML preview.** Never invent or guess a URL — only use URLs
-you can verify actually exist and return the image. A 404 from a fabricated GitHub raw
-URL is just as broken as an HTML page from a Drive share link. These URL types do NOT work:
+**Option A — Generate images with your LLM (best quality, industry-specific):**
+
+If the model you are using supports image generation (e.g. ChatGPT/DALL-E, Gemini/Imagen),
+generate a logo and favicon inline during config creation:
+
+1. Generate a logo PNG: a clean icon or wordmark that fits the brand (transparent or white
+   background, at least 200×60 px for a wordmark or 128×128 px for an icon).
+2. Generate a favicon PNG: a simple icon version of the logo (32×32 or 64×64 px).
+3. Insert the generated image URLs directly into `theme.logo` and `theme.favicon`.
+
+⚠️ **LLM-generated image URLs are often temporary** (DALL-E URLs expire in ~1–2 hours;
+Gemini/Imagen URLs may expire similarly). The deploy script downloads the images at
+`helm install` time — so if you deploy promptly after generating the config, the URLs
+will still be live. If deployment is delayed, the URLs may expire and produce broken
+images. In that case, redeploy after updating the URLs (or omit the fields to fall back
+to the platform default).
+
+**Option B — Use reliable public image sources:**
+
+- ✅ **Unsplash** (hero photos): `https://images.unsplash.com/photo-<id>?w=1600&q=80`
+- ✅ **GitHub raw** (for repos that actually exist): `https://raw.githubusercontent.com/<user>/<repo>/main/path.png`
+- ✅ **Imgur direct**: `https://i.imgur.com/<id>.png`
+- ✅ Any CDN or object storage URL that returns raw file bytes with no auth redirect
+
+**Option C — Omit logo/favicon (safe default):**
+
+Omit `theme.logo` and/or `theme.favicon` entirely. The platform renders the built-in
+Meridian mark recolored to `theme.colors.brand` — looks correct and requires no external
+image. Always prefer omitting over guessing a URL.
+
+**URL requirements — applies to all options:**
+- The URL must serve raw file bytes directly (no redirect to HTML, no login gate).
 - ❌ Google Drive share links: `https://drive.google.com/file/d/.../view` — serves HTML
 - ❌ Dropbox share links: `?dl=0` suffix — serves HTML preview
 - ❌ Any URL requiring a cookie / session to download
-
-Use one of these reliable sources instead:
-- ✅ **Unsplash** (photos): `https://images.unsplash.com/photo-<id>?w=1600&q=80`
-- ✅ **GitHub raw**: `https://raw.githubusercontent.com/<user>/<repo>/main/path/to/image.png`
-- ✅ **Imgur direct**: `https://i.imgur.com/<id>.png`
-- ✅ Any CDN or object storage URL that returns the raw file with no auth gate
+- ❌ **Never invent a URL** (e.g. `raw.githubusercontent.com/yourcompany/...` for a repo
+  that doesn't exist). A 404 is just as broken as an HTML redirect. Never add a comment
+  like `# ⚠️ replace if needed` — that comment disappears at deploy time.
 
 Specific fields:
 - `theme.heroImage` — full-bleed background for the `welcome-hero` home module. Use a
   wide landscape photo (city skyline, hospital corridor, factory floor). Unsplash URLs
   work perfectly: `https://images.unsplash.com/photo-xxx?w=1600&q=80`
-- `theme.favicon` — browser tab icon. Supply a PNG or ICO direct URL, **or omit entirely
-  to use the built-in Meridian mark recolored to `brand`.** Omitting is better than
-  supplying a URL you cannot verify — a 404 produces a broken favicon while the default
-  looks correct. Do NOT output a URL with a comment like `# ⚠️ replace if needed` — that
-  comment will be stripped at deploy time and the broken URL deployed as-is.
-- `theme.logo` — navbar logo image. Supply a PNG/SVG direct URL, **or omit entirely to use
-  the built-in Meridian mark recolored to `brand`.** Same rule: if you do not have a
-  verified URL, omit the field entirely. A fabricated URL with a caveat comment is not better
-  than omitting — it is worse, because the comment disappears but the 404 stays.
+- `theme.favicon` — browser tab icon. LLM-generated, Imgur, or GitHub raw (verified repo).
+  Omit to use the built-in Meridian mark recolored to `brand`.
+- `theme.logo` — navbar logo image. LLM-generated, Imgur, or GitHub raw (verified repo).
+  Omit to use the built-in Meridian mark recolored to `brand`.
 
 ### 4e. Company
 ```yaml
