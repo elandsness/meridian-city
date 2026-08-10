@@ -16,6 +16,7 @@ import {
   stopTraffic,
   burstTraffic,
   setJourneyEnabled,
+  purgeMessages,
 } from '../api/demo.js';
 import { getIncidents } from '../api/incidents.js';
 import { getDevices } from '../api/devices.js';
@@ -94,6 +95,8 @@ function SystemStatus({ status, onResetAll }) {
   const [confirm, setConfirm] = useState(false);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [purgeLoading, setPurgeLoading] = useState(false);
+  const [purgeResult, setPurgeResult] = useState(null);
 
   const activeScenario = status?.active_scenario?.name;
 
@@ -112,6 +115,19 @@ function SystemStatus({ status, onResetAll }) {
     } finally {
       setLoading(false);
       setConfirm(false);
+    }
+  }
+
+  async function handlePurgeMessages() {
+    setPurgeLoading(true);
+    setPurgeResult(null);
+    try {
+      await purgeMessages();
+      setPurgeResult({ ok: true });
+    } catch (err) {
+      setPurgeResult({ ok: false, error: err.response?.data?.message ?? err.message });
+    } finally {
+      setPurgeLoading(false);
     }
   }
 
@@ -134,6 +150,15 @@ function SystemStatus({ status, onResetAll }) {
         {confirm && (
           <span className="text-xs text-rose-400">Are you sure? Click again to confirm.</span>
         )}
+        <button
+          onClick={handlePurgeMessages}
+          disabled={purgeLoading}
+          title="Delete all citizen inbox messages from the database"
+          className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+        >
+          {purgeLoading ? '…' : '🗑 Purge Messages'}
+        </button>
+        <StatusMsg result={purgeResult} />
         <button
           onClick={handleResetAll}
           disabled={loading}

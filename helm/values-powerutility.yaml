@@ -48,6 +48,18 @@ industry:
     billingTitle: "Billing & Payments"
     billingSubtitle: "Your PowerUnlimited energy statements and payment history."
     billNoun: "energy bill"
+    iotCategory1: "Field Vehicles"
+    iotCategory2: "Substations"
+    iotCategory3: "Smart Meters"
+    iotIdPrefix1: "veh"
+    iotIdPrefix2: "sub"
+    iotIdPrefix3: "mtr"
+    iotZonePositions:
+      metro-substation:  { x: 500,  y: 400 }
+      valley-substation: { x: 300,  y: 700 }
+      north-region:      { x: 800,  y: 200 }
+      south-region:      { x: 900,  y: 800 }
+      industrial-park:   { x: 1300, y: 500 }
 
   screens:
     public:
@@ -59,14 +71,18 @@ industry:
 
     ops:
       - overview
-      - { id: grid-map, template: status-map,
-          label: "Live Grid Map", icon: "🗺️",
-          title: "Infrastructure Grid Status",
-          source: devices,
-          viewBox: "0 0 1600 1067",
-          background: { kind: image, src: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1600&q=80" } }
+      - id: grid-map
+        template: status-map
+        label: "Live Grid Map"
+        icon: "🗺️"
+        title: "Infrastructure Grid Status"
+        source: devices
+        clusterBy: zone
+        viewBox: "0 0 1600 1067"
+        background: { kind: image, src: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1600&q=80" }
       - { id: active-outages, template: entity-list, entityType: outage_event, label: "Active Outages" }
       - { id: repairs, template: entity-list, entityType: repair_task, label: "Field Repairs" }
+      - { id: incidents, label: "Grid Faults" }
       - { id: iot, label: "Asset Fleet" }
       - { id: analytics, label: "Reliability (SAIDI)" }
       - demo-control
@@ -225,3 +241,11 @@ industry:
       tax-payment:     "Utility Bill Payment"
 
     flows: [service-request, account-creation, iot-incident, tax-payment]
+
+# Entity engine ownership — add power-utility entities to each service.
+# outage_event and meter_reading are customer-facing; repair_task is ops-facing.
+customerEntityService:
+  ownedTypes: "citizen,service_request,bill,cart,outage_event,meter_reading"
+
+opsEntityService:
+  ownedTypes: "incident,work_order,repair_task"
