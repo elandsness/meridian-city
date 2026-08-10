@@ -264,22 +264,26 @@ a local `/industry-assets/` path, so the browser always loads from the same orig
 
 `ownerField` tells the journey screen which entities belong to the logged-in user: it filters entities where `ownerField == user.id`. This only returns results when the entity was created with that field set to a real citizen ID — which only happens through **user-initiated actions** (submitting a form, placing an order, completing a registration).
 
-**Two rules that must both be true for `ownerField` to work:**
-1. The field named in `ownerField` must be explicitly declared in the entity's `fields:` block.
-2. Entities must be created by user action (form submit, purchase, registration) — not by `generator`. The generator creates entities with no knowledge of any citizen ID. There is no "assume users have matching IDs" workaround — the engine has no such concept. Every logged-in user sees an empty journey when the entity is generator-driven.
+**Hard platform constraint — `ownerField` only ever works for the built-in `my-journey` (aviation).**
 
-**Do not combine `entity-journey` + `ownerField` with a generator-driven entity type.** No amount of commenting or documentation inside the YAML changes this — it is a hard engine constraint.
+In the current platform, the public portal form (`NewRequest`) creates `service_request` records — it does NOT create custom entity type instances. There is no API, form, or flow that creates a custom entity (like `billing_dispute`, `loan_application`, `service_interruption`) on behalf of a logged-in user. This means:
 
-✅ **Good `entity-journey` candidates** (user-created entities):
-- Loan application (user fills the form → entity created with their ID)
-- Patient admission (check-in creates the entity)
-- Insurance claim (user submits → entity created)
-- Store order (purchase flow creates the entity)
+- **Generator-driven entity + ownerField** → generator never populates ownerField → empty journey. ❌
+- **No-generator entity + ownerField** → entity never gets created at all → still empty journey. ❌
+- **Both are permanently broken for all custom entity types.**
 
-❌ **Bad `entity-journey` candidates** (backend-generated, no owner link):
-- Outage event, grid fault, IoT incident → use `status-map` instead
-- Flight / shipment / work order → ops-side only, use `entity-list` or `entity-map`
-- Any entity where you must "assume" or "infer" owner IDs — the assumption will always be wrong
+The only working `entity-journey` + `ownerField` in the public portal is the built-in `my-journey` screen (aviation-specific, not configurable here).
+
+**For all other industries:** if you want a personal-looking journey tracker, use `entity-list` with no `ownerField` — it shows the live entity pipeline for all users as a real-time feed, which is still compelling and actually works.
+
+✅ **Good uses of `entity-journey` (ops dashboard, no ownerField):**
+- Flight board showing all flights in each boarding state
+- All claims being processed in the ops view
+- All admissions in the patient pipeline
+
+❌ **Never use `entity-journey` + `ownerField` for a custom entity type, generator or not:**
+- Loan application, outage report, billing dispute, service interruption, etc. → always empty
+- If the user wants "track my own X", use `entity-list` instead (shows all entities as a feed)
 
 **Template screen extra props (entity-journey):**
 ```yaml
@@ -315,6 +319,10 @@ a **template object** (dynamic module with config props).
 | `flight-status` | Departures/arrivals board | aviation only |
 | `airfield-map` | Airfield map card | aviation only |
 | `my-journey` | Journey tracker call-to-action | aviation only |
+
+⚠️ **`weather-widget`, `clock-widget`, `entity-map`, etc. are template modules — not static ids.** They must use
+the `{ id: <unique>, template: weather-widget, ...props }` object form, not a bare string. Writing
+`- weather-widget` as a string will render blank or crash because there is no built-in screen with that id.
 
 **Portal — template modules (use `{ id, template, ...props }`):**
 | template | What it is | Props |
@@ -358,7 +366,7 @@ home:
 | id | What it is | When to use |
 |----|-----------|-------------|
 | `ops-overview` | KPI row + requests-over-time chart | generic baseline |
-| `flight-summary` | Live flight KPI strip | aviation only |
+| `flight-summary` | Live flight KPI strip | **aviation only** — do NOT include for non-aviation industries |
 
 **Ops — template modules:**
 | template | What it is | Props |
@@ -402,7 +410,7 @@ error. Rules:
   `environment`, `transport`, `other`) — meaningless for non-city contexts.
 
 ```yaml
-# Good: categories ↔ routing are in sync
+# Good: categories ↔ routing are in sync — including 'other'
 terminology:
   requestCategories: [account-issue, card-dispute, loan-inquiry, fraud-report, password-reset, other]
 routing:
@@ -411,6 +419,7 @@ routing:
   loan-inquiry: "Lending"
   fraud-report: "Fraud Detection"
   password-reset: "Digital Support"
+  other: "General Support"           # always include 'other' — it's in every requestCategories list
 ```
 
 **`billingTitle`, `billingSubtitle`, `billNoun` — REQUIRED if `billing` is in `screens.public`.**
@@ -520,8 +529,12 @@ dynatrace:
     - service-request
     - account-creation
     - iot-incident
-    # add: purchase / tax-payment only if store/billing screens are active
+    # add: tax-payment only if billing screen is active
     # add: aircraft-turnaround / passenger-journey only for aviation
+    # ⚠️ The valid flow ids are EXACTLY: service-request, account-creation, iot-incident,
+    # tax-payment, aircraft-turnaround, passenger-journey.
+    # Do NOT invent flow ids (e.g. grid-fault-resolution, bill-payment-flow, etc.) —
+    # they will silently do nothing. Map your concept to the closest valid id above.
 ```
 
 ---
@@ -594,6 +607,13 @@ dynatrace:
     `citizen-service`, `city-operations`, `service-dispatch`, `api-gateway`,
     `notification-service`, `billing-service`. A key like `grid-operations` or `analytics-engine`
     won't rename anything — it's silently ignored. Map your industry labels to these fixed keys.
+27. **`dynatrace.flows` entries must be from the known list.** Valid flow ids: `service-request`,
+    `account-creation`, `iot-incident`, `tax-payment`, `aircraft-turnaround`, `passenger-journey`.
+    Any other string (e.g. `grid-fault-resolution`, `bill-payment-flow`) is silently ignored.
+28. **`entity-journey` + `ownerField` never works for custom entity types in the public portal.**
+    The portal has no mechanism to create custom entity type instances from user actions — only
+    `service_request` records are created by the portal form. Entity-journey + ownerField is only
+    valid for the built-in `my-journey` (aviation). For all other custom entities, use `entity-list`.
 
 ---
 
