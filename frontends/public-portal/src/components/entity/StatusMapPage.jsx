@@ -31,17 +31,31 @@ function scatterPosition(center, deviceId, radius = 75) {
   return { x: center.x + Math.cos(angle) * r, y: center.y + Math.sin(angle) * r }
 }
 
-// Two independent hashes of the same device ID: forward pass → x, reverse
-// pass → y. Uncorrelated so dots scatter organically; overlaps are accepted.
-function scatterFull(deviceId, w = 1000, h = 580, margin = 30) {
-  let hx = 5381, hy = 5381
-  for (let i = 0; i < deviceId.length; i++)
-    hx = ((hx << 5) + hx + deviceId.charCodeAt(i)) & 0xffffffff
-  for (let i = deviceId.length - 1; i >= 0; i--)
-    hy = ((hy << 5) + hy + deviceId.charCodeAt(i)) & 0xffffffff
+// FNV-1a hash of the full string, then two independent Wang-hash avalanche
+// mixes to produce x and y. FNV-1a distributes well even for near-identical
+// strings (same prefix, differing suffix); the avalanche mix breaks any
+// residual correlation so x and y are genuinely independent.
+function scatterFull(deviceId, vbW = 1000, vbH = 580, margin = 30) {
+  let base = 2166136261
+  for (let i = 0; i < deviceId.length; i++) {
+    base ^= deviceId.charCodeAt(i)
+    base = Math.imul(base, 16777619)
+  }
+  base = base >>> 0
+
+  let hx = base
+  hx ^= hx >>> 16
+  hx = Math.imul(hx, 0x45d9f3b) >>> 0
+  hx ^= hx >>> 16
+
+  let hy = base
+  hy ^= hy >>> 17
+  hy = Math.imul(hy, 0x9e3779b9) >>> 0
+  hy ^= hy >>> 15
+
   return {
-    x: margin + ((hx >>> 0) % (w - margin * 2)),
-    y: margin + ((hy >>> 0) % (h - margin * 2)),
+    x: margin + (hx % (vbW - margin * 2)),
+    y: margin + (hy % (vbH - margin * 2)),
   }
 }
 
