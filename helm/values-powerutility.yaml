@@ -1,215 +1,96 @@
 industry:
   version: 1
-  id: energy
+  id: power-utility
   company:
-    name: "Meridian Power"
-    short: "Meridian"
-    tagline: "Empowering your world, reliably."
+    name: "PowerUnlimited"
+    short: "PowerUnlimited"
+    tagline: "Powering your life. Safely and reliably."
     assistant:
       name: "Volt"
-      persona: "the Meridian Power virtual assistant"
+      persona: "the PowerUnlimited virtual assistant"
+      supportPhone: "1-800-436-PWR-U"
       systemPrompt: |-
-        You are Volt, the virtual assistant for Meridian Power. Help customers check
-        for power outages, report downed lines, understand their energy bills, and
-        manage smart meter services. Be concise, empathetic, and prioritize safety
-        when dealing with electrical hazards.
+        You are Volt, the virtual assistant for PowerUnlimited, an electric utility company.
+        Help customers report power outages, check restoration times, report downed lines, 
+        and view their bills. Prioritize safety—if a user mentions a downed wire, instruct 
+        them to stay 30 feet away and call emergency services immediately. Be reassuring, 
+        concise, and professional.
   theme:
     colors:
-      brand: "#1E40AF"             # Strong, calming utility blue
-      brandDeep: "#172554"         # Dark navy for headers
-      brandSoft: "#3B82F6"         # Lighter blue for active states
-      brandTint: "#EFF6FF"         # Very light blue background tint
-      accent: "#F59E0B"            # Amber/Orange for alerts & energy
-      accentSoft: "#FCD34D"        # Light amber
-      accentInk: "#78350F"         # Dark amber text for readability
-    logo: ""
-    favicon: ""
+      brand: "#005E3C"             
+      brandDeep: "#004229"         
+      brandSoft: "#009A44"         
+      brandTint: "#E6F4EA"         
+      accent: "#E96A00"            
+      accentSoft: "#FF9838"        
+      accentInk: "#4A2000"         
+    logo: "https://drive.google.com/uc?export=download&id=1lVEsF1Ol8bwuua0DXVXaqZvkPI01GvsD"
+    favicon: "https://drive.google.com/uc?export=download&id=1vA_VHAnU0Q90KcQJPJopUggTZpH9KF9C"
   terminology:
     customer: "Customer"
     customerPlural: "Customers"
-    request: "Outage Report"
-    requestPlural: "Outage Reports"
-    incident: "Grid Outage"
-    incidentPlural: "Grid Outages"
-    iotCategory1: "Field Vehicles"
-    iotCategory2: "Substations"
-    iotCategory3: "Smart Meters"
-    billingTitle: "Pay My Bill"
-    billingSubtitle: "Your Meridian Power energy bills and payment history."
-    billNoun: "energy bill"
-    workOrder: "Field Dispatch"
+    request: "Service Request"
+    requestPlural: "Service Requests"
+    incident: "Grid Incident"
+    incidentPlural: "Grid Incidents"
+    workOrder: "Field Work Order"
     asset: "Grid Asset"
     assetPlural: "Grid Assets"
-    requestCategories: [outage-report, billing-issue, new-connection, meter-issue, hazard, other]
-    iotIdPrefix1: "fld"
-    iotIdPrefix2: "sub"
-    iotIdPrefix3: "mtr"
-  screens:
+    billingTitle: "Billing & Payments"
+    billingSubtitle: "Your PowerUnlimited electricity bills and payment history."
+    billNoun: "electric bill"
+    requestCategories: [outage, safety, streetlights, metering, other]
+  screens:                         
     public:
       - home
-      - { id: service-requests, label: "Report Outage" }
-      - { id: billing, label: "Pay Bill" }
+      - { id: service-requests, label: "Outage & Service Center" }
+      - { id: billing, label: "Billing & Payments" }
       - messages
-      - id: outage-status
-        template: entity-journey
-        entityType: outage_restoration
-        label: "Outage Status"
-        icon: "⚡"
-        ownerField: address
-        steps:
-          - { state: reported, label: "Outage Reported" }
-          - { state: crew_dispatched, label: "Crew Dispatched" }
-          - { state: crew_on_site, label: "Crew On Site" }
-          - { state: restoration_in_progress, label: "Restoring Power" }
-          - { state: power_restored, label: "Power Restored ✓" }
-        description: "Track the restoration of your power from initial report through full service return."
     ops:
       - overview
-      - id: active-outages
-        template: entity-list
-        entityType: outage_restoration
-        label: "Active Outages"
-        icon: "⚡"
       - { id: requests, label: "Field Dispatch" }
       - { id: incidents, label: "Grid Outages" }
-      - { id: iot, label: "Smart Grid Assets" }
-      - { id: analytics, label: "Grid Performance" }
+      - { id: iot, label: "Smart Grid & Meters" }
+      - { id: analytics, label: "Reliability & SAIDI" }
       - demo-control
   home:
-    public:
-      - id: grid-ticker
-        template: ticker
-        height: slim
-        label: "⚡ GRID STATUS"
-        items:
-          - "System load: 2,847 MW · Grid frequency: 60.01 Hz — NORMAL"
-          - "North District: All circuits nominal"
-          - "Downtown Grid: Load advisory lifted — full service restored"
-          - "East Valley: Scheduled maintenance Apr 20 2–6 AM (advance notice sent)"
-          - "Renewable mix: 34% solar + wind of current load — record high this month"
-          - "Smart meter enrollment: 89,241 customers enrolled — 12% increase YoY"
-      - welcome-hero
-      - quick-actions
-      - id: service-advisories
-        template: announcements
-        title: "Service Advisories"
-        items:
-          - "Planned outage: Westside Substation — Apr 22 midnight–4 AM for transformer replacement."
-          - "Storm watch: Crews on standby for weekend forecast. Report outages via app or 1-800-PWR."
-          - "Smart meter enrollment open: Enroll by May 1 and receive a $25 bill credit."
-    ops:
-      - id: outage-kpi
-        template: entity-kpi-row
-        entityTypes: [outage_restoration]
-      - ops-overview
+    public: ["city-home", "quick-actions"]
+    ops: ["ops-overview"]
   data:
-    zones: ["North District", "South Substation", "Downtown Grid", "East Valley", "Westside Substation"]
+    zones: ["substation-alpha", "substation-bravo", "north-district", "south-district", "metro-grid", "suburban-ring"]
     requestTemplates:
-      - { category: grid-ops, title: "Total Power Loss", description: "Entire block is out of power." }
-      - { category: grid-ops, title: "Flickering Lights", description: "Power is intermittent and lights are flickering." }
-      - { category: maintenance, title: "Downed Power Line", description: "Tree fell on a line, wire is on the ground. (High Priority)" }
-      - { category: maintenance, title: "Transformer Sparking", description: "Loud pop and sparks from the pole transformer." }
-      - { category: customer-service, title: "Smart Meter Check", description: "Meter is blank or seems to be reading incorrectly." }
+      - { category: outage, title: "Total Power Loss", description: "Entire neighborhood has been without power since 2:00 PM." }
+      - { category: outage, title: "Flickering Lights", description: "Lights are browning out and flickering intermittently for the last hour." }
+      - { category: safety, title: "Downed Power Line", description: "Tree branch fell and took down a line across the driveway on Elm St. Sparks visible." }
+      - { category: safety, title: "Transformer Sparking", description: "Loud pop and sparks coming from the pole-mounted transformer at the corner." }
+      - { category: streetlights, title: "Streetlight Outage", description: "Three consecutive streetlights on Maple Ave are completely dark." }
+      - { category: metering, title: "Smart Meter Offline", description: "My smart meter display is blank and I cannot see my daily usage in the app." }
     chatQuestions:
-      - "Is there an outage reported in my area?"
+      - "Is there a known power outage in my area?"
       - "How do I report a downed power line?"
-      - "Can I pay my energy bill online?"
-      - "Why is my power flickering?"
-      - "How do I track my outage restoration?"
       - "When will my power be restored?"
+      - "Can I get an extension on my electric bill?"
   routing:
-    grid-ops: "Grid Operations"
-    maintenance: "Line Maintenance"
-    customer-service: "Customer Support"
+    outage: "Grid Operations"
+    safety: "Emergency Response"
+    streetlights: "Field Services"
+    metering: "Advanced Metering (AMI)"
   dynatrace:
     serviceNames:
-      citizen-service: "Customer Portal Services"
+      citizen-service: "Customer Experience Portal"
       city-operations: "Grid Operations Center"
       service-dispatch: "Field Dispatch Service"
       api-gateway: "Utility API Gateway"
-      notification-service: "Outage Alert Service"
-      billing-service: "Energy Billing System"
+      notification-service: "Outage Notification Engine"
+      billing-service: "CIS Billing Service"
     flowLabels:
-      service-request: "Outage Report Lifecycle"
-      account-creation: "New Customer Registration"
-      iot-incident: "Smart Asset Fault Resolution"
+      service-request: "Outage Reporting Lifecycle"
+      account-creation: "New Customer Move-in"
+      iot-incident: "Smart Grid Fault Resolution"
       tax-payment: "Utility Bill Payment"
-      outage_restoration: "Power Restoration Journey"
     flows:
       - service-request
       - account-creation
       - iot-incident
       - tax-payment
-  analytics:
-    flows:
-      - service-request
-      - account-creation
-      - iot-incident
-      - tax-payment
-      - outage_restoration
-    flowLabels:
-      service-request: "Outage Report Lifecycle"
-      account-creation: "New Customer Registration"
-      iot-incident: "Smart Asset Fault Resolution"
-      tax-payment: "Utility Bill Payment"
-      outage_restoration: "Power Restoration Journey"
-  entities:
-    # -----------------------------------------------------------------------
-    # OUTAGE RESTORATION — customer-facing power restoration lifecycle
-    # Tracks a reported outage from crew dispatch through power restoration.
-    # Customers can track their own outage via the outage-status entity-journey
-    # screen (ownerField: address). Ops see all active restorations in the
-    # active-outages entity-list screen.
-    # -----------------------------------------------------------------------
-    outage_restoration:
-      displayName: "Outage Restoration"
-      displayNamePlural: "Outage Restorations"
-      idPrefix: "otg"
-      fields:
-        address: { type: string }
-        district: { type: string }
-        affected_customers: { type: number }
-        crew_id: { type: string }
-        cause:
-          type: enum
-          values: [storm_damage, equipment_failure, vehicle_accident, planned_maintenance, unknown]
-          default: unknown
-      initial: reported
-      states:
-        reported: { label: "Reported", tone: amber }
-        crew_dispatched: { label: "Crew Dispatched", tone: blue }
-        crew_on_site: { label: "Crew On Site", tone: blue }
-        restoration_in_progress: { label: "Restoring Power", tone: amber }
-        escalated: { label: "Escalated", tone: red, isError: true }
-        power_restored: { label: "Power Restored", tone: green, terminal: true, isKpi: true }
-      transitions:
-        - from: reported
-          to: crew_dispatched
-          timer: { minSeconds: 60, maxSeconds: 300 }
-        - from: crew_dispatched
-          to: escalated
-          when: { faultGate: "outage-crew-unavailable", probability: 0.05 }
-          timer: { minSeconds: 120, maxSeconds: 600 }
-        - from: crew_dispatched
-          to: crew_on_site
-          timer: { minSeconds: 120, maxSeconds: 600 }
-        - from: crew_on_site
-          to: restoration_in_progress
-          timer: { minSeconds: 60, maxSeconds: 240 }
-        - from: restoration_in_progress
-          to: escalated
-          when: { faultGate: "outage-complex-fault", probability: 0.08 }
-          timer: { minSeconds: 120, maxSeconds: 480 }
-        - from: restoration_in_progress
-          to: power_restored
-          timer: { minSeconds: 120, maxSeconds: 480 }
-        - from: escalated
-          to: restoration_in_progress
-          timer: { minSeconds: 300, maxSeconds: 900 }
-      generator:
-        strategy: simpleSteadyState
-        intervalMs: 120000
-        maxActive: 8
-        fields:
-          address: { faker: streetAddress }
-          affected_customers: { min: 5, max: 850 }
+
