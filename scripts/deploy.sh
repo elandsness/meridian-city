@@ -276,6 +276,7 @@ install_or_upgrade() {
     info "Patched $otel_deploy: progressDeadlineSeconds=1800"
   ) &
   patch_pid=$!
+  disown $patch_pid
 
   # Background progress reporter: prints a pod summary every 20s.
   # Loop condition checks that the parent script is still alive (kill -0 $$
@@ -300,6 +301,7 @@ install_or_upgrade() {
     done
   ) &
   progress_pid=$!
+  disown $progress_pid
 
   # Ensure the shared cluster-singleton operators (CloudNativePG + Strimzi) are
   # installed and ready BEFORE the instance install. They own the cluster-scoped
