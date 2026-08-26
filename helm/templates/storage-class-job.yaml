@@ -1,0 +1,253 @@
+{{/*
+Auto-configure storage classes for the detected cloud provider.
+
+This Job runs once during installation to:
+1. Detect the cloud provider (AWS, GCP, Azure)
+2. Create appropriate storage classes
+3. Set them as default
+
+This ensures Meridian City "just works" on EKS, GKE, and AKS without manual
+storage class configuration. The Job is idempotent and safe to re-run.
+
+The Job uses a small script in a ConfigMap to detect the provider via node labels
+and create the appropriate storage classes.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ include "meridian.fullname" . }}-storage-class-config"
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded
+data:
+  detect-provider.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Detecting cloud provider..."
+
+    # Detect cloud provider by checking node labels
+    # AWS nodes have: topology.kubernetes.io/zone with us-east-1a format
+    # GCP nodes have: cloud.google.com/gke-nodepool label
+    # Azure nodes have: failure-domain.beta.kubernetes.io/zone or kubernetes.io/azure-zone
+
+    PROVIDER="unknown"
+
+    # Check for GCP (GKE)
+    if kubectl get nodes -o jsonpath='{.items[0].metadata.labels.cloud\.google\.com/gke-nodepool}' 2>/dev/null | grep -q .; then
+      PROVIDER="gcp"
+      echo "Detected: Google Cloud Platform (GKE)"
+    # Check for Azure (AKS)
+    elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' 2>/dev/null | grep -q . || \
+         kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.io/azure-zone}' 2>/dev/null | grep -q .; then
+      PROVIDER="azure"
+      echo "Detected: Microsoft Azure (AKS)"
+    # Check for AWS (EKS) - check for AWS-specific zone format or instance type
+    elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}' 2>/dev/null | grep -qE '^[a-z]{2}-[a-z]+-[0-9]+$' || \
+         kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE '^aws://'; then
+      PROVIDER="aws"
+      echo "Detected: Amazon Web Services (EKS)"
+    else
+      echo "Could not detect cloud provider, defaulting to AWS (EKS)"
+      PROVIDER="aws"
+    fi
+
+    echo "Using provider: $PROVIDER"
+
+    # Create storage classes based on provider
+    case "$PROVIDER" in
+      aws)
+        echo "Creating AWS storage classes..."
+        cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: meridian-gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+  kmsKeyId: alias/aws/ebs
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: meridian-io2
+provisioner: ebs.csi.aws.com
+parameters:
+  type: io2
+  encrypted: "true"
+  kmsKeyId: alias/aws/ebs
+  iops: "3000"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+        echo "AWS storage classes created (meridian-gp3 set as default)"
+        ;;
+      gcp)
+        echo "Creating GCP storage classes..."
+        cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: meridian-standard
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-standard
+  encrypted: "true"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: meridian-premium
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-ssd
+  encrypted: "true"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+        echo "GCP storage classes created (meridian-standard set as default)"
+        ;;
+      azure)
+        echo "Creating Azure storage classes..."
+        cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: meridian-managed-premium
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: StandardSSD_LRS
+  encrypted: "true"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: meridian-managed-ssd
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+  encrypted: "true"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+        echo "Azure storage classes created (meridian-managed-premium set as default)"
+        ;;
+      *)
+        echo "ERROR: Unknown provider '$PROVIDER'"
+        exit 1
+        ;;
+    esac
+
+    echo "Storage class configuration complete."
+    echo "Default storage class: meridian-<provider>-<type>"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ include "meridian.fullname" . }}-storage-class-setup"
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-4"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "meridian.selectorLabels" (dict "component" "storage-class-setup" "context" $) | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: "{{ include "meridian.fullname" . }}-storage-class-admin"
+      containers:
+        - name: setup-storage
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              /etc/scripts/detect-provider.sh
+          volumeMounts:
+            - name: scripts
+              mountPath: /etc/scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: "{{ include "meridian.fullname" . }}-storage-class-config"
+            defaultMode: 0755
+---
+{{/* ServiceAccount for storage class creation */}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "{{ include "meridian.fullname" . }}-storage-class-admin"
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-6"
+    "helm.sh/hook-delete-policy": hook-succeeded
+---
+{{/* ClusterRole to create storage classes */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "{{ include "meridian.fullname" . }}-storage-class-admin"
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-6"
+    "helm.sh/hook-delete-policy": hook-succeeded
+rules:
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+{{/* Bind ServiceAccount to ClusterRole */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: "{{ include "meridian.fullname" . }}-storage-class-admin"
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: "{{ include "meridian.fullname" . }}-storage-class-admin"
+subjects:
+  - kind: ServiceAccount
+    name: "{{ include "meridian.fullname" . }}-storage-class-admin"
+    namespace: {{ include "meridian.namespace" . }}

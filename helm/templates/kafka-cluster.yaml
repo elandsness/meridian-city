@@ -18,6 +18,9 @@ spec:
   storage:
     type: persistent-claim
     size: {{ .Values.kafka.storage.size }}
+    {{- with .Values.kafka.storage.storageClassName }}
+    storageClassName: {{ . | quote }}
+    {{- end }}
     deleteClaim: false
   resources:
     {{- toYaml .Values.kafka.resources | nindent 4 }}

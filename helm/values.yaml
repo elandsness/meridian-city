@@ -753,6 +753,24 @@ opsDashboard:
 # Cluster CR named "<release>-db" (e.g. meridian-a1b2-db) in its own namespace,
 # with services <release>-db-rw (read-write) / <release>-db-r (read-only).
 # The database name itself stays "meridian" — it is isolated per cluster/namespace.
+#
+# EKS DEPLOYMENT NOTES:
+# - Ensure EBS CSI driver is installed: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+# - Recommended storage class: "gp3" (best value) or "io2" (low-latency for high-IOPS workloads)
+# - Create storage class with WaitForFirstConsumer for AZ affinity:
+#   apiVersion: storage.k8s.io/v1
+#   kind: StorageClass
+#   metadata:
+#     name: gp3
+#   provisioner: ebs.csi.aws.com
+#   reclaimPolicy: Retain
+#   volumeBindingMode: WaitForFirstConsumer
+#   parameters:
+#     type: gp3
+#     encrypted: "true"
+# - PostgreSQL pods require persistent storage; without proper storage class, pods will
+#   remain in Pending state waiting for volume provisioning
+# - For production workloads, consider io2 with provisioned IOPS for consistent low-latency
 # ---------------------------------------------------------------------------
 postgresql:
   enabled: true
@@ -768,6 +786,13 @@ postgresql:
     database: "meridian"
   storage:
     size: "10Gi"
+    # Storage class name.
+    # Auto-detected by storage-class-job.yaml hook (runs before install):
+    #   - AWS (EKS): "meridian-gp3" (default) or "meridian-io2"
+    #   - GCP (GKE): "meridian-standard" (default) or "meridian-premium"
+    #   - Azure (AKS): "meridian-managed-premium" (default) or "meridian-managed-ssd"
+    # Override to use a custom storage class or cluster default (leave empty).
+    storageClassName: ""
   resources:
     requests:
       cpu: "250m"
@@ -787,6 +812,23 @@ postgresql:
 # with watchAnyNamespace=true (not per-instance). Each Meridian instance gets its
 # own single-node KRaft Kafka CR named "<release>" (e.g. meridian-a1b2) in its own
 # namespace, with bootstrap <release>-kafka-bootstrap:9092. Topics via KafkaTopic CRDs.
+#
+# EKS DEPLOYMENT NOTES:
+# - Ensure EBS CSI driver is installed: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+# - Recommended storage class: "gp3" (best value) or "io2" (low-latency)
+# - Create storage class with WaitForFirstConsumer for AZ affinity:
+#   apiVersion: storage.k8s.io/v1
+#   kind: StorageClass
+#   metadata:
+#     name: gp3
+#   provisioner: ebs.csi.aws.com
+#   reclaimPolicy: Retain
+#   volumeBindingMode: WaitForFirstConsumer
+#   parameters:
+#     type: gp3
+#     encrypted: "true"
+# - Kafka pods require persistent storage; without proper storage class, pods will
+#   remain in Pending state waiting for volume provisioning
 # ---------------------------------------------------------------------------
 kafka:
   enabled: true
@@ -798,6 +840,13 @@ kafka:
   version: "4.2.0"
   storage:
     size: "8Gi"
+    # Storage class name.
+    # Auto-detected by storage-class-job.yaml hook (runs before install):
+    #   - AWS (EKS): "meridian-gp3" (default) or "meridian-io2"
+    #   - GCP (GKE): "meridian-standard" (default) or "meridian-premium"
+    #   - Azure (AKS): "meridian-managed-premium" (default) or "meridian-managed-ssd"
+    # Override to use a custom storage class or cluster default (leave empty).
+    storageClassName: ""
   resources:
     requests:
       cpu: "250m"
@@ -805,6 +854,17 @@ kafka:
     limits:
       cpu: "1000m"
       memory: "2Gi"
+  # Node affinity for EKS — schedule Kafka pods on dedicated node group.
+  # Uncomment and customize for EKS production deployments.
+  # nodeAffinity:
+  #   requiredDuringSchedulingIgnoredDuringExecution:
+  #     nodeSelectorTerms:
+  #       - matchExpressions:
+  #           - key: node.kubernetes.io/instance-type
+  #             operator: In
+  #             values:
+  #               - r6i.xlarge
+  #               - r6i.2xlarge
   topics:
     - name: iot.telemetry.raw
       partitions: 3
