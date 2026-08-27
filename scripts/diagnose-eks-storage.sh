@@ -20,20 +20,83 @@ echo "1. Checking EBS CSI driver pods..."
 if kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver &>/dev/null; then
     echo "   ✅ EBS CSI driver pods found:"
     kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver -o wide
+    echo ""
+
+    # Check for CrashLoopBackOff
+    CRASHING=$(kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.containerStatuses[0].restartCount}{"\n"}{end}' 2>/dev/null | grep -v Running | grep -v Succeeded)
+
+    if [[ -n "$CRASHING" ]]; then
+        echo "   ⚠️  WARNING: Some EBS CSI driver pods are NOT running:"
+        echo ""
+        echo "   $CRASHING"
+        echo ""
+        echo "   This is the MOST COMMON cause of PVC Pending on EKS."
+        echo "   The controller pods are crashing due to IAM/IRSA misconfiguration."
+        echo ""
+        echo "   FIX: Reinstall the EBS CSI driver with proper IAM:"
+        echo ""
+        CLUSTER_NAME=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}')
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "<ACCOUNT_ID>")
+        echo "   eksctl create iamserviceaccount \\"
+        echo "     --name ebs-csi-controller-sa \\"
+        echo "     --namespace kube-system \\"
+        echo "     --cluster $CLUSTER_NAME \\"
+        echo "     --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2 \\"
+        echo "     --approve --role-only --role-name AmazonEKS_EBS_CSI_DriverRole"
+        echo ""
+        echo "   Then delete the crashing pods to trigger restart:"
+        echo "   kubectl delete pods -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver"
+        echo ""
+    else
+        echo "   ✅ All EBS CSI driver pods are running"
+    fi
 else
     echo "   ❌ EBS CSI driver pods NOT found"
     echo ""
     echo "   The EBS CSI driver is REQUIRED for persistent volumes on EKS."
     echo "   Install it with:"
     echo ""
+    CLUSTER_NAME=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}')
     echo "   eksctl create iamserviceaccount \\"
     echo "     --name ebs-csi-controller-sa \\"
     echo "     --namespace kube-system \\"
-    echo "     --cluster <cluster-name> \\"
+    echo "     --cluster $CLUSTER_NAME \\"
     echo "     --role-name AmazonEKS_EBS_CSI_DriverRole \\"
     echo "     --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2 \\"
     echo "     --approve"
     echo ""
+fi
+echo ""
+
+# Check 1b: EBS CSI Driver IAM Role
+echo "1b. Checking EBS CSI driver IAM role..."
+if command -v aws &>/dev/null; then
+    ROLE_NAME="AmazonEKS_EBS_CSI_DriverRole"
+    if aws iam get-role --role-name "$ROLE_NAME" &>/dev/null; then
+        echo "   ✅ IAM role '$ROLE_NAME' exists"
+        POLICY_ARN=$(aws iam list-attached-role-policies --role-name "$ROLE_NAME" \
+          --query 'AttachedPolicies[?PolicyName==`AmazonEBSCSIDriverPolicyV2`].PolicyArn' --output text 2>/dev/null)
+        if [[ -n "$POLICY_ARN" ]]; then
+            echo "   ✅ Policy 'AmazonEBSCSIDriverPolicyV2' attached to role"
+        else
+            echo "   ⚠️  Policy 'AmazonEBSCSIDriverPolicyV2' NOT attached to role"
+            echo "   Attach it with:"
+            echo "   aws iam attach-role-policy --role-name $ROLE_NAME --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2"
+        fi
+    else
+        echo "   ⚠️  IAM role '$ROLE_NAME' NOT found"
+        echo "   Create it with:"
+        echo "   eksctl create iamserviceaccount \\"
+        echo "     --name ebs-csi-controller-sa \\"
+        echo "     --namespace kube-system \\"
+        echo "     --cluster <cluster-name> \\"
+        echo "     --role-name $ROLE_NAME \\"
+        echo "     --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2 \\"
+        echo "     --approve"
+    fi
+else
+    echo "   ⚠️  AWS CLI not found. Install it to verify IAM configuration."
 fi
 echo ""
 
@@ -111,10 +174,10 @@ echo "Diagnosis Complete"
 echo "=========================================="
 echo ""
 echo "Common Issues:"
-echo "1. EBS CSI driver not installed → Install it (see Check 1)"
-echo "2. Wrong default StorageClass → Patch to use ebs.csi.aws.com"
-echo "3. Storage class setup job failed → Check job logs"
-echo "4. IAM permissions missing → Verify IAM role for EBS CSI driver"
+echo "1. EBS CSI driver controller crashing (CrashLoopBackOff) → Fix IAM/IRSA (see Check 1)"
+echo "2. EBS CSI driver not installed → Install it (see Check 1)"
+echo "3. Wrong default StorageClass → Patch to use ebs.csi.aws.com"
+echo "4. Storage class setup job failed → Check job logs"
 echo ""
 echo "Next Steps:"
 echo "- If EBS CSI driver is missing: Install it using the command in Check 1"
