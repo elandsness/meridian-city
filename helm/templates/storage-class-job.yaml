@@ -18,7 +18,11 @@ metadata:
   name: "{{ include "meridian.fullname" . }}-storage-class-config"
   namespace: {{ include "meridian.namespace" . }}
   labels:
-    {{- include "meridian.labels" . | nindent 4 }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/part-of: meridian-city-platform
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "-5"
@@ -31,10 +35,6 @@ data:
     echo "Detecting cloud provider..."
 
     # Detect cloud provider by checking node labels
-    # AWS nodes have: topology.kubernetes.io/zone with us-east-1a format
-    # GCP nodes have: cloud.google.com/gke-nodepool label
-    # Azure nodes have: failure-domain.beta.kubernetes.io/zone or kubernetes.io/azure-zone
-
     PROVIDER="unknown"
 
     # Check for GCP (GKE)
@@ -46,7 +46,7 @@ data:
          kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.io/azure-zone}' 2>/dev/null | grep -q .; then
       PROVIDER="azure"
       echo "Detected: Microsoft Azure (AKS)"
-    # Check for AWS (EKS) - check for AWS-specific zone format or instance type
+    # Check for AWS (EKS)
     elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}' 2>/dev/null | grep -qE '^[a-z]{2}-[a-z]+-[0-9]+$' || \
          kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE '^aws://'; then
       PROVIDER="aws"
@@ -62,98 +62,71 @@ data:
     case "$PROVIDER" in
       aws)
         echo "Creating AWS storage classes..."
-        cat <<EOF | kubectl apply -f -
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: meridian-gp3
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: ebs.csi.aws.com
-parameters:
-  type: gp3
-  encrypted: "true"
-  kmsKeyId: alias/aws/ebs
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: meridian-io2
-provisioner: ebs.csi.aws.com
-parameters:
-  type: io2
-  encrypted: "true"
-  kmsKeyId: alias/aws/ebs
-  iops: "3000"
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
-EOF
+        # Create meridian-gp3 (default)
+        kubectl create storageclass meridian-gp3 \
+          --provider=ebs.csi.aws.com \
+          --parameters='type=gp3,encrypted=true,kmsKeyId=alias/aws/ebs' \
+          --reclaim-policy=Retain \
+          --volume-binding-mode=WaitForFirstConsumer \
+          --allow-volume-expansion \
+          --annotate storageclass.kubernetes.io/is-default-class=true \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # Create meridian-io2
+        kubectl create storageclass meridian-io2 \
+          --provider=ebs.csi.aws.com \
+          --parameters='type=io2,encrypted=true,kmsKeyId=alias/aws/ebs,iops=3000' \
+          --reclaim-policy=Retain \
+          --volume-binding-mode=WaitForFirstConsumer \
+          --allow-volume-expansion \
+          --dry-run=client -o yaml | kubectl apply -f -
+
         echo "AWS storage classes created (meridian-gp3 set as default)"
         ;;
       gcp)
         echo "Creating GCP storage classes..."
-        cat <<EOF | kubectl apply -f -
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: meridian-standard
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: pd.csi.storage.gke.io
-parameters:
-  type: pd-standard
-  encrypted: "true"
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: meridian-premium
-provisioner: pd.csi.storage.gke.io
-parameters:
-  type: pd-ssd
-  encrypted: "true"
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
-EOF
+        # Create meridian-standard (default)
+        kubectl create storageclass meridian-standard \
+          --provider=pd.csi.storage.gke.io \
+          --parameters='type=pd-standard,encrypted=true' \
+          --reclaim-policy=Retain \
+          --volume-binding-mode=WaitForFirstConsumer \
+          --allow-volume-expansion \
+          --annotate storageclass.kubernetes.io/is-default-class=true \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # Create meridian-premium
+        kubectl create storageclass meridian-premium \
+          --provider=pd.csi.storage.gke.io \
+          --parameters='type=pd-ssd,encrypted=true' \
+          --reclaim-policy=Retain \
+          --volume-binding-mode=WaitForFirstConsumer \
+          --allow-volume-expansion \
+          --dry-run=client -o yaml | kubectl apply -f -
+
         echo "GCP storage classes created (meridian-standard set as default)"
         ;;
       azure)
         echo "Creating Azure storage classes..."
-        cat <<EOF | kubectl apply -f -
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: meridian-managed-premium
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: disk.csi.azure.com
-parameters:
-  skuName: StandardSSD_LRS
-  encrypted: "true"
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: meridian-managed-ssd
-provisioner: disk.csi.azure.com
-parameters:
-  skuName: Premium_LRS
-  encrypted: "true"
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
-EOF
+        # Create meridian-managed-premium (default)
+        kubectl create storageclass meridian-managed-premium \
+          --provider=disk.csi.azure.com \
+          --parameters='skuName=StandardSSD_LRS,encrypted=true' \
+          --reclaim-policy=Retain \
+          --volume-binding-mode=WaitForFirstConsumer \
+          --allow-volume-expansion \
+          --annotate storageclass.kubernetes.io/is-default-class=true \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # Create meridian-managed-ssd
+        kubectl create storageclass meridian-managed-ssd \
+          --provider=disk.csi.azure.com \
+          --parameters='skuName=Premium_LRS,encrypted=true' \
+          --reclaim-policy=Retain \
+          --volume-binding-mode=WaitForFirstConsumer \
+          --allow-volume-expansion \
+          --dry-run=client -o yaml | kubectl apply -f -
+
         echo "Azure storage classes created (meridian-managed-premium set as default)"
         ;;
       *)
@@ -171,7 +144,11 @@ metadata:
   name: "{{ include "meridian.fullname" . }}-storage-class-setup"
   namespace: {{ include "meridian.namespace" . }}
   labels:
-    {{- include "meridian.labels" . | nindent 4 }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/part-of: meridian-city-platform
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "-4"
@@ -181,7 +158,12 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "meridian.selectorLabels" (dict "component" "storage-class-setup" "context" $) | nindent 8 }}
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        app.kubernetes.io/part-of: meridian-city-platform
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+        app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
+        app.kubernetes.io/name: storage-class-setup
     spec:
       restartPolicy: Never
       serviceAccountName: "{{ include "meridian.fullname" . }}-storage-class-admin"
@@ -203,26 +185,32 @@ spec:
             name: "{{ include "meridian.fullname" . }}-storage-class-config"
             defaultMode: 0755
 ---
-{{/* ServiceAccount for storage class creation */}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: "{{ include "meridian.fullname" . }}-storage-class-admin"
   namespace: {{ include "meridian.namespace" . }}
   labels:
-    {{- include "meridian.labels" . | nindent 4 }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/part-of: meridian-city-platform
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "-6"
     "helm.sh/hook-delete-policy": hook-succeeded
 ---
-{{/* ClusterRole to create storage classes */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: "{{ include "meridian.fullname" . }}-storage-class-admin"
   labels:
-    {{- include "meridian.labels" . | nindent 4 }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/part-of: meridian-city-platform
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "-6"
@@ -232,13 +220,16 @@ rules:
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
-{{/* Bind ServiceAccount to ClusterRole */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: "{{ include "meridian.fullname" . }}-storage-class-admin"
   labels:
-    {{- include "meridian.labels" . | nindent 4 }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/part-of: meridian-city-platform
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "-5"
