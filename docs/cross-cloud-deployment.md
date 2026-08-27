@@ -178,10 +178,21 @@ kubectl describe cluster -n meridian-<hash>
 
 ### AWS EKS
 
-- **EBS CSI driver required** — Not included by default
+- **EBS CSI driver** — Typically installed as an EKS managed addon (recommended)
+  - If not installed, run:
+    ```bash
+    eksctl create iamserviceaccount \
+      --name ebs-csi-controller-sa \
+      --namespace kube-system \
+      --cluster <cluster-name> \
+      --role-name AmazonEKS_EBS_CSI_DriverRole \
+      --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2 \
+      --approve
+    ```
+  - Documentation: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
 - **Instance types**: Use `r6i` (memory-optimized) or `i3en` (high I/O) for stateful workloads
 - **Node groups**: Consider dedicated node groups for Kafka/PostgreSQL
-- **IAM**: Ensure EBS CSI driver has proper IAM permissions
+- **IAM**: The EKS managed addon handles IAM/IRSA automatically
 
 ### GCP GKE
 

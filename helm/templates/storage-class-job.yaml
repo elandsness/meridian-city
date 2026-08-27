@@ -3,14 +3,21 @@ Auto-configure storage classes for the detected cloud provider.
 
 This Job runs once during installation to:
 1. Detect the cloud provider (AWS, GCP, Azure)
-2. Create appropriate storage classes
-3. Set them as default
+2. Verify required CSI drivers are available
+3. Create appropriate storage classes
+4. Set them as default
 
 This ensures Meridian City "just works" on EKS, GKE, and AKS without manual
 storage class configuration. The Job is idempotent and safe to re-run.
 
 The Job uses a small script in a ConfigMap to detect the provider via node labels
 and create the appropriate storage classes.
+
+For EKS:
+- The EBS CSI driver is typically installed as an EKS managed addon
+- If not installed, see: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+- The deprecated in-tree provisioner (kubernetes.io/aws-ebs) was removed in K8s 1.28
+- We use ebs.csi.aws.com (the correct, modern provisioner)
 */}}
 apiVersion: v1
 kind: ConfigMap
@@ -57,6 +64,56 @@ data:
     fi
 
     echo "Using provider: $PROVIDER"
+
+    # Verify required CSI drivers are available
+    if [[ "$PROVIDER" == "aws" ]]; then
+      echo "Verifying EBS CSI driver is available..."
+      if ! kubectl get storageclass | grep -q ebs.csi.aws.com; then
+        echo "ERROR: EBS CSI driver not found on this EKS cluster."
+        echo ""
+        echo "The EBS CSI driver is required for persistent volumes on EKS."
+        echo "It is typically installed as an EKS managed addon."
+        echo ""
+        echo "To install it, run one of these commands:"
+        echo ""
+        echo "  # Option 1: Using eksctl (recommended)"
+        echo "  eksctl create iamserviceaccount \\"
+        echo "    --name ebs-csi-controller-sa \\"
+        echo "    --namespace kube-system \\"
+        echo "    --cluster $(kubectl config view --minify -o jsonpath='{.clusters[0].name}') \\"
+        echo "    --role-name AmazonEKS_EBS_CSI_DriverRole \\"
+        echo "    --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2 \\"
+        echo "    --approve"
+        echo ""
+        echo "  # Option 2: Using AWS Console"
+        echo "  https://docs.aws.amazon.com/eks/latest/userguide/managing-ebs-csi.html"
+        echo ""
+        echo "After installing the EBS CSI driver, redeploy Meridian City."
+        echo ""
+        echo "NOTE: The deprecated in-tree provisioner (kubernetes.io/aws-ebs)"
+        echo "was removed in Kubernetes 1.28. You must use the EBS CSI driver."
+        exit 1
+      fi
+      echo "EBS CSI driver verified."
+    elif [[ "$PROVIDER" == "gcp" ]]; then
+      echo "Verifying GCP PD CSI driver is available..."
+      if ! kubectl get storageclass | grep -q pd.csi.storage.gke.io; then
+        echo "ERROR: GCP PD CSI driver not found on this GKE cluster."
+        echo "GKE includes the CSI driver by default. If you're seeing this,"
+        echo "your cluster may have been configured without it."
+        exit 1
+      fi
+      echo "GCP PD CSI driver verified."
+    elif [[ "$PROVIDER" == "azure" ]]; then
+      echo "Verifying Azure Disk CSI driver is available..."
+      if ! kubectl get storageclass | grep -q disk.csi.azure.com; then
+        echo "ERROR: Azure Disk CSI driver not found on this AKS cluster."
+        echo "AKS includes the CSI driver by default. If you're seeing this,"
+        echo "your cluster may have been configured without it."
+        exit 1
+      fi
+      echo "Azure Disk CSI driver verified."
+    fi
 
     # Create storage classes based on provider
     case "$PROVIDER" in
