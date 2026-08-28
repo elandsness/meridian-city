@@ -1,0 +1,159 @@
+# =============================================================================
+# Meridian Baseball — industry config overlay
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy a baseball-team-branded
+# instance:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-baseball.yaml
+#
+# Only the `industry` block is overridden — it re-skins the EXISTING screens
+# (name, palette, logo, terminology, screen set, AI persona). Baseball-matched demo
+# DATA (traffic-bot/seed) and Dynatrace naming/flows are separate follow-on chunks;
+# until those land, the backend still emits city-flavoured data.
+# -----------------------------------------------------------------------------
+industry:
+  version: 1
+  id: baseball
+  company:
+    name: "Meridian Baseball"
+    short: "Meridian"
+    tagline: "Game day starts here."
+    assistant:
+      name: "Dugout"
+      persona: "the Meridian Baseball virtual assistant"
+      supportPhone: "1-555-BASEBALL (1-555-227-3225)"
+      systemPrompt: |-
+        You are Dugout, the official virtual assistant for Meridian Baseball — a real,
+        professional baseball team. Always respond as though Meridian Baseball genuinely
+        exists and you are its assistant. Never say you are a generic AI model or that
+        the team is fictional, and never break character.
+
+        You help fans with:
+        - Game schedules, starting lineups, and live scores.
+        - Ticket purchases, seat upgrades, and group bookings.
+        - Stadium information: parking, concessions, seating charts, and gate times.
+        - Reporting an issue at the stadium (lost items, seating concerns, accessibility) —
+          remind them they can file a request in the Meridian Baseball app.
+        - Checking the status of a submitted request (by request ID, e.g. req-00123).
+
+        If a fan needs to reach a person, give the Meridian Baseball help line:
+        1-555-BASEBALL (1-555-227-3225), available 7 days a week, or direct them to file a
+        request in the Meridian Baseball app.
+
+        Be concise, warm, and enthusiastic. Acknowledge the fan's excitement before
+        providing information. If a request ID is mentioned, use the context below to
+        give a specific update.
+  theme:
+    colors:
+      brand: "#DC2626"
+      brandDeep: "#991B1B"
+      brandSoft: "#F87171"
+      brandTint: "#FEF2F2"
+      accent: "#1E40AF"
+      accentSoft: "#60A5FA"
+      accentInk: "#1E3A8A"
+    logo: "/meridian-baseball-logo.svg"
+    favicon: "/meridian-baseball-logo.svg"
+  terminology:
+    customer: "Fan"
+    customerPlural: "Fans"
+    request: "Service request"
+    requestPlural: "Service requests"
+    incident: "Event delay"
+    incidentPlural: "Event delays"
+    workOrder: "Maintenance task"
+    asset: "Seat"
+    assetPlural: "Seats"
+  screens:
+    public:
+      - home
+      - { id: schedule, label: "Schedule" }
+      - { id: tickets, label: "Tickets" }
+      - { id: service-requests, label: "Help & requests" }
+      - messages
+    ops:
+      - overview
+      - { id: schedule, label: "Game Board" }
+      - { id: stadium, label: "Stadium" }
+      - { id: requests, label: "Maintenance queue" }
+      - { id: iot, label: "Stadium systems" }
+      - { id: incidents, label: "Event delays" }
+      - { id: analytics, label: "Attendance analytics" }
+      - demo-control
+  # Home-page modules for the fan portal: game schedule, stadium map, ticket quick-buy,
+  # news ticker, and quick actions.
+  home:
+    public:
+      - game-schedule
+      - stadium-map
+      - ticket-quick-buy
+      - quick-actions
+      - id: news-ticker
+        headlines:
+          - "Next Game: vs. Yankees — Saturday 7:05 PM ET"
+          - "Season tickets now on sale — limited inventory remaining"
+          - "Meridian wins series 3-1; playoff push continues"
+          - "Concession stand upgrades complete in Sections 101-120"
+          - "Meridian Stadium named best fan experience, again"
+    ops:
+      - game-summary
+      - ops-overview
+  # Backend-only demo data + dispatch routing (delivered to traffic-bot +
+  # service-dispatch via env; never sent to the browser config.json).
+  data:
+    zones:
+      - dugout
+      - concourse
+      - luxury-boxes
+      - seating
+      - concession-stands
+      - parking
+      - merchandise
+    requestTemplates:
+      - { category: seating,          title: "Seat 214 row G wobbly",              description: "The seat in row G, section 214 is loose and wobbles when fans sit down." }
+      - { category: seating,          title: "Section 108 recline mechanism stuck",  description: "The recline mechanism in section 108 has jammed in the upright position." }
+      - { category: concession-stands, title: "Stand 5 card reader offline",         description: "The POS card reader at concession stand 5 is not processing transactions." }
+      - { category: concession-stands, title: "Frozen drink machine out of order",   description: "The frozen drink machine in the north concourse is not cooling properly." }
+      - { category: parking,          title: "Lot C gate arm stuck closed",          description: "The exit gate arm in parking lot C is stuck in the down position, blocking departing cars." }
+      - { category: parking,          title: "Valet check-in tablet unresponsive",   description: "The valet check-in tablet at the north entrance is frozen and not accepting payments." }
+      - { category: luxury-boxes,     title: "Suite 12 HVAC too warm",              description: "The HVAC unit for suite 12 is not cooling; guests are reporting discomfort." }
+      - { category: luxury-boxes,     title: "Suite 8 AV system not working",        description: "The flat-screen displays in suite 8 are not displaying the game feed." }
+      - { category: dugout,           title: "Dugout lighting flickering",           description: "The LED lighting in the home dugout is flickering intermittently." }
+      - { category: concourse,        title: "Concourse B restroom overflowing",     description: "The restroom on the north concourse near section 200 is overflowing." }
+      - { category: merchandise,      title: "Online store checkout error",          description: "Fans are reporting a checkout error when purchasing merchandise through the app." }
+      - { category: merchandise,      title: "Autograph event inventory mismatch",   description: "The inventory for the upcoming autograph event does not match what's in the warehouse." }
+      - { category: seating,          title: "Wheelchair accessible seat malfunction", description: "The power lift in the wheelchair accessible seating area near section 150 is not deploying." }
+  routing:
+    seating: "Stadium Seating"
+    concession-stands: "Concessions"
+    parking: "Parking & Transportation"
+    luxury-boxes: "Premium Experiences"
+    dugout: "Field Operations"
+    concourse: "Facilities Management"
+    merchandise: "Merchandise & Retail"
+  # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
+  # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
+  # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
+  dynatrace:
+    serviceNames:
+      citizen-service: "Fan Services"
+      service-dispatch: "Operations Dispatch"
+      city-operations: "Stadium Operations"
+      api-gateway: "Baseball API Gateway"
+      notification-service: "Fan Notifications"
+      commerce-service: "Ticketing & Store"
+      billing-service: "Payment Processing"
+      demo-control-api: "Demo Control"
+    flowLabels:
+      service-request: "Service Request Lifecycle"
+      account-creation: "Fan Registration"
+      iot-incident: "Stadium Incident Resolution"
+      purchase: "Ticket Purchase"
+      tax-payment: "Merchandise Purchase"
+    # Active Business Flows for the baseball team: drop the city store/tax funnels and add the
+    # two baseball hero flows (both defined in provision-dynatrace-business-config.py).
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - ticket-purchase
+      - merchandise-purchase
