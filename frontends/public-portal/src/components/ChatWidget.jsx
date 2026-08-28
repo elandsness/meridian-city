@@ -23,12 +23,20 @@ function DotsLoader() {
   )
 }
 
-export default function ChatWidget() {
+// Configurable chat assistant widget.
+// Reads assistant name/persona from props or falls back to config.
+// Used by the PageComposer / component registry pattern for reskinning.
+
+export default function ChatWidget({ assistantName, assistantPersona, config }) {
   const { open, toggleChat, closeChat } = useChat()
   const cfg = useConfig()
-  const assistant = cfg.company.assistant.name
+
+  // Resolve assistant identity: props > config > hardcoded default
+  const name = assistantName || cfg.company?.assistant?.name || 'Meri'
+  const persona = assistantPersona || cfg.company?.assistant?.persona || "Meridian City's virtual assistant"
+
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Hi, I'm ${assistant} — ${cfg.company.name}'s assistant. How can I help you today?` },
+    { role: 'assistant', content: `Hi, I'm ${name} — ${persona}. How can I help you today?` },
   ])
   const [input, setInput] = useState('')
   const [sessionId] = useState(() => uuidv4())
@@ -50,8 +58,6 @@ export default function ChatWidget() {
     setLoading(true)
 
     try {
-      // RUM custom action; the session.id property is the join key to the
-      // chatbot.interaction business event (see docs/INSTRUMENTATION.md).
       const data = await trackAction('chat.send', { 'session.id': sessionId }, () =>
         sendMessage({ message: text, session_id: sessionId })
       )
@@ -85,15 +91,15 @@ export default function ChatWidget() {
         >
           <div className="bg-meridian-blue px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2 text-white">
-              <span className="w-6 h-6 rounded-full bg-noon-sun text-noon-ink flex items-center justify-center text-xs font-semibold">{assistant.charAt(0)}</span>
-              <span className="font-semibold text-sm">Ask {assistant}</span>
+              <span className="w-6 h-6 rounded-full bg-noon-sun text-noon-ink flex items-center justify-center text-xs font-semibold">{name.charAt(0)}</span>
+              <span className="font-semibold text-sm">Ask {name}</span>
             </div>
             <button
               onClick={closeChat}
               className="text-white/70 hover:text-white transition-colors text-xl leading-none"
               aria-label="Close chat"
             >
-              ×
+              x
             </button>
           </div>
 
@@ -145,9 +151,9 @@ export default function ChatWidget() {
       <button
         onClick={toggleChat}
         className="bg-meridian-blue hover:bg-meridian-blue-deep text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors"
-        aria-label={`Ask ${assistant}`}
+        aria-label={`Ask ${name}`}
       >
-        {open ? <span className="text-2xl leading-none">×</span> : <ChatIcon />}
+        {open ? <span className="text-2xl leading-none">x</span> : <ChatIcon />}
       </button>
     </div>
   )

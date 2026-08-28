@@ -1,10 +1,14 @@
-// Generic entity journey page — renders a journey/funnel for an entity type.
-// Currently a placeholder; will be implemented as part of the entity engine reskin.
+// EntityJourneyPage — generic entity journey view for the ops dashboard.
 
 export default function EntityJourneyPage({ entityType, config }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-400">
-      Entity journey for <code>{entityType}</code> — coming soon
+    <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
+      <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">
+        {entityType || 'Entity'} Journey
+      </h3>
+      <div className="bg-slate-700 rounded-lg h-48 flex items-center justify-center text-slate-400 text-sm">
+        Journey view for {entityType || 'entity'}
+      </div>
     </div>
   )
 }

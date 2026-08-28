@@ -5,23 +5,15 @@ import Badge from '../ui/Badge.jsx'
 const STROKE_WIDTH = { rail: 6, subway: 4, bus: 3 }
 const MODE_LABEL = { rail: 'Regional rail', subway: 'Subway', bus: 'Bus' }
 
-// Topology + live status share one cadence: the backend advances vehicles once a
-// minute, so there's nothing to gain from polling faster.
 const STATUS_REFETCH_MS = 60000
 
 function statusFor(v) {
-  if (!v) return { text: '—', tone: 'slate' }
+  if (!v) return { text: '-', tone: 'slate' }
   if (v.status === 'late') return { text: `${v.delay_minutes} min late`, tone: 'amber' }
   if (v.status === 'early') return { text: `${v.delay_minutes} min early`, tone: 'blue' }
   return { text: 'On time', tone: 'green' }
 }
 
-/**
- * Smooth SVG path through a list of {x,y} points using a Catmull-Rom spline
- * converted to cubic Béziers. Colinear points yield straight segments, bends
- * yield gentle curves — so routes read like a real transit diagram instead of
- * connect-the-dots polylines.
- */
 function smoothPath(points) {
   if (points.length < 2) return ''
   if (points.length === 2) {
@@ -42,33 +34,84 @@ function smoothPath(points) {
   return d.join(' ')
 }
 
+// Default routes used when the config does not provide custom ones.
+const DEFAULT_ROUTES = [
+  {
+    name: 'Blue Line',
+    mode: 'subway',
+    color: '#3B82F6',
+    stops: [
+      { id: 's1', name: 'Central Station', x: 60, y: 420 },
+      { id: 's2', name: 'Market Square', x: 180, y: 350 },
+      { id: 's3', name: 'City Hall', x: 320, y: 300 },
+      { id: 's4', name: 'Arts District', x: 440, y: 250 },
+      { id: 's5', name: 'University', x: 560, y: 200 },
+      { id: 's6', name: 'Airport', x: 680, y: 150 },
+    ],
+  },
+  {
+    name: 'Red Line',
+    mode: 'rail',
+    color: '#EF4444',
+    stops: [
+      { id: 's1', name: 'Central Station', x: 60, y: 420 },
+      { id: 's7', name: 'Hospital', x: 150, y: 300 },
+      { id: 's8', name: 'Tech Park', x: 300, y: 200 },
+      { id: 's9', name: 'Stadium', x: 450, y: 120 },
+      { id: 's10', name: 'North Gate', x: 600, y: 80 },
+    ],
+  },
+  {
+    name: 'Green Bus',
+    mode: 'bus',
+    color: '#10B981',
+    stops: [
+      { id: 's1', name: 'Central Station', x: 60, y: 420 },
+      { id: 's11', name: 'Riverside', x: 200, y: 440 },
+      { id: 's12', name: 'Old Town', x: 350, y: 430 },
+      { id: 's13', name: 'Harbor', x: 500, y: 400 },
+      { id: 's6', name: 'Airport', x: 680, y: 150 },
+    ],
+  },
+]
+
 /**
- * Combined transit panel for the portal home page — a curved schematic map with
- * an inline live-status legend below it. Topology (lines, stops, coordinates,
- * colors) comes from demo-control-api; vehicle positions + per-line status are
- * polled and rendered as a moving dot that lights up the stop it's currently at.
+ * Combined transit panel for the home page — a curved schematic map with
+ * an inline live-status legend below it. When `routes` is provided via props
+ * (from the PageComposer / industry config), those routes are used instead of
+ * the live API data. This makes the panel configurable for reskinning.
  */
-export default function TransitPanel() {
+export default function TransitPanel({ routes, config }) {
+  const useConfigRoutes = routes && routes.length > 0
+
   const { data: linesData } = useQuery({
     queryKey: ['transit', 'lines'],
     queryFn: getTransitLines,
     staleTime: Infinity,
+    enabled: !useConfigRoutes,
   })
   const { data: statusData } = useQuery({
     queryKey: ['transit', 'status'],
     queryFn: getTransitStatus,
     refetchInterval: STATUS_REFETCH_MS,
+    enabled: !useConfigRoutes,
   })
 
-  const lines = Array.isArray(linesData?.lines) ? linesData.lines : []
-  const vehicles = Array.isArray(statusData?.lines) ? statusData.lines : []
+  const lines = useConfigRoutes
+    ? routes
+    : Array.isArray(linesData?.lines)
+      ? linesData.lines
+      : []
+  const vehicles = useConfigRoutes
+    ? []
+    : Array.isArray(statusData?.lines)
+      ? statusData.lines
+      : []
 
   if (lines.length === 0) {
-    return <p className="text-slate-400 text-sm py-8 text-center">Loading transit…</p>
+    return <p className="text-slate-400 text-sm py-8 text-center">Loading transit...</p>
   }
 
-  // Dedup stops by id (interchanges appear on multiple lines); track which line
-  // colors touch each stop so multi-line interchanges render neutral.
   const stopById = {}
   const stopColors = {}
   for (const line of lines) {
@@ -78,7 +121,7 @@ export default function TransitPanel() {
       stopColors[s.id].add(line.color)
     }
   }
-  const colorByLine = Object.fromEntries(lines.map((l) => [l.id, l.color]))
+  const colorByLine = Object.fromEntries(lines.map((l) => [l.id || l.name, l.color]))
 
   return (
     <div className="space-y-4">
@@ -86,7 +129,7 @@ export default function TransitPanel() {
         <svg viewBox="0 0 720 470" className="w-full h-auto" role="img" aria-label="Meridian City transit map">
           {lines.map((line) => (
             <path
-              key={line.id}
+              key={line.id || line.name}
               d={smoothPath(line.stops)}
               fill="none"
               stroke={line.color}
@@ -140,10 +183,11 @@ export default function TransitPanel() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
         {lines.map((line) => {
-          const st = statusFor(vehicles.find((x) => x.line_id === line.id))
+          const vehicle = vehicles.find((x) => x.line_id === (line.id || line.name))
+          const st = statusFor(vehicle)
           return (
             <div
-              key={line.id}
+              key={line.id || line.name}
               className="flex items-center justify-between gap-3 py-2 border-b border-slate-100"
             >
               <div className="flex items-center gap-2.5 min-w-0">

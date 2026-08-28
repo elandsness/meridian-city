@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 
-// Fake "breaking news" ticker for the portal home page — Onion-style headlines
-// that are uplifting and absurd. Replaces the old "Monitored zones" stat tile.
-// Headlines are shuffled once per mount and walked in order (so no immediate
-// repeats); a thin progress bar fills over each interval so the box reads as live.
-const ROTATE_MS = 90000 // ~1.5 min between headlines — bump/lower this one constant to taste
+// Configurable "breaking news" ticker for the home page.
+// Headlines come from the component's `headlines` prop (supplied by the
+// PageComposer from the industry config); falls back to a curated set of
+// Onion-style headlines when none are provided.
+const ROTATE_MS = 90000 // ~1.5 min between headlines
 
-const HEADLINES = [
+const DEFAULT_HEADLINES = [
   "Local Man Returns Library Book On Time, City Council Votes To Erect Statue",
   "Meridian Pothole Repairs Itself Out Of Sheer Civic Pride",
   "Sun Reportedly 'Showing Off' Again, Local Meteorologists Confirm",
@@ -60,8 +60,12 @@ function shuffle(arr) {
   return a
 }
 
-export default function NewsTicker() {
-  const order = useMemo(() => shuffle(HEADLINES), [])
+export default function NewsTicker({ headlines, config }) {
+  const tickerHeadlines = useMemo(
+    () => (headlines && headlines.length > 0 ? headlines : DEFAULT_HEADLINES),
+    [headlines]
+  )
+  const order = useMemo(() => shuffle(tickerHeadlines), [tickerHeadlines])
   const [i, setI] = useState(0)
 
   useEffect(() => {

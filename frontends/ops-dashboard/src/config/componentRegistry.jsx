@@ -1,13 +1,15 @@
 // Generic component registry — maps component IDs to React components.
-// The PageComposer reads this registry to render modules from the industry
-// config. Adding a new component means: implement the component, then add it
-// to this map. Zero config changes needed.
+// This allows the PageComposer to compose pages from a library of generic
+// components, enabling zero-code reskinning via the industry config DSL.
+//
+// The registry is the contract between the config layer and the UI layer:
+// the config specifies which component IDs to use, and the registry resolves
+// them to actual React components.
 
-import OpsOverview from '../components/home/OpsOverview'
-import FlightSummary from '../components/home/FlightSummary'
-import KpiTile from '../components/home/KpiTile'
-import IncidentBadge from '../components/home/IncidentBadge'
-import FunnelChart from '../components/home/FunnelChart'
+import WeatherWidget from '../components/WeatherWidget'
+import NewsTicker from '../components/NewsTicker'
+import TransitPanel from '../components/TransitPanel'
+import ChatWidget from '../components/ChatWidget'
 import EntityListPage from '../components/entity/EntityListPage'
 import EntityDetailPage from '../components/entity/EntityDetailPage'
 import EntityMapPage from '../components/entity/EntityMapPage'
@@ -16,14 +18,10 @@ import EntityJourneyPage from '../components/entity/EntityJourneyPage'
 import StatusMapPage from '../components/entity/StatusMapPage'
 
 export const COMPONENT_REGISTRY = {
-  // Ops home modules (configurable via home.ops)
-  'ops-overview': OpsOverview,
-  'flight-summary': FlightSummary,
-  'kpi-tile': KpiTile,
-  'incident-badge': IncidentBadge,
-  'funnel-chart': FunnelChart,
-
-  // Entity pages (configurable via entity definitions)
+  'weather': WeatherWidget,
+  'news-ticker': NewsTicker,
+  'transit-map': TransitPanel,
+  'chat-widget': ChatWidget,
   'entity-list': EntityListPage,
   'entity-detail': EntityDetailPage,
   'entity-map': EntityMapPage,
