@@ -1,0 +1,163 @@
+# =============================================================================
+# Meridian Hospital — industry config overlay (Phase 3)
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy a hospital-branded
+# instance:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-hospital.yaml
+#
+# Only the `industry` block is overridden — it re-skins the EXISTING screens
+# (name, palette, logo, terminology, screen set, AI persona). Hospital-matched demo
+# DATA (traffic-bot/seed) and Dynatrace naming/flows are separate follow-on chunks;
+# until those land, the backend still emits city-flavoured data.
+# -----------------------------------------------------------------------------
+industry:
+  version: 1
+  id: hospital
+  company:
+    name: "Meridian Hospital"
+    short: "MH"
+    tagline: "Care that heals."
+    assistant:
+      name: "Ava"
+      persona: "the Meridian Hospital virtual assistant"
+      supportPhone: "1-555-HOSP-MERID (1-555-467-7637)"
+      systemPrompt: |-
+        You are Ava, the official virtual assistant for Meridian Hospital — a real,
+        busy teaching hospital. Always respond as though Meridian Hospital genuinely
+        exists and you are its assistant. Never say you are a generic AI model or that
+        the hospital is fictional, and never break character.
+
+        You help patients and visitors with:
+        - Finding departments, clinics, and services.
+        - Visitor hours and parking information.
+        - Reporting a concern or issue at the hospital.
+        - Checking the status of a submitted request (by request ID, e.g. req-00123).
+
+        If a visitor needs to reach a person, give the Meridian Hospital help line:
+        1-555-HOSP-MERID (1-555-467-7637), available 24/7, or direct them to file a
+        request in the app.
+
+        Be concise, warm, and professional. Acknowledge the person's concern before
+        providing information. If a request ID is mentioned, use the context below to
+        give a specific update.
+  theme:
+    colors:
+      brand: "#065F46"
+      brandDeep: "#064E3B"
+      brandSoft: "#10B981"
+      brandTint: "#D1FAE5"
+      accent: "#F59E0B"
+      accentSoft: "#FBBF24"
+      accentInk: "#78350F"
+    logo: "/meridian-hospital-logo.svg"
+    favicon: "/meridian-hospital-logo.svg"
+  terminology:
+    customer: "Patient"
+    customerPlural: "Patients"
+    request: "Service request"
+    requestPlural: "Service requests"
+    incident: "Safety concern"
+    incidentPlural: "Safety concerns"
+    workOrder: "Maintenance task"
+    asset: "Medical device"
+    assetPlural: "Medical devices"
+  screens:
+    public:
+      - home
+      - { id: my-journey, label: "My Care" }
+      - { id: service-requests, label: "Help & requests" }
+      - messages
+    ops:
+      - overview
+      - { id: bed-board, label: "Bed Board" }
+      - { id: equipment, label: "Equipment" }
+      - { id: requests, label: "Maintenance queue" }
+      - { id: iot, label: "Medical devices" }
+      - { id: incidents, label: "Safety concerns" }
+      - { id: analytics, label: "Patient flow" }
+      - demo-control
+  # Home-page modules for the patient portal: status board, equipment map, care tracker,
+  # news ticker, weather widget, and quick actions.
+  home:
+    public:
+      - { id: city-home, label: "Welcome" }
+      - { id: news-ticker, label: "Hospital Updates", headlines: ["ER Wait Time: 15 min", "Visitor Hours: 9am-7pm", "Parking Garage B: 3 levels available", "New direct route: Meridian to Reykjavik, launching June", "Meridian Hospital rated Top 5% nationally"] }
+      - { id: transit-map, label: "Shuttle Map" }
+      - { id: weather, label: "Hospital Weather", location: "Meridian Hospital", units: "fahrenheit" }
+    ops:
+      - { id: ops-overview, label: "Overview" }
+      - { id: bed-summary, label: "Bed Summary" }
+  # Backend-only demo data + dispatch routing (delivered to traffic-bot +
+  # service-dispatch via env; never sent to the browser config.json).
+  data:
+    zones:
+      - emergency
+      - icu
+      - surgical
+      - pediatric
+      - maternity
+      - outpatient
+      - imaging
+      - pharmacy
+    requestTemplates:
+      - { category: terminal,         title: "Bed alarm malfunction in Room 302",     description: "The bed alarm in Room 302 is beeping intermittently even when the patient is in bed." }
+      - { category: terminal,         title: "IV pump malfunction on Floor 4",        description: "The IV pump on Floor 4 is not delivering the correct infusion rate." }
+      - { category: terminal,         title: "Oxygen supply low in ICU",              description: "The oxygen supply in the ICU is running low and needs to be restocked." }
+      - { category: baggage,          title: "Linen cart stuck in elevator",          description: "A linen cart is stuck in the elevator between Floors 2 and 3." }
+      - { category: baggage,         title: "Sterilizer offline in surgical",       description: "The sterilizer in the surgical wing is offline and needs maintenance." }
+      - { category: airfield,         title: "Defibrillator battery low",            description: "The defibrillator in the emergency department has a low battery." }
+      - { category: airfield,         title: "Ventilator fault in ICU",              description: "A ventilator in the ICU is showing a fault code and needs service." }
+      - { category: airfield,         title: "CT scanner calibration error",         description: "The CT scanner is showing a calibration error and needs to be serviced." }
+      - { category: security,         title: "Security camera offline in ER",        description: "A security camera in the emergency department is offline." }
+      - { category: security,         title: "Long wait time in ER",                 description: "Patient wait times in the emergency department are exceeding 4 hours." }
+      - { category: facilities,       title: "Water leak in pharmacy",               description: "There is a water leak in the pharmacy ceiling and needs to be fixed." }
+      - { category: facilities,       title: "HVAC too cold in pediatric",           description: "The air conditioning in the pediatric wing is too cold and patients are uncomfortable." }
+      - { category: ground-transport, title: "Ambulance bay blocked",                description: "The ambulance bay is blocked by a delivery truck and ambulances cannot access the entrance." }
+      - { category: ground-transport, title: "Shuttle bay 3 blocked",                description: "A stalled vehicle is blocking shuttle bay 3 at the arrivals curb." }
+    chatQuestions:
+      - "What are the visiting hours?"
+      - "Where is the nearest parking?"
+      - "How do I find a specific department?"
+      - "Where do I report a concern or issue?"
+      - "What is the wait time in the emergency department?"
+      - "How do I check the status of my test results?"
+      - "Where is the nearest pharmacy?"
+      - "How do I get to the helipad?"
+      - "Are there charging stations in the waiting areas?"
+      - "Where is the pet relief area?"
+      - "Where do I pick up my rental car?"
+      - "Is there a shuttle to long-term parking?"
+  routing:
+    terminal: "Nursing Operations"
+    baggage: "Linen & Supply"
+    airfield: "Clinical Engineering"
+    security: "Patient Safety"
+    facilities: "Facilities Management"
+    ground-transport: "Ground Transportation"
+  # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
+  # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
+  # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
+  dynatrace:
+    serviceNames:
+      citizen-service: "Patient Services"
+      service-dispatch: "Operations Dispatch"
+      city-operations: "Clinical Engineering"
+      api-gateway: "Hospital API Gateway"
+      notification-service: "Patient Notifications"
+      commerce-service: "Hospital Retail"
+      billing-service: "Hospital Billing"
+      demo-control-api: "Demo Control"
+    flowLabels:
+      service-request: "Service Request Lifecycle"
+      account-creation: "Patient Registration"
+      iot-incident: "Medical Device Incident Resolution"
+      purchase: "Hospital Retail Purchase"
+      tax-payment: "Hospital Fee Payment"
+    # Active Business Flows for the hospital: drop the city store/tax funnels and add the
+    # two hospital hero flows (both defined in provision-dynatrace-business-config.py).
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - patient-admission
+      - equipment-maintenance
