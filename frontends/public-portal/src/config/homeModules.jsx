@@ -21,5 +21,8 @@ export function getActiveHomeModules(config) {
   return list
     .map((item) => (typeof item === 'string' ? { id: item } : item))
     .filter((it) => it && HOME_MODULES[it.id])
-    .map((it) => ({ id: it.id, Component: HOME_MODULES[it.id] }))
+    .map((it) => {
+      const { id, ...rest } = it
+      return { id, Component: HOME_MODULES[id], ...rest }
+    })
 }

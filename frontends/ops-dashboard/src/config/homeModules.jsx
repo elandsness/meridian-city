@@ -4,10 +4,12 @@
 // portal's homeModules.jsx and the screen registry pattern.
 import OpsOverview from '../components/home/OpsOverview.jsx';
 import FlightSummary from '../components/home/FlightSummary.jsx';
+import NewsTicker from '../components/NewsTicker.jsx';
 
 export const HOME_MODULES = {
   'ops-overview': OpsOverview,
   'flight-summary': FlightSummary,
+  'news-ticker': NewsTicker,
 };
 
 export function getActiveHomeModules(config) {
@@ -15,5 +17,8 @@ export function getActiveHomeModules(config) {
   return list
     .map((item) => (typeof item === 'string' ? { id: item } : item))
     .filter((it) => it && HOME_MODULES[it.id])
-    .map((it) => ({ id: it.id, Component: HOME_MODULES[it.id] }));
+    .map((it) => {
+      const { id, ...rest } = it;
+      return { id, Component: HOME_MODULES[id], ...rest };
+    });
 }

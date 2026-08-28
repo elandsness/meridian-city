@@ -11,8 +11,8 @@ export default function Overview() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Overview</h1>
-      {modules.map(({ id, Component }) => (
-        <Component key={id} />
+      {modules.map(({ id, Component, ...moduleProps }) => (
+        <Component key={id} {...moduleProps} config={cfg} />
       ))}
     </div>
   );

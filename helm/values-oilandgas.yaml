@@ -1,0 +1,298 @@
+# =============================================================================
+# Meridian Oil — industry config overlay (Stage 7: entity engine retrofit)
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy an oil and gas
+# branded instance backed by the generic entity engine:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-oilandgas.yaml
+
+industry:
+  version: 1
+  id: oil-and-gas
+  company:
+    name: "Meridian Oil"
+    short: "Meridian Oil"
+    tagline: "Powering progress through responsible energy."
+    assistant:
+      name: "Riggy"
+      persona: "the Meridian Oil virtual assistant"
+      supportPhone: "1-800-MERIDIAN (1-800-637-4326)"
+      systemPrompt: |-
+        You are Riggy, the Meridian Oil virtual assistant.
+        Help customers and field personnel with well operations, pipeline issues,
+        maintenance requests, and safety reporting. If a user reports an emergency
+        (fire, explosion, major leak), immediately say:
+        '⚠️ Your safety is our priority. Call emergency services at 911 immediately!'
+
+  theme:
+    colors:
+      brand: "#FF7A00"
+      brandDeep: "#CC5F00"
+      brandSoft: "#FF983D"
+      brandTint: "#FFF4E6"
+      accent: "#2EC4B6"
+      accentSoft: "#5DE4D1"
+      accentInk: "#1A7A6F"
+    heroImage: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1600&q=80"
+    logo: "/meridian-oil-logo.svg"
+    favicon: "/meridian-oil_ico.svg"
+
+  terminology:
+    customer: "Well Operator"
+    customerPlural: "Well Operators"
+    request: "Service Request"
+    requestPlural: "Service Requests"
+    incident: "Operational Incident"
+    incidentPlural: "Operational Incidents"
+    workOrder: "Maintenance Work Order"
+    asset: "Field Asset"
+    assetPlural: "Field Assets"
+    requestCategories:
+      - well-issue
+      - pipeline-leak
+      - equipment-fault
+      - safety-concern
+      - maintenance-request
+      - other
+    billingTitle: "Billing & Contracts"
+    billingSubtitle: "Your Meridian Oil service statements and payment history."
+    billNoun: "service invoice"
+    iotCategory1: "Wellheads"
+    iotCategory2: "Pipelines"
+    iotCategory3: "Processing Plants"
+    iotIdPrefix1: "wh"
+    iotIdPrefix2: "pl"
+    iotIdPrefix3: "pp"
+    iotZonePositions:
+      north-field:       { x: 200, y: 150 }
+      south-field:       { x: 700, y: 800 }
+      east-pipeline:     { x: 900, y: 400 }
+      west-pipeline:     { x: 100, y: 400 }
+      central-processing: { x: 500, y: 500 }
+
+  screens:
+    public:
+      - home
+      - { id: my-incidents, template: entity-list, entityType: incident, label: "My Incidents", icon: "⚠️" }
+      - { id: service-requests, label: "Support & Help" }
+      - billing
+      - messages
+
+    ops:
+      - overview
+      - id: asset-map
+        template: status-map
+        label: "Asset Map"
+        icon: "🗺️"
+        title: "Field Assets & Infrastructure"
+        source: devices
+        clusterBy: zone
+        viewBox: "0 0 1600 1067"
+        background: { kind: image, src: "https://images.unsplash.com/photo-1426005963413-822d2e634bca?w=1600&q=80" }
+      - { id: active-incidents, template: entity-list, entityType: incident, label: "Active Incidents" }
+      - { id: work-orders, template: entity-list, entityType: maintenance_task, label: "Maintenance Queue" }
+      - id: iot
+        label: "Field IoT Devices"
+        icon: "📡"
+      - { id: incidents, label: "Operational Incidents" }
+      - { id: analytics, label: "Production Analytics" }
+      - demo-control
+
+  home:
+    public:
+      - welcome-hero
+      - id: news-ticker
+        headlines:
+          - "System operating normally. No active incidents reported."
+          - "Scheduled maintenance on Pipeline Route 7 at 2:00 AM."
+          - "Safety Drill scheduled for this Friday at all fields."
+          - "North Field Well 12 pressure normalized after relief well intersection."
+          - "East Pipeline flow restored to 95% capacity following valve repair."
+      - quick-actions
+      - { id: weather, template: weather-widget, mode: forecast }
+      - chat-teaser
+
+    ops:
+      - { id: incident-kpi, template: entity-summary-card, entityType: incident, label: "Incidents Today" }
+      - { id: production-kpi, template: entity-analytics, entityType: production_reading, label: "Production Trend" }
+      - ops-overview
+      - { id: incident-feed, template: activity-feed, entityTypes: [incident], maxItems: 8 }
+
+  entities:
+    incident:
+      displayName: "Operational Incident"
+      displayNamePlural: "Incidents"
+      idPrefix: inc
+      fields:
+        well_id:     { type: string }
+        location:    { type: string }
+        severity:    { type: enum, values: [minor, moderate, major, critical] }
+        category:    { type: enum, values: ["leak", "fire", "explosion", "equipment-fail", "safety"] }
+      initial: reported
+
+      states:
+        reported:         { label: "Reported",        tone: slate }
+        acknowledged:     { label: "Acknowledged",    tone: amber }
+        investigation:    { label: "Investigating",   tone: orange }
+        containment:      { label: "Containment In Progress", tone: red }
+        resolved:         { label: "Resolved",        tone: green, terminal: true, isKpi: true }
+
+      transitions:
+        - from: reported
+          to: acknowledged
+          timer: { minSeconds: 30, maxSeconds: 120 }
+        - from: acknowledged
+          to: investigation
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: investigation
+          to: containment
+          when: { probability: 0.4 }
+          timer: { minSeconds: 90, maxSeconds: 600 }
+        - from: investigation
+          to: resolved
+          when: { probability: 0.3 }
+          timer: { minSeconds: 120, maxSeconds: 900 }
+        - from: containment
+          to: resolved
+          timer: { minSeconds: 180, maxSeconds: 1800 }
+
+      computed:
+        position:
+          type: point2d
+          interpolation: easeInOut
+          waypoints:
+            reported:         { x: 200, "y": 100 }
+            acknowledged:     { x: 350, "y": 200 }
+            investigation:    { x: 500, "y": 150 }
+            containment:      { x: 650, "y": 250 }
+            resolved:         { x: 800, "y": 200 }
+
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 45000
+        maxActive: 6
+
+    maintenance_task:
+      displayName: "Maintenance Work Order"
+      displayNamePlural: "Work Orders"
+      idPrefix: mwo
+      fields:
+        asset_type: { type: enum, values: ["wellhead", "pipeline", "pump", "valve", "separator"] }
+        priority:   { type: enum, values: ["critical", "high", "standard"] }
+        scheduled:  { type: boolean, default: false }
+      initial: queued
+
+      states:
+        queued:       { label: "Queued",         tone: slate }
+        assigned:     { label: "Assigned",       tone: blue }
+        in_progress:  { label: "In Progress",    tone: amber }
+        inspection:   { label: "Quality Check",  tone: orange }
+        completed:    { label: "Completed",      tone: green, terminal: true }
+
+      transitions:
+        - from: queued
+          to: assigned
+          timer: { minSeconds: 120, maxSeconds: 600 }
+        - from: assigned
+          to: in_progress
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: in_progress
+          to: inspection
+          timer: { minSeconds: 180, maxSeconds: 1200 }
+        - from: inspection
+          to: queued
+          when: { probability: 0.15 }
+          timer: { minSeconds: 60, maxSeconds: 300 }
+        - from: inspection
+          to: completed
+          timer: { minSeconds: 30, maxSeconds: 120 }
+
+      computed:
+        position:
+          type: point2d
+          interpolation: linear
+          waypoints:
+            queued:       { x: 400, "y": 600 }
+            assigned:     { x: 550, "y": 700 }
+            in_progress:  { x: 700, "y": 650 }
+            inspection:   { x: 800, "y": 500 }
+            completed:    { x: 900, "y": 400 }
+
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 60000
+        maxActive: 10
+
+    production_reading:
+      displayName: "Production Reading"
+      displayNamePlural: "Readings"
+      idPrefix: prod
+      fields:
+        well_id:       { type: string }
+        oil_barrels:   { type: number }
+        gas_mcf:       { type: number }
+        water_bbls:    { type: number }
+      initial: recorded
+
+      states:
+        recorded: { label: "Recorded", tone: slate, terminal: true }
+
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 30000
+        maxActive: 50
+
+  data:
+    zones:
+      - north-field
+      - south-field
+      - east-pipeline
+      - west-pipeline
+      - central-processing
+    requestTemplates:
+      - { category: well-issue,       title: "Wellhead Abnormal Pressure",     description: "Pressure gauge reading outside normal range at North Field Well 12." }
+      - { category: pipeline-leak,    title: "Pipeline Leak Detected",         description: "Visual leak detected along East Pipeline Route near Mile Marker 45." }
+      - { category: equipment-fault,  title: "Pump Failure",                   description: "Main extraction pump at Central Processing failed to start." }
+      - { category: safety-concern,   title: "H2S Odor Detected",              description: "Sulfur smell detected near South Field wellhead." }
+      - { category: maintenance-request, title: "Scheduled Valve Inspection",  description: "Routine inspection due for isolation valve at Pipeline Junction B." }
+      - { category: other,            title: "Remote Sensor Offline",         description: "Temperature sensor at Well 23 has not reported in 4 hours." }
+    chatQuestions:
+      - "How do I report a pipeline leak?"
+      - "What is the current status of incidents in my area?"
+      - "When will my maintenance request be scheduled?"
+      - "How do I check production reading history?"
+      - "Where can I find safety protocols?"
+
+  routing:
+    well-issue:          "Well Operations"
+    pipeline-leak:       "Pipeline Maintenance"
+    equipment-fault:     "Field Equipment Support"
+    safety-concern:      "Safety & Compliance"
+    maintenance-request: "Maintenance Scheduling"
+    other:               "General Operations"
+
+  dynatrace:
+    serviceNames:
+      citizen-service:      "Well Operator Portal"
+      city-operations:      "Operations Control Center"
+      service-dispatch:     "Field Service Dispatch"
+      api-gateway:          "Energy API Gateway"
+      notification-service: "Alert Notification Engine"
+      billing-service:      "Customer Billing Service"
+
+    flowLabels:
+      service-request:   "Maintenance Request Lifecycle"
+      account-creation:  "New Operator Onboarding"
+      iot-incident:      "Operational Incident Resolution"
+      tax-payment:       "Service Invoice Payment"
+
+    flows: [service-request, account-creation, iot-incident, tax-payment]
+
+# =============================================================================
+# Entity engine ownership — add oil and gas entities to each service.
+# =============================================================================
+
+customerEntityService:
+  ownedTypes: "citizen,service_request,bill,cart,production_reading"
+
+opsEntityService:
+  ownedTypes: "incident,work_order,maintenance_task"

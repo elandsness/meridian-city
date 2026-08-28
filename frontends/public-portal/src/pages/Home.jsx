@@ -29,8 +29,8 @@ export default function Home() {
         )}
       </section>
 
-      {modules.map(({ id, Component }) => (
-        <Component key={id} />
+      {modules.map(({ id, Component, ...moduleProps }) => (
+        <Component key={id} {...moduleProps} config={cfg} />
       ))}
     </div>
   )
