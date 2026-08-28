@@ -79,23 +79,16 @@ industry:
       - { id: analytics, label: "On-time performance" }
       - demo-control
   # Home-page modules for the passenger portal: status board, airfield map, journey tracker,
-  # news ticker, and quick actions.
+  # news ticker, weather widget, and quick actions.
   home:
     public:
-      - flight-status
-      - airfield-map
-      - my-journey
-      - quick-actions
-      - id: news-ticker
-        headlines:
-          - "Flight 123 On Time"
-          - "Flight 456 Delayed 30 min — rebooking open at Gate C9"
-          - "Gate B12 Closed for de-icing; passengers redirected to Gate B14"
-          - "Meridian Airport named #1 for on-time performance, again"
-          - "New direct route: Meridian to Reykjavik, launching June"
+      - { id: city-home, label: "Welcome" }
+      - { id: news-ticker, label: "Flight Updates", headlines: ["Flight 123 On Time", "Flight 456 Delayed 30 min — rebooking open at Gate C9", "Gate B12 Closed for de-icing; passengers redirected to Gate B14", "Meridian Airport named #1 for on-time performance, again", "New direct route: Meridian to Reykjavik, launching June"] }
+      - { id: transit-map, label: "Shuttle Map" }
+      - { id: weather, label: "Airport Weather", location: "Meridian Airport", units: "fahrenheit" }
     ops:
-      - flight-summary
-      - ops-overview
+      - { id: ops-overview, label: "Overview" }
+      - { id: flight-summary, label: "Flight Summary" }
   # Backend-only demo data + dispatch routing (delivered to traffic-bot +
   # service-dispatch via env; never sent to the browser config.json).
   data:
