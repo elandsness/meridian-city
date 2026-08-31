@@ -2,15 +2,15 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { displayName, greeting } from '../lib/format.js'
 import { useConfig } from '../config/ConfigContext'
 import Button from '../ui/Button.jsx'
-import { getActiveHomeModules } from '../config/homeModules.jsx'
+import PageComposer from '../components/PageComposer'
 
-// Home is a hero shell + a config-selected list of home modules (see homeModules.jsx).
+// Home is a hero shell + a PageComposer that renders modules from the industry config.
+// The config drives which modules appear (see config.home.public or config.pages.home.modules).
 // The default (city) config renders the original home bundle; the airport config swaps in
 // flight status, the airfield map, and the journey tracker.
 export default function Home() {
   const { isAuthenticated, user } = useAuth()
   const cfg = useConfig()
-  const modules = getActiveHomeModules(cfg)
 
   return (
     <div className="space-y-6">
@@ -29,9 +29,7 @@ export default function Home() {
         )}
       </section>
 
-      {modules.map(({ id, Component, ...moduleProps }) => (
-        <Component key={id} {...moduleProps} config={cfg} />
-      ))}
+      <PageComposer pageId="public" config={cfg} />
     </div>
   )
 }

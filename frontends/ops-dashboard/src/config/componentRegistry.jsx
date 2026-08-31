@@ -17,7 +17,12 @@ import EntityAnalyticsPage from '../components/entity/EntityAnalyticsPage'
 import EntityJourneyPage from '../components/entity/EntityJourneyPage'
 import StatusMapPage from '../components/entity/StatusMapPage'
 
+// Home-page components (legacy homeModules keys)
+import OpsOverview from '../components/home/OpsOverview'
+import FlightSummary from '../components/home/FlightSummary'
+
 export const COMPONENT_REGISTRY = {
+  // Generic components
   'weather': WeatherWidget,
   'news-ticker': NewsTicker,
   'transit-map': TransitPanel,
@@ -28,6 +33,10 @@ export const COMPONENT_REGISTRY = {
   'entity-analytics': EntityAnalyticsPage,
   'entity-journey': EntityJourneyPage,
   'status-map': StatusMapPage,
+
+  // Home-page components (legacy homeModules keys)
+  'ops-overview': OpsOverview,
+  'flight-summary': FlightSummary,
 }
 
 export default COMPONENT_REGISTRY

@@ -1,28 +1,16 @@
-// Home-module registry. `config.home.public` (from the industry config) selects and orders
-// the modules that compose the portal home page; an absent list falls back to the city
-// bundle so the default app is unchanged. This is the home-page analogue of screens.jsx —
-// the seam a config-authored industry plugs its home layout into.
-import CityHome from '../components/home/CityHome.jsx'
-import QuickActions from '../components/home/QuickActions.jsx'
-import FlightStatus from '../components/home/FlightStatus.jsx'
-import AirfieldMapCard from '../components/home/AirfieldMapCard.jsx'
-import MyJourneyCard from '../components/home/MyJourneyCard.jsx'
+// Deprecated: home modules are now resolved through COMPONENT_REGISTRY by the
+// PageComposer. This file is kept as a compatibility shim for any code that
+// still imports from homeModules.jsx.
+//
+// The PageComposer handles module resolution from either config.pages or
+// config.home, so this file is no longer the source of truth.
 
-export const HOME_MODULES = {
-  'city-home': CityHome,
-  'quick-actions': QuickActions,
-  'flight-status': FlightStatus,
-  'airfield-map': AirfieldMapCard,
-  'my-journey': MyJourneyCard,
-}
+import { COMPONENT_REGISTRY } from './componentRegistry'
+
+export const HOME_MODULES = COMPONENT_REGISTRY
 
 export function getActiveHomeModules(config) {
-  const list = config?.home?.public ?? ['city-home', 'quick-actions']
-  return list
-    .map((item) => (typeof item === 'string' ? { id: item } : item))
-    .filter((it) => it && HOME_MODULES[it.id])
-    .map((it) => {
-      const { id, ...rest } = it
-      return { id, Component: HOME_MODULES[id], ...rest }
-    })
+  // No-op: PageComposer handles module resolution now.
+  // Returns empty array so callers that iterate modules render nothing.
+  return []
 }

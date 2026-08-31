@@ -1,15 +1,22 @@
 // PageComposer renders a page from the industry config.
 //
-// The config drives the page layout:
-//   config.pages[pageId].modules = [
-//     { type: 'ops-overview', position: 'top' },
-//     { type: 'incident-badge', position: 'top' },
-//     { type: 'entity-list', position: 'main', entityType: 'incident' },
-//   ]
+// Two config formats are supported (new format preferred, legacy fallback):
 //
-// Each module's `type` is looked up in COMPONENT_REGISTRY to get the React
-// component. The module object is spread as props (minus `type` and `position`),
-// plus the full `config` for branding/terminology access.
+//   New format:
+//     config.pages[pageId].modules = [
+//       { type: 'ops-overview', position: 'top' },
+//       { type: 'news-ticker', position: 'top', headlines: ['Power restored'] },
+//     ]
+//
+//   Legacy format (config.home.<pageId>):
+//     config.home.ops = [
+//       { id: 'ops-overview', label: 'Overview' },
+//       { id: 'news-ticker', headlines: ['Power restored'] },
+//     ]
+//
+// Each module's `type` (new) or `id` (legacy) is looked up in COMPONENT_REGISTRY
+// to get the React component. The module object is spread as props (minus the
+// identifier key and `position`), plus the full `config` for branding/terminology.
 //
 // `position` controls layout:
 //   - 'top' / undefined: standard grid cell (1/2 on md+)
@@ -18,22 +25,17 @@
 //   - 'sidebar': rendered in a sidebar slot (currently treated as standard cell)
 //
 // Unknown component types render an inline warning. Missing pages render an
-// error message.
+// empty-state message.
 
 import { COMPONENT_REGISTRY } from '../config/componentRegistry'
 
 export default function PageComposer({ pageId, config }) {
+  // Resolve modules: try new format (config.pages) first, fall back to legacy
+  // format (config.home[pageId]), then empty array.
   const page = config?.pages?.[pageId]
-
-  if (!page) {
-    return (
-      <div className="p-6 text-red-600 bg-red-50 border border-red-200 rounded-xl">
-        Page &ldquo;{pageId}&rdquo; not found in config
-      </div>
-    )
-  }
-
-  const modules = page.modules || []
+  const modules = page?.modules
+    || (config?.home?.[pageId])
+    || []
 
   if (modules.length === 0) {
     return (
@@ -46,7 +48,9 @@ export default function PageComposer({ pageId, config }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {modules.map((module, index) => {
-        const Component = COMPONENT_REGISTRY[module.type]
+        // Check both `type` (new format) and `id` (legacy format) keys.
+        const componentKey = module.type || module.id
+        const Component = componentKey ? COMPONENT_REGISTRY[componentKey] : undefined
 
         if (!Component) {
           return (
@@ -54,19 +58,20 @@ export default function PageComposer({ pageId, config }) {
               key={`unknown-${index}`}
               className="p-4 text-amber-700 bg-amber-50 border border-amber-200 rounded-xl text-sm"
             >
-              Unknown component type: <code className="font-mono">{module.type}</code>
+              Unknown component: <code className="font-mono">{componentKey || '(none)'}
+              </code>
             </div>
           )
         }
 
-        // Strip layout-only keys before passing to the component
-        const { type: _type, position: _position, ...moduleProps } = module
+        // Strip layout-only keys before passing to the component.
+        const { type: _type, id: _id, position: _position, ...moduleProps } = module
 
         const isFullWidth = module.position === 'full' || module.position === 'sidebar'
 
         return (
           <div
-            key={`${module.type}-${index}`}
+            key={`${componentKey}-${index}`}
             className={isFullWidth ? 'md:col-span-2' : ''}
           >
             <Component {...moduleProps} config={config} />

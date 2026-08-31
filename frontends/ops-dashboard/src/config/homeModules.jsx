@@ -1,24 +1,16 @@
-// Ops-home module registry. `config.home.ops` selects and orders the modules that
-// compose the ops-dashboard landing (Overview); an absent list falls back to the
-// standard ops overview so the default dashboard is unchanged. Mirrors the public
-// portal's homeModules.jsx and the screen registry pattern.
-import OpsOverview from '../components/home/OpsOverview.jsx';
-import FlightSummary from '../components/home/FlightSummary.jsx';
-import NewsTicker from '../components/NewsTicker.jsx';
+// Deprecated: home modules are now resolved through COMPONENT_REGISTRY by the
+// PageComposer. This file is kept as a compatibility shim for any code that
+// still imports from homeModules.jsx.
+//
+// The PageComposer handles module resolution from either config.pages or
+// config.home, so this file is no longer the source of truth.
 
-export const HOME_MODULES = {
-  'ops-overview': OpsOverview,
-  'flight-summary': FlightSummary,
-  'news-ticker': NewsTicker,
-};
+import { COMPONENT_REGISTRY } from './componentRegistry'
+
+export const HOME_MODULES = COMPONENT_REGISTRY
 
 export function getActiveHomeModules(config) {
-  const list = config?.home?.ops ?? ['ops-overview'];
-  return list
-    .map((item) => (typeof item === 'string' ? { id: item } : item))
-    .filter((it) => it && HOME_MODULES[it.id])
-    .map((it) => {
-      const { id, ...rest } = it;
-      return { id, Component: HOME_MODULES[id], ...rest };
-    });
+  // No-op: PageComposer handles module resolution now.
+  // Returns empty array so callers that iterate modules render nothing.
+  return []
 }
