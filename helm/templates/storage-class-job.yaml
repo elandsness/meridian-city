@@ -64,10 +64,15 @@ data:
 
     echo "Using provider: $PROVIDER"
 
-    # Verify required CSI drivers are available
+    # Verify required CSI drivers are available. The existing-storageclass list is
+    # captured into a variable first, then grepped via a here-string — piping
+    # `kubectl get storageclass | grep -q ...` directly would let grep exit the
+    # instant it finds a match, SIGPIPE-ing kubectl mid-write; with `pipefail` (set
+    # above) that turns into a false "driver not found" (confirmed: exit 141).
+    existing_storageclasses="$(kubectl get storageclass)"
     if [[ "$PROVIDER" == "aws" ]]; then
       echo "Verifying EBS CSI driver is available..."
-      if ! kubectl get storageclass | grep -q ebs.csi.aws.com; then
+      if ! grep -q ebs.csi.aws.com <<< "$existing_storageclasses"; then
         echo "ERROR: EBS CSI driver not found on this EKS cluster."
         echo ""
         echo "The EBS CSI driver is required for persistent volumes on EKS."
@@ -96,7 +101,7 @@ data:
       echo "EBS CSI driver verified."
     elif [[ "$PROVIDER" == "gcp" ]]; then
       echo "Verifying GCP PD CSI driver is available..."
-      if ! kubectl get storageclass | grep -q pd.csi.storage.gke.io; then
+      if ! grep -q pd.csi.storage.gke.io <<< "$existing_storageclasses"; then
         echo "ERROR: GCP PD CSI driver not found on this GKE cluster."
         echo "GKE includes the CSI driver by default. If you're seeing this,"
         echo "your cluster may have been configured without it."
@@ -105,7 +110,7 @@ data:
       echo "GCP PD CSI driver verified."
     elif [[ "$PROVIDER" == "azure" ]]; then
       echo "Verifying Azure Disk CSI driver is available..."
-      if ! kubectl get storageclass | grep -q disk.csi.azure.com; then
+      if ! grep -q disk.csi.azure.com <<< "$existing_storageclasses"; then
         echo "ERROR: Azure Disk CSI driver not found on this AKS cluster."
         echo "AKS includes the CSI driver by default. If you're seeing this,"
         echo "your cluster may have been configured without it."
@@ -114,74 +119,113 @@ data:
       echo "Azure Disk CSI driver verified."
     fi
 
-    # Create storage classes based on provider
+    # Create storage classes based on provider.
+    # NOTE: `kubectl create storageclass` does not exist as a kubectl subcommand
+    # (confirmed against kubectl v1.36 --help — only clusterrole, configmap, job,
+    # etc. are valid `create` subcommands). StorageClass objects must be created
+    # from a manifest via `kubectl apply -f -`. Manifests are emitted with printf
+    # (not a heredoc) because this script is embedded in a Helm ConfigMap as a YAML
+    # block scalar — a heredoc's unindented terminator line would be misread as
+    # ending the block scalar early.
     case "$PROVIDER" in
       aws)
         echo "Creating AWS storage classes..."
-        # Create meridian-gp3 (default)
-        kubectl create storageclass meridian-gp3 \
-          --provisioner=ebs.csi.aws.com \
-          --parameters='type=gp3,encrypted=true,kmsKeyId=alias/aws/ebs' \
-          --reclaim-policy=Retain \
-          --volume-binding-mode=WaitForFirstConsumer \
-          --allow-volume-expansion \
-          --annotate storageclass.kubernetes.io/is-default-class=true \
-          --dry-run=client -o yaml | kubectl apply -f -
-
-        # Create meridian-io2
-        kubectl create storageclass meridian-io2 \
-          --provisioner=ebs.csi.aws.com \
-          --parameters='type=io2,encrypted=true,kmsKeyId=alias/aws/ebs,iops=3000' \
-          --reclaim-policy=Retain \
-          --volume-binding-mode=WaitForFirstConsumer \
-          --allow-volume-expansion \
-          --dry-run=client -o yaml | kubectl apply -f -
+        # type/encrypted/iops verified against the aws-ebs-csi-driver parameter docs.
+        printf '%s\n' \
+          'apiVersion: storage.k8s.io/v1' \
+          'kind: StorageClass' \
+          'metadata:' \
+          '  name: meridian-gp3' \
+          '  annotations:' \
+          '    storageclass.kubernetes.io/is-default-class: "true"' \
+          'provisioner: ebs.csi.aws.com' \
+          'parameters:' \
+          '  type: gp3' \
+          '  encrypted: "true"' \
+          'reclaimPolicy: Retain' \
+          'volumeBindingMode: WaitForFirstConsumer' \
+          'allowVolumeExpansion: true' \
+          '---' \
+          'apiVersion: storage.k8s.io/v1' \
+          'kind: StorageClass' \
+          'metadata:' \
+          '  name: meridian-io2' \
+          'provisioner: ebs.csi.aws.com' \
+          'parameters:' \
+          '  type: io2' \
+          '  iops: "3000"' \
+          '  encrypted: "true"' \
+          'reclaimPolicy: Retain' \
+          'volumeBindingMode: WaitForFirstConsumer' \
+          'allowVolumeExpansion: true' \
+          | kubectl apply -f -
 
         echo "AWS storage classes created (meridian-gp3 set as default)"
         ;;
       gcp)
         echo "Creating GCP storage classes..."
-        # Create meridian-standard (default)
-        kubectl create storageclass meridian-standard \
-          --provisioner=pd.csi.storage.gke.io \
-          --parameters='type=pd-standard,encrypted=true' \
-          --reclaim-policy=Retain \
-          --volume-binding-mode=WaitForFirstConsumer \
-          --allow-volume-expansion \
-          --annotate storageclass.kubernetes.io/is-default-class=true \
-          --dry-run=client -o yaml | kubectl apply -f -
-
-        # Create meridian-premium
-        kubectl create storageclass meridian-premium \
-          --provisioner=pd.csi.storage.gke.io \
-          --parameters='type=pd-ssd,encrypted=true' \
-          --reclaim-policy=Retain \
-          --volume-binding-mode=WaitForFirstConsumer \
-          --allow-volume-expansion \
-          --dry-run=client -o yaml | kubectl apply -f -
+        # type is the only parameter the pd.csi.storage.gke.io provisioner takes —
+        # verified against this cluster's own built-in standard-rwo/premium-rwo
+        # StorageClasses. GCE persistent disks are encrypted at rest by default;
+        # there is no 'encrypted' parameter for this provisioner.
+        printf '%s\n' \
+          'apiVersion: storage.k8s.io/v1' \
+          'kind: StorageClass' \
+          'metadata:' \
+          '  name: meridian-standard' \
+          '  annotations:' \
+          '    storageclass.kubernetes.io/is-default-class: "true"' \
+          'provisioner: pd.csi.storage.gke.io' \
+          'parameters:' \
+          '  type: pd-standard' \
+          'reclaimPolicy: Retain' \
+          'volumeBindingMode: WaitForFirstConsumer' \
+          'allowVolumeExpansion: true' \
+          '---' \
+          'apiVersion: storage.k8s.io/v1' \
+          'kind: StorageClass' \
+          'metadata:' \
+          '  name: meridian-premium' \
+          'provisioner: pd.csi.storage.gke.io' \
+          'parameters:' \
+          '  type: pd-ssd' \
+          'reclaimPolicy: Retain' \
+          'volumeBindingMode: WaitForFirstConsumer' \
+          'allowVolumeExpansion: true' \
+          | kubectl apply -f -
 
         echo "GCP storage classes created (meridian-standard set as default)"
         ;;
       azure)
         echo "Creating Azure storage classes..."
-        # Create meridian-managed-premium (default)
-        kubectl create storageclass meridian-managed-premium \
-          --provisioner=disk.csi.azure.com \
-          --parameters='skuName=StandardSSD_LRS,encrypted=true' \
-          --reclaim-policy=Retain \
-          --volume-binding-mode=WaitForFirstConsumer \
-          --allow-volume-expansion \
-          --annotate storageclass.kubernetes.io/is-default-class=true \
-          --dry-run=client -o yaml | kubectl apply -f -
-
-        # Create meridian-managed-ssd
-        kubectl create storageclass meridian-managed-ssd \
-          --provisioner=disk.csi.azure.com \
-          --parameters='skuName=Premium_LRS,encrypted=true' \
-          --reclaim-policy=Retain \
-          --volume-binding-mode=WaitForFirstConsumer \
-          --allow-volume-expansion \
-          --dry-run=client -o yaml | kubectl apply -f -
+        # skuName verified against the azuredisk-csi-driver parameter docs; that
+        # driver has no 'encrypted' parameter (Azure disk encryption is configured
+        # via diskEncryptionSetID / platform defaults, not a boolean flag).
+        printf '%s\n' \
+          'apiVersion: storage.k8s.io/v1' \
+          'kind: StorageClass' \
+          'metadata:' \
+          '  name: meridian-managed-premium' \
+          '  annotations:' \
+          '    storageclass.kubernetes.io/is-default-class: "true"' \
+          'provisioner: disk.csi.azure.com' \
+          'parameters:' \
+          '  skuName: StandardSSD_LRS' \
+          'reclaimPolicy: Retain' \
+          'volumeBindingMode: WaitForFirstConsumer' \
+          'allowVolumeExpansion: true' \
+          '---' \
+          'apiVersion: storage.k8s.io/v1' \
+          'kind: StorageClass' \
+          'metadata:' \
+          '  name: meridian-managed-ssd' \
+          'provisioner: disk.csi.azure.com' \
+          'parameters:' \
+          '  skuName: Premium_LRS' \
+          'reclaimPolicy: Retain' \
+          'volumeBindingMode: WaitForFirstConsumer' \
+          'allowVolumeExpansion: true' \
+          | kubectl apply -f -
 
         echo "Azure storage classes created (meridian-managed-premium set as default)"
         ;;
