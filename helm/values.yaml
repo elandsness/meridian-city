@@ -705,11 +705,13 @@ publicPortal:
     tls: []
   resources:
     requests:
-      cpu: "50m"
-      memory: "64Mi"
-    limits:
-      cpu: "200m"
+      cpu: "100m"
       memory: "256Mi"
+      ephemeral-storage: "2Gi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+      ephemeral-storage: "4Gi"
 
 # ---------------------------------------------------------------------------
 # Ops Dashboard (React / Vite)
@@ -739,11 +741,13 @@ opsDashboard:
     tls: []
   resources:
     requests:
-      cpu: "50m"
-      memory: "64Mi"
-    limits:
-      cpu: "200m"
+      cpu: "100m"
       memory: "256Mi"
+      ephemeral-storage: "2Gi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+      ephemeral-storage: "4Gi"
 
 # ---------------------------------------------------------------------------
 # Infrastructure: PostgreSQL (CloudNativePG operator)
