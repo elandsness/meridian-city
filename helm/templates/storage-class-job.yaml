@@ -44,23 +44,22 @@ data:
     # Detect cloud provider by checking node labels
     PROVIDER="unknown"
 
-    # Check for GCP (GKE)
-    if kubectl get nodes -o jsonpath='{.items[0].metadata.labels.cloud\.google\.com/gke-nodepool}' 2>/dev/null | grep -q .; then
+    # Check for GCP (GKE) - uses providerID format gce://...
+    if kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE '^gce://'; then
       PROVIDER="gcp"
       echo "Detected: Google Cloud Platform (GKE)"
-    # Check for Azure (AKS)
-    elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' 2>/dev/null | grep -q . || \
-         kubectl get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.io/azure-zone}' 2>/dev/null | grep -q .; then
+    # Check for Azure (AKS) - uses providerID format azure://...
+    elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE '^azure://'; then
       PROVIDER="azure"
       echo "Detected: Microsoft Azure (AKS)"
-    # Check for AWS (EKS)
-    elif kubectl get nodes -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}' 2>/dev/null | grep -qE '^[a-z]{2}-[a-z]+-[0-9]+$' || \
-         kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE '^aws://'; then
+    # Check for AWS (EKS) - uses providerID format aws://...
+    elif kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE '^aws://'; then
       PROVIDER="aws"
       echo "Detected: Amazon Web Services (EKS)"
     else
-      echo "Could not detect cloud provider, defaulting to AWS (EKS)"
-      PROVIDER="aws"
+      echo "Could not detect cloud provider. Unable to auto-configure storage classes."
+      echo "Please manually configure storage classes for your cluster."
+      exit 1
     fi
 
     echo "Using provider: $PROVIDER"

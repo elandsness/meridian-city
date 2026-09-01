@@ -177,6 +177,52 @@ restart_app_workloads() {
     || warn "Pods still settling after restart — check: ./scripts/deploy.sh status"
 }
 
+# Clean up old ReplicaSets, failed Jobs, and orphaned pods from previous deployments.
+# Keeps the 2 most recent ReplicaSets per deployment for rollback, deletes the rest.
+# Also removes old hook Jobs that have completed or failed.
+cleanup_old_resources() {
+  info "Cleaning up old resources..."
+
+  # Delete old ReplicaSets (keep 2 most recent per deployment for quick rollback).
+  # This significantly reduces the clutter of old pods listed by kubectl get pods.
+  local rs_deleted=0
+  for rs in $(kubectl get rs -n "$NAMESPACE" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[*].metadata.name}'); do
+    local owner
+    owner=$(kubectl get rs "$rs" -n "$NAMESPACE" -o jsonpath='{.metadata.ownerReferences[0].name}' 2>/dev/null)
+    if [[ -n "$owner" ]]; then
+      # Count how many RS this deployment has; if more than 2, delete the older ones.
+      local count
+      count=$(kubectl get rs -n "$NAMESPACE" -l "app.kubernetes.io/instance=$owner" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | wc -w)
+      if [[ $count -gt 2 ]]; then
+        kubectl delete rs "$rs" -n "$NAMESPACE" --ignore-not-found 2>/dev/null && ((rs_deleted++))
+      fi
+    fi
+  done
+  [[ $rs_deleted -gt 0 ]] && info "  Deleted $rs_deleted old ReplicaSets."
+
+  # Delete failed hook Jobs (storage-class-setup, etc) that have status 'Error' or 'Failed'.
+  # These hook jobs run once at install and can accumulate if install is retried.
+  local job_deleted=0
+  for job in $(kubectl get jobs -n "$NAMESPACE" --field-selector status.failed=1 -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found 2>/dev/null && ((job_deleted++))
+  done
+  [[ $job_deleted -gt 0 ]] && info "  Deleted $job_deleted failed Jobs."
+
+  # Delete orphaned pods that are no longer owned by any workload (Completed, Evicted, etc).
+  local pod_deleted=0
+  for pod in $(kubectl get pods -n "$NAMESPACE" --field-selector status.phase=Failed,status.phase=Succeeded -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    local owner
+    owner=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.metadata.ownerReferences[0].kind}' 2>/dev/null)
+    # Only delete if NOT owned by a Job or ReplicaSet (those are managed by their controller).
+    if [[ -z "$owner" ]]; then
+      kubectl delete pod "$pod" -n "$NAMESPACE" --ignore-not-found 2>/dev/null && ((pod_deleted++))
+    fi
+  done
+  [[ $pod_deleted -gt 0 ]] && info "  Deleted $pod_deleted orphaned pods."
+
+  success "Cleanup complete."
+}
+
 # When llm.provider == "local", the chart deploys an in-cluster Ollama
 # (helm/templates/ollama.yaml). Ollama starts with no models, so pull the
 # configured model into it once it is ready. We discover the provider/model by
@@ -439,6 +485,8 @@ install_or_upgrade() {
     info "Restarting app workloads to pull fresh :latest images..."
     restart_app_workloads
     success "App workloads restarted on fresh images."
+    echo ""
+    cleanup_old_resources
   fi
 
   # OneAgent injection happens at pod creation, but on a fresh install the app
