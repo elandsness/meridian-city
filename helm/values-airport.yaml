@@ -82,9 +82,11 @@ industry:
   # news ticker, weather widget, and quick actions.
   home:
     public:
-      - { id: city-home, label: "Welcome" }
+      - { id: flight-status }
+      - { id: airfield-map }
+      - { id: my-journey }
+      - { id: quick-actions }
       - { id: news-ticker, label: "Flight Updates", headlines: ["Flight 123 On Time", "Flight 456 Delayed 30 min — rebooking open at Gate C9", "Gate B12 Closed for de-icing; passengers redirected to Gate B14", "Meridian Airport named #1 for on-time performance, again", "New direct route: Meridian to Reykjavik, launching June"] }
-      - { id: transit-map, label: "Shuttle Map" }
       - { id: weather, label: "Airport Weather", location: "Meridian Airport", units: "fahrenheit" }
     ops:
       - { id: ops-overview, label: "Overview" }
