@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: workflow-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:meridian-db-rw:5432}/${DB_NAME:meridian}
+    username: ${DB_USERNAME:meridian}
+    password: ${DB_PASSWORD:meridian-secret-change-me}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: workflow
+    show-sql: false
+
+  flyway:
+    schemas: workflow
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:meridian-kafka-bootstrap:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: workflow-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.meridian.workflow
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.meridian.workflow: INFO
+    org.springframework.kafka: INFO

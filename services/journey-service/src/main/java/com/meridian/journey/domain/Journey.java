@@ -1,0 +1,100 @@
+package com.meridian.journey.domain;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+/**
+ * Generic journey entity — replaces the former Flight and Passenger entities.
+ * Configurable stages, transitions, and position interpolation driven by industry
+ * config rather than hardcoded domain concepts.
+ *
+ * <p>In an airport, this represents a flight or passenger journey.
+ * In a hospital, it could represent a patient journey.
+ * In a bank, it could represent a loan processing journey.
+ */
+@Entity
+@Table(schema = "journey", name = "journeys")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Journey {
+
+    @Id
+    private String id;
+
+    /** Entity type: "flight", "passenger", "patient", "loan", etc. */
+    @Column(name = "entity_type")
+    private String entityType;
+
+    /** Display name (e.g., flight number, passenger name). */
+    private String name;
+
+    /** Best-effort link to a related entity (e.g., flight_id for passengers). */
+    @Column(name = "related_id")
+    private String relatedId;
+
+    /** Direction or category (e.g., "departure", "arrival", "inbound", "outbound"). */
+    private String direction;
+
+    /** Origin (e.g., origin airport, origin department). */
+    private String origin;
+
+    /** Destination (e.g., destination airport, destination department). */
+    private String destination;
+
+    /** Additional metadata (e.g., gate, stand, seat, aircraft type). */
+    @Column(columnDefinition = "jsonb")
+    private String metadata;
+
+    @Builder.Default
+    private String status = "initiated";
+
+    /** 0..1 journey completion, reserved for future visualisation. */
+    @Builder.Default
+    private double progress = 0.0;
+
+    @Column(name = "scheduled_at")
+    private OffsetDateTime scheduledAt;
+
+    @Column(name = "created_at")
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
+
+    @Column(name = "next_transition_at")
+    private OffsetDateTime nextTransitionAt;
+
+    /** Factory — generates id like "jrn-a1b2c". */
+    public static Journey create(String entityType, String name, String relatedId,
+                                 String direction, String origin, String destination,
+                                 String metadata, String initialStatus) {
+        String shortId = UUID.randomUUID().toString().replace("-", "").substring(0, 5);
+        OffsetDateTime now = OffsetDateTime.now();
+        return Journey.builder()
+                .id("jrn-" + shortId)
+                .entityType(entityType)
+                .name(name)
+                .relatedId(relatedId)
+                .direction(direction)
+                .origin(origin)
+                .destination(destination)
+                .metadata(metadata)
+                .status(initialStatus)
+                .progress(0.0)
+                .scheduledAt(now)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+    }
+}

@@ -25,9 +25,9 @@ async function authRoutes (fastify, opts) {
       return reply.code(200).send({ token, user: { username, role: 'operator' } })
     }
 
-    // 2. Citizen login — verify credentials against citizen-service.
+    // 2. Citizen login — verify credentials against identity-service.
     try {
-      const res = await undiciRequest(`${config.CITIZEN_SERVICE_URL}/api/v1/auth/login`, {
+      const res = await undiciRequest(`${config.IDENTITY_SERVICE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: username, password }),
@@ -36,18 +36,18 @@ async function authRoutes (fastify, opts) {
       })
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        const citizen = await res.body.json()
+        const identity = await res.body.json()
         const token = fastify.jwt.sign(
-          { sub: citizen.citizen_id, role: 'citizen' },
+          { sub: identity.identity_id, role: 'citizen' },
           { expiresIn: '8h' }
         )
-        request.log.info({ citizenId: citizen.citizen_id }, 'citizen login')
+        request.log.info({ identityId: identity.identity_id }, 'citizen login')
         return reply.code(200).send({
           token,
           user: {
-            id: citizen.citizen_id,
-            username: citizen.email,
-            name: citizen.name,
+            id: identity.identity_id,
+            username: identity.email,
+            name: identity.name,
             role: 'citizen',
           },
         })

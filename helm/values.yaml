@@ -91,9 +91,91 @@ industry:
   # City defaults; an industry overlay (e.g. values-airport.yaml) supplies its own.
   data: {}
   routing: {}
-  # Per-industry Dynatrace: {serviceNames: {deployment: displayName}, flowLabels: {flowKey: name}}.
+  # Per-industry Dynatrace: {serviceNames: {deployment: displayName}, flowLabels: {flowKey: name}, flows: [...]}.
   # Applied by the provisioner Job, scoped to this instance's namespace. Empty = City defaults.
-  dynatrace: {}
+  # flows: array of {id, displayName, correlation, steps: [{event}], errors: [{event, isError}]}
+  dynatrace:
+    serviceNames: {}
+    flowLabels: {}
+    flows: []
+
+  # Generic service configuration — defines which services are enabled and their behavior.
+  # Each service section maps to a generic domain-pattern service.
+  services:
+    identity:
+      enabled: true
+      # Account lifecycle states (default: register → verify → activate)
+      accountLifecycle:
+        states: ["registered", "verification_sent", "verified", "activated"]
+        transitions:
+          - from: registered
+            to: verification_sent
+            timer: { minSeconds: 5, maxSeconds: 30 }
+          - from: verification_sent
+            to: verified
+            timer: { minSeconds: 60, maxSeconds: 300 }
+          - from: verified
+            to: activated
+            timer: { minSeconds: 30, maxSeconds: 120 }
+    workflow:
+      enabled: true
+      # Dispatch routing: category → department mapping
+      dispatchRules: {}
+      # Entity types this service owns (comma-separated)
+      ownedTypes: "request,incident,work_order"
+    transaction:
+      enabled: true
+      # Order fulfillment states (default: placed → packed → shipped → delivered)
+      orderFulfillment:
+        states: ["placed", "packed", "shipped", "delivered"]
+        transitions:
+          - from: placed
+            to: packed
+            timer: { minSeconds: 30, maxSeconds: 120 }
+          - from: packed
+            to: shipped
+            timer: { minSeconds: 60, maxSeconds: 300 }
+          - from: shipped
+            to: delivered
+            timer: { minSeconds: 120, maxSeconds: 600 }
+      # Bill generation rules
+      billGeneration:
+        enabled: true
+        interval: "quarterly"
+        defaultAmount: 15000
+    journey:
+      enabled: true
+      # Journey stages (configurable per industry)
+      stages: []
+      # Position interpolation for map display
+      positionInterpolation: "easeInOut"
+    iot:
+      enabled: true
+      # Device types and their configurations
+      deviceTypes:
+        - type: "vehicle"
+          count: 30
+          emitInterval: 15
+          anomalyProbability: 0.01
+        - type: "building"
+          count: 15
+          emitInterval: 15
+          anomalyProbability: 0.01
+        - type: "machine"
+          count: 10
+          emitInterval: 15
+          anomalyProbability: 0.01
+      # Anomaly detection thresholds per (device_type, metric)
+      anomalyThresholds:
+        vehicle:
+          engine_temp: { threshold: 110.0, consecutive: 1 }
+          speed: { threshold: 120.0, consecutive: 1 }
+        building:
+          hvac_temp: { threshold: 85.0, consecutive: 3 }
+          co2_ppm: { threshold: 1000.0, consecutive: 2 }
+        machine:
+          vibration: { threshold: 8.0, consecutive: 1 }
+          error_rate: { threshold: 5.0, consecutive: 1 }
 
 # ---------------------------------------------------------------------------
 # Dynatrace configuration
@@ -261,14 +343,15 @@ apiGateway:
   env: {}
 
 # ---------------------------------------------------------------------------
-# Citizen Service (Java / Spring Boot)
-# Manages citizen accounts and service request submission.
+# Identity Service (Java / Spring Boot)
+# Generic identity service for user registration, authentication, and account lifecycle.
+# Replaces citizen-service with configurable account lifecycle states and transitions.
 # ---------------------------------------------------------------------------
-citizenService:
+identityService:
   enabled: true
   replicaCount: 1
   image:
-    repository: "citizen-service"
+    repository: "identity-service"
     tag: ""
   service:
     type: ClusterIP
@@ -282,13 +365,119 @@ citizenService:
     limits:
       cpu: "1000m"
       memory: "1536Mi"
-  # Business-flow step durations default to a ~5 min – 2 hr band per transition (see
-  # request-lifecycle / account-lifecycle in citizen-service application.yml). Override the
-  # bands here to tune, e.g. for a live demo:
-  #   env:
-  #     REQUEST_LIFECYCLE_VALIDATED_MIN_SECONDS: "30"
-  #     REQUEST_LIFECYCLE_VALIDATED_MAX_SECONDS: "120"
-  #     ACCOUNT_LIFECYCLE_VERIFIED_MAX_SECONDS: "120"
+  # Account lifecycle configuration (overrides industry.services.identity.accountLifecycle)
+  # Default states: registered → verification_sent → verified → activated
+  accountLifecycle:
+    enabled: true
+    verifyProbability: 0.85
+    activateProbability: 0.92
+    verifiedDelaySeconds:
+      min: 60
+      max: 300
+    activatedDelaySeconds:
+      min: 30
+      max: 120
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Workflow Service (Java / Spring Boot)
+# Generic workflow service for service requests, work orders, incidents, and asset management.
+# Replaces service-dispatch + city-operations with configurable state machines.
+# ---------------------------------------------------------------------------
+workflowService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "workflow-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8083
+  resources:
+    requests:
+      cpu: "200m"
+      # Right-sized to observed working set (~575 MiB) + headroom (was 384Mi → ~150% sat).
+      memory: "768Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
+  # Workflow lifecycle configuration (overrides industry.services.workflow)
+  workflowLifecycle:
+    enabled: true
+    # Entity types this service owns (comma-separated)
+    ownedTypes: "service_request,work_order,incident"
+    # Dispatch routing: category → department mapping (industry-configurable)
+    dispatchRules: {}
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Transaction Service (Java / Spring Boot)
+# Generic transaction service merging commerce-service + billing-service.
+# Handles carts, orders, bills, and payments with configurable fulfillment state machine.
+# ---------------------------------------------------------------------------
+transactionService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "transaction-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8090
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "768Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
+  # Order fulfillment delays (placed -> packed -> shipped -> delivered)
+  fulfillment:
+    packedMinSeconds: 300
+    packedMaxSeconds: 7200
+    shippedMinSeconds: 300
+    shippedMaxSeconds: 7200
+    deliveredMinSeconds: 300
+    deliveredMaxSeconds: 7200
+  # Bill issuance configuration
+  billing:
+    quarterly:
+      enabled: true
+      intervalMs: 3600000
+      initialDelayMs: 60000
+      minAmountCents: 15000
+      maxAmountCents: 45000
+      dueDays: 45
+  # Fault injection
+  fault:
+    dbSlowdownEnabled: false
+    dbSlowdownDelayMs: 0
+    paymentFailEnabled: false
+    paymentFailRate: 0.0
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Citizen Service (Java / Spring Boot) — DEPRECATED
+# Manages citizen accounts and service request submission.
+# Replaced by identity-service (generic) + workflow-service (generic).
+# Kept for backward compatibility during transition.
+# ---------------------------------------------------------------------------
+citizenService:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: "citizen-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "768Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -880,11 +1069,31 @@ kafka:
       replicationFactor: 1
       config:
         retention.ms: "86400000"
-    - name: requests.events
+    - name: identity.events
       partitions: 2
       replicationFactor: 1
       config:
         retention.ms: "604800000"
+    - name: workflow.events
+      partitions: 2
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
+    - name: transaction.events
+      partitions: 2
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
+    - name: journey.events
+      partitions: 1
+      replicationFactor: 1
+      config:
+        retention.ms: "604800000"
+    - name: notifications.outbound
+      partitions: 1
+      replicationFactor: 1
+      config:
+        retention.ms: "3600000"
     - name: notifications.outbound
       partitions: 1
       replicationFactor: 1

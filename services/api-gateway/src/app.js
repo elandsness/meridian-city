@@ -25,6 +25,14 @@ const config = {
   BILLING_SERVICE_URL: process.env.BILLING_SERVICE_URL || 'http://localhost:8091',
   TELEMETRY_PROCESSOR_URL: process.env.TELEMETRY_PROCESSOR_URL || 'http://localhost:8086',
   DEMO_CONTROL_API_URL: process.env.DEMO_CONTROL_API_URL || 'http://localhost:3001',
+  // Generic services (new architecture)
+  IDENTITY_SERVICE_URL: process.env.IDENTITY_SERVICE_URL || 'http://localhost:8081',
+  WORKFLOW_SERVICE_URL: process.env.WORKFLOW_SERVICE_URL || 'http://localhost:8083',
+  TRANSACTION_SERVICE_URL: process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8090',
+  JOURNEY_SERVICE_URL: process.env.JOURNEY_SERVICE_URL || 'http://localhost:8093',
+  IOT_SERVICE_URL: process.env.IOT_SERVICE_URL || 'http://localhost:8086',
+  NEWS_TICKER_SERVICE_URL: process.env.NEWS_TICKER_SERVICE_URL || 'http://localhost:8095',
+  WEATHER_SERVICE_URL: process.env.WEATHER_SERVICE_URL || 'http://localhost:8096',
 }
 
 async function build () {

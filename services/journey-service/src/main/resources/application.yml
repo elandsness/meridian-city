@@ -1,0 +1,79 @@
+server:
+  port: 8093
+
+spring:
+  application:
+    name: journey-service
+  jackson:
+    # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: journey
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: journey
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: journey-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Journey lifecycle timing (default: ~5 min – 2 hr band per transition).
+# Override per-instance to tune, e.g.:
+#   env:
+#     JOURNEY_LIFECYCLE_MIN_SECONDS: "10"
+#     JOURNEY_LIFECYCLE_MAX_SECONDS: "120"
+journey:
+  lifecycle:
+    enabled: ${JOURNEY_LIFECYCLE_ENABLED:true}
+    min-seconds: ${JOURNEY_LIFECYCLE_MIN_SECONDS:300}
+    max-seconds: ${JOURNEY_LIFECYCLE_MAX_SECONDS:7200}
+
+# Journey generator (default: 24 active journeys, 60 active passengers).
+# Override per-instance, e.g.:
+#   env:
+#     JOURNEY_GENERATOR_MAX_ACTIVE: "12"
+#     PASSENGER_GENERATOR_MAX_ACTIVE: "30"
+generator:
+  max-active: ${JOURNEY_GENERATOR_MAX_ACTIVE:24}
+  passenger-max-active: ${PASSENGER_GENERATOR_MAX_ACTIVE:60}
+  bag-probability: ${PASSENGER_GENERATOR_BAG_PROBABILITY:0.7}
+
+# Fault injection flags — set by demo-control-api at runtime.
+fault:
+  failures-enabled: ${FAULT_FAILURES_ENABLED:false}
+  failure-rate: ${FAULT_FAILURES_RATE:0.0}

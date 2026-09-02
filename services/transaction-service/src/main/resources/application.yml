@@ -1,0 +1,87 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: transaction-service
+  jackson:
+    # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: transaction
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: transaction
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: transaction-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Fulfillment delay bands — placed -> packed -> shipped -> delivered. Each transition
+# draws a uniform random delay in its [min, max] band (default ~5 min – 2 hr) so the
+# order.packed/shipped/delivered bizevent steps look realistic. The @Scheduled
+# FulfillmentScheduler advances orders. Shrink the bands for a live demo.
+fulfillment:
+  packed-min-seconds: ${FULFILLMENT_PACKED_MIN_SECONDS:300}
+  packed-max-seconds: ${FULFILLMENT_PACKED_MAX_SECONDS:7200}
+  shipped-min-seconds: ${FULFILLMENT_SHIPPED_MIN_SECONDS:300}
+  shipped-max-seconds: ${FULFILLMENT_SHIPPED_MAX_SECONDS:7200}
+  delivered-min-seconds: ${FULFILLMENT_DELIVERED_MIN_SECONDS:300}
+  delivered-max-seconds: ${FULFILLMENT_DELIVERED_MAX_SECONDS:7200}
+
+# Quarterly bill issuance: at the start of each quarter, issue one outstanding
+# bill to every citizen who doesn't yet have one for the current period. Idempotent,
+# so it's safe to run on any cadence (checked hourly by default).
+billing:
+  quarterly:
+    enabled: ${BILLING_QUARTERLY_ENABLED:true}
+    interval-ms: ${BILLING_QUARTERLY_INTERVAL_MS:3600000}
+    initial-delay-ms: ${BILLING_QUARTERLY_INITIAL_DELAY_MS:60000}
+    min-amount-cents: ${BILLING_QUARTERLY_MIN_AMOUNT_CENTS:15000}
+    max-amount-cents: ${BILLING_QUARTERLY_MAX_AMOUNT_CENTS:45000}
+    due-days: ${BILLING_QUARTERLY_DUE_DAYS:45}
+
+# Fault injection flags — set by demo-control-api at runtime (db-slowdown on checkout,
+# payment_fail on bill pay).
+fault:
+  db-slowdown:
+    enabled: ${FAULT_DB_SLOWDOWN_ENABLED:false}
+    delay-ms: ${FAULT_DB_SLOWDOWN_DELAY_MS:0}
+  payment-fail:
+    enabled: ${FAULT_PAYMENT_FAIL_ENABLED:false}
+    rate: ${FAULT_PAYMENT_FAIL_RATE:0.0}

@@ -67,7 +67,10 @@ def _load_json_env(name):
 # Per-industry Dynatrace overrides (empty = City defaults / no naming rules).
 SERVICE_NAMES = _load_json_env("DT_SERVICE_NAMES")  # {k8s deployment name: service display name}
 FLOW_LABELS = _load_json_env("DT_FLOW_LABELS")      # {flow key: Business Flow display name}
-FLOW_KEYS = _load_json_env("DT_FLOWS")              # [flow key, ...] to provision (empty = City default set)
+# DT_FLOWS can be either:
+#   - Array of flow keys (backward compatible): ["service-request", "account-creation"]
+#   - Array of full flow definitions: [{key, name, correlationID, kpiLabel, kpi, kpiCalculation, kpiEventName, steps}, ...]
+FLOW_KEYS_OR_SPECS = _load_json_env("DT_FLOWS")      # [flow key | flow spec, ...]
 
 # Per-instance identity. With a hash, every name carries it so concurrent installs
 # on the shared tenant stay isolated; without one we keep the legacy single-instance
@@ -157,6 +160,7 @@ DQL_SCRIPT = (
     "`work_order.id` = bizjson[`work_order.id`], `incident.id` = bizjson[`incident.id`], "
     "`asset.id` = bizjson[`asset.id`], `anomaly.type` = bizjson[`anomaly.type`], "
     "`flight.id` = bizjson[`flight.id`], `passenger.id` = bizjson[`passenger.id`], "
+    "`identity.id` = bizjson[`identity.id`], "
     "`assigned_department` = bizjson[`assigned_department`]\n"
     "| fieldsRemove bizjson"
 )
@@ -230,14 +234,18 @@ FLOW_SPECS = [
                ("Validated", "service_request.validated", ["service_request.rejected"]),
                ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
                ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
-    {"key": "account-creation", "name": "Account Creation", "correlationID": "citizen.id",
-     "kpiLabel": "Activations", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
+    {"key": "account-creation", "name": "Account Creation", "correlationID": "identity.id",
+     "kpiLabel": "Activations", "kpi": "identity.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "account.activated",
      "steps": [("Registration started", "account.registration_started"),
                ("Details submitted", "account.details_submitted"),
                ("Verification sent", "account.verification_sent"),
                ("Verified", "account.verified", ["account.verification_failed"]),
                ("Activated", "account.activated", ["account.activation_failed"])]},
+    {"key": "identity-registration", "name": "Identity Registration", "correlationID": "identity.id",
+     "kpiLabel": "Registered identities", "kpi": "identity.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "identity.registered",
+     "steps": [("Identity created", "identity.registered")]},
     {"key": "iot-incident", "name": "IoT Incident Resolution", "correlationID": "incident.id",
      "kpiLabel": "Resolved incidents", "kpi": "incident.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "workorder.resolved",
@@ -275,8 +283,25 @@ FLOW_SPECS = [
 # City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)
 # pass DT_FLOWS to select a different subset; provision()'s stale-flow cleanup removes any
 # of this instance's flows that drop out of the active set on an in-place upgrade.
-DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "iot-incident", "purchase", "tax-payment"]
-ACTIVE_FLOW_SPECS = [s for s in FLOW_SPECS if s["key"] in (FLOW_KEYS or DEFAULT_FLOW_KEYS)]
+DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "identity-registration", "iot-incident", "purchase", "tax-payment"]
+
+# Resolve ACTIVE_FLOW_SPECS from DT_FLOWS. Supports two formats:
+#   1. Array of flow keys (backward compatible): ["service-request", "account-creation"]
+#   2. Array of full flow definitions: [{key, name, correlationID, ...steps, ...}]
+# Format 2 allows per-industry flow definitions with custom steps, correlation keys, and KPIs.
+def _resolve_flow_specs():
+    if not FLOW_KEYS_OR_SPECS:
+        return [s for s in FLOW_SPECS if s["key"] in DEFAULT_FLOW_KEYS]
+    # Check if first item is a dict (full spec) or string (key)
+    first = FLOW_KEYS_OR_SPECS[0]
+    if isinstance(first, dict) and "key" in first:
+        # Full flow definitions — use them directly
+        return FLOW_KEYS_OR_SPECS
+    else:
+        # Array of keys — filter FLOW_SPECS by keys
+        return [s for s in FLOW_SPECS if s["key"] in FLOW_KEYS_OR_SPECS]
+
+ACTIVE_FLOW_SPECS = _resolve_flow_specs()
 
 
 def _event(event_type, is_error=False):
