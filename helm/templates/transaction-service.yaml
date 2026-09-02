@@ -11,12 +11,12 @@ spec:
   replicas: {{ .Values.transactionService.replicaCount }}
   selector:
     matchLabels:
-      {{- include "meridian.selectorLabels" . | nindent 6 }}
+      {{- include "meridian.selectorLabels" (dict "component" "transaction-service" "context" $) | nindent 6 }}
       app.kubernetes.io/component: transaction-service
   template:
     metadata:
       labels:
-        {{- include "meridian.selectorLabels" . | nindent 8 }}
+        {{- include "meridian.selectorLabels" (dict "component" "transaction-service" "context" $) | nindent 8 }}
         app.kubernetes.io/component: transaction-service
     spec:
       containers:
@@ -79,6 +79,6 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "meridian.selectorLabels" . | nindent 4 }}
+    {{- include "meridian.selectorLabels" (dict "component" "transaction-service" "context" $) | nindent 4 }}
     app.kubernetes.io/component: transaction-service
 {{- end }}

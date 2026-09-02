@@ -24,4 +24,8 @@ public interface JourneyRepository extends JpaRepository<Journey, String> {
     @Query("SELECT j FROM Journey j WHERE j.entityType = :entityType AND j.direction = :direction")
     List<Journey> findByEntityTypeAndDirection(@Param("entityType") String entityType,
                                                @Param("direction") String direction);
+
+    List<Journey> findByStatusOrderByCreatedAtDesc(String status);
+
+    List<Journey> findAllByOrderByCreatedAtDesc();
 }

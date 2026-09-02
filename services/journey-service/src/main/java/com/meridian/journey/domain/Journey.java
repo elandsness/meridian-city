@@ -59,9 +59,30 @@ public class Journey {
     @Builder.Default
     private String status = "initiated";
 
-    /** 0..1 journey completion, reserved for future visualisation. */
+    /** 0..1 journey completion. Drives the interpolated position below. */
     @Builder.Default
     private double progress = 0.0;
+
+    /**
+     * Optional origin/destination coordinates in the industry config's map viewBox
+     * space (not lat/lng — the same abstract x/y space entity-map background shapes
+     * use). Null when this journey type has no map visualisation (e.g. a loan
+     * application journey). When set, {@link com.meridian.journey.dto.JourneyResponse}
+     * exposes a linearly-interpolated `position` computed from these + progress, so a
+     * generic map component can render a moving sprite without any journey-type-
+     * specific code.
+     */
+    @Column(name = "origin_x")
+    private Double originX;
+
+    @Column(name = "origin_y")
+    private Double originY;
+
+    @Column(name = "dest_x")
+    private Double destX;
+
+    @Column(name = "dest_y")
+    private Double destY;
 
     @Column(name = "scheduled_at")
     private OffsetDateTime scheduledAt;
@@ -79,6 +100,15 @@ public class Journey {
     public static Journey create(String entityType, String name, String relatedId,
                                  String direction, String origin, String destination,
                                  String metadata, String initialStatus) {
+        return create(entityType, name, relatedId, direction, origin, destination,
+                metadata, initialStatus, null, null, null, null);
+    }
+
+    /** Factory with map coordinates — see {@link #originX} for the coordinate space. */
+    public static Journey create(String entityType, String name, String relatedId,
+                                 String direction, String origin, String destination,
+                                 String metadata, String initialStatus,
+                                 Double originX, Double originY, Double destX, Double destY) {
         String shortId = UUID.randomUUID().toString().replace("-", "").substring(0, 5);
         OffsetDateTime now = OffsetDateTime.now();
         return Journey.builder()
@@ -92,6 +122,10 @@ public class Journey {
                 .metadata(metadata)
                 .status(initialStatus)
                 .progress(0.0)
+                .originX(originX)
+                .originY(originY)
+                .destX(destX)
+                .destY(destY)
                 .scheduledAt(now)
                 .createdAt(now)
                 .updatedAt(now)

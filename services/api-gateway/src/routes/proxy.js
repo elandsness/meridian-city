@@ -64,6 +64,12 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      prefix: '/api/v1/journeys',
+      target: config.JOURNEY_SERVICE_URL,
+      serviceName: 'journey-service',
+      requiresAuth: false,
+    },
+    {
       prefix: '/api/v1/passengers',
       target: config.PASSENGER_SERVICE_URL,
       serviceName: 'passenger-service',

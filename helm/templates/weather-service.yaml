@@ -2,77 +2,72 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: meridian-weather-service
+  name: {{ include "meridian.fullname" . }}-weather-service
+  namespace: {{ include "meridian.namespace" . }}
   labels:
-    app: meridian-weather-service
-    component: backend
-    app.kubernetes.io/part-of: meridian
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: weather-service
 spec:
-  replicas: 1
+  replicas: {{ .Values.weatherService.replicaCount }}
   selector:
     matchLabels:
-      app: meridian-weather-service
+      {{- include "meridian.selectorLabels" (dict "component" "weather-service" "context" $) | nindent 6 }}
+      app.kubernetes.io/component: weather-service
   template:
     metadata:
       labels:
-        app: meridian-weather-service
-        component: backend
+        {{- include "meridian.selectorLabels" (dict "component" "weather-service" "context" $) | nindent 8 }}
+        app.kubernetes.io/component: weather-service
       annotations:
         sidecar.istio.io/inject: "false"
     spec:
-      serviceAccountName: meridian-weather-service
       containers:
         - name: weather-service
-          image: {{ .Values.weatherService.image }}
+          image: "{{ .Values.weatherService.image.repository }}:{{ .Values.weatherService.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           ports:
-            - containerPort: 8096
-              name: http
+            - name: http
+              containerPort: 8096
           env:
             - name: PORT
               value: "8096"
+            {{- if .Values.weatherService.env }}
+            {{- range $key, $value := .Values.weatherService.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /api/v1/weather
-              port: 8096
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /api/v1/weather
-              port: 8096
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 15
           resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 200m
-              memory: 256Mi
+            {{- toYaml .Values.weatherService.resources | nindent 12 }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: meridian-weather-service
+  name: {{ include "meridian.fullname" . }}-weather-service
+  namespace: {{ include "meridian.namespace" . }}
   labels:
-    app: meridian-weather-service
-    component: backend
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: weather-service
 spec:
-  type: ClusterIP
+  type: {{ .Values.weatherService.service.type }}
   ports:
-    - port: 8096
-      targetPort: 8096
+    - port: {{ .Values.weatherService.service.port }}
+      targetPort: http
       protocol: TCP
       name: http
   selector:
-    app: meridian-weather-service
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: meridian-weather-service
-  labels:
-    app: meridian-weather-service
+    {{- include "meridian.selectorLabels" (dict "component" "weather-service" "context" $) | nindent 4 }}
+    app.kubernetes.io/component: weather-service
 {{- end }}

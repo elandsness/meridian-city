@@ -1,6 +1,7 @@
 package com.meridian.journey.service;
 
 import com.meridian.journey.config.JourneyGeneratorProperties;
+import com.meridian.journey.config.JourneyLifecycleProperties;
 import com.meridian.journey.domain.Journey;
 import com.meridian.journey.repository.JourneyRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class JourneyGenerator {
 
     private final JourneyRepository journeyRepository;
     private final JourneyGeneratorProperties props;
+    private final JourneyLifecycleProperties lifecycleProps;
 
     @Scheduled(fixedDelay = 5_000, initialDelay = 10_000)
     @Transactional
@@ -40,6 +42,9 @@ public class JourneyGenerator {
         // Generate a new journey
         String entityType = props.getEntityTypes()[ThreadLocalRandom.current().nextInt(props.getEntityTypes().length)];
         Journey journey = createRandomJourney(entityType);
+        // Without this, JourneyLifecycleScheduler's next_transition_at <= now query
+        // never matches a NULL (unknown in SQL) and the journey never advances.
+        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProps.nextDelaySeconds()));
         journeyRepository.save(journey);
 
         log.debug("Generated {} journey id={}", entityType, journey.getId());

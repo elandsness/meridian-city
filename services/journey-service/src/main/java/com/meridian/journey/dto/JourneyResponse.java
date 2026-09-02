@@ -23,7 +23,12 @@ public class JourneyResponse {
     private String origin;
     private String destination;
     private String status;
+    /** Mirrors `status` — lets a generic map/list consumer key off `state` the same
+     * way every other entity type does, without journey-specific code. */
+    private String state;
     private double progress;
+    /** Null unless the journey has map coordinates (see Journey#originX). */
+    private Position position;
     private List<Stage> stages;
     private OffsetDateTime scheduledAt;
     private OffsetDateTime createdAt;
@@ -39,5 +44,14 @@ public class JourneyResponse {
         private double progress;
         private OffsetDateTime enteredAt;
         private OffsetDateTime exitedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Position {
+        private double x;
+        private double y;
     }
 }

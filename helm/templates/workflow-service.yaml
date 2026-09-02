@@ -11,12 +11,12 @@ spec:
   replicas: {{ .Values.workflowService.replicaCount }}
   selector:
     matchLabels:
-      {{- include "meridian.selectorLabels" . | nindent 6 }}
+      {{- include "meridian.selectorLabels" (dict "component" "workflow-service" "context" $) | nindent 6 }}
       app.kubernetes.io/component: workflow-service
   template:
     metadata:
       labels:
-        {{- include "meridian.selectorLabels" . | nindent 8 }}
+        {{- include "meridian.selectorLabels" (dict "component" "workflow-service" "context" $) | nindent 8 }}
         app.kubernetes.io/component: workflow-service
     spec:
       containers:
@@ -79,6 +79,6 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "meridian.selectorLabels" . | nindent 4 }}
+    {{- include "meridian.selectorLabels" (dict "component" "workflow-service" "context" $) | nindent 4 }}
     app.kubernetes.io/component: workflow-service
 {{- end }}

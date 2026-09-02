@@ -955,6 +955,125 @@ transactionService:
   env: {}
 
 # ---------------------------------------------------------------------------
+# Journey Service (Java / Spring Boot)
+# Generic journey service merging flight-ops + passenger-service. Configurable
+# journey stages + position interpolation, used by the moving-map/entity-map
+# style home modules (industry.services.journey.stages).
+# ---------------------------------------------------------------------------
+journeyService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "journey-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8093
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "768Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1536Mi"
+  # Journey lifecycle timing (min-max seconds per stage transition)
+  lifecycle:
+    enabled: true
+    minSeconds: 300
+    maxSeconds: 7200
+  # Journey/passenger generator (active-count targets)
+  generator:
+    enabled: true
+    maxActive: 24
+    passengerMaxActive: 60
+    bagProbability: 0.7
+    entityTypes: ["flight", "passenger"]
+  # Fault injection
+  fault:
+    failuresEnabled: false
+    failureStage: ""
+    failureRate: 0.0
+  env: {}
+
+# ---------------------------------------------------------------------------
+# IoT Service (Go)
+# Consolidates iot-simulator + iot-ingestion + telemetry-processor: configurable
+# device fleet simulation, OTLP ingestion, and anomaly detection.
+# ---------------------------------------------------------------------------
+iotService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "iot-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8086
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  simulator:
+    enabled: true
+    fleet:
+      vehicles:
+        count: 30
+      buildings:
+        count: 15
+      machines:
+        count: 10
+  env: {}
+
+# ---------------------------------------------------------------------------
+# News Ticker Service (Node.js)
+# Configurable headline pools per industry, served over REST for the ticker
+# home module.
+# ---------------------------------------------------------------------------
+newsTickerService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "news-ticker-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8095
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Weather Service (Node.js)
+# Configurable location/units per industry, served over REST for the weather
+# home module.
+# ---------------------------------------------------------------------------
+weatherService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "weather-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8096
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
 # Citizen Service (Java / Spring Boot) — DEPRECATED
 # Manages citizen accounts and service request submission.
 # Replaced by identity-service (generic) + workflow-service (generic).

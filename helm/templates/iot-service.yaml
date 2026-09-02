@@ -2,56 +2,53 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: meridian-iot-service
+  name: {{ include "meridian.fullname" . }}-iot-service
+  namespace: {{ include "meridian.namespace" . }}
   labels:
-    app: meridian-iot-service
-    component: backend
-    app.kubernetes.io/part-of: meridian
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iot-service
 spec:
-  replicas: 1
+  replicas: {{ .Values.iotService.replicaCount }}
   selector:
     matchLabels:
-      app: meridian-iot-service
+      {{- include "meridian.selectorLabels" (dict "component" "iot-service" "context" $) | nindent 6 }}
+      app.kubernetes.io/component: iot-service
   template:
     metadata:
       labels:
-        app: meridian-iot-service
-        component: backend
+        {{- include "meridian.selectorLabels" (dict "component" "iot-service" "context" $) | nindent 8 }}
+        app.kubernetes.io/component: iot-service
       annotations:
         sidecar.istio.io/inject: "false"
-        instrumention.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-java: "false"
     spec:
-      serviceAccountName: meridian-iot-service
+      serviceAccountName: {{ include "meridian.fullname" . }}-iot-service
       containers:
         - name: iot-service
-          image: {{ .Values.iotService.image }}
+          image: "{{ .Values.iotService.image.repository }}:{{ .Values.iotService.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           ports:
-            - containerPort: 4317
-              name: otlp-grpc
-            - containerPort: 4318
-              name: otlp-http
-            - containerPort: 8086
-              name: http
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+            - name: http
+              containerPort: 8086
           env:
             - name: DB_HOST
               value: {{ include "meridian.dbRwService" . }}
             - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: meridian-db-credentials
-                  key: DB_NAME
+              value: meridian
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: meridian-db-credentials
-                  key: DB_USERNAME
+                  name: {{ include "meridian.fullname" . }}-db-credentials
+                  key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: meridian-db-credentials
-                  key: DB_PASSWORD
+                  name: {{ include "meridian.fullname" . }}-db-credentials
+                  key: password
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ include "meridian.kafkaBootstrap" . }}
             - name: SIMULATOR_ENABLED
@@ -62,62 +59,69 @@ spec:
               value: {{ .Values.iotService.simulator.fleet.buildings.count | quote }}
             - name: SIMULATOR_FLEET_MACHINES_COUNT
               value: {{ .Values.iotService.simulator.fleet.machines.count | quote }}
+            {{- if .Values.iotService.env }}
+            {{- range $key, $value := .Values.iotService.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health
-              port: 8086
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
-              port: 8086
+              port: http
             initialDelaySeconds: 20
             periodSeconds: 15
           resources:
-            requests:
-              cpu: 200m
-              memory: 512Mi
-            limits:
-              cpu: 1000m
-              memory: 1Gi
+            {{- toYaml .Values.iotService.resources | nindent 12 }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: meridian-iot-service
+  name: {{ include "meridian.fullname" . }}-iot-service
+  namespace: {{ include "meridian.namespace" . }}
   labels:
-    app: meridian-iot-service
-    component: backend
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iot-service
 spec:
-  type: ClusterIP
+  type: {{ .Values.iotService.service.type }}
   ports:
     - port: 4317
-      targetPort: 4317
+      targetPort: otlp-grpc
       protocol: TCP
       name: otlp-grpc
     - port: 4318
-      targetPort: 4318
+      targetPort: otlp-http
       protocol: TCP
       name: otlp-http
-    - port: 8086
-      targetPort: 8086
+    - port: {{ .Values.iotService.service.port }}
+      targetPort: http
       protocol: TCP
       name: http
   selector:
-    app: meridian-iot-service
+    {{- include "meridian.selectorLabels" (dict "component" "iot-service" "context" $) | nindent 4 }}
+    app.kubernetes.io/component: iot-service
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: meridian-iot-service
+  name: {{ include "meridian.fullname" . }}-iot-service
+  namespace: {{ include "meridian.namespace" . }}
   labels:
-    app: meridian-iot-service
+    {{- include "meridian.labels" . | nindent 4 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: meridian-iot-service
+  name: {{ include "meridian.fullname" . }}-iot-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["configmaps"]
@@ -126,12 +130,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: meridian-iot-service
+  name: {{ include "meridian.fullname" . }}-iot-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: meridian-iot-service
+  name: {{ include "meridian.fullname" . }}-iot-service
 subjects:
   - kind: ServiceAccount
-    name: meridian-iot-service
+    name: {{ include "meridian.fullname" . }}-iot-service
+    namespace: {{ include "meridian.namespace" . }}
 {{- end }}

@@ -57,11 +57,24 @@ management:
 #   env:
 #     JOURNEY_LIFECYCLE_MIN_SECONDS: "10"
 #     JOURNEY_LIFECYCLE_MAX_SECONDS: "120"
+#
+# transitions/progress-map/active-statuses are GLOBAL (not per entity-type) --
+# JourneyLifecycleProperties#getNextStatus takes only a status, not an entity
+# type, so choose status names that don't collide across entity types when
+# overriding this for an industry with multiple journey-backed entity types.
 journey:
   lifecycle:
     enabled: ${JOURNEY_LIFECYCLE_ENABLED:true}
     min-seconds: ${JOURNEY_LIFECYCLE_MIN_SECONDS:300}
     max-seconds: ${JOURNEY_LIFECYCLE_MAX_SECONDS:7200}
+    transitions:
+      initiated: in_progress
+      in_progress: completed
+    progress-map:
+      initiated: 0.0
+      in_progress: 0.5
+      completed: 1.0
+    active-statuses: [initiated, in_progress]
 
 # Journey generator (default: 24 active journeys, 60 active passengers).
 # Override per-instance, e.g.:
@@ -72,6 +85,10 @@ generator:
   max-active: ${JOURNEY_GENERATOR_MAX_ACTIVE:24}
   passenger-max-active: ${PASSENGER_GENERATOR_MAX_ACTIVE:60}
   bag-probability: ${PASSENGER_GENERATOR_BAG_PROBABILITY:0.7}
+  entity-types: [flight, passenger]
+  initial-statuses:
+    flight: initiated
+    passenger: initiated
 
 # Fault injection flags — set by demo-control-api at runtime.
 fault:
