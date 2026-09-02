@@ -149,20 +149,14 @@ industry:
       city-operations: "Grid Operations"
       api-gateway: "Utility API Gateway"
       notification-service: "Customer Notifications"
-      commerce-service: "Utility Retail"
       billing-service: "Billing"
-      demo-control-api: "Demo Control"
     flowLabels:
       service-request: "Service Request Lifecycle"
       account-creation: "Customer Onboarding"
       iot-incident: "Outage Resolution"
-      purchase: "Utility Retail Purchase"
-      tax-payment: "Utility Bill Payment"
-    # Active Business Flows for the utility: drop the city store/tax funnels and add the
-    # two utility hero flows (both defined in provision-dynatrace-business-config.py).
+    # Active Business Flows for the utility (store/tax funnels dropped since
+    # store + billing screens are disabled above).
     flows:
       - service-request
       - account-creation
       - iot-incident
-      - outage-management
-      - meter-reading

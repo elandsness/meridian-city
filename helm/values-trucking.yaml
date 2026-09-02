@@ -176,6 +176,18 @@ industry:
   # journeyService.lifecycle.transitions, which must use the SAME state names.
   entities:
     journey:
+      displayName: "Shipment"
+      displayNamePlural: "Shipments"
+      fields:
+        origin:
+          type: enum
+          values: ["Seattle DC", "Tacoma Hub", "Olympia Depot", "Yakima Depot", "Spokane Terminal", "Bellingham Hub"]
+        destination:
+          type: enum
+          values: ["Seattle DC", "Tacoma Hub", "Olympia Depot", "Yakima Depot", "Spokane Terminal", "Bellingham Hub"]
+        status:
+          type: enum
+          values: [in_progress, completed]
       initial: in_progress
       states:
         in_progress: { label: "En route", tone: blue, glyph: "🚚" }

@@ -21,6 +21,17 @@ import StatusMapPage from '../components/entity/StatusMapPage'
 import OpsOverview from '../components/home/OpsOverview'
 import FlightSummary from '../components/home/FlightSummary'
 
+// Widget templates from the industry-config schema's screenList $defs
+// (docs/industry-config.schema.json) -- keyed by the schema's own `template`
+// enum values, not the legacy homeModules ids above.
+import Ticker from '../components/home/Ticker'
+import Announcements from '../components/home/Announcements'
+import HomeWeatherWidget from '../components/home/WeatherWidget'
+import ClockWidget from '../components/home/ClockWidget'
+import EntitySummaryCard from '../components/home/EntitySummaryCard'
+import EntityKpiRow from '../components/home/EntityKpiRow'
+import ActivityFeed from '../components/home/ActivityFeed'
+
 export const COMPONENT_REGISTRY = {
   // Generic components
   'weather': WeatherWidget,
@@ -37,6 +48,15 @@ export const COMPONENT_REGISTRY = {
   // Home-page components (legacy homeModules keys)
   'ops-overview': OpsOverview,
   'flight-summary': FlightSummary,
+
+  // Schema `template:` widget keys
+  'ticker': Ticker,
+  'announcements': Announcements,
+  'weather-widget': HomeWeatherWidget,
+  'clock-widget': ClockWidget,
+  'entity-summary-card': EntitySummaryCard,
+  'entity-kpi-row': EntityKpiRow,
+  'activity-feed': ActivityFeed,
 }
 
 export default COMPONENT_REGISTRY

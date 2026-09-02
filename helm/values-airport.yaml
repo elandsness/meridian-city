@@ -162,7 +162,7 @@ industry:
           - "Gate B12 Closed for de-icing; passengers redirected to Gate B14"
           - "Meridian Airport named #1 for on-time performance, again"
           - "New direct route: Meridian to Reykjavik, launching June"
-      - { id: weather, label: "Airport Weather", location: "Meridian Airport", units: "fahrenheit" }
+      - { id: weather, template: weather-widget, mode: forecast }
     ops:
       - { id: ops-overview, label: "Overview" }
       - { id: flight-summary, label: "Flight Summary" }

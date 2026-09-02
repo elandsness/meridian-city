@@ -48,8 +48,8 @@ export default function PageComposer({ pageId, config }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {modules.map((module, index) => {
-        // Check both `type` (new format) and `id` (legacy format) keys.
-        const componentKey = module.type || module.id
+        // Check `type`, `template` (the schema's own field name), then `id`.
+        const componentKey = module.type || module.template || module.id
         const Component = componentKey ? COMPONENT_REGISTRY[componentKey] : undefined
 
         if (!Component) {
@@ -64,8 +64,8 @@ export default function PageComposer({ pageId, config }) {
           )
         }
 
-        // Strip layout-only keys before passing to the component.
-        const { type: _type, id: _id, position: _position, ...moduleProps } = module
+        // Strip layout-only/identifier keys before passing to the component.
+        const { type: _type, template: _template, id: _id, position: _position, ...moduleProps } = module
 
         const isFullWidth = module.position === 'full' || module.position === 'sidebar'
 

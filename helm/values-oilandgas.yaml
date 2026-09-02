@@ -101,7 +101,8 @@ industry:
     public:
       - welcome-hero
       - id: news-ticker
-        headlines:
+        template: ticker
+        items:
           - "System operating normally. No active incidents reported."
           - "Scheduled maintenance on Pipeline Route 7 at 2:00 AM."
           - "Safety Drill scheduled for this Friday at all fields."

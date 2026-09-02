@@ -134,6 +134,7 @@ industry:
     parking: "Parking & Transportation"
     suites: "VIP & Suites"
     training-ground: "Training Grounds"
+    facilities: "Facilities Management"
   # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
   # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
   # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
@@ -144,20 +145,14 @@ industry:
       city-operations: "Facility Management"
       api-gateway: "Sports Team API Gateway"
       notification-service: "Fan Notifications"
-      commerce-service: "Team Store"
       billing-service: "Ticketing"
-      demo-control-api: "Demo Control"
     flowLabels:
       service-request: "Facility Request Lifecycle"
       account-creation: "Fan Registration"
       iot-incident: "Stadium Equipment Incident Resolution"
-      purchase: "Team Store Purchase"
-      tax-payment: "Ticket Fee Payment"
-    # Active Business Flows for the sports team: drop the city store/tax funnels and add the
-    # two sports hero flows (both defined in provision-dynatrace-business-config.py).
+    # Active Business Flows for the sports team (store/tax funnels dropped since
+    # store + billing screens are disabled above).
     flows:
       - service-request
       - account-creation
       - iot-incident
-      - game-day-operations
-      - player-performance

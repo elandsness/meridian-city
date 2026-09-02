@@ -1,12 +1,17 @@
 // PageComposer renders a page from the industry config.
 //
-// Two config formats are supported (new format preferred, legacy fallback):
+// Modules resolve a component key from, in order: `type`, `template`, `id`.
+// `template` is the industry-config-schema's own name for this field (see
+// docs/industry-config.schema.json and every values-*.yaml industry overlay,
+// which use `template:` pervasively, e.g. `{ id: fleet-map, template:
+// entity-map, entityType: journey }`) -- checking it here (not just `type`)
+// is what makes those configs actually render instead of showing "Unknown
+// component" for every templated module.
 //
-//   New format:
-//     config.pages[pageId].modules = [
-//       { type: 'weather', position: 'top', location: 'Meridian Airport' },
-//       { type: 'news-ticker', position: 'top', headlines: ['Flight 123 On Time'] },
-//     ]
+//   config.pages[pageId].modules = [
+//     { type: 'weather', position: 'top', location: 'Meridian Airport' },
+//     { id: 'fleet-map', template: 'entity-map', entityType: 'journey' },
+//   ]
 //
 //   Legacy format (config.home.<pageId>):
 //     config.home.public = [
@@ -14,9 +19,9 @@
 //       { id: 'news-ticker', headlines: ['Flight 123 On Time'] },
 //     ]
 //
-// Each module's `type` (new) or `id` (legacy) is looked up in COMPONENT_REGISTRY
-// to get the React component. The module object is spread as props (minus the
-// identifier key and `position`), plus the full `config` for branding/terminology.
+// The resolved key is looked up in COMPONENT_REGISTRY to get the React
+// component. The module object is spread as props (minus the identifier
+// keys and `position`), plus the full `config` for branding/terminology.
 //
 // `position` controls layout:
 //   - 'top' / undefined: standard grid cell (1/2 on md+)
@@ -48,8 +53,8 @@ export default function PageComposer({ pageId, config }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {modules.map((module, index) => {
-        // Check both `type` (new format) and `id` (legacy format) keys.
-        const componentKey = module.type || module.id
+        // Check `type`, `template` (the schema's own field name), then `id`.
+        const componentKey = module.type || module.template || module.id
         const Component = componentKey ? COMPONENT_REGISTRY[componentKey] : undefined
 
         if (!Component) {
@@ -64,8 +69,11 @@ export default function PageComposer({ pageId, config }) {
           )
         }
 
-        // Strip layout-only keys before passing to the component.
-        const { type: _type, id: _id, position: _position, ...moduleProps } = module
+        // Strip layout-only/identifier keys before passing to the component --
+        // `id` is kept when it's the sole identifier (legacy format), but once
+        // `template` is present `id` is the module's own instance name (e.g.
+        // "fleet-map"), not a component key, so it must not leak through as a prop.
+        const { type: _type, template: _template, id: _id, position: _position, ...moduleProps } = module
 
         const isFullWidth = module.position === 'full' || module.position === 'sidebar'
 
