@@ -211,6 +211,16 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      // Journeys (generic moving-map entity type: flights, passengers, trucks,
+      // whatever an industry names it) -> journey-service's own REST shape,
+      // reusing the generic entity-map/entity-list frontend templates as-is.
+      prefix: '/api/v1/entities/journey',
+      target: config.JOURNEY_SERVICE_URL,
+      serviceName: 'journey-service',
+      requiresAuth: false,
+      rewritePrefix: '/api/v1/journeys',
+    },
+    {
       // Customer entity types (citizen, service_request, bill, cart) +
       // admin fault-gates on customer entities → customer-entity-service.
       // Also serves as the entity-engine fallback if Stage 6 is disabled.
