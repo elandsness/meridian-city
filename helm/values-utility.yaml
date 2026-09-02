@@ -1,0 +1,168 @@
+# =============================================================================
+# Meridian Utility — industry config overlay
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy a utility-company-branded
+# instance:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-utility.yaml
+#
+# Only the `industry` block is overridden — it re-skins the EXISTING screens
+# (name, palette, logo, terminology, screen set, AI persona). Utility-matched demo
+# DATA (traffic-bot/seed) and Dynatrace naming/flows are separate follow-on chunks;
+# until those land, the backend still emits city-flavoured data.
+# -----------------------------------------------------------------------------
+industry:
+  version: 1
+  id: utility
+  company:
+    name: "Meridian Utilities"
+    short: "Meridian"
+    tagline: "Powering your world."
+    assistant:
+      name: "Sam"
+      persona: "the Meridian Utilities virtual assistant"
+      supportPhone: "1-555-UTIL-MERID (1-555-884-56374)"
+      systemPrompt: |-
+        You are Sam, the official virtual assistant for Meridian Utilities — a real,
+        essential utility company. Always respond as though Meridian Utilities genuinely
+        exists and you are its assistant. Never say you are a generic AI model or that
+        the utility is fictional, and never break character.
+
+        You help customers with:
+        - Reporting a power outage or water main break.
+        - Checking service status and estimated restoration times.
+        - Scheduling a service appointment (installation, maintenance).
+        - Reporting a safety concern (downed power line, gas leak).
+        - Checking the status of a submitted request (by request ID, e.g. req-00123).
+
+        If a customer needs to reach a person, give the Meridian Utilities help line:
+        1-555-UTIL-MERID (1-555-884-56374), available 24/7 for emergencies, or direct
+        them to file a request in the app.
+
+        Be calm, professional, and safety-focused. Acknowledge the customer's concern
+        before providing information. If a request ID is mentioned, use the context below
+        to give a specific update.
+  theme:
+    colors:
+      brand: "#059669"
+      brandDeep: "#047857"
+      brandSoft: "#10B981"
+      brandTint: "#ECFDF5"
+      accent: "#F97316"
+      accentSoft: "#FB923C"
+      accentInk: "#431407"
+    logo: "/meridian-utilities-logo.svg"
+    favicon: "/meridian-utilities-logo.svg"
+  terminology:
+    customer: "Customer"
+    customerPlural: "Customers"
+    request: "Service request"
+    requestPlural: "Service requests"
+    incident: "Outage"
+    incidentPlural: "Outages"
+    workOrder: "Work order"
+    asset: "Utility infrastructure"
+    assetPlural: "Utility infrastructure"
+  screens:
+    # store + billing intentionally omitted -> disabled for the utility
+    public:
+      - home
+      - { id: my-journey, label: "My Service" }
+      - { id: service-requests, label: "Service requests" }
+      - messages
+    ops:
+      - overview
+      - { id: outage-map, label: "Outage Map" }
+      - { id: grid, label: "Grid Status" }
+      - { id: requests, label: "Service queue" }
+      - { id: iot, label: "Smart meters" }
+      - { id: incidents, label: "Outages" }
+      - { id: analytics, label: "Reliability" }
+      - demo-control
+  # Home-page modules for the customer portal: outage map, grid status, service tracker.
+  home:
+    public:
+      - outage-map
+      - grid-status
+      - my-service
+      - quick-actions
+    ops:
+      - outage-summary
+      - ops-overview
+  # Backend-only demo data + dispatch routing (delivered to traffic-bot +
+  # service-dispatch via env; never sent to the browser config.json).
+  data:
+    zones:
+      - generation
+      - transmission
+      - distribution
+      - customer-service
+      - field-operations
+      - metering
+      - billing
+      - emergency
+    requestTemplates:
+      - { category: generation,    title: "Generator 3 vibration alarm",                  description: "Generator 3 at the power plant is reporting a vibration alarm and may need shutdown." }
+      - { category: generation,    title: "Transformer oil temperature high",              description: "The main transformer at the substation is reporting high oil temperature and may trip." }
+      - { category: transmission,  title: "Power line fault on Transmission Line 5",       description: "A fault has been detected on Transmission Line 5 and protective relays have tripped." }
+      - { category: transmission,  title: "Substation communications lost",                description: "Communications with Substation North have been lost and SCADA data is no longer available." }
+      - { category: distribution,  title: "Distribution transformer fault",                description: "A distribution transformer on Elm Street has failed and is causing a localized outage." }
+      - { category: distribution,  title: "Underground cable fault",                       description: "An underground cable fault has been detected in the downtown distribution network." }
+      - { category: customer-service, title: "Customer call center system down",          description: "The customer call center system is down and agents cannot take calls." }
+      - { category: customer-service, title: "Self-service portal not responding",        description: "The self-service customer portal is not responding and customers cannot log in." }
+      - { category: field-operations, title: "Crew vehicle GPS tracker offline",          description: "The GPS tracker in Crew Vehicle 7 is offline and dispatch cannot track its location." }
+      - { category: field-operations, title: "Work order system not syncing",             description: "The field work order system is not syncing with the central database and crews cannot update job status." }
+      - { category: metering,      title: "Smart meter cluster not reporting",             description: "A cluster of 50 smart meters in the Oakwood neighborhood is not reporting usage data." }
+      - { category: metering,      title: "Meter reading gateway fault",                   description: "The meter reading gateway at the distribution center is reporting a fault and not collecting data." }
+      - { category: billing,       title: "Billing system calculation error",              description: "The billing system is calculating incorrect charges for a batch of customers." }
+      - { category: billing,       title: "Payment processing system down",                description: "The payment processing system is down and customers cannot pay their bills online." }
+      - { category: emergency,     title: "Gas leak reported in downtown",                 description: "A gas leak has been reported in the downtown area and emergency crews are being dispatched." }
+      - { category: emergency,     title: "Downed power line on Main Street",              description: "A downed power line has been reported on Main Street and the area is being secured." }
+    chatQuestions:
+      - "Is there a power outage in my area?"
+      - "When will power be restored?"
+      - "How do I report a gas leak?"
+      - "Where is the nearest emergency shelter?"
+      - "How do I sign up for alert notifications?"
+      - "How do I check my bill?"
+      - "How do I set up automatic payments?"
+      - "Where is the nearest customer service center?"
+      - "How do I report a downed power line?"
+      - "How do I apply for low-income assistance?"
+      - "How do I sign up for renewable energy?"
+      - "How do I check my usage history?"
+  routing:
+    generation: "Generation"
+    transmission: "Transmission"
+    distribution: "Distribution"
+    customer-service: "Customer Service"
+    field-operations: "Field Operations"
+    metering: "Metering & Data"
+    billing: "Billing & Payments"
+    emergency: "Emergency Response"
+  # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
+  # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
+  # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
+  dynatrace:
+    serviceNames:
+      citizen-service: "Customer Services"
+      service-dispatch: "Field Operations"
+      city-operations: "Grid Operations"
+      api-gateway: "Utility API Gateway"
+      notification-service: "Customer Notifications"
+      commerce-service: "Utility Retail"
+      billing-service: "Billing"
+      demo-control-api: "Demo Control"
+    flowLabels:
+      service-request: "Service Request Lifecycle"
+      account-creation: "Customer Onboarding"
+      iot-incident: "Outage Resolution"
+      purchase: "Utility Retail Purchase"
+      tax-payment: "Utility Bill Payment"
+    # Active Business Flows for the utility: drop the city store/tax funnels and add the
+    # two utility hero flows (both defined in provision-dynatrace-business-config.py).
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - outage-management
+      - meter-reading

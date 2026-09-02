@@ -1,0 +1,78 @@
+{{- if .Values.weatherService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meridian-weather-service
+  labels:
+    app: meridian-weather-service
+    component: backend
+    app.kubernetes.io/part-of: meridian
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meridian-weather-service
+  template:
+    metadata:
+      labels:
+        app: meridian-weather-service
+        component: backend
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: meridian-weather-service
+      containers:
+        - name: weather-service
+          image: {{ .Values.weatherService.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: 8096
+              name: http
+          env:
+            - name: PORT
+              value: "8096"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/weather
+              port: 8096
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/weather
+              port: 8096
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meridian-weather-service
+  labels:
+    app: meridian-weather-service
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8096
+      targetPort: 8096
+      protocol: TCP
+      name: http
+  selector:
+    app: meridian-weather-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: meridian-weather-service
+  labels:
+    app: meridian-weather-service
+{{- end }}

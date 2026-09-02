@@ -1,0 +1,80 @@
+{{- if .Values.newsTickerService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meridian-news-ticker-service
+  labels:
+    app: meridian-news-ticker-service
+    component: backend
+    app.kubernetes.io/part-of: meridian
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meridian-news-ticker-service
+  template:
+    metadata:
+      labels:
+        app: meridian-news-ticker-service
+        component: backend
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: meridian-news-ticker-service
+      containers:
+        - name: news-ticker-service
+          image: {{ .Values.newsTickerService.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: 8095
+              name: http
+          env:
+            - name: PORT
+              value: "8095"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "meridian.kafkaBootstrap" . }}
+          readinessProbe:
+            httpGet:
+              path: /api/v1/news
+              port: 8095
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/news
+              port: 8095
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meridian-news-ticker-service
+  labels:
+    app: meridian-news-ticker-service
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8095
+      targetPort: 8095
+      protocol: TCP
+      name: http
+  selector:
+    app: meridian-news-ticker-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: meridian-news-ticker-service
+  labels:
+    app: meridian-news-ticker-service
+{{- end }}

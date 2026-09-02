@@ -1,0 +1,163 @@
+# =============================================================================
+# Meridian Sports Team — industry config overlay
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy a sports-team-branded
+# instance:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-sports.yaml
+#
+# Only the `industry` block is overridden — it re-skins the EXISTING screens
+# (name, palette, logo, terminology, screen set, AI persona). Sports-matched demo
+# DATA (traffic-bot/seed) and Dynatrace naming/flows are separate follow-on chunks;
+# until those land, the backend still emits city-flavoured data.
+# -----------------------------------------------------------------------------
+industry:
+  version: 1
+  id: sports
+  company:
+    name: "Meridian Stars"
+    short: "Meridian"
+    tagline: "Where champions are made."
+    assistant:
+      name: "Coach"
+      persona: "the Meridian Stars virtual assistant"
+      supportPhone: "1-555-STAR-MERID (1-555-782-76374)"
+      systemPrompt: |-
+        You are Coach, the official virtual assistant for the Meridian Stars — a real,
+        professional sports team. Always respond as though the Meridian Stars genuinely
+        exist and you are their assistant. Never say you are a generic AI model or that
+        the team is fictional, and never break character.
+
+        You help fans with:
+        - Game schedules and ticket information.
+        - Stadium facilities: parking, concessions, restrooms.
+        - Reporting an issue at the stadium (spills, broken seats, long lines).
+        - Checking the status of a submitted request (by request ID, e.g. req-00123).
+
+        If a fan needs to reach a person, give the Meridian Stars help line:
+        1-555-STAR-MERID (1-555-782-76374), available 24/7, or direct them to file a
+        request in the app.
+
+        Be enthusiastic, energetic, and fan-focused. Acknowledge the fan's excitement or
+        concern before providing information. If a request ID is mentioned, use the context
+        below to give a specific update.
+  theme:
+    colors:
+      brand: "#DC2626"
+      brandDeep: "#991B1B"
+      brandSoft: "#EF4444"
+      brandTint: "#FEF2F2"
+      accent: "#F59E0B"
+      accentSoft: "#FCD34D"
+      accentInk: "#451A03"
+    logo: "/meridian-stars-logo.svg"
+    favicon: "/meridian-stars-logo.svg"
+  terminology:
+    customer: "Fan"
+    customerPlural: "Fans"
+    request: "Stadium request"
+    requestPlural: "Stadium requests"
+    incident: "Facility incident"
+    incidentPlural: "Facility incidents"
+    workOrder: "Work order"
+    asset: "Stadium equipment"
+    assetPlural: "Stadium equipment"
+  screens:
+    # store + billing intentionally omitted -> disabled for the sports team
+    public:
+      - home
+      - { id: my-journey, label: "My Game Day" }
+      - { id: service-requests, label: "Stadium requests" }
+      - messages
+    ops:
+      - overview
+      - { id: game-board, label: "Game Day Board" }
+      - { id: stadium, label: "Stadium" }
+      - { id: requests, label: "Facility queue" }
+      - { id: iot, label: "Stadium sensors" }
+      - { id: incidents, label: "Facility incidents" }
+      - { id: analytics, label: "Game analytics" }
+      - demo-control
+  # Home-page modules for the fan portal: game schedule, stadium map, game day tracker.
+  home:
+    public:
+      - game-schedule
+      - stadium-map
+      - my-game-day
+      - quick-actions
+    ops:
+      - game-summary
+      - ops-overview
+  # Backend-only demo data + dispatch routing (delivered to traffic-bot +
+  # service-dispatch via env; never sent to the browser config.json).
+  data:
+    zones:
+      - stadium
+      - locker-room
+      - training-facility
+      - media-center
+      - concessions
+      - parking
+      - suites
+      - training-ground
+    requestTemplates:
+      - { category: stadium,        title: "Scoreboard display malfunction",               description: "The main scoreboard display is flickering and not showing game time correctly." }
+      - { category: stadium,        title: "Concourse B vendor cart stuck",                description: "The vendor cart in Concourse B is stuck and not moving to the next location." }
+      - { category: stadium,        title: "Restroom floor flooded near Section 100",       description: "The restroom floor near Section 100 is flooded and fans are slipping." }
+      - { category: stadium,        title: "VIP suite HVAC not working",                   description: "The HVAC in VIP Suite 5 is not cooling and the suite is too warm for guests." }
+      - { category: locker-room,    title: "Locker room shower head broken",               description: "The shower head in the home locker room is broken and spraying water everywhere." }
+      - { category: training-facility, title: "Turf irrigation system fault",              description: "The turf irrigation system at the training facility is not watering and the turf is drying out." }
+      - { category: media-center,   title: "Press conference microphone not working",      description: "The microphone in the press conference room is not working and the press cannot hear the coach." }
+      - { category: concessions,    title: "Popcorn machine at Gate A broken",             description: "The popcorn machine at Gate A is broken and not popping popcorn." }
+      - { category: parking,        title: "Parking structure P1 gate arm stuck",          description: "The exit gate arm in parking structure P1 is stuck down and blocking cars." }
+      - { category: suites,         title: "Suite seating cushion torn",                   description: "The seating cushion in Suite 3 is torn and needs to be replaced." }
+      - { category: facilities,     title: "Stadium Wi-Fi access point down",              description: "The Wi-Fi access point in Section 200 is down and fans cannot connect to the network." }
+      - { category: facilities,     title: "Jumbotron screen pixel failure",               description: "The Jumbotron has a cluster of dead pixels in the center and is not displaying video correctly." }
+    chatQuestions:
+      - "Where is the nearest restroom?"
+      - "How do I get to my seat?"
+      - "Where can I park?"
+      - "What time does the game start?"
+      - "Where is the nearest concession stand?"
+      - "How do I get to the locker room tour?"
+      - "Where is the fan shop?"
+      - "How do I report a lost item?"
+      - "Where is the nearest ATM?"
+      - "How do I get to the VIP suites?"
+      - "Where is the media center?"
+      - "How do I get to the training facility?"
+  routing:
+    stadium: "Stadium Operations"
+    locker-room: "Locker Room Services"
+    training-facility: "Training Facility"
+    media-center: "Media & Communications"
+    concessions: "Concessions & Retail"
+    parking: "Parking & Transportation"
+    suites: "VIP & Suites"
+    training-ground: "Training Grounds"
+  # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
+  # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
+  # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
+  dynatrace:
+    serviceNames:
+      citizen-service: "Fan Services"
+      service-dispatch: "Game Day Operations"
+      city-operations: "Facility Management"
+      api-gateway: "Sports Team API Gateway"
+      notification-service: "Fan Notifications"
+      commerce-service: "Team Store"
+      billing-service: "Ticketing"
+      demo-control-api: "Demo Control"
+    flowLabels:
+      service-request: "Facility Request Lifecycle"
+      account-creation: "Fan Registration"
+      iot-incident: "Stadium Equipment Incident Resolution"
+      purchase: "Team Store Purchase"
+      tax-payment: "Ticket Fee Payment"
+    # Active Business Flows for the sports team: drop the city store/tax funnels and add the
+    # two sports hero flows (both defined in provision-dynatrace-business-config.py).
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - game-day-operations
+      - player-performance
