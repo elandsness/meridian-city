@@ -988,6 +988,14 @@ journeyService:
     passengerMaxActive: 60
     bagProbability: 0.7
     entityTypes: ["flight", "passenger"]
+    initialStatuses:
+      flight: "initiated"
+      passenger: "initiated"
+    # Named routes with map coordinates for entity types other than flight/
+    # passenger (e.g. "truck") -- see JourneyGeneratorProperties.RouteConfig.
+    # Empty by default; an industry overlay supplies its own to get a moving
+    # map purely through config.
+    routes: []
   # Fault injection
   fault:
     failuresEnabled: false

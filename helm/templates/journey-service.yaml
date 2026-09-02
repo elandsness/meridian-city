@@ -54,6 +54,13 @@ spec:
               value: {{ .Values.journeyService.generator.passengerMaxActive | quote }}
             - name: PASSENGER_GENERATOR_BAG_PROBABILITY
               value: {{ .Values.journeyService.generator.bagProbability | quote }}
+            # entityTypes/routes/initialStatuses are lists/maps that plain env vars
+            # can't express -- Spring Boot merges SPRING_APPLICATION_JSON into the
+            # environment at top precedence, overriding application.yml's defaults.
+            # This is how an industry config gives journey-service a moving map
+            # (routes with coordinates) purely through Helm values, no code change.
+            - name: SPRING_APPLICATION_JSON
+              value: {{ dict "generator" (dict "entityTypes" .Values.journeyService.generator.entityTypes "routes" .Values.journeyService.generator.routes "initialStatuses" .Values.journeyService.generator.initialStatuses) | toJson | quote }}
             {{- if .Values.journeyService.env }}
             {{- range $key, $value := .Values.journeyService.env }}
             - name: {{ $key }}

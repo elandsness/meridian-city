@@ -1,0 +1,228 @@
+# =============================================================================
+# Meridian Freight — industry config overlay (trucking/logistics)
+# =============================================================================
+# Layer this over the base chart + your secrets to deploy a freight-carrier-
+# branded instance:
+#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-trucking.yaml
+#
+# The moving map (industry.home.public's fleet-map module + ops screens.ops's
+# fleet-map screen) is backed by journey-service's generic journey entity type,
+# generating synthetic "truck" journeys along the routes defined in the
+# top-level journeyService.generator block below (outside industry: — see
+# that block's own comment for why).
+# -----------------------------------------------------------------------------
+industry:
+  version: 1
+  id: trucking
+  company:
+    name: "Meridian Freight"
+    short: "Meridian"
+    tagline: "On time, every mile."
+    assistant:
+      name: "Dispatch"
+      persona: "the Meridian Freight virtual assistant"
+      supportPhone: "1-555-MFREIGHT (1-555-637-3444)"
+      systemPrompt: |-
+        You are Dispatch, the official virtual assistant for Meridian Freight — a real,
+        regional trucking and logistics carrier. Always respond as though Meridian
+        Freight genuinely exists and you are its assistant. Never say you are a generic
+        AI model or that the carrier is fictional, and never break character.
+
+        You help customers with:
+        - Tracking a shipment or delivery status.
+        - Reporting a delivery issue (damaged cargo, missed pickup, delay).
+        - Checking or paying an outstanding freight invoice.
+        - Scheduling a new pickup.
+
+        If a customer needs to reach a person, give the Meridian Freight help line:
+        1-555-MFREIGHT (1-555-637-3444), available 24/7, or direct them to file a
+        request in the app.
+
+        Be concise, professional, and direct. Acknowledge the customer's concern before
+        providing information. If a shipment or request ID is mentioned, use the context
+        below to give a specific update.
+  theme:
+    colors:
+      brand: "#B45309"
+      brandDeep: "#78350F"
+      brandSoft: "#D97706"
+      brandTint: "#FEF3E2"
+      accent: "#1E293B"
+      accentSoft: "#334155"
+      accentInk: "#F1F5F9"
+    logo: ""
+    favicon: ""
+  terminology:
+    customer: "Shipper"
+    customerPlural: "Shippers"
+    request: "Delivery issue"
+    requestPlural: "Delivery issues"
+    incident: "Service disruption"
+    incidentPlural: "Service disruptions"
+    workOrder: "Dispatch task"
+    asset: "Truck"
+    assetPlural: "Trucks"
+    requestCategories: [damaged-cargo, delivery-delay, missed-pickup, driver-issue, billing-question, other]
+  screens:
+    public:
+      - home
+      - { id: service-requests, label: "Delivery issues" }
+      - { id: billing, label: "Pay invoices" }
+      - messages
+    ops:
+      - overview
+      - id: fleet-map
+        template: entity-map
+        entityType: journey
+        label: "Fleet Map"
+        icon: "🚚"
+        viewBox: "0 0 1000 600"
+        labelField: destination
+        background:
+          kind: shapes
+          shapes:
+            # State boundary placeholder (schematic, not a literal WA outline)
+            - { type: rect, x: 40, "y": 30, width: 920, height: 540, fill: "#0f172a", stroke: "#334155", "stroke-width": 2, rx: 12 }
+            - { type: text, x: 500, "y": 60, text: "WASHINGTON STATE — FLEET NETWORK", fill: "#64748b", "font-size": 13, "text-anchor": middle }
+            # Stops
+            - { type: circle, cx: 180, cy: 90, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 180, "y": 75, text: "Bellingham Hub", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+            - { type: circle, cx: 180, cy: 200, r: 8, fill: "#fbbf24" }
+            - { type: text, x: 180, "y": 185, text: "Seattle DC", fill: "#e2e8f0", "font-size": 13, "font-weight": bold, "text-anchor": middle }
+            - { type: circle, cx: 210, cy: 290, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 250, "y": 290, text: "Tacoma Hub", fill: "#cbd5e1", "font-size": 12 }
+            - { type: circle, cx: 190, cy: 400, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 230, "y": 400, text: "Olympia Depot", fill: "#cbd5e1", "font-size": 12 }
+            - { type: circle, cx: 520, cy: 420, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 520, "y": 445, text: "Yakima Depot", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+            - { type: circle, cx: 830, cy: 180, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 830, "y": 160, text: "Spokane Terminal", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+      - { id: requests, label: "Dispatch queue" }
+      - { id: incidents, label: "Service disruptions" }
+      - { id: analytics, label: "On-time performance" }
+      - demo-control
+  # Home-page modules for the shipper portal: fleet map, quick actions, freight
+  # news ticker.
+  home:
+    public:
+      - id: fleet-map
+        template: entity-map
+        entityType: journey
+        viewBox: "0 0 1000 600"
+        labelField: destination
+        background:
+          kind: shapes
+          shapes:
+            - { type: rect, x: 40, "y": 30, width: 920, height: 540, fill: "#0f172a", stroke: "#334155", "stroke-width": 2, rx: 12 }
+            - { type: circle, cx: 180, cy: 90, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 180, "y": 75, text: "Bellingham Hub", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+            - { type: circle, cx: 180, cy: 200, r: 8, fill: "#fbbf24" }
+            - { type: text, x: 180, "y": 185, text: "Seattle DC", fill: "#e2e8f0", "font-size": 13, "font-weight": bold, "text-anchor": middle }
+            - { type: circle, cx: 210, cy: 290, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 250, "y": 290, text: "Tacoma Hub", fill: "#cbd5e1", "font-size": 12 }
+            - { type: circle, cx: 190, cy: 400, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 230, "y": 400, text: "Olympia Depot", fill: "#cbd5e1", "font-size": 12 }
+            - { type: circle, cx: 520, cy: 420, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 520, "y": 445, text: "Yakima Depot", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+            - { type: circle, cx: 830, cy: 180, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 830, "y": 160, text: "Spokane Terminal", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+      - quick-actions
+      - id: freight-news
+        template: ticker
+        label: "📦 FREIGHT UPDATES"
+        items:
+          - "I-5 corridor running on schedule — no delays reported"
+          - "New route added: Seattle DC to Spokane Terminal, daily service"
+          - "Winter weather advisory: Snoqualmie Pass may affect Yakima routes"
+          - "Meridian Freight adds 12 trucks to Puget Sound fleet"
+          - "Fuel surcharge adjusted for Q3 — see your invoice for details"
+    ops:
+      - ops-overview
+  # Backend-only demo data + dispatch routing (delivered to traffic-bot +
+  # workflow-service via env; never sent to the browser config.json).
+  data:
+    zones:
+      - seattle-dc
+      - tacoma-hub
+      - olympia-depot
+      - yakima-depot
+      - spokane-terminal
+      - bellingham-hub
+    requestTemplates:
+      - { category: damaged-cargo,   title: "Pallet damaged in transit",           description: "Shipment arrived with a crushed pallet; customer is requesting a damage claim." }
+      - { category: damaged-cargo,   title: "Temperature-sensitive load compromised", description: "Refrigerated trailer lost power during transit; contents may be spoiled." }
+      - { category: delivery-delay,  title: "Delivery running 6+ hours behind",     description: "Driver reports I-90 closure near Spokane; delivery ETA pushed to tomorrow." }
+      - { category: delivery-delay,  title: "Missed delivery window",               description: "Customer's dock was unavailable at scheduled time; redelivery needed." }
+      - { category: missed-pickup,   title: "Pickup not completed at Tacoma Hub",   description: "Scheduled pickup was skipped; shipper is asking for same-day rescue pickup." }
+      - { category: driver-issue,    title: "Driver reported unsafe loading dock",  description: "Driver flagged a loading dock at Yakima Depot with a broken safety rail." }
+      - { category: billing-question, title: "Invoice discrepancy on fuel surcharge", description: "Customer disputes the fuel surcharge line item on their latest invoice." }
+    chatQuestions:
+      - "Where is my shipment right now?"
+      - "How do I report damaged cargo?"
+      - "How do I pay my freight invoice?"
+      - "Can I schedule a new pickup?"
+      - "What's your on-time delivery rate?"
+      - "How do I dispute a billing charge?"
+  routing:
+    damaged-cargo: "Claims & Damage Resolution"
+    delivery-delay: "Dispatch Operations"
+    missed-pickup: "Dispatch Operations"
+    driver-issue: "Safety & Fleet Compliance"
+    billing-question: "Billing & Accounts"
+    other: "General Support"
+  # Frontend-only visual metadata for the entity-map/entity-list templates --
+  # state -> glyph/tone/terminal. Purely declarative (see entityConfig.js);
+  # journey-service's own state machine is configured separately below via
+  # journeyService.lifecycle.transitions, which must use the SAME state names.
+  entities:
+    journey:
+      initial: in_progress
+      states:
+        in_progress: { label: "En route", tone: blue, glyph: "🚚" }
+        completed: { label: "Delivered", tone: green, glyph: "✅", terminal: true }
+      transitions:
+        - { from: in_progress, to: completed }
+  # Dynatrace reskin (Path A): rename the service map and Business Flow titles.
+  dynatrace:
+    serviceNames:
+      citizen-service: "Shipper Portal"
+      service-dispatch: "Dispatch Operations"
+      city-operations: "Fleet Operations"
+      api-gateway: "Freight API Gateway"
+      notification-service: "Shipper Notifications"
+      billing-service: "Freight Billing"
+    flowLabels:
+      service-request: "Delivery Issue Resolution"
+      account-creation: "Shipper Account Setup"
+      iot-incident: "Fleet Incident Resolution"
+      tax-payment: "Freight Invoice Payment"
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - tax-payment
+
+# -----------------------------------------------------------------------------
+# journey-service generator overrides — TOP-LEVEL (outside industry:), same as
+# the customerEntityService/opsEntityService pattern: this configures the
+# actual backend simulation, not just frontend labels. Generates "truck"
+# journeys along the routes below instead of the default flight/passenger.
+# Lifecycle timing is shortened from the default 5min-2hr band so movement is
+# visible within a normal demo session.
+# -----------------------------------------------------------------------------
+journeyService:
+  lifecycle:
+    minSeconds: 20
+    maxSeconds: 60
+  generator:
+    maxActive: 10
+    entityTypes: ["truck"]
+    initialStatuses:
+      truck: "in_progress"
+    routes:
+      - { origin: "Seattle DC", destination: "Tacoma Hub", originX: 180, originY: 200, destX: 210, destY: 290 }
+      - { origin: "Tacoma Hub", destination: "Olympia Depot", originX: 210, originY: 290, destX: 190, destY: 400 }
+      - { origin: "Seattle DC", destination: "Spokane Terminal", originX: 180, originY: 200, destX: 830, destY: 180 }
+      - { origin: "Spokane Terminal", destination: "Yakima Depot", originX: 830, originY: 180, destX: 520, destY: 420 }
+      - { origin: "Yakima Depot", destination: "Olympia Depot", originX: 520, originY: 420, destX: 190, destY: 400 }
+      - { origin: "Seattle DC", destination: "Bellingham Hub", originX: 180, originY: 200, destX: 180, destY: 90 }

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -75,17 +76,22 @@ public class JourneyGenerator {
                     String.format("{\"hasBag\":%s}", ThreadLocalRandom.current().nextDouble() < props.getBagProbability()),
                     initialStatus
             );
-            default -> Journey.create(
-                    entityType,
-                    entityType + "-" + ThreadLocalRandom.current().nextInt(10000),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    initialStatus
-            );
+            default -> createFromRoute(entityType, initialStatus);
         };
+    }
+
+    /** Any entity type not hardcoded above (e.g. "truck") — picks a random
+     * configured route so the map has something to show. No routes configured
+     * -> same as before (no coordinates, renders in lists but not on a map). */
+    private Journey createFromRoute(String entityType, String initialStatus) {
+        String name = entityType + "-" + ThreadLocalRandom.current().nextInt(10000);
+        List<JourneyGeneratorProperties.RouteConfig> routes = props.getRoutes();
+        if (routes == null || routes.isEmpty()) {
+            return Journey.create(entityType, name, null, null, null, null, null, initialStatus);
+        }
+        JourneyGeneratorProperties.RouteConfig route = routes.get(ThreadLocalRandom.current().nextInt(routes.size()));
+        return Journey.create(entityType, name, null, null, route.getOrigin(), route.getDestination(), null,
+                initialStatus, route.getOriginX(), route.getOriginY(), route.getDestX(), route.getDestY());
     }
 
     private String randomAirport() {
