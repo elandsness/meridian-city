@@ -1,0 +1,137 @@
+{{- if .Values.iotService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meridian-iot-service
+  labels:
+    app: meridian-iot-service
+    component: backend
+    app.kubernetes.io/part-of: meridian
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meridian-iot-service
+  template:
+    metadata:
+      labels:
+        app: meridian-iot-service
+        component: backend
+      annotations:
+        sidecar.istio.io/inject: "false"
+        instrumention.opentelemetry.io/inject-java: "false"
+    spec:
+      serviceAccountName: meridian-iot-service
+      containers:
+        - name: iot-service
+          image: {{ .Values.iotService.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+            - containerPort: 8086
+              name: http
+          env:
+            - name: DB_HOST
+              value: {{ include "meridian.dbRwService" . }}
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-db-credentials
+                  key: DB_NAME
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-db-credentials
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: meridian-db-credentials
+                  key: DB_PASSWORD
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "meridian.kafkaBootstrap" . }}
+            - name: SIMULATOR_ENABLED
+              value: {{ .Values.iotService.simulator.enabled | quote }}
+            - name: SIMULATOR_FLEET_VEHICLES_COUNT
+              value: {{ .Values.iotService.simulator.fleet.vehicles.count | quote }}
+            - name: SIMULATOR_FLEET_BUILDINGS_COUNT
+              value: {{ .Values.iotService.simulator.fleet.buildings.count | quote }}
+            - name: SIMULATOR_FLEET_MACHINES_COUNT
+              value: {{ .Values.iotService.simulator.fleet.machines.count | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8086
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8086
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meridian-iot-service
+  labels:
+    app: meridian-iot-service
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4317
+      targetPort: 4317
+      protocol: TCP
+      name: otlp-grpc
+    - port: 4318
+      targetPort: 4318
+      protocol: TCP
+      name: otlp-http
+    - port: 8086
+      targetPort: 8086
+      protocol: TCP
+      name: http
+  selector:
+    app: meridian-iot-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: meridian-iot-service
+  labels:
+    app: meridian-iot-service
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: meridian-iot-service
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: meridian-iot-service
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: meridian-iot-service
+subjects:
+  - kind: ServiceAccount
+    name: meridian-iot-service
+{{- end }}

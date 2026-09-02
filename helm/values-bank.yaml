@@ -1,7 +1,8 @@
 # =============================================================================
 # Meridian Bank — industry config overlay
 # =============================================================================
-# Layer this over the base chart + your secrets to deploy a bank-branded instance:
+# Layer this over the base chart + your secrets to deploy a bank-branded
+# instance:
 #   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-bank.yaml
 #
 # Only the `industry` block is overridden — it re-skins the EXISTING screens
@@ -17,133 +18,147 @@ industry:
     short: "Meridian"
     tagline: "Your financial partner."
     assistant:
-      name: "Maris"
+      name: "Alex"
       persona: "the Meridian Bank virtual assistant"
-      supportPhone: "1-800-MERIDIAN (1-800-637-4342)"
+      supportPhone: "1-555-BANK-MERID (1-555-226-56374)"
       systemPrompt: |-
-        You are Maris, the official virtual assistant for Meridian Bank — a real,
-        full-service regional bank. Always respond as though Meridian Bank genuinely
-        exists and you are its assistant. Never say you are a generic AI model or that
-        the bank is fictional, and never break character.
+        You are Alex, the official virtual assistant for Meridian Bank — a real,
+        full-service bank. Always respond as though Meridian Bank genuinely exists
+        and you are its assistant. Never say you are a generic AI model or that the
+        bank is fictional, and never break character.
 
-        You help clients with:
-        - Account inquiries: balances, recent transactions, account types.
-        - Service requests: fraud alerts, payment holds, account updates.
-        - Checking the status of a submitted request (by request ID, e.g. req-00123).
-        - Locating the nearest branch or ATM.
+        You help customers with:
+        - Checking account balances and recent transactions.
+        - Scheduling appointments with bankers or financial advisors.
+        - Reporting a lost or stolen card.
+        - Checking the status of a loan or application.
+        - Filing a complaint or service request.
 
-        If a client needs to reach a person, give the Meridian Bank help line:
-        1-800-MERIDIAN (1-800-637-4342), available 24/7, or direct them to file a
-        request in the Meridian Bank app.
+        If a customer needs to reach a person, give the Meridian Bank help line:
+        1-555-BANK-MERID (1-555-226-56374), available 24/7, or direct them to file a
+        request in the app.
 
-        Be concise, warm, and professional. Acknowledge the client's concern before
-        providing information. If a request ID is mentioned, use the context below to
+        Be professional, clear, and secure. Acknowledge the customer's concern before
+        providing information. If a reference number is mentioned, use the context below to
         give a specific update.
   theme:
     colors:
-      brand: "#1E3A8A"
-      brandDeep: "#172554"
+      brand: "#1E40AF"
+      brandDeep: "#1E3A8A"
       brandSoft: "#3B82F6"
-      brandTint: "#DBEAFE"
+      brandTint: "#EFF6FF"
       accent: "#10B981"
       accentSoft: "#34D399"
-      accentInk: "#064E3B"
+      accentInk: "#022C22"
     logo: "/meridian-bank-logo.svg"
     favicon: "/meridian-bank-logo.svg"
   terminology:
-    customer: "Client"
-    customerPlural: "Clients"
+    customer: "Customer"
+    customerPlural: "Customers"
     request: "Service request"
     requestPlural: "Service requests"
-    incident: "Fraud alert"
-    incidentPlural: "Fraud alerts"
-    workOrder: "Audit task"
-    asset: "Account"
-    assetPlural: "Accounts"
+    incident: "Security incident"
+    incidentPlural: "Security incidents"
+    workOrder: "Work order"
+    asset: "Branch equipment"
+    assetPlural: "Branch equipment"
   screens:
+    # store + billing intentionally omitted -> disabled for the bank
     public:
       - home
-      - { id: accounts, label: "Accounts" }
-      - { id: transactions, label: "Transactions" }
-      - { id: service-requests, label: "Help & requests" }
+      - { id: my-journey, label: "My Application" }
+      - { id: service-requests, label: "Service requests" }
       - messages
     ops:
       - overview
-      - { id: accounts, label: "Accounts" }
-      - { id: requests, label: "Service requests" }
-      - { id: incidents, label: "Fraud alerts" }
-      - { id: iot, label: "Branch systems" }
-      - { id: analytics, label: "Analytics" }
+      - { id: loan-board, label: "Loan Pipeline" }
+      - { id: branches, label: "Branches" }
+      - { id: requests, label: "Service queue" }
+      - { id: iot, label: "ATMs & equipment" }
+      - { id: incidents, label: "Security incidents" }
+      - { id: analytics, label: "Performance" }
       - demo-control
-  # Home-page modules for the client portal: account summary, transaction feed,
-  # news ticker, and quick actions.
+  # Home-page modules for the customer portal: loan status, branch map, application tracker.
   home:
     public:
-      - account-summary
-      - transaction-feed
+      - loan-status
+      - branch-map
+      - my-application
       - quick-actions
-      - id: news-ticker
-        headlines:
-          - "S&P 500 rises 1.2% on strong earnings reports"
-          - "Federal Reserve holds interest rates unchanged"
-          - "Meridian Bank reports record quarterly profits"
-          - "New savings account rates now live — earn up to 4.5% APY"
-          - "Meridian Bank named top regional bank for customer satisfaction"
     ops:
+      - loan-summary
       - ops-overview
   # Backend-only demo data + dispatch routing (delivered to traffic-bot +
   # service-dispatch via env; never sent to the browser config.json).
   data:
     zones:
-      - corporate-office
-      - retail-branches
-      - call-center
-      - data-center
-      - vault
+      - retail-banking
+      - commercial-lending
+      - wealth-management
+      - operations
       - compliance
+      - IT
+      - branches
+      - call-center
     requestTemplates:
-      - { category: compliance,     title: "Suspicious wire transfer flagged",    description: "A $45,000 wire transfer from a corporate account to an unverified recipient in a high-risk jurisdiction has been flagged for review." }
-      - { category: compliance,     title: "Unusual ATM activity at Branch 7",    description: "Multiple cash withdrawals from the same card at the Branch 7 ATM within 20 minutes — possible card cloning." }
-      - { category: retail-branches, title: "Teller discrepancy at Branch 12",    description: "End-of-day cash count at Branch 12 is $230 short. Teller reports a possible counting error." }
-      - { category: retail-branches, title: "ATM out of cash at Main Street",     description: "The Main Street ATM has been out of cash for 4 hours. Customers are leaving without withdrawals." }
-      - { category: retail-branches, title: "Branch security camera offline",    description: "The security camera at the north entrance of Branch 5 has been offline for 2 days." }
-      - { category: call-center,    title: "Phone system degraded in call center", description: "Call center IVR is routing only 60% of calls; customers reporting long hold times." }
-      - { category: call-center,    title: "Callback queue exceeding SLA",        description: "Average callback wait time in the call center has exceeded 45 minutes, above the 30-minute SLA." }
-      - { category: data-center,    title: "Core banking database replication lag", description: "Read replica lag on the core banking database has exceeded 10 seconds — risk of stale balances." }
-      - { category: data-center,    title: "Backup job failed for transaction log", description: "The nightly backup job for the transaction log database failed with a disk space error." }
-      - { category: vault,          title: "Vault temperature alarm triggered",   description: "The vault HVAC system triggered a high-temperature alarm; current temperature is 82°F." }
-      - { category: compliance,     title: "KYC document expired for Corp Account 8821", description: "The Know Your Customer documents for corporate account 8821 expired 60 days ago; account frozen per policy." }
-      - { category: retail-branches, title: "Branch safe deposit box override",   description: "A customer claims their safe deposit box key was lost; branch manager needs override authorization." }
+      - { category: retail-banking,  title: "ATM at Main St out of service",             description: "The ATM at 123 Main St is out of service and displaying an error message." }
+      - { category: retail-banking,  title: "Branch vault door malfunction",             description: "The vault door at the Downtown branch is not closing properly and security is concerned." }
+      - { category: commercial-lending, title: "Loan document scanner offline",          description: "The document scanner in the commercial lending office is offline and not scanning PDFs." }
+      - { category: commercial-lending, title: "Mortgage processing system slow",        description: "The mortgage processing system is running slowly and customers are complaining about delays." }
+      - { category: wealth-management, title: "Client portfolio portal not updating",    description: "The wealth management client portal is not updating portfolio values in real-time." }
+      - { category: operations,      title: "Check processing queue stuck",              description: "The check processing queue is stuck and not advancing to the next check." }
+      - { category: compliance,      title: "KYC system alert threshold exceeded",       description: "The KYC system has triggered an alert because the threshold for suspicious activity was exceeded." }
+      - { category: IT,              title: "Core banking system latency spike",         description: "The core banking system is experiencing a latency spike and transactions are taking longer than usual." }
+      - { category: branches,        title: "Branch HVAC system fault",                  description: "The HVAC system at the Northside branch is not cooling and customers are complaining about the heat." }
+      - { category: branches,        title: "Branch security camera offline",            description: "The security camera at the Eastside branch entrance is offline and not recording." }
+      - { category: call-center,     title: "Call center queue system down",             description: "The call center queue system is down and calls are not being routed to agents." }
+      - { category: call-center,     title: "Agent headsets not working",                description: "Multiple agent headsets in the call center are not working and agents cannot take calls." }
+    chatQuestions:
+      - "Where is the nearest ATM?"
+      - "How do I open a new account?"
+      - "What are the loan rates?"
+      - "How do I report a lost card?"
+      - "Where is the nearest branch?"
+      - "How do I apply for a mortgage?"
+      - "What are the banking hours?"
+      - "How do I dispute a charge?"
+      - "How do I set up online banking?"
+      - "What are the fees for business accounts?"
+      - "How do I contact my financial advisor?"
+      - "Where is the drive-thru ATM?"
   routing:
-    compliance: "Compliance & Fraud"
-    retail-branches: "Branch Operations"
+    retail-banking: "Retail Banking"
+    commercial-lending: "Commercial Lending"
+    wealth-management: "Wealth Management"
+    operations: "Operations"
+    compliance: "Compliance & Risk"
+    IT: "IT Support"
+    branches: "Branch Operations"
     call-center: "Call Center"
-    data-center: "IT Operations"
-    vault: "Vault & Cash Management"
   # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
   # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
   # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
   dynatrace:
     serviceNames:
-      citizen-service: "Client Services"
-      service-dispatch: "Operations Dispatch"
+      citizen-service: "Customer Services"
+      service-dispatch: "Loan Processing"
       city-operations: "Branch Operations"
       api-gateway: "Bank API Gateway"
-      notification-service: "Client Notifications"
-      commerce-service: "Banking Portal"
-      billing-service: "Payment Processing"
+      notification-service: "Customer Notifications"
+      commerce-service: "Bank Retail"
+      billing-service: "Bank Billing"
       demo-control-api: "Demo Control"
     flowLabels:
       service-request: "Service Request Lifecycle"
       account-creation: "Account Opening"
-      iot-incident: "Branch Incident Resolution"
-      purchase: "Client Payment"
-      tax-payment: "Wire Transfer"
+      iot-incident: "ATM Incident Resolution"
+      purchase: "Bank Retail Purchase"
+      tax-payment: "Bank Fee Payment"
     # Active Business Flows for the bank: drop the city store/tax funnels and add the
-    # two banking hero flows (both defined in provision-dynatrace-business-config.py).
+    # two bank hero flows (both defined in provision-dynatrace-business-config.py).
     flows:
       - service-request
       - account-creation
       - iot-incident
+      - loan-lifecycle
       - account-opening
-      - wire-transfer

@@ -1,5 +1,5 @@
 # =============================================================================
-# Meridian Hospital — industry config overlay (Phase 3)
+# Meridian Hospital — industry config overlay
 # =============================================================================
 # Layer this over the base chart + your secrets to deploy a hospital-branded
 # instance:
@@ -15,142 +15,141 @@ industry:
   id: hospital
   company:
     name: "Meridian Hospital"
-    short: "MH"
+    short: "Meridian"
     tagline: "Care that heals."
     assistant:
-      name: "Ava"
+      name: "Dr. Maya"
       persona: "the Meridian Hospital virtual assistant"
-      supportPhone: "1-555-HOSP-MERID (1-555-467-7637)"
+      supportPhone: "1-555-HOSP-MERID (1-555-467-76374)"
       systemPrompt: |-
-        You are Ava, the official virtual assistant for Meridian Hospital — a real,
-        busy teaching hospital. Always respond as though Meridian Hospital genuinely
-        exists and you are its assistant. Never say you are a generic AI model or that
-        the hospital is fictional, and never break character.
+        You are Dr. Maya, the official virtual assistant for Meridian Hospital — a real,
+        busy general hospital. Always respond as though Meridian Hospital genuinely exists
+        and you are its assistant. Never say you are a generic AI model or that the hospital
+        is fictional, and never break character.
 
         You help patients and visitors with:
-        - Finding departments, clinics, and services.
-        - Visitor hours and parking information.
-        - Reporting a concern or issue at the hospital.
+        - Finding departments, doctors, and facilities.
+        - Scheduling appointments and checking wait times.
+        - Reporting a concern about care or facilities.
         - Checking the status of a submitted request (by request ID, e.g. req-00123).
 
-        If a visitor needs to reach a person, give the Meridian Hospital help line:
-        1-555-HOSP-MERID (1-555-467-7637), available 24/7, or direct them to file a
+        If a patient needs to reach a person, give the Meridian Hospital help line:
+        1-555-HOSP-MERID (1-555-467-76374), available 24/7, or direct them to file a
         request in the app.
 
-        Be concise, warm, and professional. Acknowledge the person's concern before
+        Be compassionate, clear, and professional. Acknowledge the patient's concern before
         providing information. If a request ID is mentioned, use the context below to
         give a specific update.
   theme:
     colors:
-      brand: "#065F46"
-      brandDeep: "#064E3B"
-      brandSoft: "#10B981"
-      brandTint: "#D1FAE5"
+      brand: "#0D9488"
+      brandDeep: "#0F766E"
+      brandSoft: "#14B8A6"
+      brandTint: "#F0FDFA"
       accent: "#F59E0B"
-      accentSoft: "#FBBF24"
-      accentInk: "#78350F"
+      accentSoft: "#FCD34D"
+      accentInk: "#451A03"
     logo: "/meridian-hospital-logo.svg"
     favicon: "/meridian-hospital-logo.svg"
   terminology:
     customer: "Patient"
     customerPlural: "Patients"
-    request: "Service request"
-    requestPlural: "Service requests"
-    incident: "Safety concern"
-    incidentPlural: "Safety concerns"
-    workOrder: "Maintenance task"
-    asset: "Medical device"
-    assetPlural: "Medical devices"
+    request: "Care request"
+    requestPlural: "Care requests"
+    incident: "Safety incident"
+    incidentPlural: "Safety incidents"
+    workOrder: "Work order"
+    asset: "Medical equipment"
+    assetPlural: "Medical equipment"
   screens:
+    # store + billing intentionally omitted -> disabled for the hospital
     public:
       - home
-      - { id: my-journey, label: "My Care" }
-      - { id: service-requests, label: "Help & requests" }
+      - { id: my-journey, label: "My Care Journey" }
+      - { id: service-requests, label: "Care requests" }
       - messages
     ops:
       - overview
-      - { id: bed-board, label: "Bed Board" }
-      - { id: equipment, label: "Equipment" }
-      - { id: requests, label: "Maintenance queue" }
-      - { id: iot, label: "Medical devices" }
-      - { id: incidents, label: "Safety concerns" }
-      - { id: analytics, label: "Patient flow" }
+      - { id: patient-board, label: "Patient Board" }
+      - { id: beds, label: "Bed Management" }
+      - { id: requests, label: "Care queue" }
+      - { id: iot, label: "Medical equipment" }
+      - { id: incidents, label: "Safety incidents" }
+      - { id: analytics, label: "Quality metrics" }
       - demo-control
-  # Home-page modules for the patient portal: status board, equipment map, care tracker,
-  # news ticker, weather widget, and quick actions.
+  # Home-page modules for the patient portal: patient board, bed map, care tracker.
   home:
     public:
-      - { id: city-home, label: "Welcome" }
-      - { id: news-ticker, label: "Hospital Updates", headlines: ["ER Wait Time: 15 min", "Visitor Hours: 9am-7pm", "Parking Garage B: 3 levels available", "New direct route: Meridian to Reykjavik, launching June", "Meridian Hospital rated Top 5% nationally"] }
-      - { id: transit-map, label: "Shuttle Map" }
-      - { id: weather, label: "Hospital Weather", location: "Meridian Hospital", units: "fahrenheit" }
+      - patient-status
+      - bed-map
+      - my-journey
+      - quick-actions
     ops:
-      - { id: ops-overview, label: "Overview" }
-      - { id: bed-summary, label: "Bed Summary" }
+      - patient-summary
+      - ops-overview
   # Backend-only demo data + dispatch routing (delivered to traffic-bot +
   # service-dispatch via env; never sent to the browser config.json).
   data:
     zones:
       - emergency
-      - icu
-      - surgical
-      - pediatric
+      - ICU
       - maternity
+      - pediatrics
       - outpatient
-      - imaging
+      - surgical
+      - radiology
       - pharmacy
     requestTemplates:
-      - { category: terminal,         title: "Bed alarm malfunction in Room 302",     description: "The bed alarm in Room 302 is beeping intermittently even when the patient is in bed." }
-      - { category: terminal,         title: "IV pump malfunction on Floor 4",        description: "The IV pump on Floor 4 is not delivering the correct infusion rate." }
-      - { category: terminal,         title: "Oxygen supply low in ICU",              description: "The oxygen supply in the ICU is running low and needs to be restocked." }
-      - { category: baggage,          title: "Linen cart stuck in elevator",          description: "A linen cart is stuck in the elevator between Floors 2 and 3." }
-      - { category: baggage,         title: "Sterilizer offline in surgical",       description: "The sterilizer in the surgical wing is offline and needs maintenance." }
-      - { category: airfield,         title: "Defibrillator battery low",            description: "The defibrillator in the emergency department has a low battery." }
-      - { category: airfield,         title: "Ventilator fault in ICU",              description: "A ventilator in the ICU is showing a fault code and needs service." }
-      - { category: airfield,         title: "CT scanner calibration error",         description: "The CT scanner is showing a calibration error and needs to be serviced." }
-      - { category: security,         title: "Security camera offline in ER",        description: "A security camera in the emergency department is offline." }
-      - { category: security,         title: "Long wait time in ER",                 description: "Patient wait times in the emergency department are exceeding 4 hours." }
-      - { category: facilities,       title: "Water leak in pharmacy",               description: "There is a water leak in the pharmacy ceiling and needs to be fixed." }
-      - { category: facilities,       title: "HVAC too cold in pediatric",           description: "The air conditioning in the pediatric wing is too cold and patients are uncomfortable." }
-      - { category: ground-transport, title: "Ambulance bay blocked",                description: "The ambulance bay is blocked by a delivery truck and ambulances cannot access the entrance." }
-      - { category: ground-transport, title: "Shuttle bay 3 blocked",                description: "A stalled vehicle is blocking shuttle bay 3 at the arrivals curb." }
+      - { category: emergency,      title: "Ambulance bay door stuck open",            description: "The automatic door at the ambulance bay is stuck open and won't close." }
+      - { category: emergency,      title: "ER triage board frozen",                  description: "The electronic triage board in the ER is frozen on a patient from 2 hours ago." }
+      - { category: outpatient,     title: "Pharmacy window 3 printer offline",       description: "The prescription printer at pharmacy window 3 is offline and not printing labels." }
+      - { category: outpatient,     title: "Lab result portal not updating",          description: "The patient portal is not showing lab results that were finalized this morning." }
+      - { category: surgical,       title: "OR 4 scrub sink faucet leaking",          description: "The scrub sink faucet in Operating Room 4 is leaking and wasting water." }
+      - { category: surgical,       title: "Sterilizer alarm at central supply",      description: "The autoclave in central supply is beeping with a sterilization failure alarm." }
+      - { category: radiology,      title: "CT scanner 2 warm-up timeout",            description: "CT Scanner 2 keeps timing out during warm-up and won't accept patients." }
+      - { category: radiology,      title: "MRI cooling system fault",                description: "The MRI cryogen cooling system is reporting a low-helium fault." }
+      - { category: facilities,     title: "ICU HVAC too warm",                       description: "The HVAC in the ICU is not keeping up; nurses reporting patients complaining about heat." }
+      - { category: facilities,     title: "Elevator 2 out of service",               description: "Elevator 2 between B1 and 2 is out of service, forcing wheelchair users to detour." }
+      - { category: facilities,      title: "Parking structure P2 gate arm broken",    description: "The exit gate arm in parking structure P2 is stuck down, blocking cars." }
+      - { category: grounds,         title: "Helipad floodlight out",                  description: "One of the helipad floodlights is out, reducing night landing visibility." }
     chatQuestions:
-      - "What are the visiting hours?"
-      - "Where is the nearest parking?"
-      - "How do I find a specific department?"
-      - "Where do I report a concern or issue?"
-      - "What is the wait time in the emergency department?"
-      - "How do I check the status of my test results?"
       - "Where is the nearest pharmacy?"
-      - "How do I get to the helipad?"
-      - "Are there charging stations in the waiting areas?"
-      - "Where is the pet relief area?"
-      - "Where do I pick up my rental car?"
-      - "Is there a shuttle to long-term parking?"
+      - "How do I find my doctor's office?"
+      - "What are the visiting hours?"
+      - "Where do I park for emergency?"
+      - "How long is the wait in the ER?"
+      - "Where is the maternity ward?"
+      - "How do I get my lab results?"
+      - "Where is the patient bookstore?"
+      - "How do I contact my doctor?"
+      - "Where is the helipad?"
+      - "How do I request a second opinion?"
+      - "Where is the nearest wheelchair station?"
   routing:
-    terminal: "Nursing Operations"
-    baggage: "Linen & Supply"
-    airfield: "Clinical Engineering"
-    security: "Patient Safety"
+    emergency: "Emergency Department"
+    ICU: "Intensive Care Unit"
+    outpatient: "Outpatient Services"
+    surgical: "Surgical Services"
+    radiology: "Diagnostic Imaging"
     facilities: "Facilities Management"
-    ground-transport: "Ground Transportation"
+    grounds: "Grounds & Helipad"
   # Dynatrace reskin (Path A): rename the service map (OneAgent services; each rule scoped
   # to this instance's namespace) and the Business Flow titles. OTel services (ai-service,
   # iot-*) are renamed via OTEL_SERVICE_NAME separately, not here.
   dynatrace:
     serviceNames:
       citizen-service: "Patient Services"
-      service-dispatch: "Operations Dispatch"
-      city-operations: "Clinical Engineering"
+      service-dispatch: "Care Coordination"
+      city-operations: "Facilities Management"
       api-gateway: "Hospital API Gateway"
       notification-service: "Patient Notifications"
       commerce-service: "Hospital Retail"
       billing-service: "Hospital Billing"
       demo-control-api: "Demo Control"
     flowLabels:
-      service-request: "Service Request Lifecycle"
+      service-request: "Care Request Lifecycle"
       account-creation: "Patient Registration"
-      iot-incident: "Medical Device Incident Resolution"
+      iot-incident: "Medical Equipment Incident Resolution"
       purchase: "Hospital Retail Purchase"
       tax-payment: "Hospital Fee Payment"
     # Active Business Flows for the hospital: drop the city store/tax funnels and add the
@@ -159,5 +158,5 @@ industry:
       - service-request
       - account-creation
       - iot-incident
-      - patient-admission
-      - equipment-maintenance
+      - patient-journey
+      - treatment-lifecycle
