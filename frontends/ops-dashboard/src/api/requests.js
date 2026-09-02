@@ -5,9 +5,9 @@ export async function getServiceRequests(params = {}) {
   return res.data;
 }
 
-// Advance a request's status. Body uses snake_case keys, but `status` is a single
-// word so it's casing-agnostic; assigned_* are optional and omitted here.
+// Advance a request via the entity engine action endpoint.
+// `status` values match entity state names (in_progress, resolved).
 export async function updateRequestStatus(id, status) {
-  const res = await client.patch(`/api/v1/service-requests/${id}/status`, { status });
+  const res = await client.post(`/api/v1/entities/service_request/${id}/actions/${status}`);
   return res.data;
 }

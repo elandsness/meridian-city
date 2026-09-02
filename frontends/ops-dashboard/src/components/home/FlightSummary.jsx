@@ -1,25 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
 import KpiTile from '../KpiTile.jsx';
-import { getFlights } from '../../api/flights.js';
+import { getEntities, unwrapEntities } from '../../api/entities.js';
 
-function unwrap(d) {
-  return Array.isArray(d) ? d : d?.flights ?? d?.items ?? [];
-}
-
-// Airport ops-home module: a live flight KPI strip at the top of the Overview.
+// Airport ops-home module: live flight KPI strip backed by entity engine.
 export default function FlightSummary() {
-  const { data } = useQuery({
-    queryKey: ['flights'],
-    queryFn: () => getFlights(),
+  const { data: depData } = useQuery({
+    queryKey: ['entities', 'flight_departure'],
+    queryFn: () => getEntities('flight_departure'),
     refetchInterval: 8000,
   });
-  const flights = unwrap(data);
-  const activeDep = flights.filter(
-    (f) => f.direction === 'departure' && f.status !== 'departed' && f.status !== 'cancelled'
-  ).length;
-  const activeArr = flights.filter((f) => f.direction === 'arrival' && f.status !== 'arrived').length;
-  const boarding = flights.filter((f) => f.status === 'boarding').length;
-  const cancelled = flights.filter((f) => f.status === 'cancelled').length;
+  const { data: arrData } = useQuery({
+    queryKey: ['entities', 'flight_arrival'],
+    queryFn: () => getEntities('flight_arrival'),
+    refetchInterval: 8000,
+  });
+
+  const deps = unwrapEntities(depData);
+  const arrs = unwrapEntities(arrData);
+
+  const activeDep = deps.filter((f) => f.state !== 'departed' && f.state !== 'cancelled').length;
+  const activeArr = arrs.filter((f) => f.state !== 'arrived' && f.state !== 'diverted').length;
+  const boarding = deps.filter((f) => f.state === 'boarding').length;
+  const cancelled = deps.filter((f) => f.state === 'cancelled').length;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -36,6 +36,20 @@ Env:
   DT_LOG_NAMESPACE    k8s namespace the services run in (default: meridian)
   DT_INSTANCE_HASH    short per-instance hash, e.g. "a1b2" (default: "" = legacy single-instance)
   DT_ACTION           provision | delete   (default: provision)
+  DT_ENTITY_CONFIG    JSON industry.entities block (generic-entity-engine initiative, Stage 5) --
+                       the SAME payload entity-engine/movement-service read. Each entity type's
+                       own Business Flow spec (steps/correlation/KPI) is DERIVED from its
+                       states/transitions rather than hand-maintained here, and its
+                       correlation id field (and any ref-field's target type's id) is added to
+                       the extraction DQL automatically -- see derive_flow_specs_from_entity_config()
+                       and _build_dql_script(). Verified against real Grail data (see
+                       docs/regression-baseline-2026-07-23.md-style checks) that Dynatrace's
+                       OpenPipeline fieldsAdd is a strict allowlist -- an un-added field is
+                       silently dropped, never promoted to a bizevent attribute by
+                       fieldExtraction:includeAll on its own -- so this generation step is load-
+                       bearing, not cosmetic. Derived specs are UNIONED with the hand-written
+                       FLOW_SPECS below (additive) so City/Airport's existing flows keep working
+                       until their entity types are actually expressed via DT_ENTITY_CONFIG.
 """
 import json
 import os
@@ -71,6 +85,7 @@ FLOW_LABELS = _load_json_env("DT_FLOW_LABELS")      # {flow key: Business Flow d
 #   - Array of flow keys (backward compatible): ["service-request", "account-creation"]
 #   - Array of full flow definitions: [{key, name, correlationID, kpiLabel, kpi, kpiCalculation, kpiEventName, steps}, ...]
 FLOW_KEYS_OR_SPECS = _load_json_env("DT_FLOWS")      # [flow key | flow spec, ...]
+ENTITY_CONFIG = _load_json_env("DT_ENTITY_CONFIG")  # {entity type id: {fields,states,transitions,...}}
 
 # Per-instance identity. With a hash, every name carries it so concurrent installs
 # on the shared tenant stay isolated; without one we keep the legacy single-instance
@@ -152,18 +167,48 @@ def upsert(schema, value, matches):
 # --------------------------------------------------------------------------- #
 # 1. OpenPipeline logs pipeline (parse + bizevent extraction)
 # --------------------------------------------------------------------------- #
-DQL_SCRIPT = (
-    'parse content, "JSON:bizjson"\n'
-    "| fieldsAdd `meridian.event_type` = bizjson[`event.type`]\n"
-    "| fieldsAdd `request.id` = bizjson[`request.id`], `citizen.id` = bizjson[`citizen.id`], "
-    "`cart.id` = bizjson[`cart.id`], `order.id` = bizjson[`order.id`], `bill.id` = bizjson[`bill.id`], "
-    "`work_order.id` = bizjson[`work_order.id`], `incident.id` = bizjson[`incident.id`], "
-    "`asset.id` = bizjson[`asset.id`], `anomaly.type` = bizjson[`anomaly.type`], "
-    "`flight.id` = bizjson[`flight.id`], `passenger.id` = bizjson[`passenger.id`], "
-    "`identity.id` = bizjson[`identity.id`], "
-    "`assigned_department` = bizjson[`assigned_department`]\n"
-    "| fieldsRemove bizjson"
-)
+#: Hand-written correlation keys for flows not yet expressed via DT_ENTITY_CONFIG
+#: (City's 5 + Airport's 2 + the generic-services backend's identity/journey ids).
+#: Verified against live Grail data (2026-07-24) that OpenPipeline's fieldsAdd is a
+#: strict allowlist: a JSON key inside `bizjson` that is never named here stays
+#: buried in `bizjson`, which is removed below, so fieldExtraction:includeAll
+#: downstream never sees it -- e.g. `citizen.email` and `flight.gate` are present
+#: in every raw log line but confirmed ABSENT from the resulting bizevent's fields
+#: precisely because nothing here names them.
+LEGACY_CORRELATION_KEYS = [
+    "request.id", "citizen.id", "cart.id", "order.id", "bill.id", "work_order.id",
+    "incident.id", "asset.id", "anomaly.type", "flight.id", "passenger.id",
+    "identity.id", "journey.id",
+    "assigned_department",
+]
+
+
+def _entity_correlation_keys():
+    """Every entity type's own `<type>.id`, plus any ref-field's target type's
+    `<type>.id` (so a linked entity's id -- e.g. an inspection's linked probe --
+    is also extractable), derived from DT_ENTITY_CONFIG. A brand-new entity type
+    needs zero manual edits here or anywhere in this pipeline."""
+    keys = set()
+    for entity_type, definition in ENTITY_CONFIG.items():
+        keys.add("%s.id" % entity_type)
+        for field_def in (definition.get("fields") or {}).values():
+            if field_def.get("type") == "ref" and field_def.get("entity"):
+                keys.add("%s.id" % field_def["entity"])
+    return keys
+
+
+def _build_dql_script():
+    keys = sorted(set(LEGACY_CORRELATION_KEYS) | _entity_correlation_keys())
+    field_adds = ", ".join("`%s` = bizjson[`%s`]" % (k, k) for k in keys)
+    return (
+        'parse content, "JSON:bizjson"\n'
+        "| fieldsAdd `meridian.event_type` = bizjson[`event.type`]\n"
+        "| fieldsAdd %s\n"
+        "| fieldsRemove bizjson"
+    ) % field_adds
+
+
+DQL_SCRIPT = _build_dql_script()
 
 
 def pipeline_value():
@@ -285,23 +330,150 @@ FLOW_SPECS = [
 # of this instance's flows that drop out of the active set on an in-place upgrade.
 DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "identity-registration", "iot-incident", "purchase", "tax-payment"]
 
-# Resolve ACTIVE_FLOW_SPECS from DT_FLOWS. Supports two formats:
+
+def _topo_walk(initial, states, transitions):
+    """Reachable non-error states from `initial`, in first-visited order (BFS
+    over declared transitions) -- the flow's step order. Error states are
+    walked (so unreachable-from-error branches still get visited) but excluded
+    from the returned step list; they're attached to their predecessor step
+    instead (see _error_events_from).
+
+    States marked externallyTriggered:true are appended after the BFS result:
+    they are reachable but via a cross-entity effect (e.g. a work_order cascade
+    driving its parent incident to "resolved"), so no transition declares them
+    as a target within this entity type's own graph."""
+    adjacency = {}
+    for t in transitions:
+        adjacency.setdefault(t.get("from"), []).append(t.get("to"))
+    visited, seen, queue = [], set(), [initial]
+    while queue:
+        current = queue.pop(0)
+        if current in seen or current not in states:
+            continue
+        seen.add(current)
+        if not states[current].get("isError"):
+            visited.append(current)
+        queue.extend(adjacency.get(current, []))
+    # Append externallyTriggered states in declaration order (they're terminal
+    # success/kpi steps that close the flow but have no incoming local transition).
+    for state_id, state_def in states.items():
+        if state_def.get("externallyTriggered") and state_id not in seen and not state_def.get("isError"):
+            visited.append(state_id)
+    return visited
+
+
+def _error_events_from(state_id, entity_type, states, transitions):
+    return ["%s.%s" % (entity_type, t["to"]) for t in transitions
+            if t.get("from") == state_id and states.get(t["to"], {}).get("isError")]
+
+
+def derive_flow_specs_from_entity_config():
+    """One Business Flow spec per entity type in DT_ENTITY_CONFIG, structurally
+    identical in shape to a hand-written FLOW_SPECS entry -- states/transitions/
+    isKpi/isError fully describe a flow's steps/correlation/KPI, so nothing here
+    is entity-type-specific. Skips any entity type with no `states`/`initial`
+    (nothing to build a flow from)."""
+    specs = []
+    for entity_type, definition in sorted(ENTITY_CONFIG.items()):
+        states = definition.get("states") or {}
+        transitions = definition.get("transitions") or []
+        initial = definition.get("initial")
+        if not states or not initial or initial not in states:
+            continue
+        ordered = _topo_walk(initial, states, transitions)
+        if not ordered:
+            continue
+
+        # Use the LAST isKpi state (the terminal success step) as the flow
+        # endpoint, not the first. The first isKpi state may be an intermediate
+        # waypoint (e.g. service_request.in_progress, bill.outstanding, cart.placed)
+        # whereas the flow's KPI metric should track completion.
+        kpi_candidates = [s for s in ordered if states[s].get("isKpi")]
+        kpi_state = kpi_candidates[-1] if kpi_candidates else ordered[-1]
+
+        # Non-terminal states are always waypoints (sequential steps on the path to
+        # completion). Terminal non-kpi states (abandoned, verified_only, ...) are
+        # silent dropout points -- visible as drop-off in the funnel but not listed
+        # as a step in their own right. The kpi_state is always included regardless.
+        #
+        # The old "has_outgoing" proxy is insufficient for externallyTriggered states
+        # (e.g. incident.open has no outgoing transition in its own config but IS a
+        # real intermediate waypoint resolved by a cross-entity effect).
+        steps = []
+        for state_id in ordered:
+            is_non_terminal = not states[state_id].get("terminal")
+            if not is_non_terminal and state_id != kpi_state:
+                continue
+            label = states[state_id].get("label", state_id)
+            event_type = "%s.%s" % (entity_type, state_id)
+            errors = _error_events_from(state_id, entity_type, states, transitions)
+            steps.append((label, event_type, errors) if errors else (label, event_type))
+
+        if not steps:
+            continue
+
+        display_name = definition.get("displayName", entity_type)
+
+        # If the kpi_state declares a kpiField, aggregate it as a sum KPI
+        # (e.g. bill.amount_cents, cart.total_cents). Otherwise count completions.
+        kpi_field = states[kpi_state].get("kpiField")
+        if kpi_field:
+            kpi = "%s.%s" % (entity_type, kpi_field)
+            kpi_calc = "sum"
+            kpi_label = "%s total" % display_name
+        else:
+            kpi = "%s.id" % entity_type
+            kpi_calc = "lastEvent"
+            kpi_label = "%s completed" % display_name
+
+        specs.append({
+            "key": entity_type,
+            "name": display_name,
+            "correlationID": "%s.id" % entity_type,
+            "kpiLabel": kpi_label,
+            "kpi": kpi,
+            "kpiCalculation": kpi_calc,
+            "kpiEventName": "%s.%s" % (entity_type, kpi_state),
+            "steps": steps,
+        })
+    return specs
+
+
+# DT_FLOWS (FLOW_KEYS_OR_SPECS) supports two formats:
 #   1. Array of flow keys (backward compatible): ["service-request", "account-creation"]
 #   2. Array of full flow definitions: [{key, name, correlationID, ...steps, ...}]
-# Format 2 allows per-industry flow definitions with custom steps, correlation keys, and KPIs.
-def _resolve_flow_specs():
+# Format 2 lets a new industry define fully custom flows (steps/correlation/KPI)
+# with zero code changes, alongside the legacy hand-written flows and every
+# flow auto-derived from DT_ENTITY_CONFIG below.
+def _flow_keys_from_env():
     if not FLOW_KEYS_OR_SPECS:
-        return [s for s in FLOW_SPECS if s["key"] in DEFAULT_FLOW_KEYS]
-    # Check if first item is a dict (full spec) or string (key)
+        return None
     first = FLOW_KEYS_OR_SPECS[0]
     if isinstance(first, dict) and "key" in first:
-        # Full flow definitions — use them directly
-        return FLOW_KEYS_OR_SPECS
-    else:
-        # Array of keys — filter FLOW_SPECS by keys
-        return [s for s in FLOW_SPECS if s["key"] in FLOW_KEYS_OR_SPECS]
+        return [s["key"] for s in FLOW_KEYS_OR_SPECS]
+    return FLOW_KEYS_OR_SPECS
 
-ACTIVE_FLOW_SPECS = _resolve_flow_specs()
+
+def _custom_flow_specs_from_env():
+    if FLOW_KEYS_OR_SPECS and isinstance(FLOW_KEYS_OR_SPECS[0], dict) and "key" in FLOW_KEYS_OR_SPECS[0]:
+        return FLOW_KEYS_OR_SPECS
+    return []
+
+
+_ACTIVE_KEYS = _flow_keys_from_env()
+
+# Legacy hand-written flows (subset selected the existing way), every derived
+# entity-type flow, and any fully custom flow specs passed via DT_FLOWS --
+# unioned. A derived flow is active when DT_FLOWS is unset (a synthetic/new
+# industry has no legacy default list to fall back to) or when its entity-type
+# key is explicitly listed in DT_FLOWS (so a mixed deployment -- some legacy
+# flows, some entity-config-derived ones, some fully custom -- can select
+# precisely).
+DERIVED_FLOW_SPECS = derive_flow_specs_from_entity_config()
+_LEGACY_ACTIVE = [s for s in FLOW_SPECS if s["key"] in (_ACTIVE_KEYS or DEFAULT_FLOW_KEYS)]
+_DERIVED_ACTIVE = [s for s in DERIVED_FLOW_SPECS if not _ACTIVE_KEYS or s["key"] in _ACTIVE_KEYS]
+_CUSTOM_ACTIVE = _custom_flow_specs_from_env()
+ACTIVE_FLOW_SPECS = _LEGACY_ACTIVE + _DERIVED_ACTIVE + _CUSTOM_ACTIVE
 
 
 def _event(event_type, is_error=False):

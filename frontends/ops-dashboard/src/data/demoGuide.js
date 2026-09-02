@@ -8,8 +8,8 @@ export const DEMO_GUIDE = [
     shows: 'End-to-end PurePath across the service chain.',
     steps: [
       'Start traffic, or submit a service request in the public portal.',
-      'Dynatrace → Distributed traces: open a request hitting city-operations.',
-      'Walk the waterfall: api-gateway → citizen-service → service-dispatch → city-operations, with SQL + Kafka spans.',
+      'Dynatrace → Distributed traces: open a request hitting ops-entity-service.',
+      'Walk the waterfall: api-gateway → customer-entity-service → routing-service → ops-entity-service, with SQL + Kafka spans.',
     ],
   },
   {
@@ -29,7 +29,7 @@ export const DEMO_GUIDE = [
     shows: 'IoT telemetry → anomaly → incident, with OTel metrics.',
     steps: [
       'Inject a fleet anomaly below (e.g. building hvac_overtemp).',
-      'After ~3 one-minute windows, telemetry-processor flags it and city-operations opens an incident.',
+      'After ~3 one-minute windows, telemetry-processor flags it and ops-entity-service opens an incident.',
       'Show the incident in Incidents and the OTel metric in Dynatrace.',
     ],
   },

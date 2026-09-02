@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getServiceRequests, updateRequestStatus } from '../api/requests.js';
+import { useConfig } from '../config/ConfigContext.jsx';
 
 const STATUS = {
   submitted: 'bg-blue-500/20 text-blue-300',
-  dispatched: 'bg-blue-500/20 text-blue-300',
-  assigned: 'bg-amber-500/20 text-amber-300',
-  acknowledged: 'bg-amber-500/20 text-amber-300',
+  validated: 'bg-blue-500/20 text-blue-300',
   in_progress: 'bg-amber-500/20 text-amber-300',
   resolved: 'bg-green-500/20 text-green-300',
-  cancelled: 'bg-gray-500/20 text-gray-300',
+  rejected: 'bg-rose-500/20 text-rose-300',
+  abandoned: 'bg-gray-500/20 text-gray-300',
+  closed: 'bg-gray-500/20 text-gray-300',
 };
 
-const CLOSED = new Set(['resolved', 'cancelled']);
+const CLOSED = new Set(['resolved', 'rejected', 'abandoned', 'closed']);
 
 function StatusBadge({ status }) {
   const cls = STATUS[(status || '').toLowerCase()] || STATUS.cancelled;
@@ -34,6 +35,10 @@ function formatDate(ts) {
 
 export default function RequestQueue() {
   const queryClient = useQueryClient();
+  const config = useConfig();
+  const term = config?.terminology ?? {};
+  const requestPlural = term.requestPlural ?? 'Service Requests';
+  const customerPlural = term.customerPlural ?? 'residents';
   const [openOnly, setOpenOnly] = useState(true);
   const [pendingId, setPendingId] = useState(null);
 
@@ -63,8 +68,8 @@ export default function RequestQueue() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Service Requests</h1>
-          <p className="text-sm text-gray-500 mt-1">Respond to issues reported by residents.</p>
+          <h1 className="text-2xl font-bold text-white">{requestPlural}</h1>
+          <p className="text-sm text-gray-500 mt-1">Respond to issues reported by {customerPlural.toLowerCase()}.</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-400">
           <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} />
@@ -114,16 +119,16 @@ export default function RequestQueue() {
                     <td className="px-4 py-3 text-gray-400">{formatDate(req.created_at ?? req.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        {open && status !== 'in_progress' && (
+                        {(status === 'submitted' || status === 'validated') && (
                           <button
-                            onClick={() => advance(req.id, 'in_progress')}
+                            onClick={() => advance(req.id, status === 'submitted' ? 'validated' : 'in_progress')}
                             disabled={busy}
                             className="text-xs px-2.5 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
                           >
                             {busy ? '…' : 'Start'}
                           </button>
                         )}
-                        {open && (
+                        {status === 'in_progress' && (
                           <button
                             onClick={() => advance(req.id, 'resolved')}
                             disabled={busy}

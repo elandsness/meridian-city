@@ -33,6 +33,9 @@ const config = {
   IOT_SERVICE_URL: process.env.IOT_SERVICE_URL || 'http://localhost:8086',
   NEWS_TICKER_SERVICE_URL: process.env.NEWS_TICKER_SERVICE_URL || 'http://localhost:8095',
   WEATHER_SERVICE_URL: process.env.WEATHER_SERVICE_URL || 'http://localhost:8096',
+  ENTITY_ENGINE_URL: process.env.ENTITY_ENGINE_URL || 'http://localhost:8094',
+  CUSTOMER_ENTITY_SERVICE_URL: process.env.CUSTOMER_ENTITY_SERVICE_URL || 'http://localhost:8094',
+  OPS_ENTITY_SERVICE_URL: process.env.OPS_ENTITY_SERVICE_URL || 'http://localhost:8094',
 }
 
 async function build () {

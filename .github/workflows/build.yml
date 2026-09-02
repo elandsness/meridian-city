@@ -37,13 +37,8 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - citizen-service
-          - service-dispatch
-          - city-operations
-          - commerce-service
-          - billing-service
-          - flight-ops
-          - passenger-service
+          - entity-engine
+          - routing-service
     steps:
       - uses: actions/checkout@v4
 
@@ -88,8 +83,8 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
-            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            SAFE_REF=$(printf '%s' "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -161,8 +156,8 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
-            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            SAFE_REF=$(printf '%s' "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -232,8 +227,8 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
-            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            SAFE_REF=$(printf '%s' "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -256,6 +251,7 @@ jobs:
         service:
           - iot-ingestion
           - iot-simulator
+          - movement-service
     steps:
       - uses: actions/checkout@v4
 
@@ -304,8 +300,8 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
-            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            SAFE_REF=$(printf '%s' "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service }} image
@@ -374,8 +370,8 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:latest"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           else
-            SAFE_REF=$(echo "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
-            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
+            SAFE_REF=$(printf '%s' "${{ github.ref_name }}" | tr -c 'a-zA-Z0-9' '-')
+            { echo "tags<<TAGEOF"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}"; echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:branch-${SAFE_REF}-${{ github.sha }}"; echo "TAGEOF"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.app }} image
@@ -385,6 +381,36 @@ jobs:
           context: frontends/${{ matrix.app }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+
+  # -------------------------------------------------------------------------
+  # Industry config validation (docs/industry-config.schema.json via ajv)
+  # -------------------------------------------------------------------------
+  validate-industry-configs:
+    name: Validate Industry Configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: scripts/package-lock.json
+
+      - name: Install validator dependencies
+        working-directory: scripts
+        run: npm ci
+
+      - name: Validate every values-*.yaml industry overlay
+        # values-synthetic-test.yaml is deliberately excluded: it's a PARTIAL
+        # overlay (industry.entities only, meant to be layered on top of
+        # values.yaml/values-custom.yaml, not a standalone config) for the
+        # generic-entity-engine initiative's Stage 2 proving ground, not a
+        # real industry -- it will never have its own company/theme/screens.
+        working-directory: scripts
+        run: |
+          node validate-industry-config.mjs $(ls ../helm/values-*.yaml | grep -v synthetic-test)
 
   # -------------------------------------------------------------------------
   # Helm chart lint
@@ -422,3 +448,32 @@ jobs:
             --set dynatrace.apiUrl=https://test.live.dynatrace.com/api \
             --set dynatrace.apiToken=test-token \
             --set dynatrace.otlpEndpoint=https://test.live.dynatrace.com/api/v2/otlp
+
+      - name: Template-render every industry overlay and check for YAML 1.1 boolean-coercion damage
+        # `helm lint` alone doesn't fully render templates and never applies any
+        # values-<industry>.yaml overlay, so it would NOT have caught this real
+        # bug found while building Stage 2 of the generic-entity-engine
+        # initiative: an unquoted `y:` key in a waypoints map (industry.entities)
+        # is silently read as the boolean `true` by YAML 1.1 (Helm's Go YAML
+        # parser follows it strictly) and serializes as the JSON key "true" --
+        # the classic Norway-problem coercion. ajv-based validate-industry-
+        # config.mjs did NOT catch it either: it parses YAML via Node's js-yaml,
+        # which (unlike Helm's parser) does not coerce a single bare `y`/`n`, so
+        # the same file can pass that check and still break here. Rendering with
+        # Helm's actual parser and grepping the ConfigMap output is what closes
+        # that gap.
+        run: |
+          for f in helm/values.yaml helm/values-*.yaml; do
+            echo "Rendering with $f ..."
+            extra_values=""
+            if [ "$f" != "helm/values.yaml" ]; then extra_values="-f $f"; fi
+            output=$(helm template meridian-ci-check helm/ \
+              --set dynatrace.apiUrl=https://test.live.dynatrace.com/api \
+              --set dynatrace.apiToken=test-token \
+              --set dynatrace.otlpEndpoint=https://test.live.dynatrace.com/api/v2/otlp \
+              $extra_values -s templates/entity-config-configmap.yaml -s templates/industry-configmap.yaml)
+            if echo "$output" | grep -qE '"true":|"false":'; then
+              echo "::error::$f rendered a boolean-coerced JSON key (\"true\"/\"false\") -- likely an unquoted y/n/yes/no/on/off key in a YAML map (the Norway problem). Quote it."
+              exit 1
+            fi
+          done

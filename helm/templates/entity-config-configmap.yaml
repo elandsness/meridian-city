@@ -1,0 +1,22 @@
+{{/*
+Entity-config ConfigMap. Mounts the full `.Values.industry.entities` block as a
+JSON file for the generic entity engine (entity-engine) and the position tick
+(movement-service) to read at startup/tick-time -- the backend-side counterpart
+to industry-configmap.yaml's browser-facing config.json (same `entities` data,
+different delivery mechanism: mounted file for backend services that need the
+full Tier-2 vocabulary including transition conditions/effects/generator
+config, vs. rendered into the browser bundle for the frontend's generic
+templates). Namespace-scoped, so the name stays plain (multi-tenancy isolates
+by namespace).
+*/}}
+{{- if or .Values.entityEngine.enabled .Values.customerEntityService.enabled .Values.opsEntityService.enabled .Values.movementService.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: entity-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+data:
+  entity-config.json: {{ .Values.industry.entities | default dict | toJson | quote }}
+{{- end }}

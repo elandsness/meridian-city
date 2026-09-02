@@ -5,6 +5,7 @@ import { useConfig } from './config/ConfigContext';
 import { getActiveScreens } from './config/screens.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
+import EntityDetailPage from './components/entity/EntityDetailPage.jsx';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -48,6 +49,9 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to={firstPath} replace />} />
         {screenRoutes(screens)}
+        {/* One generic route every entity-list template's rows link to, regardless
+            of entity type -- no per-industry detail-screen config needed. */}
+        <Route path="/entities/:entityType/:id" element={<EntityDetailPage />} />
       </Route>
 
       {/* Catch-all */}

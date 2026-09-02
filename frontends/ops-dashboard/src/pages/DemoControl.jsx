@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useConfig } from '../config/ConfigContext.jsx';
 import {
   getDemoStatus,
   getScenarios,
@@ -15,6 +16,7 @@ import {
   stopTraffic,
   burstTraffic,
   setJourneyEnabled,
+  purgeMessages,
 } from '../api/demo.js';
 import { getIncidents } from '../api/incidents.js';
 import { getDevices } from '../api/devices.js';
@@ -93,6 +95,8 @@ function SystemStatus({ status, onResetAll }) {
   const [confirm, setConfirm] = useState(false);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [purgeLoading, setPurgeLoading] = useState(false);
+  const [purgeResult, setPurgeResult] = useState(null);
 
   const activeScenario = status?.active_scenario?.name;
 
@@ -111,6 +115,19 @@ function SystemStatus({ status, onResetAll }) {
     } finally {
       setLoading(false);
       setConfirm(false);
+    }
+  }
+
+  async function handlePurgeMessages() {
+    setPurgeLoading(true);
+    setPurgeResult(null);
+    try {
+      await purgeMessages();
+      setPurgeResult({ ok: true });
+    } catch (err) {
+      setPurgeResult({ ok: false, error: err.response?.data?.message ?? err.message });
+    } finally {
+      setPurgeLoading(false);
     }
   }
 
@@ -133,6 +150,15 @@ function SystemStatus({ status, onResetAll }) {
         {confirm && (
           <span className="text-xs text-rose-400">Are you sure? Click again to confirm.</span>
         )}
+        <button
+          onClick={handlePurgeMessages}
+          disabled={purgeLoading}
+          title="Delete all citizen inbox messages from the database"
+          className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+        >
+          {purgeLoading ? '…' : '🗑 Purge Messages'}
+        </button>
+        <StatusMsg result={purgeResult} />
         <button
           onClick={handleResetAll}
           disabled={loading}
@@ -368,6 +394,23 @@ function ScenarioControlCard({ activeScenario }) {
 // ---------------------------------------------------------------------------
 function FleetCard() {
   const qc = useQueryClient();
+  const config = useConfig();
+  const term = config?.terminology ?? {};
+  const cat1 = term.iotCategory1 ?? 'Vehicles';
+  const cat2 = term.iotCategory2 ?? 'Buildings';
+  const cat3 = term.iotCategory3 ?? 'Machines';
+  const categoryLabel = { vehicle: cat1, building: cat2, machine: cat3 };
+  const pfx1 = term.iotIdPrefix1 ?? 'veh';
+  const pfx2 = term.iotIdPrefix2 ?? 'bldg';
+  const pfx3 = term.iotIdPrefix3 ?? 'mach';
+
+  function displayDeviceId(deviceId) {
+    if (!deviceId) return deviceId;
+    if (deviceId.startsWith('veh-')) return pfx1 + deviceId.slice(3);
+    if (deviceId.startsWith('bldg-')) return pfx2 + deviceId.slice(4);
+    if (deviceId.startsWith('mach-')) return pfx3 + deviceId.slice(4);
+    return deviceId;
+  }
   const { data: fleetStatus, isLoading } = useQuery({
     queryKey: ['fleet-status'],
     queryFn: getFleetStatus,
@@ -497,17 +540,17 @@ function FleetCard() {
         <p className="text-gray-500 text-sm">Loading fleet status…</p>
       ) : (
         <div className="flex gap-4 text-xs text-gray-400">
-          <span>Current: <span className="text-blue-400">{fleetStatus?.vehicles ?? '?'} vehicles</span></span>
-          <span><span className="text-green-400">{fleetStatus?.buildings ?? '?'} buildings</span></span>
-          <span><span className="text-orange-400">{fleetStatus?.machines ?? '?'} machines</span></span>
+          <span>Current: <span className="text-blue-400">{fleetStatus?.vehicles ?? '?'} {cat1}</span></span>
+          <span><span className="text-green-400">{fleetStatus?.buildings ?? '?'} {cat2}</span></span>
+          <span><span className="text-orange-400">{fleetStatus?.machines ?? '?'} {cat3}</span></span>
         </div>
       )}
 
       {/* Resize controls */}
       <div className="flex flex-wrap items-end gap-4">
-        <NumberInput label="Vehicles (1–100)" value={vehicles} setValue={setVehicles} min={1} max={100} />
-        <NumberInput label="Buildings (1–50)" value={buildings} setValue={setBuildings} min={1} max={50} />
-        <NumberInput label="Machines (1–30)" value={machines} setValue={setMachines} min={1} max={30} />
+        <NumberInput label={`${cat1} (1–100)`} value={vehicles} setValue={setVehicles} min={1} max={100} />
+        <NumberInput label={`${cat2} (1–50)`} value={buildings} setValue={setBuildings} min={1} max={50} />
+        <NumberInput label={`${cat3} (1–30)`} value={machines} setValue={setMachines} min={1} max={30} />
         <button
           onClick={handleResize}
           disabled={resizeLoading}
@@ -538,10 +581,10 @@ function FleetCard() {
                 const inCat = devices.filter((d) => d.category === cat);
                 if (inCat.length === 0) return null;
                 return (
-                  <optgroup key={cat} label={`${cat[0].toUpperCase()}${cat.slice(1)}s`}>
+                  <optgroup key={cat} label={categoryLabel[cat] ?? cat}>
                     {inCat.map((d) => (
                       <option key={d.device_id} value={d.device_id}>
-                        {d.device_id}
+                        {displayDeviceId(d.device_id)}
                         {d.status && d.status !== 'ok' ? ` — ${d.status}` : ''}
                       </option>
                     ))}

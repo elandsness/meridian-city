@@ -1,21 +1,25 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useConfig } from '../config/ConfigContext.jsx'
 import { createServiceRequest } from '../api/serviceRequests.js'
 import { startAction, addActionProperties, endAction, reportError } from '../lib/rum.js'
 import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
 import { inputClass, labelClass } from '../ui/form.js'
 
-const CATEGORIES = ['infrastructure', 'utilities', 'safety', 'environment', 'transport', 'other']
+const DEFAULT_CATEGORIES = ['infrastructure', 'utilities', 'safety', 'environment', 'transport', 'other']
 const PRIORITIES = ['low', 'normal', 'high', 'urgent']
 
 export default function NewRequest() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const cfg = useConfig()
+  const requestSingular = cfg?.terminology?.request ?? 'request'
+  const categories = cfg?.terminology?.requestCategories ?? DEFAULT_CATEGORIES
 
   const [form, setForm] = useState({
-    category: 'infrastructure',
+    category: categories[0] ?? 'other',
     title: '',
     description: '',
     priority: 'normal',
@@ -71,7 +75,7 @@ export default function NewRequest() {
         <Link to="/service-requests" className="text-slate-500 hover:text-slate-900 transition-colors text-sm">
           ← Back
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Submit a request</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Submit a {requestSingular.toLowerCase()}</h1>
       </div>
 
       <Card>
@@ -79,7 +83,7 @@ export default function NewRequest() {
           <div>
             <label className={labelClass}>Category</label>
             <select name="category" value={form.category} onChange={handleChange} required className={inputClass}>
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
               ))}
             </select>

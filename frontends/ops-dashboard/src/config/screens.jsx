@@ -9,12 +9,29 @@ import RequestQueue from '../pages/RequestQueue.jsx';
 import BusinessAnalytics from '../pages/BusinessAnalytics.jsx';
 import DemoControl from '../pages/DemoControl.jsx';
 import FlightBoard from '../pages/FlightBoard.jsx';
-import AirfieldMap from '../pages/AirfieldMap.jsx';
+import EntityListPage from '../components/entity/EntityListPage.jsx';
+import EntityDetailPage from '../components/entity/EntityDetailPage.jsx';
+import EntityMapPage from '../components/entity/EntityMapPage.jsx';
+import EntityAnalyticsPage from '../components/entity/EntityAnalyticsPage.jsx';
+import EntityJourneyPage from '../components/entity/EntityJourneyPage.jsx';
+import StatusMapPage from '../components/entity/StatusMapPage.jsx';
+
+// Generic entity-template registry (generic-entity-engine initiative). A
+// screens.ops entry of the form {id, template, entityType, ...} resolves
+// through here instead of the static SCREENS map above -- see
+// docs/industry-config.schema.json's third screenList branch.
+const TEMPLATES = {
+  'entity-list': EntityListPage,
+  'entity-detail': EntityDetailPage,
+  'entity-map': EntityMapPage,
+  'entity-analytics': EntityAnalyticsPage,
+  'entity-journey': EntityJourneyPage,
+  'status-map': StatusMapPage,
+};
 
 export const SCREENS = {
   overview: { path: '/overview', label: 'Overview', icon: '📊', component: Overview },
   'flight-board': { path: '/flight-board', label: 'Flight Board', icon: '✈️', component: FlightBoard },
-  airfield: { path: '/airfield', label: 'Airfield', icon: '🛩️', component: AirfieldMap },
   iot: { path: '/iot', label: 'IoT Fleet', icon: '🌐', component: IoTPage },
   incidents: {
     path: '/incidents',
@@ -36,8 +53,19 @@ export function getActiveScreens(config) {
   const term = (key, fallback) => config?.terminology?.[key] ?? fallback;
   return list
     .map((item) => (typeof item === 'string' ? { id: item } : item))
-    .filter((it) => it && SCREENS[it.id])
+    .filter((it) => it && (it.template ? TEMPLATES[it.template] : SCREENS[it.id]))
     .map((it) => {
+      if (it.template) {
+        const Template = TEMPLATES[it.template];
+        return {
+          id: it.id,
+          path: `/${it.id}`,
+          component: () => <Template {...it} />,
+          icon: it.icon,
+          subRoutes: [],
+          label: it.label ?? it.id,
+        };
+      }
       const def = SCREENS[it.id];
       return {
         id: it.id,

@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { getFlights } from '../api/flights.js';
+import { getEntities, unwrapEntities } from '../api/entities.js';
 
 const STATUS_STYLES = {
   at_gate: 'bg-sky-400/10 text-sky-300',
-  servicing: 'bg-amber-400/10 text-amber-300',
   boarding: 'bg-emerald-400/10 text-emerald-300',
   taxiing: 'bg-indigo-400/10 text-indigo-300',
   takeoff: 'bg-cyan-400/10 text-cyan-300',
@@ -12,6 +11,8 @@ const STATUS_STYLES = {
   landing: 'bg-blue-400/10 text-blue-300',
   taxi_in: 'bg-indigo-400/10 text-indigo-300',
   arrived: 'bg-gray-500/10 text-gray-400',
+  cancelled: 'bg-red-500/10 text-red-400',
+  diverted: 'bg-orange-500/10 text-orange-400',
 };
 
 function StatusBadge({ status }) {
@@ -23,15 +24,20 @@ function StatusBadge({ status }) {
 }
 
 export default function FlightBoard() {
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['flights'],
-    queryFn: () => getFlights(),
+  const { data: depData, isLoading: depLoading, error: depError, refetch: refetchDep } = useQuery({
+    queryKey: ['entities', 'flight_departure'],
+    queryFn: () => getEntities('flight_departure'),
+    refetchInterval: 15_000,
+  });
+  const { data: arrData, isLoading: arrLoading, error: arrError, refetch: refetchArr } = useQuery({
+    queryKey: ['entities', 'flight_arrival'],
+    queryFn: () => getEntities('flight_arrival'),
     refetchInterval: 15_000,
   });
 
-  const flights = Array.isArray(data) ? data : data?.flights ?? data?.items ?? [];
-  const departures = flights.filter((f) => f.direction === 'departure');
-  const arrivals = flights.filter((f) => f.direction === 'arrival');
+  const departures = unwrapEntities(depData);
+  const arrivals = unwrapEntities(arrData);
+  const error = depError || arrError;
 
   return (
     <div className="space-y-6">
@@ -41,7 +47,7 @@ export default function FlightBoard() {
           <p className="text-gray-500 text-sm mt-1">Live departures &amp; arrivals across the airfield.</p>
         </div>
         <button
-          onClick={() => refetch()}
+          onClick={() => { refetchDep(); refetchArr(); }}
           className="text-xs text-gray-500 hover:text-cyan-400 transition-colors"
         >
           ↻ Refresh
@@ -51,14 +57,28 @@ export default function FlightBoard() {
       {error && <p className="text-rose-400 text-sm">Failed to load flights: {error.message}</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <FlightTable title="Departures" icon="🛫" endpointLabel="To" rows={departures} isLoading={isLoading} />
-        <FlightTable title="Arrivals" icon="🛬" endpointLabel="From" rows={arrivals} isLoading={isLoading} />
+        <FlightTable
+          title="Departures"
+          icon="🛫"
+          endpointLabel="To"
+          endpointField="destination"
+          rows={departures}
+          isLoading={depLoading}
+        />
+        <FlightTable
+          title="Arrivals"
+          icon="🛬"
+          endpointLabel="From"
+          endpointField="origin"
+          rows={arrivals}
+          isLoading={arrLoading}
+        />
       </div>
     </div>
   );
 }
 
-function FlightTable({ title, icon, endpointLabel, rows, isLoading }) {
+function FlightTable({ title, icon, endpointLabel, endpointField, rows, isLoading }) {
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
@@ -91,11 +111,9 @@ function FlightTable({ title, icon, endpointLabel, rows, isLoading }) {
                   <div className="text-white font-medium">{f.flight_number ?? '—'}</div>
                   <div className="text-gray-500 text-xs">{f.airline ?? ''}</div>
                 </td>
-                <td className="px-4 py-3 text-gray-300">
-                  {(title === 'Departures' ? f.destination : f.origin) ?? '—'}
-                </td>
+                <td className="px-4 py-3 text-gray-300">{f[endpointField] ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-400">{f.gate ?? '—'}</td>
-                <td className="px-4 py-3"><StatusBadge status={f.status} /></td>
+                <td className="px-4 py-3"><StatusBadge status={f.state ?? f.status} /></td>
               </tr>
             ))
           )}

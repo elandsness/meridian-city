@@ -4,8 +4,65 @@ config.json, which is mounted into both frontends at the nginx html root and
 fetched at startup by each SPA's ConfigContext. One ConfigMap serves both SPAs.
 Namespace-scoped, so the name stays plain (multi-tenancy isolates by namespace).
 NEVER add secrets to .Values.industry: config.json is served to every browser.
+
+`data`/`routing`/`dynatrace` are omitted below because they're backend-only
+mechanism config with nothing a browser renders. `entities` (the generic
+entity-engine's field/state/transition definitions) is deliberately NOT added
+to this omit list even though parts of it are backend-only mechanics (transition
+conditions/effects, generator strategy) — there's no secret in it, and the
+frontend's generic page/map templates need the browser-relevant parts (states,
+fields, computed.position.waypoints) at render time. Trimming it down to just
+those parts here would need per-field projection logic in this template, which
+isn't worth building for zero real benefit; the frontend simply ignores the
+fields it doesn't use. If a future entity-engine field ever needs to be a real
+secret, omit it explicitly by name here rather than omitting `entities` wholesale.
+
+Remote image URLs in theme.heroImage / theme.favicon / theme.logo and in any
+status-map screen's background.src are replaced here with local /industry-assets/
+paths. The public-portal pod's init container (see public-portal.yaml) downloads
+the originals at pod startup and places them at those paths under nginx's html
+root via an emptyDir volume. This keeps config.json self-consistent (only local
+refs) and means the browser never depends on an external image host at runtime.
 */}}
 {{- if or .Values.publicPortal.enabled .Values.opsDashboard.enabled }}
+{{- $hash := include "meridian.instanceHash" . -}}
+{{- $ind := deepCopy .Values.industry -}}
+
+{{- /* --- Replace remote URLs in theme with /industry-assets/ local paths --- */}}
+{{- $theme := deepCopy $ind.theme -}}
+{{- if hasPrefix "http" (default "" $theme.heroImage) -}}
+{{- $_ := set $theme "heroImage" (printf "/industry-assets/hero-%s.jpg" $hash) -}}
+{{- end -}}
+{{- if hasPrefix "http" (default "" $theme.favicon) -}}
+{{- $_ := set $theme "favicon" (printf "/industry-assets/favicon-%s.png" $hash) -}}
+{{- end -}}
+{{- if hasPrefix "http" (default "" $theme.logo) -}}
+{{- $_ := set $theme "logo" (printf "/industry-assets/logo-%s.png" $hash) -}}
+{{- end -}}
+{{- $_ := set $ind "theme" $theme -}}
+
+{{- /* --- Replace remote background.src in status-map public screens --- */}}
+{{- if (($ind.screens).public) -}}
+{{- $screensBlock := deepCopy $ind.screens -}}
+{{- $newPublic := list -}}
+{{- range $screensBlock.public -}}
+{{- $screen := . -}}
+{{- if kindIs "map" . -}}
+{{- $screen = deepCopy . -}}
+{{- if and (eq (default "" .template) "status-map") ((.background).src) -}}
+{{- if hasPrefix "http" (default "" .background.src) -}}
+{{- $newBg := deepCopy .background -}}
+{{- $_ := set $newBg "src" (printf "/industry-assets/mapbg-%s-%s.jpg" .id $hash) -}}
+{{- $_ = set $screen "background" $newBg -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $newPublic = append $newPublic $screen -}}
+{{- end -}}
+{{- $_ := set $screensBlock "public" $newPublic -}}
+{{- $_ = set $ind "screens" $screensBlock -}}
+{{- end -}}
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,5 +71,5 @@ metadata:
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
 data:
-  config.json: {{ omit .Values.industry "data" "routing" "dynatrace" | toJson | quote }}
+  config.json: {{ omit $ind "data" "routing" "dynatrace" | toJson | quote }}
 {{- end }}

@@ -46,4 +46,10 @@ async function markAllRead (citizenId) {
   await getPool().query('UPDATE messages.messages SET read = true WHERE citizen_id = $1', [citizenId])
 }
 
-module.exports = { insert, listForCitizen, markRead, markAllRead }
+async function purgeAll () {
+  if (!isReady()) return
+  await getPool().query('TRUNCATE messages.messages')
+  console.log(JSON.stringify({ level: 'info', msg: 'inbox purged (all messages deleted)' }))
+}
+
+module.exports = { insert, listForCitizen, markRead, markAllRead, purgeAll }

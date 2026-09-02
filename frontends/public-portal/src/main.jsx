@@ -11,6 +11,12 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 30_000,
+      // This is a demo platform meant to run on unattended/background screens
+      // (a monitor at a booth, a tab behind the presenter's terminal) -- the
+      // TanStack Query default of pausing refetchInterval polling once the tab
+      // loses OS focus would silently freeze every live widget (transit map,
+      // entity maps, flight status) until someone manually reloads the page.
+      refetchIntervalInBackground: true,
     },
   },
 })

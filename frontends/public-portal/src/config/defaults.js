@@ -44,6 +44,20 @@ export const DEFAULT_CONFIG = {
     ops: ['overview', 'iot', 'incidents', 'requests', 'analytics', 'demo-control'],
     disabled: [],
   },
+  home: {
+    public: [
+      { id: 'cityband', template: 'ticker', height: 'slim', label: '🏙️ CITY NEWS', items: [
+        'City Hall announces $2M parks renovation starting Spring 2026',
+        'Transit expansion: Blue Line extended to North Heights — opens June 2026',
+        'Meridian Central Station wins Best Urban Infrastructure award',
+        'Community solar program now open for residential sign-ups',
+        'Water main upgrade complete — service fully restored citywide',
+      ]},
+      'city-home', 'transit-map', 'quick-actions',
+    ],
+    ops: ['ops-overview'],
+  },
+  entities: {},
 }
 
 export default DEFAULT_CONFIG

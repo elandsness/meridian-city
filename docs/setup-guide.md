@@ -276,6 +276,78 @@ See [dynatrace-config-guide.md](dynatrace-config-guide.md) for:
 
 ---
 
+## Local Development (Building Images Without Waiting on CI)
+
+CI only builds/pushes images on push to `main` (see below), so iterating on a
+service locally needs a separate build+deploy loop. This path has been in use for
+a while but was never written down — captured here from practice.
+
+### Cluster
+
+A local **Rancher Desktop** (k3s) cluster, kept as its own `rancher-desktop`
+kubectl context alongside your primary cloud cluster's context:
+
+```bash
+kubectl config get-contexts
+kubectl config use-context rancher-desktop        # local
+kubectl config use-context <your-cloud-context>   # e.g. a GKE/EKS/AKS context
+```
+
+### Container engine
+
+Rancher Desktop uses **containerd**, not Docker — use `nerdctl` (Docker-CLI
+compatible) instead of `docker` to build:
+
+```bash
+nerdctl build -t <appImageRegistry>/<service-name>:local services/<service-name>
+```
+
+If the cluster reports `ImagePullBackOff`/`ErrImageNeverPull` for a `:local` tag
+even though the build succeeded, it likely landed in the wrong containerd
+namespace — k3s reads from `k8s.io`, while a plain `nerdctl build` defaults to a
+different one. Build with the namespace pinned:
+
+```bash
+nerdctl --namespace k8s.io build -t <appImageRegistry>/<service-name>:local services/<service-name>
+```
+
+### VM resources
+
+Rancher Desktop's default VM RAM (2 GB) is not enough for a Maven build — it
+OOMs. Bump it before building Java services (check current value with
+`rdctl list-settings`):
+
+```bash
+rdctl set --virtual-machine.memory-in-gb 6   # or higher; restarts the backend
+```
+
+### Repo location matters
+
+If your working copy lives under a cloud-synced folder (OneDrive, Dropbox,
+etc.), Rancher Desktop's VM cannot mount that path as a build context. Stage a
+plain copy under your home directory first:
+
+```bash
+rsync -a --exclude .git <path-to-synced-repo>/ ~/meridian-build/
+cd ~/meridian-build && nerdctl --namespace k8s.io build -t ...
+```
+
+### Deploying locally-built images
+
+Every service image is resolved from **one global tag**
+(`<appImageRegistry>/<service-name>:<global.imageTag>`, see `helm/values.yaml`) —
+there's no per-service tag override. So a local-build loop needs a `:local`-tagged
+image for every service the chart expects to find (build the ones you're
+changing; re-tag pulled `:latest` images as `:local` for the rest), then point
+one upgrade at all of them at once:
+
+```bash
+./scripts/deploy.sh upgrade -f helm/values-dev.yaml -f helm/values-custom.yaml \
+  --set global.imageTag=local --set global.imagePullPolicy=IfNotPresent
+```
+
+---
+
 ## Continuous Integration (Image Builds)
 
 Service images are built and pushed to GHCR by `.github/workflows/build.yml` on

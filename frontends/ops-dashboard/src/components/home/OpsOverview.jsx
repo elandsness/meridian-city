@@ -47,16 +47,25 @@ export default function OpsOverview() {
     refetchInterval: 60_000,
   });
 
-  const chartData = (Array.isArray(history) ? history : [])
+  const sorted = (Array.isArray(history) ? history : [])
     .slice()
     .sort(
       (a, b) =>
         new Date(a.snapshot_at ?? a.timestamp) - new Date(b.snapshot_at ?? b.timestamp)
-    )
-    .map((snap) => ({
+    );
+
+  // Show new requests per interval (delta between consecutive cumulative snapshots).
+  // The cumulative daily total is monotonically increasing, so deltas show actual
+  // throughput. First point gets 0; negative deltas (e.g. day rollover or
+  // re-deploy) are clamped to 0.
+  const chartData = sorted.map((snap, i) => {
+    const curr = snap.requests_today ?? 0;
+    const prev = i === 0 ? curr : (sorted[i - 1].requests_today ?? 0);
+    return {
       time: formatHHmm(snap.snapshot_at ?? snap.timestamp),
-      requests: snap.requests_today ?? 0,
-    }));
+      requests: Math.max(0, curr - prev),
+    };
+  });
 
   return (
     <>

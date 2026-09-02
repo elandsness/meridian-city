@@ -41,6 +41,7 @@ export default function Layout() {
           <div className="hidden md:flex items-center gap-5">
             {screens.map((s) => (
               <NavLink key={s.id} to={s.path} end={s.path === '/'} className={navLinkClass}>
+                {s.icon && <span className="mr-1">{s.icon}</span>}
                 {s.label}
               </NavLink>
             ))}

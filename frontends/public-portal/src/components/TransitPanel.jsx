@@ -7,10 +7,16 @@ const MODE_LABEL = { rail: 'Regional rail', subway: 'Subway', bus: 'Bus' }
 
 const STATUS_REFETCH_MS = 60000
 
-function statusFor(v) {
-  if (!v) return { text: '-', tone: 'slate' }
-  if (v.status === 'late') return { text: `${v.delay_minutes} min late`, tone: 'amber' }
-  if (v.status === 'early') return { text: `${v.delay_minutes} min early`, tone: 'blue' }
+// Worst status wins when multiple vehicles share a line (late > early > on_time).
+function statusFor(vehicles, lineId) {
+  const vs = vehicles.filter((v) => v.line_id === lineId)
+  if (vs.length === 0) return { text: '—', tone: 'slate' }
+  const worst = vs.sort((a, b) =>
+    (a.status === 'late' ? 0 : a.status === 'early' ? 1 : 2) -
+    (b.status === 'late' ? 0 : b.status === 'early' ? 1 : 2)
+  )[0]
+  if (worst.status === 'late') return { text: `${worst.delay_minutes} min late`, tone: 'amber' }
+  if (worst.status === 'early') return { text: `${worst.delay_minutes} min early`, tone: 'blue' }
   return { text: 'On time', tone: 'green' }
 }
 
@@ -168,7 +174,7 @@ export default function TransitPanel({ routes, config }) {
             const color = colorByLine[v.line_id] || '#475569'
             return (
               <g
-                key={v.line_id}
+                key={`${v.line_id}-${v.direction}`}
                 style={{ transform: `translate(${stop.x}px, ${stop.y}px)`, transition: 'transform 1.6s ease-in-out' }}
               >
                 <circle r={10} fill="none" stroke={color} strokeWidth={2} opacity={0.5}>
@@ -183,8 +189,7 @@ export default function TransitPanel({ routes, config }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
         {lines.map((line) => {
-          const vehicle = vehicles.find((x) => x.line_id === (line.id || line.name))
-          const st = statusFor(vehicle)
+          const st = statusFor(vehicles, line.id || line.name)
           return (
             <div
               key={line.id || line.name}

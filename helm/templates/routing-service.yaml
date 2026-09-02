@@ -1,0 +1,72 @@
+{{- if .Values.routingService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: routing-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: routing-service
+spec:
+  replicas: {{ .Values.routingService.replicaCount }}
+  selector:
+    matchLabels:
+      app: routing-service
+  template:
+    metadata:
+      labels:
+        app: routing-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: routing-service
+    spec:
+      containers:
+        - name: routing-service
+          image: {{ include "meridian.image" (dict "repository" .Values.routingService.image.repository "tag" .Values.routingService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8095
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "routing-service"
+            # Industry routing map (JSON string from industry.routing values key).
+            # Empty = built-in City defaults (infrastructure→Infrastructure Maintenance, etc.).
+            - name: ROUTING_MAP
+              value: {{ .Values.industry.routing | default dict | toJson | quote }}
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.routingService.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8095
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8095
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.routingService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: routing-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: routing-service
+spec:
+  type: ClusterIP
+  selector:
+    app: routing-service
+  ports:
+    - name: http
+      port: {{ .Values.routingService.service.port }}
+      targetPort: 8095
+{{- end }}

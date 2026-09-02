@@ -103,6 +103,8 @@ spec:
               value: {{ .Values.industry.dynatrace.flowLabels | default dict | toJson | quote }}
             - name: DT_FLOWS
               value: {{ .Values.industry.dynatrace.flows | default list | toJson | quote }}
+            - name: DT_ENTITY_CONFIG
+              value: {{ .Values.industry.entities | default dict | toJson | quote }}
           volumeMounts:
             - name: scripts
               mountPath: /scripts
@@ -208,6 +210,8 @@ spec:
               value: {{ .Values.industry.dynatrace.flowLabels | default dict | toJson | quote }}
             - name: DT_FLOWS
               value: {{ .Values.industry.dynatrace.flows | default list | toJson | quote }}
+            - name: DT_ENTITY_CONFIG
+              value: {{ .Values.industry.entities | default dict | toJson | quote }}
           volumeMounts:
             - name: scripts
               mountPath: /scripts

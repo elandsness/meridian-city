@@ -1,0 +1,311 @@
+{{/*
+Generic config-driven entity/lifecycle engine.
+Stage 6: entity-engine image deployed TWICE:
+  customer-entity-service owns customer-facing types (citizen, service_request, bill, cart)
+  ops-entity-service     owns ops-facing types     (incident, work_order)
+The old single `entity-engine` deployment is disabled (entityEngine.enabled=false) and
+will be removed in Stage 10. Both new deployments share the same entity-config ConfigMap.
+*/}}
+
+{{- if .Values.customerEntityService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-entity-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: customer-entity-service
+spec:
+  replicas: {{ .Values.customerEntityService.replicaCount }}
+  selector:
+    matchLabels:
+      app: customer-entity-service
+  template:
+    metadata:
+      annotations:
+        checksum/entity-config: {{ include (print $.Template.BasePath "/entity-config-configmap.yaml") . | sha256sum }}
+      labels:
+        app: customer-entity-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: customer-entity-service
+    spec:
+      volumes:
+        - name: entity-config
+          configMap:
+            name: entity-config
+      containers:
+        - name: customer-entity-service
+          image: {{ include "meridian.image" (dict "repository" .Values.customerEntityService.image.repository "tag" .Values.customerEntityService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8094
+          volumeMounts:
+            - name: entity-config
+              mountPath: /etc/meridian/entity-config.json
+              subPath: entity-config.json
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "customer-entity-service"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: db-password
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            - name: ENTITY_CONFIG_PATH
+              value: "file:/etc/meridian/entity-config.json"
+            - name: ENTITY_TYPES
+              value: {{ .Values.customerEntityService.ownedTypes | quote }}
+            - name: KAFKA_GROUP_ID
+              value: "customer-entity-service-group"
+            # application.yml binds spring.kafka.bootstrap-servers from SPRING_KAFKA_BOOTSTRAP_SERVERS,
+            # not from the generic KAFKA_BOOTSTRAP_SERVERS that commonEnv provides -- must be explicit.
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: {{ printf "%s:9092" (include "meridian.kafkaBootstrap" .) | quote }}
+            # Routing-service URL for the service_request submitted→validated callService effect.
+            - name: ROUTING_SERVICE_URL
+              value: "http://routing-service:8095"
+            # Ops-entity-service URL for creating linked work_orders from service requests.
+            - name: OPS_ENTITY_SERVICE_URL
+              value: "http://ops-entity-service:8094"
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.customerEntityService.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8094
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8094
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.customerEntityService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-entity-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: customer-entity-service
+spec:
+  type: ClusterIP
+  selector:
+    app: customer-entity-service
+  ports:
+    - name: http
+      port: {{ .Values.customerEntityService.service.port }}
+      targetPort: 8094
+{{- end }}
+
+{{- if .Values.opsEntityService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-entity-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ops-entity-service
+spec:
+  replicas: {{ .Values.opsEntityService.replicaCount }}
+  selector:
+    matchLabels:
+      app: ops-entity-service
+  template:
+    metadata:
+      annotations:
+        checksum/entity-config: {{ include (print $.Template.BasePath "/entity-config-configmap.yaml") . | sha256sum }}
+      labels:
+        app: ops-entity-service
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ops-entity-service
+    spec:
+      volumes:
+        - name: entity-config
+          configMap:
+            name: entity-config
+      containers:
+        - name: ops-entity-service
+          image: {{ include "meridian.image" (dict "repository" .Values.opsEntityService.image.repository "tag" .Values.opsEntityService.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8094
+          volumeMounts:
+            - name: entity-config
+              mountPath: /etc/meridian/entity-config.json
+              subPath: entity-config.json
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "ops-entity-service"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: db-password
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            - name: ENTITY_CONFIG_PATH
+              value: "file:/etc/meridian/entity-config.json"
+            - name: ENTITY_TYPES
+              value: {{ .Values.opsEntityService.ownedTypes | quote }}
+            - name: KAFKA_GROUP_ID
+              value: "ops-entity-service-group"
+            # Kafka bridge: listen to iot.anomalies and create incident entities.
+            - name: KAFKA_TRIGGERS_ENABLED
+              value: "true"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: {{ printf "%s:9092" (include "meridian.kafkaBootstrap" .) | quote }}
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.opsEntityService.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8094
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8094
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.opsEntityService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-entity-service
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ops-entity-service
+spec:
+  type: ClusterIP
+  selector:
+    app: ops-entity-service
+  ports:
+    - name: http
+      port: {{ .Values.opsEntityService.service.port }}
+      targetPort: 8094
+{{- end }}
+
+{{- if .Values.entityEngine.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entity-engine
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: entity-engine
+spec:
+  replicas: {{ .Values.entityEngine.replicaCount }}
+  selector:
+    matchLabels:
+      app: entity-engine
+  template:
+    metadata:
+      annotations:
+        checksum/entity-config: {{ include (print $.Template.BasePath "/entity-config-configmap.yaml") . | sha256sum }}
+      labels:
+        app: entity-engine
+        {{- include "meridian.labels" . | nindent 8 }}
+        app.kubernetes.io/component: entity-engine
+    spec:
+      volumes:
+        - name: entity-config
+          configMap:
+            name: entity-config
+      containers:
+        - name: entity-engine
+          image: {{ include "meridian.image" (dict "repository" .Values.entityEngine.image.repository "tag" .Values.entityEngine.image.tag "context" $) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8094
+          volumeMounts:
+            - name: entity-config
+              mountPath: /etc/meridian/entity-config.json
+              subPath: entity-config.json
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "entity-engine"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: db-password
+            # Flyway owns the schema; Hibernate maps without validating (mirrors
+            # every other Java service here), so a fresh image never crash-loops
+            # on ddl validate.
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
+            - name: ENTITY_CONFIG_PATH
+              value: "file:/etc/meridian/entity-config.json"
+            - name: ENTITY_TYPES
+              value: {{ .Values.entityEngine.ownedTypes | quote }}
+            {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
+            {{- with .Values.entityEngine.env }}
+            {{- include "meridian.extraEnv" . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8094
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8094
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.entityEngine.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entity-engine
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: entity-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: entity-engine
+  ports:
+    - name: http
+      port: {{ .Values.entityEngine.service.port }}
+      targetPort: 8094
+{{- end }}

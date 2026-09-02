@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "public-portal-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontends/public-portal"],
+      "port": 5173
+    },
+    {
+      "name": "ops-dashboard-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontends/ops-dashboard"],
+      "port": 5174
+    }
+  ]
+}

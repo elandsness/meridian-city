@@ -1,82 +1,71 @@
-# =============================================================================
-# Meridian Power — industry config overlay (Stage 7: entity engine retrofit)
-# =============================================================================
-# Layer this over the base chart + your secrets to deploy a power utility
-# branded instance backed by the generic entity engine:
-#   ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-powerutility.yaml
-
 industry:
   version: 1
-  id: power-utility
+  id: power-utility-retro
   company:
-    name: "Meridian Power"
-    short: "Meridian Power"
-    tagline: "Keeping the lights on."
+    name: "PowerUnlimited"
+    short: "PowerUnlimited"
+    tagline: "Powering your life. Safely and reliably."
     assistant:
-      name: "Luma"
-      persona: "the Meridian Power virtual assistant"
-      supportPhone: "1-800-MERIDIAN (1-800-637-4326)"
+      name: "Volt"
+      persona: "the PowerUnlimited virtual assistant"
+      supportPhone: "1-800-436-PWR-U"
       systemPrompt: |-
-        You are Luma, the Meridian Power virtual assistant.
-        Help customers with outages, service requests, billing questions, and
-        energy-saving tips. If a user reports an emergency (downed power line,
-        electrical fire), immediately say:
-        '⚠️ Your safety is our priority. If there is a downed power line or
-        electrical hazard, stay at least 30 feet away and call 911 and Meridian
-        Power emergency line at 1-800-MERIDIAN right away.'
+        You are Volt, the PowerUnlimited virtual assistant.
+        Help customers report outages, check restoration times, and ask billing questions.
+        If a user mentions downed wires or sparks, immediately say:
+        '⚠️ Stay at least 30 feet away — call emergency services first!'
 
   theme:
     colors:
-      brand: "#F59E0B"
-      brandDeep: "#B45309"
-      brandSoft: "#FBBF24"
-      brandTint: "#FFFBEB"
-      accent: "#10B981"
-      accentSoft: "#34D399"
-      accentInk: "#064E3B"
-    heroImage: "https://images.unsplash.com/photo-1473341314170-576993b4d347?w=1600&q=80"
-    logo: "/meridian-power-logo.svg"
-    favicon: "/meridian-power_ico.svg"
+      brand: "#FF7A00"
+      brandDeep: "#CC5F00"
+      brandSoft: "#FF983D"
+      brandTint: "#FFF4E6"
+      accent: "#2EC4B6"
+      accentSoft: "#5DE4D1"
+      accentInk: "#1A7A6F"
+    heroImage: "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1600&q=80"
+    logo: "/powerunlimited_logo.svg"
+    favicon: "/powerunlimited_ico.svg"
 
   terminology:
-    customer: "Ratepayer"
-    customerPlural: "Ratepayers"
+    customer: "Customer"
+    customerPlural: "Customers"
     request: "Service Request"
     requestPlural: "Service Requests"
-    incident: "Outage"
-    incidentPlural: "Outages"
-    workOrder: "Work Order"
+    incident: "Grid Fault"
+    incidentPlural: "Grid Faults"
+    workOrder: "Field Work Order"
     asset: "Grid Asset"
     assetPlural: "Grid Assets"
     requestCategories:
-      - outage
-      - power-quality
-      - meter-issue
-      - safety-concern
-      - maintenance-request
-      - new-service
+      - outage-report
+      - billing-question
+      - tree-trimming
+      - streetlights
+      - safety-hazard
       - other
     billingTitle: "Billing & Payments"
-    billingSubtitle: "Your Meridian Power service statements and payment history."
-    billNoun: "utility bill"
-    iotCategory1: "Transformers"
-    iotCategory2: " substations"
+    billingSubtitle: "Your PowerUnlimited energy statements and payment history."
+    billNoun: "energy bill"
+    iotCategory1: "Field Vehicles"
+    iotCategory2: "Substations"
     iotCategory3: "Smart Meters"
-    iotIdPrefix1: "xfmr"
+    iotIdPrefix1: "veh"
     iotIdPrefix2: "sub"
-    iotIdPrefix3: "meter"
+    iotIdPrefix3: "mtr"
     iotZonePositions:
-      north-district:     { x: 200, y: 150 }
-      south-district:     { x: 700, y: 800 }
-      east-substation:    { x: 900, y: 400 }
-      west-substation:    { x: 100, y: 400 }
-      central-hub:        { x: 500, y: 500 }
+      metro-substation:  { x: 500,  y: 400 }
+      valley-substation: { x: 300,  y: 700 }
+      north-region:      { x: 800,  y: 200 }
+      south-region:      { x: 900,  y: 800 }
+      industrial-park:   { x: 1300, y: 500 }
 
   screens:
     public:
       - home
-      - { id: my-outages, template: entity-list, entityType: outage, label: "My Outages", icon: "⚡" }
-      - { id: service-requests, label: "Help & Requests" }
+      - { id: outage-tracker, template: entity-list, entityType: outage_event, label: "My Outages", icon: "⚡" }
+      - { id: service-requests, label: "Help & Support" }
       - billing
       - messages
 
@@ -84,227 +73,179 @@ industry:
       - overview
       - id: grid-map
         template: status-map
-        label: "Grid Map"
+        label: "Live Grid Map"
         icon: "🗺️"
-        title: "Grid Assets & Infrastructure"
+        title: "Infrastructure Grid Status"
         source: devices
         clusterBy: zone
         viewBox: "0 0 1600 1067"
-        background: { kind: image, src: "https://images.unsplash.com/photo-1477554093534-7a0da111b036?w=1600&q=80" }
-      - { id: active-outages, template: entity-list, entityType: outage, label: "Active Outages" }
-      - { id: work-orders, template: entity-list, entityType: work_order, label: "Work Orders" }
-      - id: iot
-        label: "Grid IoT Devices"
-        icon: "📡"
-      - { id: incidents, label: "Outages" }
-      - { id: analytics, label: "Grid Analytics" }
+        background: { kind: image, src: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1600&q=80" }
+      - { id: active-outages, template: entity-list, entityType: outage_event, label: "Active Outages" }
+      - { id: repairs, template: entity-list, entityType: repair_task, label: "Field Repairs" }
+      - { id: incidents, label: "Grid Faults" }
+      - { id: iot, label: "Asset Fleet" }
+      - { id: analytics, label: "Reliability (SAIDI)" }
       - demo-control
 
   home:
     public:
       - welcome-hero
-      - id: news-ticker
-        headlines:
+      - id: grid-news
+        template: ticker
+        height: slim
+        label: "⚡ GRID STATUS"
+        items:
           - "System operating normally. No major outages reported."
-          - "Scheduled maintenance on Transformer XFMR-1247 at 2:00 AM."
-          - "Save Energy Tip: Set your thermostat 2 degrees higher in summer."
-          - "North District: Power restored to 98% of affected customers."
-          - "Report a downed power line: stay 30 feet away and call 911."
+          - "Scheduled maintenance in Valley Substation at 11:00 PM."
+          - "Hot weather alert: See our tips to reduce cooling costs."
       - quick-actions
       - { id: weather, template: weather-widget, mode: forecast }
       - chat-teaser
 
     ops:
-      - { id: outage-kpi, template: entity-summary-card, entityType: outage, label: "Outages Today" }
-      - { id: grid-kpi, template: entity-analytics, entityType: grid_reading, label: "Grid Load Trend" }
+      - { id: outage-kpi, template: entity-summary-card, entityType: outage_event, label: "Outages Today" }
+      - { id: demand-kpi, template: entity-analytics, entityType: meter_reading, label: "Peak Demand Trend" }
       - ops-overview
-      - { id: outage-feed, template: activity-feed, entityTypes: [outage], maxItems: 8 }
+      - { id: outage-feed, template: activity-feed, entityTypes: [outage_event], maxItems: 8 }
 
   entities:
-    outage:
-      displayName: "Outage"
-      displayNamePlural: "Outages"
+    outage_event:
+      displayName: "Outage Event"
+      displayNamePlural: "Outage Events"
       idPrefix: out
       fields:
-        zone:          { type: string }
-        location:      { type: string }
-        severity:      { type: enum, values: [minor, moderate, major, critical] }
-        cause:         { type: enum, values: ["weather", "equipment-fail", "vehicle-accident", "animal", "unknown"] }
-        affected_customers: { type: number }
+        customer_id: { type: string }
+        location:    { type: string }
+        severity:    { type: enum, values: [minor, major, critical] }
       initial: reported
 
       states:
-        reported:         { label: "Reported",            tone: slate }
-        acknowledged:     { label: "Acknowledged",        tone: amber }
-        diagnosing:       { label: "Diagnosing",          tone: orange }
-        repairing:        { label: "Repair In Progress",  tone: red }
-        restored:         { label: "Power Restored",      tone: green, terminal: true, isKpi: true }
+        reported:         { label: "Reported",        tone: slate }
+        investigating:    { label: "Investigating",   tone: amber }
+        crew_dispatched:  { label: "Crew Dispatched", tone: blue }
+        on_site:          { label: "Crew On Site",    tone: orange }
+        restored:         { label: "Power Restored",  tone: green, terminal: true, isKpi: true }
 
       transitions:
         - from: reported
-          to: acknowledged
-          timer: { minSeconds: 15, maxSeconds: 60 }
-        - from: acknowledged
-          to: diagnosing
-          timer: { minSeconds: 30, maxSeconds: 180 }
-        - from: diagnosing
-          to: repairing
-          when: { probability: 0.7 }
-          timer: { minSeconds: 60, maxSeconds: 300 }
-        - from: diagnosing
+          to: investigating
+          timer: { minSeconds: 15, maxSeconds: 45 }
+        - from: investigating
+          to: crew_dispatched
+          timer: { minSeconds: 30, maxSeconds: 90 }
+        - from: crew_dispatched
+          to: on_site
+          timer: { minSeconds: 45, maxSeconds: 120 }
+        - from: on_site
           to: restored
-          when: { probability: 0.3 }
-          timer: { minSeconds: 60, maxSeconds: 300 }
-        - from: repairing
-          to: restored
-          timer: { minSeconds: 120, maxSeconds: 1800 }
+          timer: { minSeconds: 60, maxSeconds: 180 }
 
       computed:
         position:
           type: point2d
           interpolation: easeInOut
           waypoints:
-            reported:         { x: 200, "y": 100 }
-            acknowledged:     { x: 350, "y": 200 }
-            diagnosing:       { x: 500, "y": 150 }
-            repairing:        { x: 650, "y": 250 }
-            restored:         { x: 800, "y": 200 }
+            reported:        { x: 197, "y": 99 }
+            investigating:   { x: 423, "y": 260 }
+            crew_dispatched: { x: 685, "y": 182 }
+            on_site:         { x: 895, "y": 240 }
+            restored:        { x: 920, "y": 310 }
 
-      generator:
-        strategy: simpleSteadyState
-        intervalMs: 45000
-        maxActive: 8
+      generator: { strategy: simpleSteadyState, intervalMs: 35000, maxActive: 8 }
 
-    work_order:
-      displayName: "Work Order"
-      displayNamePlural: "Work Orders"
-      idPrefix: wo
+    repair_task:
+      displayName: "Repair Task"
+      displayNamePlural: "Repair Tasks"
+      idPrefix: rpr
       fields:
-        asset_type: { type: enum, values: ["transformer", "substation", "line", "meter", "switch"] }
-        priority:   { type: enum, values: ["critical", "high", "standard"] }
-        scheduled:  { type: boolean, default: false }
-      initial: queued
+        task_type: { type: enum, values: ["pole-repair", "transformer-fail"] }
+        priority:  { type: enum, values: ["critical", "high"] }
+      initial: assigned
 
       states:
-        queued:       { label: "Queued",           tone: slate }
-        assigned:     { label: "Assigned",         tone: blue }
-        in_progress:  { label: "In Progress",      tone: amber }
-        inspection:   { label: "Inspection",       tone: orange }
-        completed:    { label: "Completed",        tone: green, terminal: true }
+        assigned:   { label: "Assigned",  tone: slate }
+        enroute:    { label: "En Route",  tone: amber }
+        on_site:    { label: "On Site",   tone: blue }
+        completed:  { label: "Completed", tone: green, terminal: true }
 
       transitions:
-        - from: queued
-          to: assigned
-          timer: { minSeconds: 60, maxSeconds: 300 }
         - from: assigned
-          to: in_progress
+          to: enroute
           timer: { minSeconds: 60, maxSeconds: 300 }
-        - from: in_progress
-          to: inspection
-          timer: { minSeconds: 120, maxSeconds: 900 }
-        - from: inspection
-          to: queued
-          when: { probability: 0.1 }
-          timer: { minSeconds: 30, maxSeconds: 180 }
-        - from: inspection
+        - from: enroute
+          to: on_site
+          timer: { minSeconds: 45, maxSeconds: 120 }
+        - from: on_site
           to: completed
-          timer: { minSeconds: 30, maxSeconds: 120 }
+          timer: { minSeconds: 60, maxSeconds: 180 }
 
       computed:
         position:
           type: point2d
           interpolation: linear
           waypoints:
-            queued:       { x: 400, "y": 600 }
-            assigned:     { x: 550, "y": 700 }
-            in_progress:  { x: 700, "y": 650 }
-            inspection:   { x: 800, "y": 500 }
-            completed:    { x: 900, "y": 400 }
+            assigned:  { x: 400, "y": 50 }
+            enroute:   { x: 650, "y": 180 }
+            on_site:   { x: 920, "y": 310 }
+            completed: { x: 1080, "y": 460 }
 
-      generator:
-        strategy: simpleSteadyState
-        intervalMs: 60000
-        maxActive: 12
+      generator: { strategy: simpleSteadyState, intervalMs: 50000, maxActive: 5 }
 
-    grid_reading:
-      displayName: "Grid Reading"
+    meter_reading:
+      displayName: "Meter Reading"
       displayNamePlural: "Readings"
-      idPrefix: gr
+      idPrefix: mtr
       fields:
-        zone:            { type: string }
-        demand_mw:       { type: number }
-        voltage_kv:      { type: number }
-        frequency_hz:    { type: number }
-        power_factor:    { type: number }
-      initial: recorded
+        device_id:      { type: string }
+        consumption_kw: { type: number }
+      initial: processed
 
       states:
-        recorded: { label: "Recorded", tone: slate, terminal: true }
+        processed: { label: "Processed", tone: slate, terminal: true }
 
-      generator:
-        strategy: simpleSteadyState
-        intervalMs: 30000
-        maxActive: 50
+      generator: { strategy: simpleSteadyState, intervalMs: 15000, maxActive: 20 }
 
   data:
-    zones:
-      - north-district
-      - south-district
-      - east-substation
-      - west-substation
-      - central-hub
+    zones: [metro-substation, valley-substation, north-region, south-region, industrial-park]
     requestTemplates:
-      - { category: outage,            title: "Power Outage Reported",            description: "No power at 123 Main Street. Neighbors confirm same." }
-      - { category: power-quality,     title: "Flickering Lights",              description: "Lights in the building flicker every few minutes." }
-      - { category: meter-issue,       title: "Smart Meter Not Reporting",      description: "Smart meter MTR-4521 has not reported in 6 hours." }
-      - { category: safety-concern,    title: "Downed Power Line",              description: "A power line is down on Oak Avenue after the storm." }
-      - { category: maintenance-request, title: "Tree Trimming Near Lines",     description: "Tree branches are hanging over power lines on Elm Street." }
-      - { category: new-service,       title: "New Service Connection",         description: "New construction at 456 Pine Road needs electrical service." }
-      - { category: other,             title: "General Inquiry",                description: "Question about service or billing." }
+      - { category: outage-report,    title: "Total Power Loss",         description: "Entire neighborhood without power since 2:00 PM." }
+      - { category: safety-hazard,    title: "Downed Power Line",        description: "Sparks visible on downed line at Elm St." }
+      - { category: billing-question, title: "Unusually high bill",      description: "Bill doubled despite no usage change." }
+      - { category: other,            title: "Smart Meter Display Blank", description: "Digital display completely off." }
     chatQuestions:
-      - "How do I report a power outage?"
-      - "What is the status of outages in my area?"
-      - "When will my work order be completed?"
-      - "How can I check my energy usage?"
-      - "Where can I find outage maps?"
-      - "How do I sign up for outage notifications?"
-      - "What should I do during a power outage?"
+      - "Is there a known outage in my area?"
       - "How do I report a downed power line?"
-      - "Can I get time-of-use pricing?"
-      - "Where can I find energy-saving tips?"
+      - "When will my power be restored?"
 
   routing:
-    outage:            "Outage Response"
-    power-quality:     "Power Quality Team"
-    meter-issue:       "Meter Operations"
-    safety-concern:    "Safety & Emergency"
-    maintenance-request: "Line Maintenance"
-    new-service:       "New Service Connections"
-    other:             "General Operations"
+    outage-report:    "Grid Operations"
+    billing-question: "Customer Accounting"
+    tree-trimming:    "Vegetation Management"
+    streetlights:     "Municipal Services"
+    safety-hazard:    "Emergency Response"
+    other:            "General Support"
 
   dynatrace:
     serviceNames:
-      citizen-service:      "Ratepayer Portal"
+      citizen-service:      "Customer Experience Portal"
       city-operations:      "Grid Operations Center"
-      service-dispatch:     "Field Service Dispatch"
+      service-dispatch:     "Field Dispatch Service"
       api-gateway:          "Utility API Gateway"
       notification-service: "Outage Notification Engine"
-      billing-service:      "Customer Billing Service"
+      billing-service:      "CIS Billing Service"
 
     flowLabels:
-      service-request:   "Service Request Lifecycle"
-      account-creation:  "New Ratepayer Onboarding"
-      iot-incident:      "Grid Incident Resolution"
-      tax-payment:       "Utility Bill Payment"
+      service-request: "Maintenance Request Lifecycle"
+      account-creation: "New Customer Move-in"
+      iot-incident:    "Smart Grid Fault Resolution"
+      tax-payment:     "Utility Bill Payment"
 
     flows: [service-request, account-creation, iot-incident, tax-payment]
 
-# =============================================================================
-# Entity engine ownership — add power utility entities to each service.
-# =============================================================================
-
+# Entity engine ownership — add power-utility entities to each service.
+# outage_event and meter_reading are customer-facing; repair_task is ops-facing.
 customerEntityService:
-  ownedTypes: "citizen,service_request,bill,cart,grid_reading"
+  ownedTypes: "citizen,service_request,bill,cart,outage_event,meter_reading"
 
 opsEntityService:
-  ownedTypes: "outage,work_order"
+  ownedTypes: "incident,work_order,repair_task"

@@ -20,4 +20,6 @@ module.exports = {
   BILLING_SERVICE_URL:      process.env.BILLING_SERVICE_URL      || 'http://localhost:8091',
   FLIGHT_OPS_URL:           process.env.FLIGHT_OPS_URL           || 'http://localhost:8092',
   PASSENGER_SERVICE_URL:    process.env.PASSENGER_SERVICE_URL    || 'http://localhost:8093',
+  CUSTOMER_ENTITY_SERVICE_URL: process.env.CUSTOMER_ENTITY_SERVICE_URL || 'http://localhost:8094',
+  OPS_ENTITY_SERVICE_URL:      process.env.OPS_ENTITY_SERVICE_URL      || 'http://localhost:8094',
 }

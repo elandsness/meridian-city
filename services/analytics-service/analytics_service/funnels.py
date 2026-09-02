@@ -34,17 +34,13 @@ _FUNNELS: dict[str, list[str]] = {
     "service-request": [
         "service_request.submitted",
         "service_request.validated",
-        "service_request.dispatched",
-        "service_request.assigned",
         "service_request.in_progress",
         "service_request.resolved",
     ],
     "account-creation": [
-        "account.registration_started",
-        "account.details_submitted",
-        "account.verification_sent",
-        "account.verified",
-        "account.activated",
+        "citizen.verification_sent",
+        "citizen.verified",
+        "citizen.activated",
     ],
     "iot-incident": [
         "iot.anomaly_detected",
@@ -54,7 +50,7 @@ _FUNNELS: dict[str, list[str]] = {
         "workorder.acknowledged",
         "workorder.resolved",
     ],
-    # Flow D — City Store purchase funnel (derived from commerce.orders)
+    # Flow D — City Store purchase funnel (derived from entity events)
     "purchase": [
         "cart.item_added",
         "checkout.completed",
@@ -62,10 +58,17 @@ _FUNNELS: dict[str, list[str]] = {
         "order.shipped",
         "order.delivered",
     ],
-    # Flow E — Tax payment funnel (derived from billing.tax_bills)
+    # Flow E — Billing payment funnel (derived from entity events)
     "tax-payment": [
-        "tax.bill_issued",
-        "tax.payment_completed",
+        "bill.outstanding",
+        "bill.paid",
+    ],
+    # Flow F — Loan application funnel (entity engine)
+    "loan_application": [
+        "loan_application.submitted",
+        "loan_application.credit_check",
+        "loan_application.underwriting",
+        "loan_application.approved",
     ],
 }
 
@@ -93,24 +96,32 @@ async def get_funnel(funnel_name: str) -> List[dict]:
         return await _query_purchase_funnel(pool, stages)
     elif funnel_name == "tax-payment":
         return await _query_tax_funnel(pool, stages)
+    elif funnel_name == "loan_application":
+        return await _query_entity_event_funnel(pool, "loan_application", stages)
     else:
         return await _query_iot_incident_funnel(pool, stages)
 
 
 async def _query_event_log(pool, stages: list[str]) -> list[dict]:
     """
-    Count service-request events per stage from requests.request_events within the
-    recent window. One row per lifecycle transition, e.g.:
-      event_type = 'service_request.submitted', request_id = 'req-00123'
+    Count service-request events per stage from entities.entity_event.
+
+    Uses cohort-based counting: only consider entities whose CREATION falls
+    within the recent window, then count how many reached each stage regardless
+    of when that transition happened. This avoids the classic funnel inversion
+    where a rolling event-timestamp window counts later-stage events for
+    entities submitted before the window.
     """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
             count = await safe_fetchval(conn, """
-                SELECT COUNT(DISTINCT request_id)
-                FROM requests.request_events
-                WHERE event_type = $1
-                  AND created_at >= NOW() - ($2 || ' hours')::INTERVAL
+                SELECT COUNT(DISTINCT ee.entity_id)
+                FROM entities.entity_event ee
+                JOIN entities.entity e ON e.id = ee.entity_id
+                WHERE ee.entity_type = 'service_request'
+                  AND ee.event_type = $1
+                  AND e.created_at >= NOW() - ($2 || ' hours')::INTERVAL
             """, stage, WINDOW_HOURS)
             result.append({"stage": stage, "count": int(count)})
     return result
@@ -118,18 +129,19 @@ async def _query_event_log(pool, stages: list[str]) -> list[dict]:
 
 async def _query_account_funnel(pool, stages: list[str]) -> list[dict]:
     """
-    Account-creation funnel from citizens.account_events (one row per lifecycle
-    transition, written by citizen-service on registration). Counts distinct citizens
-    per stage within the recent window.
+    Account-creation funnel from entities.entity_event (citizen entity lifecycle).
+    Citizen initial state is verification_sent; stages follow citizen.<state> naming.
     """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
             count = await safe_fetchval(conn, """
-                SELECT COUNT(DISTINCT citizen_id)
-                FROM citizens.account_events
-                WHERE event_type = $1
-                  AND created_at >= NOW() - ($2 || ' hours')::INTERVAL
+                SELECT COUNT(DISTINCT ee.entity_id)
+                FROM entities.entity_event ee
+                JOIN entities.entity e ON e.id = ee.entity_id
+                WHERE ee.entity_type = 'citizen'
+                  AND ee.event_type = $1
+                  AND e.created_at >= NOW() - ($2 || ' hours')::INTERVAL
             """, stage, WINDOW_HOURS)
             result.append({"stage": stage, "count": int(count)})
     return result
@@ -137,22 +149,8 @@ async def _query_account_funnel(pool, stages: list[str]) -> list[dict]:
 
 async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
     """
-    Derive IoT incident resolution funnel from iot.anomalies, incidents tables.
-
-    Maps funnel stages to direct table counts. Work-order stages are scoped to
-    incident-linked work orders (incident_id IS NOT NULL) so the funnel reads as a
-    proper IoT funnel and excludes service-request work orders:
-      iot.anomaly_detected → iot.anomalies total
-      incident.created     → incidents.incidents total
-      workorder.created    → incident-linked work_orders total
-      workorder.assigned   → incident-linked work_orders past the pre-assignment stages
-      workorder.acknowledged → incident-linked work_orders WHERE status IN ('acknowledged','in_progress','resolved')
-      workorder.resolved   → incident-linked work_orders WHERE status = 'resolved'
-
-    Work orders are created up-front (so ids exist and incident.id correlates) but sit in the
-    pre-'created' stages 'awaiting_incident'/'awaiting_workorder' while their incident.created /
-    workorder.created business events are deferred for realistic timing — those, plus 'created',
-    are excluded from the assigned count below.
+    Derive IoT incident resolution funnel from iot.anomalies (owned by
+    telemetry-processor) and entities.entity_event (owned by entity engine).
     """
     async with pool.acquire() as conn:
         anomalies   = await safe_fetchval(conn, """
@@ -160,29 +158,37 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
             WHERE detected_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         incidents   = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM incidents.incidents
-            WHERE created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event
+            WHERE entity_type = 'incident' AND event_type = 'incident.detecting'
+              AND occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         wo_total    = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM incidents.work_orders
-            WHERE incident_id IS NOT NULL
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event ee
+            JOIN entities.entity e ON e.id = ee.entity_id
+            WHERE ee.entity_type = 'work_order' AND ee.event_type = 'work_order.created'
+              AND e.links->>'incident_id' IS NOT NULL
+              AND ee.occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         wo_assigned = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM incidents.work_orders
-            WHERE incident_id IS NOT NULL
-              AND status NOT IN ('awaiting_incident', 'awaiting_workorder', 'created')
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event ee
+            JOIN entities.entity e ON e.id = ee.entity_id
+            WHERE ee.entity_type = 'work_order' AND ee.event_type = 'work_order.assigned'
+              AND e.links->>'incident_id' IS NOT NULL
+              AND ee.occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         wo_acked    = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM incidents.work_orders
-            WHERE incident_id IS NOT NULL AND status IN ('acknowledged', 'in_progress', 'resolved')
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event ee
+            JOIN entities.entity e ON e.id = ee.entity_id
+            WHERE ee.entity_type = 'work_order' AND ee.event_type = 'work_order.acknowledged'
+              AND e.links->>'incident_id' IS NOT NULL
+              AND ee.occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         wo_resolved = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM incidents.work_orders
-            WHERE incident_id IS NOT NULL AND status = 'resolved'
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event ee
+            JOIN entities.entity e ON e.id = ee.entity_id
+            WHERE ee.entity_type = 'work_order' AND ee.event_type = 'work_order.resolved'
+              AND e.links->>'incident_id' IS NOT NULL
+              AND ee.occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
 
     counts = [anomalies, incidents, wo_total, wo_assigned, wo_acked, wo_resolved]
@@ -194,58 +200,44 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
 
 async def _query_purchase_funnel(pool, stages: list[str]) -> list[dict]:
     """
-    City Store purchase funnel from commerce.carts / commerce.orders:
-      cart.item_added    → carts created (shopping sessions)
-      checkout.completed → orders placed
-      order.packed/shipped/delivered → orders with the matching *_at timestamp
+    City Store purchase funnel from entities.entity_event (cart entity lifecycle).
+    Falls back gracefully to zero if the entity engine has no cart events yet.
     """
-    async with pool.acquire() as conn:
-        carts     = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM commerce.carts
-            WHERE created_at >= NOW() - ($1 || ' hours')::INTERVAL
-        """, WINDOW_HOURS)
-        orders    = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM commerce.orders
-            WHERE created_at >= NOW() - ($1 || ' hours')::INTERVAL
-        """, WINDOW_HOURS)
-        packed    = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM commerce.orders
-            WHERE packed_at IS NOT NULL
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
-        """, WINDOW_HOURS)
-        shipped   = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM commerce.orders
-            WHERE shipped_at IS NOT NULL
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
-        """, WINDOW_HOURS)
-        delivered = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM commerce.orders
-            WHERE delivered_at IS NOT NULL
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
-        """, WINDOW_HOURS)
-
-    counts = [carts, orders, packed, shipped, delivered]
-    return [
-        {"stage": stage, "count": int(count)}
-        for stage, count in zip(stages, counts)
+    stage_events = [
+        "cart.open",          # cart created
+        "cart.checked_out",   # checkout completed
+        "cart.packed",
+        "cart.shipped",
+        "cart.delivered",
     ]
+    result = []
+    async with pool.acquire() as conn:
+        for stage, event in zip(stages, stage_events):
+            count = await safe_fetchval(conn, """
+                SELECT COUNT(*) FROM entities.entity_event
+                WHERE entity_type = 'cart' AND event_type = $1
+                  AND occurred_at >= NOW() - ($2 || ' hours')::INTERVAL
+            """, event, WINDOW_HOURS)
+            result.append({"stage": stage, "count": int(count)})
+    return result
 
 
 async def _query_tax_funnel(pool, stages: list[str]) -> list[dict]:
     """
-    Tax payment funnel from billing.tax_bills:
-      tax.bill_issued        → total bills
-      tax.payment_completed  → bills with status = 'paid'
+    Billing payment funnel from entities.entity_event (bill entity lifecycle).
+    Works for city (tax bills) and bank (credit card statements) — both use
+    the 'bill' entity type with outstanding→paid states.
     """
     async with pool.acquire() as conn:
         issued = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM billing.tax_bills
-            WHERE created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event
+            WHERE entity_type = 'bill' AND event_type = 'bill.outstanding'
+              AND occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
         paid   = await safe_fetchval(conn, """
-            SELECT COUNT(*) FROM billing.tax_bills
-            WHERE status = 'paid'
-              AND created_at >= NOW() - ($1 || ' hours')::INTERVAL
+            SELECT COUNT(*) FROM entities.entity_event
+            WHERE entity_type = 'bill' AND event_type = 'bill.paid'
+              AND occurred_at >= NOW() - ($1 || ' hours')::INTERVAL
         """, WINDOW_HOURS)
 
     counts = [issued, paid]
@@ -253,3 +245,20 @@ async def _query_tax_funnel(pool, stages: list[str]) -> list[dict]:
         {"stage": stage, "count": int(count)}
         for stage, count in zip(stages, counts)
     ]
+
+
+async def _query_entity_event_funnel(pool, entity_type: str, stages: list[str]) -> list[dict]:
+    """
+    Generic funnel over entities.entity_event. Each stage key must match an
+    event_type emitted by the entity engine (<entityType>.<state>).
+    """
+    result = []
+    async with pool.acquire() as conn:
+        for stage in stages:
+            count = await safe_fetchval(conn, """
+                SELECT COUNT(DISTINCT entity_id) FROM entities.entity_event
+                WHERE entity_type = $1 AND event_type = $2
+                  AND occurred_at >= NOW() - ($3 || ' hours')::INTERVAL
+            """, entity_type, stage, WINDOW_HOURS)
+            result.append({"stage": stage, "count": int(count)})
+    return result

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import IncidentBadge from '../components/IncidentBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useConfig } from '../config/ConfigContext.jsx';
 import {
   getIncident,
   getIncidentComments,
@@ -22,6 +23,12 @@ function formatDate(ts) {
 export default function IncidentDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const config = useConfig();
+  const term = config?.terminology ?? {};
+  const incident_noun = term.incident ?? 'incident';
+  const incidentPlural = term.incidentPlural ?? 'incidents';
+  const assetLabel = term.asset ?? 'Asset';
+  const workOrderLabel = term.workOrder ?? 'Work orders';
   const queryClient = useQueryClient();
   const [comment, setComment] = useState('');
 
@@ -69,7 +76,7 @@ export default function IncidentDetail() {
   return (
     <div className="max-w-4xl space-y-6">
       <Link to="/incidents" className="text-sm text-gray-500 hover:text-cyan-400 transition-colors">
-        ← Back to incidents
+        ← Back to {incidentPlural.toLowerCase()}
       </Link>
 
       {incidentQuery.isLoading && <p className="text-gray-400">Loading…</p>}
@@ -100,7 +107,7 @@ export default function IncidentDetail() {
                   disabled={statusMutation.isPending}
                   className="text-sm px-3 py-1.5 rounded bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 disabled:opacity-50"
                 >
-                  {statusMutation.isPending ? 'Saving…' : 'Resolve incident'}
+                  {statusMutation.isPending ? 'Saving…' : `Resolve ${incident_noun}`}
                 </button>
               )}
             </div>
@@ -115,9 +122,9 @@ export default function IncidentDetail() {
                 </p>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 mt-4 text-sm">
                   <div><dt className="text-gray-500">Status</dt><dd className="text-gray-200 capitalize">{incident.status}</dd></div>
-                  <div><dt className="text-gray-500">Asset</dt><dd className="text-gray-200">{incident.asset_id || '—'}</dd></div>
+                  <div><dt className="text-gray-500">{assetLabel}</dt><dd className="text-gray-200">{incident.asset_id || '—'}</dd></div>
                   <div><dt className="text-gray-500">Location</dt><dd className="text-gray-200">{incident.location_name || '—'}</dd></div>
-                  <div><dt className="text-gray-500">Work orders</dt><dd className="text-gray-200">{incident.work_order_count ?? 0}</dd></div>
+                  <div><dt className="text-gray-500">{workOrderLabel}</dt><dd className="text-gray-200">{incident.work_order_count ?? 0}</dd></div>
                   <div><dt className="text-gray-500">Created</dt><dd className="text-gray-200">{formatDate(incident.created_at)}</dd></div>
                   <div><dt className="text-gray-500">Resolved</dt><dd className="text-gray-200">{formatDate(incident.resolved_at)}</dd></div>
                 </dl>

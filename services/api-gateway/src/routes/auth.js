@@ -25,9 +25,13 @@ async function authRoutes (fastify, opts) {
       return reply.code(200).send({ token, user: { username, role: 'operator' } })
     }
 
-    // 2. Citizen login — verify credentials against identity-service.
+    // 2. Citizen login — verify credentials against identity-service (the
+    //    generic-services replacement for citizen-service). Falls back to
+    //    customer-entity-service, then citizen-service, for environments where
+    //    identity-service isn't deployed yet.
+    const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
     try {
-      const res = await undiciRequest(`${config.IDENTITY_SERVICE_URL}/api/v1/auth/login`, {
+      const res = await undiciRequest(`${citizenAuthUrl}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: username, password }),

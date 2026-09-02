@@ -32,17 +32,18 @@ async def get_pool() -> asyncpg.Pool:
 async def fetch_open_incidents_by_asset(asset_ids: list) -> dict:
     """Return {asset_id: [incident_id, ...]} for open incidents on the given assets.
 
-    Cross-schema read of incidents.incidents (owned by city-operations); the shared
-    meridian DB user can read it. Used by GET /api/v1/devices to link devices to
-    their open incidents.
+    Reads from entities.entity (owned by ops-entity-service); incidents are
+    non-terminal when state is 'detecting' or 'open'.
     """
     if not asset_ids:
         return {}
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT id, asset_id FROM incidents.incidents "
-            "WHERE asset_id = ANY($1::text[]) AND status <> 'resolved'",
+            "SELECT id, data->>'asset_id' AS asset_id FROM entities.entity "
+            "WHERE entity_type = 'incident' "
+            "AND state <> 'resolved' "
+            "AND data->>'asset_id' = ANY($1::text[])",
             asset_ids,
         )
     result: dict = {}

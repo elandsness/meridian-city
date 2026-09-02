@@ -3,13 +3,14 @@
 /**
  * Per-citizen messages inbox routes.
  *
- * GET  /api/v1/messages?citizen_id=&unread_only=&limit=
- * POST /api/v1/messages/:id/read
- * POST /api/v1/messages/read-all?citizen_id=
+ * GET    /api/v1/messages?citizen_id=&unread_only=&limit=
+ * POST   /api/v1/messages/:id/read
+ * POST   /api/v1/messages/read-all?citizen_id=
+ * DELETE /api/v1/messages           — purge all messages (demo reset)
  */
 
 const { Router } = require('express')
-const { listForCitizen, markRead, markAllRead } = require('../messages')
+const { listForCitizen, markRead, markAllRead, purgeAll } = require('../messages')
 
 const router = Router()
 
@@ -37,6 +38,15 @@ router.post('/:id/read', async (req, res, next) => {
 router.post('/read-all', async (req, res, next) => {
   try {
     await markAllRead(req.query.citizen_id)
+    res.status(204).end()
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/', async (req, res, next) => {
+  try {
+    await purgeAll()
     res.status(204).end()
   } catch (err) {
     next(err)

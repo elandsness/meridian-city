@@ -1,0 +1,45 @@
+import { useConfig } from '../../config/ConfigContext'
+
+export default function WelcomeHero() {
+  const cfg = useConfig()
+  const name = cfg.company?.name ?? 'Welcome'
+  const tagline = cfg.company?.tagline ?? ''
+  const heroImage = cfg.theme?.heroImage
+
+  return (
+    <div
+      className="rounded-2xl px-8 py-12 text-white text-center relative overflow-hidden"
+      style={heroImage ? {
+        backgroundImage: `url(${heroImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      } : {
+        background: 'linear-gradient(135deg, rgb(var(--brand)) 0%, color-mix(in srgb, rgb(var(--brand)) 60%, rgb(var(--accent, 14 165 233))) 100%)',
+      }}
+    >
+      {/* Brand gradient overlay — always present; translucent over a photo, opaque otherwise */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'linear-gradient(135deg, rgb(var(--brand)) 0%, color-mix(in srgb, rgb(var(--brand)) 60%, rgb(var(--accent, 14 165 233))) 100%)',
+          opacity: heroImage ? 0.82 : 1,
+        }}
+      />
+      {/* Dot texture */}
+      <div
+        className="absolute inset-0 opacity-10 pointer-events-none"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
+      />
+      <div className="relative z-10">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight drop-shadow-sm">{name}</h1>
+        {tagline && (
+          <p className="mt-3 text-lg md:text-xl opacity-90 font-light max-w-xl mx-auto">{tagline}</p>
+        )}
+      </div>
+    </div>
+  )
+}

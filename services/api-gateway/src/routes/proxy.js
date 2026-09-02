@@ -8,16 +8,21 @@ const { v4: uuidv4 } = require('uuid')
 function buildRouteTable (config) {
   return [
     {
+      // citizen registration + profile — rewritten to the entity engine's generic path.
+      // Login is handled separately in auth.js (also hits customer-entity-service).
       prefix: '/api/v1/citizens',
       target: config.IDENTITY_SERVICE_URL,
       serviceName: 'identity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/citizen',
     },
     {
+      // service requests — rewritten to the entity engine's generic path.
       prefix: '/api/v1/service-requests',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/service_request',
     },
     {
       prefix: '/api/v1/dispatch',
@@ -36,18 +41,21 @@ function buildRouteTable (config) {
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/asset',
     },
     {
       prefix: '/api/v1/incidents',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/incident',
     },
     {
       prefix: '/api/v1/work-orders',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/work_order',
     },
     {
       prefix: '/api/v1/flights',
@@ -167,6 +175,43 @@ function buildRouteTable (config) {
       serviceName: 'demo-control',
       requiresAuth: true,
       rewritePrefix: '/api/v1',
+    },
+    {
+      // Ops entity types (incident, work_order, flight_departure, flight_arrival)
+      // → ops-entity-service. These prefixes must come BEFORE the
+      // customer-entity-service catch-all below so the more-specific match wins
+      // (routeTable.find() returns first).
+      prefix: '/api/v1/entities/incident',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      prefix: '/api/v1/entities/work_order',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      prefix: '/api/v1/entities/flight_departure',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      prefix: '/api/v1/entities/flight_arrival',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
+      requiresAuth: false,
+    },
+    {
+      // Customer entity types (citizen, service_request, bill, cart) +
+      // admin fault-gates on customer entities → customer-entity-service.
+      // Also serves as the entity-engine fallback if Stage 6 is disabled.
+      prefix: '/api/v1/entities',
+      target: config.CUSTOMER_ENTITY_SERVICE_URL,
+      serviceName: 'customer-entity-service',
+      requiresAuth: false,
     },
   ]
 }

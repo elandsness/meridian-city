@@ -44,7 +44,7 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 app.kubernetes.io/part-of: meridian-city-platform
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/version: {{ .Values.global.imageTag | quote }}
+app.kubernetes.io/version: {{ .Values.global.imageTag | trunc 63 | quote }}
 {{- end }}
 
 {{/*

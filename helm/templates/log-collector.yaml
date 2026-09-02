@@ -132,10 +132,8 @@ spec:
       # Run on every node, tolerating any taint (e.g. kind's control-plane node).
       tolerations:
         - operator: Exists
-      # Reading root-owned files under /var/log/pods requires root.
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
+      # GKE Autopilot allows /var/log/ hostPath read-only without root —
+      # log files are world-readable (mode 0644 from containerd).
       containers:
         - name: log-collector
           image: {{ .Values.logCollector.image | quote }}

@@ -80,3 +80,7 @@ export async function setJourneyEnabled(name, enabled) {
   const res = await client.post('/api/v1/demo-control/traffic/journey', { name, enabled });
   return res.data;
 }
+
+export async function purgeMessages() {
+  await client.delete('/api/v1/messages');
+}

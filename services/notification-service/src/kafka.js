@@ -21,6 +21,14 @@ const { insert } = require('./messages')
 const KAFKA_BROKERS = (process.env.KAFKA_BOOTSTRAP_SERVERS || 'kafka:9092').split(',')
 const GROUP_ID = 'notification-service'
 
+// When set, only these comma-separated topics are subscribed. Lets industry
+// configs (e.g. airport, which has no store/billing) suppress irrelevant inbox
+// messages without touching the notification service code.
+const ALL_TOPICS = ['iot.anomalies', 'requests.events', 'commerce.events', 'billing.events']
+const ENABLED_TOPICS = process.env.ENABLED_TOPICS
+  ? process.env.ENABLED_TOPICS.split(',').map((t) => t.trim()).filter(Boolean)
+  : ALL_TOPICS
+
 const kafka = new Kafka({
   clientId: GROUP_ID,
   brokers: KAFKA_BROKERS,
@@ -98,21 +106,22 @@ async function mapBillingToInbox (payload) {
   const eventType = payload.eventType || payload.event_type
   const citizenId = payload.citizenId || payload.citizen_id
   const period = payload.period || ''
+  const billNoun = (payload.display_name || 'Tax Bill').toLowerCase()
   if (!citizenId) return
   if (eventType === 'tax.bill_issued') {
     await insert({
       citizenId,
       type: 'tax_due',
-      title: `${period} tax bill issued`,
-      body: `A new ${period} tax bill is now due. View it under Pay bills.`,
+      title: `${period} ${billNoun} issued`,
+      body: `A new ${period} ${billNoun} is now due. View it under Pay bills.`,
       metadata: payload,
     })
   } else if (eventType === 'tax.payment_completed') {
     await insert({
       citizenId,
       type: 'tax_paid',
-      title: 'Tax payment received',
-      body: `Thank you — your ${period} tax bill is paid.`,
+      title: 'Payment received',
+      body: `Thank you — your ${period} ${billNoun} is paid.`,
       metadata: payload,
     })
   }
@@ -154,7 +163,7 @@ async function start () {
   try {
     await consumer.connect()
     await consumer.subscribe({
-      topics: ['iot.anomalies', 'requests.events', 'commerce.events', 'billing.events'],
+      topics: ENABLED_TOPICS,
       fromBeginning: false,
     })
 
@@ -189,7 +198,7 @@ async function start () {
       },
     })
 
-    console.log(JSON.stringify({ level: 'info', msg: 'Kafka consumer started', topics: ['iot.anomalies', 'requests.events', 'commerce.events', 'billing.events'] }))
+    console.log(JSON.stringify({ level: 'info', msg: 'Kafka consumer started', topics: ENABLED_TOPICS }))
   } catch (err) {
     console.error(JSON.stringify({ level: 'error', msg: 'Kafka consumer start failed (will not retry)', error: err.message }))
     _started = false

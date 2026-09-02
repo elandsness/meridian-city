@@ -77,6 +77,7 @@ industry:
     workOrder: "Work order"
     asset: "Asset"
     assetPlural: "Assets"
+    requestCategories: [infrastructure, utilities, safety, environment, transport, other]
   screens:
     public: ["home", "service-requests", "store", "billing", "messages"]
     ops: ["overview", "iot", "incidents", "requests", "analytics", "demo-control"]
@@ -84,7 +85,20 @@ industry:
   # Home-page module composition per SPA (module ids from frontends/*/src/config/homeModules.jsx).
   # Absent falls back to the city bundle; an industry overlay supplies its own.
   home:
-    public: ["city-home", "quick-actions"]
+    public:
+      - id: cityband
+        template: ticker
+        height: slim
+        label: "🏙️ CITY NEWS"
+        items:
+          - "City Hall announces $2M parks renovation starting Spring 2026"
+          - "Transit expansion: Blue Line extended to North Heights — opens June 2026"
+          - "Meridian Central Station wins Best Urban Infrastructure award"
+          - "Community solar program now open for residential sign-ups"
+          - "Water main upgrade complete — service fully restored citywide"
+      - city-home
+      - transit-map
+      - quick-actions
     ops: ["ops-overview"]
   # Backend-only demo-data pools + dispatch routing. NOT rendered into the browser
   # config.json (see industry-configmap.yaml). Empty = services use their built-in
@@ -176,6 +190,490 @@ industry:
         machine:
           vibration: { threshold: 8.0, consecutive: 1 }
           error_rate: { threshold: 5.0, consecutive: 1 }
+  dynatrace: {}
+  # Browser-visible analytics config: which Business Flow funnels to show and their labels.
+  # NOT omitted from config.json (unlike `dynatrace` which is backend-only provisioner data).
+  analytics:
+    flows:
+      - service-request
+      - account-creation
+      - iot-incident
+      - purchase
+      - tax-payment
+    flowLabels:
+      service-request: "Service Request"
+      account-creation: "Account Creation"
+      iot-incident: "IoT Incident"
+      purchase: "Purchase"
+      tax-payment: "Tax Payment"
+  # Config-driven entity/lifecycle definitions for the generic entity engine.
+  # customer-entity-service owns: citizen, service_request, bill, cart
+  # ops-entity-service owns: incident, work_order
+  # See docs/industry-config.schema.json and the generic-entity-engine plan.
+  entities:
+    # -----------------------------------------------------------------------
+    # CITIZEN — account creation lifecycle
+    # Replaces citizen-service's AccountLifecycleScheduler.
+    # Created externally (traffic-bot / REST), no generator.
+    # -----------------------------------------------------------------------
+    citizen:
+      displayName: "Citizen"
+      displayNamePlural: "Citizens"
+      idPrefix: "cit"
+      fields:
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string }
+        zone_id: { type: string }
+        password: { type: password }
+      initial: verification_sent
+      states:
+        verification_sent: { label: "Verification Sent", tone: amber }
+        verified: { label: "Verified", tone: blue }
+        verification_failed:
+          label: "Verification Failed"
+          tone: red
+          terminal: true
+          isError: true
+        activated:
+          label: "Activated"
+          tone: green
+          terminal: true
+          isKpi: true
+        abandoned: { label: "Abandoned", tone: slate, terminal: true }
+        verified_only: { label: "Verified Only", tone: slate, terminal: true }
+        activation_failed:
+          label: "Activation Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        # Fault path evaluated first -- gate off by default (rate 0), so
+        # normal deploys never see it unless demo-control enables the gate.
+        - from: verification_sent
+          to: verification_failed
+          when: { faultGate: "account-verification-failed", probability: 0.05 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verification_sent
+          to: verified
+          when: { probability: 0.85 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        # Catch-all: drop-off if neither fault nor probability fired.
+        - from: verification_sent
+          to: abandoned
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verified
+          to: activation_failed
+          when: { faultGate: "account-activation-failed", probability: 0.05 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verified
+          to: activated
+          when: { probability: 0.92 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: verified
+          to: verified_only
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+
+    # -----------------------------------------------------------------------
+    # SERVICE REQUEST — citizen-submitted request lifecycle
+    # Replaces CitizenService + RequestLifecycleScheduler.
+    # On submitted→validated: calls routing-service (department assignment)
+    # then calls ops-entity-service to create a linked work_order.
+    # citizen_id is plain string (not ref) so the field lives in data JSONB
+    # and can be queried directly -- no cross-entity effects from request→citizen.
+    # -----------------------------------------------------------------------
+    service_request:
+      displayName: "Service Request"
+      displayNamePlural: "Service Requests"
+      idPrefix: "req"
+      fields:
+        citizen_id: { type: string }
+        category: { type: string }
+        priority:
+          type: enum
+          values: [low, normal, high, urgent]
+          default: normal
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+        assigned_department: { type: string }
+        assigned_to: { type: string }
+      initial: submitted
+      states:
+        submitted: { label: "Submitted", tone: slate }
+        rejected:
+          label: "Rejected"
+          tone: red
+          terminal: true
+          isError: true
+        validated: { label: "Validated", tone: blue }
+        in_progress:
+          label: "In Progress"
+          tone: amber
+          isKpi: true
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+        abandoned: { label: "Abandoned", tone: slate, terminal: true }
+      transitions:
+        # Manual advancement by ops-dashboard operators — these are user-triggerable
+        # only; the scheduler never picks them up (it skips userTriggerable transitions).
+        # Effects are intentionally omitted here so the auto-timer path (below) is the
+        # one that runs routing + work_order creation; ops advancement just moves state.
+        - from: submitted
+          to: validated
+          userTriggerable: true
+          label: "Start"
+        - from: validated
+          to: in_progress
+          userTriggerable: true
+          label: "Start"
+        - from: in_progress
+          to: resolved
+          userTriggerable: true
+          label: "Resolve"
+        # Auto-advancement via scheduler
+        - from: submitted
+          to: rejected
+          when: { faultGate: "service-request-rejected", probability: 0.1 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: submitted
+          to: validated
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            # Step 1: ask routing-service for the responsible department;
+            # result is written back to assigned_department on this entity.
+            # Step 2 then reads that field to pass it to the work_order.
+            - action: callService
+              url: "${ROUTING_SERVICE_URL}/api/v1/route"
+              method: POST
+              body:
+                category: { from: category }
+                zone_id: { from: zone_id }
+              responseFields:
+                assigned_department: department
+            # Step 2: create a linked work_order on ops-entity-service.
+            # Best-effort -- a downstream failure is logged and skipped.
+            - action: callService
+              url: "${OPS_ENTITY_SERVICE_URL}/api/v1/entities/work_order"
+              method: POST
+              body:
+                request_id: { from: id }
+                title: { from: title }
+                priority: { from: priority }
+                assigned_department: { from: assigned_department }
+                zone_id: { from: zone_id }
+        - from: validated
+          to: in_progress
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: in_progress
+          to: resolved
+          when: { probability: 0.88 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        # Drop-off: ~12% of in_progress requests are abandoned (no match above).
+        - from: in_progress
+          to: abandoned
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+
+    # -----------------------------------------------------------------------
+    # BILL (tax bill) — quarterly billing lifecycle
+    # Replaces billing-service's BillingService + BillingScheduler.
+    # periodicHistoryBackfill: for every citizen, seeds 2-8 quarters of bill
+    # history on first tick, then issues one new bill per quarter.
+    # citizen_id is plain string (not ref) -- TransitionScheduler's
+    # groupingBy uses getField(), which reads data JSONB only.
+    # -----------------------------------------------------------------------
+    bill:
+      displayName: "Tax Bill"
+      displayNamePlural: "Tax Bills"
+      idPrefix: "bill"
+      fields:
+        citizen_id: { type: string }
+        period: { type: string }
+        amount_cents: { type: number, default: 0 }
+        issued_at: { type: string }
+        due_at: { type: string }
+        paid_at: { type: string }
+      initial: outstanding
+      states:
+        outstanding:
+          label: "Outstanding"
+          tone: amber
+          isKpi: true
+        paid:
+          label: "Paid"
+          tone: green
+          terminal: true
+          isKpi: true
+          kpiField: amount_cents
+        payment_failed:
+          label: "Payment Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        # Fault path first -- user action "Pay Now" tries this gate first.
+        - from: outstanding
+          to: payment_failed
+          userTriggerable: true
+          when: { faultGate: "tax-payment-failed", probability: 0.3 }
+          label: "Pay Now"
+        - from: outstanding
+          to: paid
+          userTriggerable: true
+          label: "Pay Now"
+          effects:
+            - action: set
+              target: self
+              field: paid_at
+              value: "${now}"
+      generator:
+        strategy: periodicHistoryBackfill
+        ownerEntityType: citizen
+        ownerField: citizen_id
+        periodField: period
+        backfill:
+          minPeriods: 2
+          maxPeriods: 8
+          outstandingMin: 1
+          outstandingMax: 2
+        amount:
+          minCents: 15000
+          maxCents: 45000
+        dueDays: 45
+
+    # -----------------------------------------------------------------------
+    # CART (collapses cart + order) — shopping and fulfillment lifecycle
+    # Replaces commerce-service's CartService + OrderService + FulfillmentScheduler.
+    # Cart item management (add/remove items) stays in a thin compatibility
+    # layer on customer-entity-service for Stage 6; the state machine below
+    # handles checkout and fulfillment only.
+    # -----------------------------------------------------------------------
+    cart:
+      displayName: "Order"
+      displayNamePlural: "Orders"
+      idPrefix: "cart"
+      fields:
+        citizen_id: { type: string }
+        total_cents: { type: number, default: 0 }
+        item_count: { type: number, default: 0 }
+      initial: open
+      states:
+        open: { label: "Open", tone: slate }
+        payment_declined:
+          label: "Payment Declined"
+          tone: red
+          terminal: true
+          isError: true
+        placed:
+          label: "Order Placed"
+          tone: blue
+          isKpi: true
+        packed: { label: "Packed", tone: amber }
+        shipped: { label: "Shipped", tone: amber }
+        delivered:
+          label: "Delivered"
+          tone: green
+          terminal: true
+          isKpi: true
+          kpiField: total_cents
+        delivery_failed:
+          label: "Delivery Failed"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        # Fault path evaluated first -- when demo-control enables the gate,
+        # checkout calls hit payment_declined at the declared rate.
+        - from: open
+          to: payment_declined
+          userTriggerable: true
+          when: { faultGate: "checkout-payment-declined", probability: 0.25 }
+          label: Checkout
+        - from: open
+          to: placed
+          userTriggerable: true
+          label: Checkout
+        - from: placed
+          to: packed
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: packed
+          to: shipped
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: shipped
+          to: delivery_failed
+          when: { faultGate: "order-delivery-failed", probability: 0.1 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: shipped
+          to: delivered
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+
+    # -----------------------------------------------------------------------
+    # INCIDENT — operational incident lifecycle
+    # Replaces city-operations IncidentService.
+    # 'detecting' is a brief (5-30s) holding state that exists solely to run
+    # the spawnLinked effect atomically in the same transaction as creation --
+    # the entity engine has no 'creationEffects' hook, so this one-state
+    # detour is the declarative equivalent of createFromIot()'s synchronous
+    # incident+workorder creation block.
+    # Kafka trigger for iot.anomalies: implemented by task #21 (kafkaTrigger
+    # engine support); config declared here for completeness.
+    # -----------------------------------------------------------------------
+    incident:
+      displayName: "Incident"
+      displayNamePlural: "Incidents"
+      idPrefix: "inc"
+      fields:
+        asset_id: { type: string }
+        source:
+          type: enum
+          values: [manual, iot]
+          default: manual
+        severity:
+          type: enum
+          values: [low, medium, high, critical]
+          default: medium
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+      initial: detecting
+      states:
+        detecting: { label: "Detecting", tone: amber }
+        open:
+          label: "Open"
+          tone: red
+          isKpi: true
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+          externallyTriggered: true  # reached via work_order completion callService, not a local transition
+      transitions:
+        # Manual resolution by ops-dashboard operators
+        - from: open
+          to: resolved
+          userTriggerable: true
+          label: "Resolve"
+        # Safety-net auto-resolve: incidents that aren't manually resolved (or
+        # whose work_order escalated without cascading) close after 1-2 hours so
+        # the device map doesn't accumulate permanent "warning" dots.
+        - from: open
+          to: resolved
+          timer: { minSeconds: 3600, maxSeconds: 7200 }
+        # Auto-detection → open
+        - from: detecting
+          to: open
+          timer: { minSeconds: 5, maxSeconds: 30 }
+          effects:
+            - action: spawnLinked
+              entityType: work_order
+              fields:
+                incident_id: { from: id }
+                title: { from: title }
+                zone_id: { from: zone_id }
+                priority:
+                  from: severity
+                  map:
+                    critical: urgent
+                    high: high
+                    medium: normal
+                    low: normal
+                  default: normal
+        # open→resolved is driven by the linked work_order's 'transition'
+        # effect (work_order.resolved cascades incident to resolved).
+        # No timer here -- incident resolution is always work_order-triggered.
+      triggers:
+        # Kafka bridge (task #21): on iot.anomalies message, create an
+        # incident entity with the mapped fields below. fieldMapping uses
+        # the same {from, value, map, default} spec as callService body.
+        kafka:
+          - topic: iot.anomalies
+            fieldMapping:
+              asset_id: { from: device_id }
+              severity:
+                from: severity
+                map:
+                  warning: medium
+                  critical: critical
+                  high: high
+                  low: low
+                default: medium
+              source: { value: iot }
+              title: { from: anomaly_type }
+              description: { from: metric_name }
+
+    # -----------------------------------------------------------------------
+    # WORK ORDER — field operations lifecycle
+    # Replaces city-operations WorkOrderService + WorkOrderLifecycleScheduler.
+    # incident_id is ref-typed so it lands in links JSONB, enabling the
+    # 'link.incident_id' transition effect target on the resolved transition.
+    # -----------------------------------------------------------------------
+    work_order:
+      displayName: "Work Order"
+      displayNamePlural: "Work Orders"
+      idPrefix: "wo"
+      fields:
+        incident_id: { type: ref, entity: incident }
+        request_id: { type: string }
+        title: { type: string }
+        assigned_department: { type: string }
+        assigned_to: { type: string }
+        priority:
+          type: enum
+          values: [normal, high, urgent]
+          default: normal
+        zone_id: { type: string }
+      initial: created
+      states:
+        created: { label: "Created", tone: slate }
+        assigned: { label: "Assigned", tone: blue }
+        acknowledged: { label: "Acknowledged", tone: amber }
+        resolved:
+          label: "Resolved"
+          tone: green
+          terminal: true
+          isKpi: true
+        escalated:
+          label: "Escalated"
+          tone: red
+          terminal: true
+          isError: true
+      transitions:
+        - from: created
+          to: assigned
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            - action: set
+              target: self
+              field: assigned_to
+              value: "Field Operations Team"
+        - from: assigned
+          to: acknowledged
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+        - from: acknowledged
+          to: escalated
+          when: { faultGate: "work-order-escalated", probability: 0.1 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            - action: transition
+              target: link.incident_id
+              to: resolved
+        - from: acknowledged
+          to: resolved
+          when: { probability: 0.85 }
+          timer: { minSeconds: 300, maxSeconds: 7200 }
+          effects:
+            # Cascade resolution to the linked incident (if any -- request-
+            # path work_orders have no incident link and this is a no-op).
+            - action: transition
+              target: link.incident_id
+              to: resolved
+        # Drop-off: ~15% of work orders loop (new timer) until resolved or
+        # escalated -- no explicit abandoned state needed; scheduleNext
+        # retries automatically when no transition matches.
 
 # ---------------------------------------------------------------------------
 # Dynatrace configuration
@@ -651,6 +1149,135 @@ passengerService:
   env: {}
 
 # ---------------------------------------------------------------------------
+# Entity Engine (Java / Spring Boot) — generic-entity-engine initiative, Stage 2
+# Generic config-driven entity/lifecycle engine, driven entirely by
+# industry.entities (see above). One deployment for now, owning every entity
+# type in the mounted config; Stage 6/7 retrofits City/Airport by deploying
+# this same image twice (customer-entity-service, ops-entity-service) with a
+# non-empty ownedTypes each — see docs/regression-baseline-2026-07-23.md and
+# the project_generic_entity_engine memory for the full plan.
+# ---------------------------------------------------------------------------
+# Stage 6: replaced by customerEntityService + opsEntityService below.
+# Kept here as disabled so any existing tooling that references entityEngine.*
+# doesn't crash; will be removed in Stage 10 cleanup.
+entityEngine:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: "entity-engine"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8094
+  ownedTypes: ""
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Customer Entity Service — entity-engine image, customer-facing entity types
+# Owns: citizen, service_request, bill, cart
+# Calls: routing-service (for department assignment), ops-entity-service
+#        (to create linked work_order on service request submission)
+# ---------------------------------------------------------------------------
+customerEntityService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "entity-engine"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8094
+  ownedTypes: "citizen,service_request,bill,cart,loan_application,patient_admission,concession_order,outage_restoration"
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Ops Entity Service — entity-engine image, ops-facing entity types
+# Owns: incident, work_order
+# Listens: iot.anomalies Kafka topic (KAFKA_TRIGGERS_ENABLED=true)
+# ---------------------------------------------------------------------------
+opsEntityService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "entity-engine"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8094
+  ownedTypes: "incident,work_order"
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Routing Service — stateless (category, zone) → department decision
+# Called internally by customer-entity-service via callService effect;
+# no public gateway route (internal-only). Reads ROUTING_MAP from
+# industry.routing (same shape as old service-dispatch RoutingEngine).
+# ---------------------------------------------------------------------------
+routingService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "routing-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8095
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
+# Movement Service (Go) — generic-entity-engine initiative, Stage 2
+# Fast, dedicated tick that computes/persists computed.position for entity
+# types that declare it, reading the same mounted entity-config as
+# entity-engine. Deliberately its own process/language — see
+# services/movement-service's package doc for why.
+# ---------------------------------------------------------------------------
+movementService:
+  enabled: true
+  image:
+    repository: "movement-service"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8095
+  tickMs: 2000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  env: {}
+
+# ---------------------------------------------------------------------------
 # Analytics Service (Python / FastAPI)
 # KPI aggregation, SRG metric endpoint, and Business Analytics support.
 # ---------------------------------------------------------------------------
@@ -986,10 +1613,17 @@ postgresql:
     #   - Azure (AKS): "meridian-managed-premium" (default) or "meridian-managed-ssd"
     # Override to use a custom storage class or cluster default (leave empty).
     storageClassName: ""
+  # CNPG's default (100) is comfortably exceeded once every entity-related service
+  # (each ~10-connection HikariCP pool) coexists with an old pod generation during
+  # a rollout restart -- observed settling at 96/100 steady-state with only 8 Java
+  # services; Stage 6/7 add more. Bumped well ahead of that growth, not just to
+  # patch the current number.
+  parameters:
+    max_connections: "300"
   resources:
     requests:
       cpu: "250m"
-      memory: "256Mi"
+      memory: "384Mi"
     limits:
       cpu: "1000m"
       memory: "1Gi"
@@ -1144,20 +1778,19 @@ opentelemetry-collector:
       memory: "1Gi"
 
 # ---------------------------------------------------------------------------
-# Infrastructure: Meridian log collector (DaemonSet) — OPT-IN FALLBACK, default OFF
-# Tails the meridian namespace's container stdout off each node via a hostPath
-# mount and ships it to Dynatrace over OTLP/HTTP. It was the original way to get
-# business-event logs into Grail under applicationMonitoring (no host OneAgent).
-#
-# PREFER the Dynatrace Kubernetes Log Module instead (spec.logMonitoring in the
-# DynaKube — see helm/templates/dynakube.yaml): it captures stdout natively, needs
-# no hostPath/root, and works on GKE Autopilot — which this DaemonSet does NOT
-# (Autopilot blocks hostPath volumes and root containers). Keep this disabled when
-# the Log Module is enabled, or logs get ingested twice. Only enable on a
-# hostPath-capable cluster (e.g. plain kind) that isn't running the Log Module.
+# Infrastructure: Meridian log collector (DaemonSet) — DEFAULT ON for GKE Autopilot
+# Tails the meridian namespace's container stdout off each node via a read-only
+# /var/log/pods hostPath mount and ships JSON business-event logs to Dynatrace via
+# OTLP/HTTP. This is the working log pipeline on GKE Autopilot:
+#   - applicationMonitoring (code module) does NOT tail stdout
+#   - Dynatrace K8s Log Module (spec.logMonitoring) is blocked by Autopilot Warden
+#     (it needs DAC_READ_SEARCH + write-mode hostPath for /var/lib/docker/containers)
+#   - This DaemonSet runs non-root with /var/log/pods read-only — allowed by Autopilot
+# Disable on non-Dynatrace clusters (no otlpEndpoint) or if a host OneAgent DaemonSet
+# is already tailing logs to avoid double-ingest.
 # ---------------------------------------------------------------------------
 logCollector:
-  enabled: false
+  enabled: true
   image: "otel/opentelemetry-collector-contrib:0.114.0"
   resources:
     requests:
