@@ -22,7 +22,7 @@ spec:
       containers:
         - name: journey-service
           image: {{ include "meridian.image" (dict "repository" .Values.journeyService.image.repository "tag" .Values.journeyService.image.tag "context" $) }}
-          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8093

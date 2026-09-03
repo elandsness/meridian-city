@@ -22,7 +22,7 @@ spec:
       containers:
         - name: workflow-service
           image: {{ include "meridian.image" (dict "repository" .Values.workflowService.image.repository "tag" .Values.workflowService.image.tag "context" $) }}
-          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8083

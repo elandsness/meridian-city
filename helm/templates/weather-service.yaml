@@ -24,7 +24,7 @@ spec:
       containers:
         - name: weather-service
           image: {{ include "meridian.image" (dict "repository" .Values.weatherService.image.repository "tag" .Values.weatherService.image.tag "context" $) }}
-          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8096

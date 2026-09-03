@@ -24,7 +24,7 @@ spec:
       containers:
         - name: news-ticker-service
           image: {{ include "meridian.image" (dict "repository" .Values.newsTickerService.image.repository "tag" .Values.newsTickerService.image.tag "context" $) }}
-          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8095

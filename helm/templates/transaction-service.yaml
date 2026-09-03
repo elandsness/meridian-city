@@ -22,7 +22,7 @@ spec:
       containers:
         - name: transaction-service
           image: {{ include "meridian.image" (dict "repository" .Values.transactionService.image.repository "tag" .Values.transactionService.image.tag "context" $) }}
-          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8090
