@@ -186,6 +186,88 @@ entities:
 
 ---
 
+## Step 3b — Fleet / moving-map entities: the `journey` type
+
+If the industry has a **fleet of things gliding between named locations on a map**
+(trucks between hubs, delivery vans between depots, ships between ports, ride-share
+cars between zones) — do **not** model it as a regular custom entity with
+`computed.position.waypoints`. That mechanism ties position to *states* (like a
+flight moving through gate → taxi → takeoff) and requires one waypoint per state.
+A fleet vehicle instead moves continuously along an **origin → destination line**,
+which is a different, purpose-built backend: **journey-service**.
+
+**How it works:** `journey` is a reserved, built-in entity type name — the API
+gateway routes `/api/v1/entities/journey` straight to journey-service (a dedicated
+microservice, not the generic entity engine), which linearly interpolates each
+journey's position between an origin point and a destination point as it advances.
+This means:
+
+- The `entityType` you put in any `entity-map`/`entity-list` screen or home module
+  must be **exactly `journey`** — not `truck`, not whatever your fleet unit is
+  called. `journey` is the routing key the gateway recognizes; anything else 404s.
+- You still declare an `entities.journey` block for frontend rendering only
+  (glyph/tone/label per status, used for the legend and sprite color) — but its
+  `states`, unlike every other entity type, do **not** drive the backend state
+  machine. journey-service's status progression is **global across the whole
+  platform and fixed**, not configurable per industry: `initiated → in_progress →
+  completed`. You cannot invent new status names (`loading`, `customs`,
+  `delivered`) — the backend will simply never enter them, so a state you declare
+  outside that fixed set will never appear on the map. Use `initialStatuses` (below)
+  to skip straight to `in_progress` if you don't need an `initiated` stage.
+- Do **not** add `computed.position` / `waypoints` to `entities.journey` — it is
+  ignored. Position comes from journey-service's own origin/destination
+  interpolation (see below), computed server-side from real route coordinates, not
+  from the generic waypoints mechanism.
+- Because `journey` is served by its own microservice, it is **not** part of the
+  generic entity engine — do **not** add `journey` to `customerEntityService` or
+  `opsEntityService` `ownedTypes` (Rule P1 does not apply to it).
+
+**The `journeyService` Helm block — REQUIRED, and it lives OUTSIDE `industry:`**
+(top-level in `values-<industry>.yaml`, a sibling of the `industry:` key, exactly
+like `customerEntityService`/`opsEntityService` overrides):
+
+```yaml
+# Outside industry: — configures the actual backend simulation, not just labels.
+journeyService:
+  lifecycle:
+    minSeconds: 20      # override the default 300–7200s (5min–2hr) band so
+    maxSeconds: 60      # movement is visible within a normal demo session
+  generator:
+    maxActive: 10                     # target number of active journeys
+    entityTypes: ["truck"]            # internal display label(s) for generated
+                                       # records — cosmetic only, NOT the routing
+                                       # key (that's always "journey", see above).
+                                       # Replaces the default ["flight","passenger"]
+                                       # entirely, so flights/passengers stop
+                                       # generating once you set this.
+    initialStatuses:
+      truck: "in_progress"            # skip "initiated" — start moving immediately
+    routes:                           # named origin/destination pairs + map
+                                       # coordinates (same abstract x/y space as
+                                       # the entity-map's viewBox, not lat/lng).
+                                       # A new journey picks one at random and
+                                       # glides from (originX,originY) to
+                                       # (destX,destY) as progress advances.
+      - { origin: "Seattle DC", destination: "Tacoma Hub",
+          originX: 180, originY: 200, destX: 210, destY: 290 }
+      - { origin: "Seattle DC", destination: "Spokane Terminal",
+          originX: 180, originY: 200, destX: 830, destY: 180 }
+```
+
+**Do not invent a `journeyService.lifecycle.transitions` key** — the status
+progression (`initiated`/`in_progress`/`completed`) and its progress-per-status
+mapping are fixed in journey-service's own defaults and are not exposed as a Helm
+value. Only `lifecycle.minSeconds`/`maxSeconds` (timing) and
+`generator.{maxActive,entityTypes,initialStatuses,routes}` are configurable.
+
+**Drawing the routes themselves is a separate, manual step.** journey-service gives
+you moving sprites between two points — it does not draw a line between them. If
+you want the routes visible on the map (recommended for a fleet network), add
+matching `line` shapes to the screen's `background.shapes` (see 4a below) using the
+same coordinates as each route's `originX/Y`/`destX/Y`.
+
+---
+
 ## Step 4 — Compose the config using the catalog
 
 ### 4a. Screens
@@ -231,6 +313,48 @@ Each screen entry is either `"<id>"` or `{ id: <id>, label: "Nav label", icon: "
 A `status-map` without a `background` is a blank canvas — dots float on white with no
 geographic or spatial context. Always supply a background image. Unsplash works well;
 use a photo that makes spatial sense for the domain (aerial city, power grid, port, campus).
+
+**`entity-map` background — `image` OR `shapes`:**
+
+`entity-map` (screens and home modules, used for `journey`/fleet maps and any other
+entity type with a computed position) supports two background kinds:
+
+- `kind: image` — same as `status-map` above: `{ kind: image, src: <path-or-URL> }`.
+  Use for a photographic or realistic map background.
+- `kind: shapes` — a schematic vector diagram drawn directly in the config, no image
+  asset needed. `shapes` is a list of primitives, each rendered as a raw SVG element
+  — every property you write is passed straight through as an SVG attribute, so any
+  valid SVG attribute name works, not just the ones shown below:
+
+  | `type` | Renders as | Common properties |
+  |--------|-----------|-------------------|
+  | `rect` | `<rect>` | `x`, `"y"`, `width`, `height`, `fill`, `stroke`, `"stroke-width"`, `rx` |
+  | `circle` | `<circle>` | `cx`, `cy`, `r`, `fill`, `stroke`, `"stroke-width"` |
+  | `line` | `<line>` | `x1`, `"y1"`, `x2`, `"y2"`, `stroke`, `"stroke-width"`, `stroke-dasharray` |
+  | `text` | `<text>` | `x`, `"y"`, `text` (the string shown), `fill`, `"font-size"`, `"font-weight"`, `"text-anchor"` |
+
+  ```yaml
+  background:
+    kind: shapes
+    shapes:
+      - { type: rect, x: 40, "y": 30, width: 920, height: 540, fill: "#0f172a", stroke: "#334155", "stroke-width": 2, rx: 12 }
+      - { type: circle, cx: 180, cy: 200, r: 8, fill: "#fbbf24" }
+      - { type: text, x: 180, "y": 185, text: "Seattle DC", fill: "#e2e8f0", "font-size": 13, "text-anchor": middle }
+      - { type: line, x1: 180, "y1": 200, x2: 210, "y2": 290, stroke: "#475569", "stroke-width": 2, "stroke-dasharray": "4 3" }
+  ```
+
+  Only `rect`, `circle`, `line`, and `text` are supported — no `path`/`polygon`.
+  Approximate curved boundaries or complex outlines with several short `line`
+  segments, or fall back to `kind: image` with a real map graphic.
+
+  ⚠️ **Only `x`/`y`-style bareword keys need quoting**, per the waypoints gotcha
+  above (`"y"`, `"y1"`, `"y2"` — YAML 1.1's Norway problem). Hyphenated keys like
+  `stroke-width`, `font-size`, `text-anchor` are never coerced and don't need
+  quoting, but quoting them is harmless if you prefer consistency.
+
+  **The `legend` shown under an entity-map is auto-generated** from the entity
+  type's `states` (`glyph`/`tone`/`label`) — there is no `legend:` key to author by
+  hand in the config; any such key is ignored.
 
 The map overlays colored dots (green = ok, amber = degraded, red = out of service) on the
 background image — one dot per device, scattered deterministically by device_id. Dots update
@@ -651,6 +775,25 @@ dynatrace:
     The portal has no mechanism to create custom entity type instances from user actions — only
     `service_request` records are created by the portal form. Entity-journey + ownerField is only
     valid for the built-in `my-journey` (aviation). For all other custom entities, use `entity-list`.
+29. **Fleet/moving-map entities use `entityType: journey`, never a custom name.** If any
+    `entity-map`/`entity-list` screen or home module is meant to show a moving fleet (trucks,
+    vans, ships), its `entityType` must be exactly `journey`. A custom name like `truck` will
+    404 — only `journey` is routed to journey-service.
+30. **A `journey`-backed fleet map needs the top-level `journeyService` block.** If `entities.journey`
+    is defined and used in a screen/home module, the config must also include a top-level
+    `journeyService.generator` block (outside `industry:`) with `entityTypes`, `initialStatuses`,
+    and a non-empty `routes` list — otherwise journey-service keeps generating flights/passengers
+    (or nothing) and the fleet map stays empty.
+31. **`entities.journey.states` keys must be a subset of `initiated`, `in_progress`, `completed`.**
+    These status names are fixed globally in journey-service and are not configurable per industry.
+    An invented status (e.g. `loading`, `customs`) will never be entered by the backend.
+32. **`entities.journey` must not define `computed.position`.** Position for `journey` comes from
+    journey-service's own origin/destination interpolation (`journeyService.generator.routes`), not
+    from the generic waypoints mechanism. A `computed.position` block on `journey` is dead config.
+33. **Route lines are not drawn automatically.** If routes should be visible on the map, add matching
+    `line` shapes to `background.shapes` using the same coordinates as each entry in
+    `journeyService.generator.routes` — otherwise only the moving sprites and hub markers show, with
+    no connecting lines.
 
 ---
 
@@ -930,6 +1073,124 @@ industry:
       iot-incident: "Equipment Incident Resolution"
       tax-payment: "Bill Payment Flow"
     flows: [service-request, account-creation, iot-incident, tax-payment]
+```
+
+---
+
+## Worked example C — Meridian Freight (trucking/logistics, journey-service fleet map)
+
+This example shows the `journey` fleet-map pattern from Step 3b: a schematic-map
+background drawn with `shapes`, routes branching from one hub, and the required
+top-level `journeyService` block.
+
+```yaml
+industry:
+  version: 1
+  id: trucking
+  company:
+    name: "Meridian Freight"
+    short: "Meridian"
+    tagline: "On time, every mile."
+    assistant:
+      name: "Dispatch"
+      persona: "the Meridian Freight virtual assistant"
+      systemPrompt: |-
+        You are Dispatch, the virtual assistant for Meridian Freight, a regional
+        trucking carrier. Help shippers track deliveries, report delivery issues,
+        and pay freight invoices. Be concise and professional.
+  theme:
+    colors:
+      brand: "#B45309"
+      brandDeep: "#78350F"
+      brandSoft: "#D97706"
+      brandTint: "#FEF3E2"
+      accent: "#1E293B"
+      accentSoft: "#334155"
+      accentInk: "#F1F5F9"
+  terminology:
+    customer: "Shipper"
+    customerPlural: "Shippers"
+    asset: "Truck"
+    assetPlural: "Trucks"
+    requestCategories: [damaged-cargo, delivery-delay, missed-pickup, other]
+  screens:
+    public:
+      - home
+      - { id: service-requests, label: "Delivery issues" }
+      - messages
+    ops:
+      - overview
+      - id: fleet-map
+        template: entity-map
+        entityType: journey          # ALWAYS "journey" — see Step 3b
+        label: "Fleet Map"
+        icon: "🚚"
+        viewBox: "0 0 1000 600"
+        labelField: destination
+        background:
+          kind: shapes
+          shapes:
+            - { type: rect, x: 40, "y": 30, width: 920, height: 540, fill: "#0f172a", stroke: "#334155", "stroke-width": 2, rx: 12 }
+            - { type: circle, cx: 500, cy: 300, r: 8, fill: "#fbbf24" }
+            - { type: text, x: 500, "y": 285, text: "Hub City", fill: "#e2e8f0", "font-size": 13, "font-weight": bold, "text-anchor": middle }
+            - { type: circle, cx: 750, cy: 180, r: 7, fill: "#38bdf8" }
+            - { type: text, x: 750, "y": 165, text: "North Depot", fill: "#cbd5e1", "font-size": 12, "text-anchor": middle }
+            # route line must match journeyService.generator.routes coordinates below
+            - { type: line, x1: 500, "y1": 300, x2: 750, "y2": 180, stroke: "#475569", "stroke-width": 2, "stroke-dasharray": "4 3" }
+      - { id: requests, label: "Dispatch queue" }
+      - demo-control
+  home:
+    ops:
+      - ops-overview
+  entities:
+    journey:                          # frontend rendering only — NOT the state machine
+      displayName: "Shipment"
+      displayNamePlural: "Shipments"
+      fields:
+        origin:      { type: string }
+        destination: { type: string }
+        status:      { type: enum, values: [in_progress, completed] }
+      initial: in_progress
+      states:                         # must be a subset of initiated/in_progress/completed
+        in_progress: { label: "En route",  tone: blue,  glyph: "🚚" }
+        completed:   { label: "Delivered", tone: green, glyph: "✅", terminal: true }
+      transitions:
+        - { from: in_progress, to: completed }
+  data:
+    zones: [hub-city, north-depot]
+    requestTemplates:
+      - { category: damaged-cargo,  title: "Pallet damaged in transit", description: "Shipment arrived with a crushed pallet." }
+      - { category: delivery-delay, title: "Delivery running behind",   description: "Driver reports a highway closure." }
+    chatQuestions:
+      - "Where is my shipment right now?"
+  routing:
+    damaged-cargo:  "Claims & Damage Resolution"
+    delivery-delay: "Dispatch Operations"
+    missed-pickup:  "Dispatch Operations"
+    other:          "General Support"
+  dynatrace:
+    serviceNames:
+      citizen-service: "Shipper Portal"
+      service-dispatch: "Dispatch Operations"
+    flowLabels:
+      service-request: "Delivery Issue Resolution"
+    flows: [service-request]
+
+# journeyService — TOP LEVEL, outside industry:. This is what actually makes the
+# fleet map move: without it, entityType: journey renders an empty map (or
+# flights/passengers, journey-service's own defaults).
+journeyService:
+  lifecycle:
+    minSeconds: 20    # shortened from the 300-7200s default so movement is
+    maxSeconds: 60    # visible within a normal demo session
+  generator:
+    maxActive: 10
+    entityTypes: ["truck"]           # cosmetic label on generated records only
+    initialStatuses:
+      truck: "in_progress"           # skip "initiated"
+    routes:
+      - { origin: "Hub City", destination: "North Depot",
+          originX: 500, originY: 300, destX: 750, destY: 180 }
 ```
 
 ---

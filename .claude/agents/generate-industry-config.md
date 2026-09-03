@@ -162,6 +162,45 @@ Defining `work_order` as a custom entity drops the incident-cascade chain. Any I
 incident will never auto-resolve, leaving permanent warning dots on every device map.
 Use domain-specific names: `field_order`, `crew_job`, `repair_task`, `maintenance_ticket`.
 
+### Rule P6 — Fleet/moving-map entities use the reserved `journey` type, not a custom entity
+
+If the industry has a fleet of things gliding between named locations (trucks between hubs,
+vans between depots, ships between ports) — this is **not** a job for `computed.position.waypoints`
+(that mechanism ties position to states, one waypoint per state, for things like a flight
+progressing through gate → taxi → takeoff). A continuously-moving fleet vehicle needs
+**journey-service**, a dedicated microservice with its own origin→destination interpolation.
+
+Full details and a worked example are in `docs/authoring-kit/AUTHORING_PROMPT.md` Step 3b.
+The essentials:
+
+- `entityType` in the screen/home module must be **exactly `journey`** — the gateway only
+  routes `/api/v1/entities/journey` to journey-service. Any other name 404s.
+- `entities.journey.states` is for frontend rendering only (glyph/tone/label) and must use a
+  subset of the fixed backend status names: `initiated`, `in_progress`, `completed`. These are
+  global across the platform, not configurable per industry — an invented status name is never
+  entered by the backend and its sprite will never appear.
+- Do **not** add `computed.position` to `entities.journey` — it's ignored. Position comes from
+  a required top-level `journeyService.generator.routes` block (outside `industry:`, a sibling of
+  `customerEntityService`/`opsEntityService`):
+
+  ```yaml
+  journeyService:
+    lifecycle: { minSeconds: 20, maxSeconds: 60 }   # default is 300-7200s (5min-2hr)
+    generator:
+      maxActive: 10
+      entityTypes: ["truck"]              # cosmetic label only, not the routing key
+      initialStatuses: { truck: "in_progress" }
+      routes:
+        - { origin: "Hub A", destination: "Hub B", originX: 180, originY: 200, destX: 210, destY: 290 }
+  ```
+
+- `journey` does **not** go in `customerEntityService`/`opsEntityService` `ownedTypes` (Rule P1
+  doesn't apply — it's served by its own microservice, not the generic entity engine).
+- No `journeyService.lifecycle.transitions` key exists — status progression is fixed in
+  journey-service's own defaults, not exposed via Helm.
+- Route lines are not auto-drawn. To make routes visible, add `line` shapes to the screen's
+  `background: { kind: shapes, shapes: [...] }` at the same coordinates as each route.
+
 ---
 
 ## Step 4 — Assemble the YAML
@@ -218,6 +257,16 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] If `iot` in `screens.ops`: `iotCategory1/2/3` and `iotIdPrefix1/2/3` in `terminology`.
 - [ ] If `status-map` with `clusterBy: zone`: `iotZonePositions` in `terminology`.
 - [ ] If `iot` in `screens.ops`: `incidents` also in `screens.ops`.
+
+### Checklist E' — Fleet / `journey` entities (Rule P6)
+
+- [ ] Any fleet/moving-map screen or home module uses `entityType: journey` — never a custom name.
+- [ ] `entities.journey.states` keys are a subset of `initiated`, `in_progress`, `completed`.
+- [ ] `entities.journey` has no `computed.position` block.
+- [ ] A top-level `journeyService.generator` block exists (outside `industry:`) with
+      `entityTypes`, `initialStatuses`, and a non-empty `routes` list.
+- [ ] `journey` is NOT added to `customerEntityService`/`opsEntityService` `ownedTypes`.
+- [ ] If routes should be visible, matching `line` shapes are added to `background.shapes`.
 
 ### Checklist E — Images
 
@@ -294,3 +343,8 @@ and Claude itself when generating industry configs. Read this list before writin
 | Fabricated image URLs | Unsplash URLs or omit — never invent GitHub raw paths |
 | `analytics:` block with invented flow ids | `analytics.flows` is browser-visible but same valid-id constraint applies |
 | Claiming validator passes without running it | Always run and show the output |
+| Fleet/moving-map entity given a custom `entityType` (e.g. `truck`) | Must be `entityType: journey` — only that name is routed to journey-service |
+| Inventing `journey` status names (`loading`, `customs`, `delivered`) | Only `initiated`/`in_progress`/`completed` exist — fixed globally, not per-industry |
+| `computed.position` added to `entities.journey` | Ignored — position comes from `journeyService.generator.routes`, not waypoints |
+| Fleet map defined with no top-level `journeyService.generator.routes` | Map renders empty (or shows flights/passengers) — the block is required, outside `industry:` |
+| `journey` added to `customerEntityService`/`opsEntityService` `ownedTypes` | Wrong — journey-service is a separate microservice, not the generic entity engine |

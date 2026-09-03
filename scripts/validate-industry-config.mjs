@@ -185,6 +185,70 @@ function checkDynatrace(cfg) {
   return errors
 }
 
+const JOURNEY_STATUSES = new Set(['initiated', 'in_progress', 'completed'])
+
+// journey-service is a dedicated microservice, not the generic entity engine —
+// see docs/authoring-kit/AUTHORING_PROMPT.md Step 3b / agent Rule P6.
+// `journeyService` lives OUTSIDE `industry:`, so this needs the full parsed
+// document, not just the `industry:` sub-object every other check operates on.
+function checkJourneyService(parsed, cfg, isValuesOverlay) {
+  const errors = []
+  const journeyDef = cfg.entities?.journey
+
+  const allPlacements = [
+    ...(cfg.screens?.public ?? []), ...(cfg.screens?.ops ?? []),
+    ...(cfg.home?.public ?? []), ...(cfg.home?.ops ?? []),
+  ]
+  const usesJourneyEntityType = allPlacements.some(
+    (item) => typeof item === 'object' && item?.entityType === 'journey'
+  )
+
+  if (!journeyDef && !usesJourneyEntityType) return errors
+
+  for (const stateKey of Object.keys(journeyDef?.states ?? {})) {
+    if (!JOURNEY_STATUSES.has(stateKey)) {
+      errors.push(
+        `entities.journey.states has key "${stateKey}" which is not a real journey-service status — ` +
+        `the backend only ever produces initiated/in_progress/completed (fixed globally, not per-industry), ` +
+        `so this state will never appear on the map`
+      )
+    }
+  }
+
+  if (journeyDef?.computed?.position) {
+    errors.push(
+      'entities.journey.computed.position is ignored — position for the journey entity type comes from ' +
+      'journeyService.generator.routes (origin/destination interpolation), not the generic waypoints ' +
+      'mechanism. Remove this block.'
+    )
+  }
+
+  if (usesJourneyEntityType && isValuesOverlay) {
+    const routes = parsed?.journeyService?.generator?.routes
+    if (!Array.isArray(routes) || routes.length === 0) {
+      errors.push(
+        'A screen or home module uses entityType: journey, but no top-level journeyService.generator.routes ' +
+        'is defined (journeyService is a sibling of industry:, not nested inside it — see AUTHORING_PROMPT.md ' +
+        'Step 3b). Without it the fleet map renders empty, or shows journey-service\'s default flight/passenger journeys.'
+      )
+    }
+  }
+
+  if (isValuesOverlay) {
+    for (const svc of ['customerEntityService', 'opsEntityService']) {
+      const owned = (parsed?.[svc]?.ownedTypes ?? '').split(',').map((s) => s.trim())
+      if (owned.includes('journey')) {
+        errors.push(
+          `${svc}.ownedTypes includes "journey" — journey-service is a separate microservice, not the ` +
+          `generic entity engine (Rule P1 does not apply to it). Remove it.`
+        )
+      }
+    }
+  }
+
+  return errors
+}
+
 function collectScreenEntityTypes(screens) {
   const types = new Set()
   for (const screen of screens ?? []) {
@@ -259,11 +323,14 @@ function checkScreens(cfg) {
 let failures = 0
 for (const path of files) {
   let cfg
+  let parsed
+  let isValuesOverlay = false
   try {
-    const parsed = yaml.load(readFileSync(path, 'utf8'))
+    parsed = yaml.load(readFileSync(path, 'utf8'))
     const isObj = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
     if (isObj && 'industry' in parsed) {
       cfg = parsed.industry
+      isValuesOverlay = true // journeyService/ownedTypes overrides live as siblings of industry:
     } else if (isObj && ('company' in parsed || 'theme' in parsed || 'screens' in parsed)) {
       cfg = parsed // already a bare rendered config.json, not a values-*.yaml overlay
     } else {
@@ -282,7 +349,10 @@ for (const path of files) {
   // validation but still run semantic entity checks so cross-reference bugs surface.
   const isPartialOverlay = !cfg.version && !cfg.company && !cfg.theme && !cfg.screens
   if (isPartialOverlay) {
-    const semanticErrors = checkEntities(cfg.entities)
+    const semanticErrors = [
+      ...checkEntities(cfg.entities),
+      ...checkJourneyService(parsed, cfg, isValuesOverlay),
+    ]
     if (semanticErrors.length) {
       console.error(`✗ ${path}: ${semanticErrors.length} error(s) (partial overlay):`)
       for (const e of semanticErrors) console.error(`  - ${e}`)
@@ -301,6 +371,7 @@ for (const path of files) {
     ...checkRouting(cfg),
     ...checkDynatrace(cfg),
     ...checkScreens(cfg),
+    ...checkJourneyService(parsed, cfg, isValuesOverlay),
   ]
   // Only surface raw AJV errors that aren't already explained by a semantic check.
   const semanticPaths = new Set(semanticErrors.map((e) => e.split(':')[0].trim()))
