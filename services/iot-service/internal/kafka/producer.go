@@ -42,7 +42,8 @@ func (p *Producer) PublishTelemetry(ctx context.Context, deviceID string, device
 		return err
 	}
 
-	return p.producer.Produce(&kafka.Message{
+	deliveryChan := make(chan kafka.Event, 1)
+	if err := p.producer.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     stringPtr("iot.telemetry.raw"),
 			Partition: kafka.PartitionAny,
@@ -52,11 +53,11 @@ func (p *Producer) PublishTelemetry(ctx context.Context, deviceID string, device
 			{Key: "device_id", Value: []byte(deviceID)},
 			{Key: "device_type", Value: []byte(deviceType)},
 		},
-	}, func(m *kafka.Message) {
-		if m.TopicPartition.Error != nil {
-			log.Printf("Failed to produce message: %v", m.TopicPartition.Error)
-		}
-	})
+	}, deliveryChan); err != nil {
+		return err
+	}
+	go logDeliveryResult(deliveryChan, "message")
+	return nil
 }
 
 // PublishAnomaly publishes an anomaly to the iot.anomalies topic.
@@ -76,7 +77,8 @@ func (p *Producer) PublishAnomaly(ctx context.Context, deviceID string, deviceTy
 		return err
 	}
 
-	return p.producer.Produce(&kafka.Message{
+	deliveryChan := make(chan kafka.Event, 1)
+	if err := p.producer.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     stringPtr("iot.anomalies"),
 			Partition: kafka.PartitionAny,
@@ -86,16 +88,23 @@ func (p *Producer) PublishAnomaly(ctx context.Context, deviceID string, deviceTy
 			{Key: "device_id", Value: []byte(deviceID)},
 			{Key: "severity", Value: []byte(severity)},
 		},
-	}, func(m *kafka.Message) {
-		if m.TopicPartition.Error != nil {
-			log.Printf("Failed to produce anomaly: %v", m.TopicPartition.Error)
-		}
-	})
+	}, deliveryChan); err != nil {
+		return err
+	}
+	go logDeliveryResult(deliveryChan, "anomaly")
+	return nil
 }
 
 // Close shuts down the producer.
 func (p *Producer) Close() {
 	p.producer.Close()
+}
+
+func logDeliveryResult(deliveryChan chan kafka.Event, kind string) {
+	e := <-deliveryChan
+	if m, ok := e.(*kafka.Message); ok && m.TopicPartition.Error != nil {
+		log.Printf("Failed to produce %s: %v", kind, m.TopicPartition.Error)
+	}
 }
 
 func stringPtr(s string) *string {

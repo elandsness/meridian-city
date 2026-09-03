@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/meridian/iot-service/internal/anomaly"
+	"github.com/meridian/iot-service/internal/api"
 	"github.com/meridian/iot-service/internal/config"
 	"github.com/meridian/iot-service/internal/fleet"
 	"github.com/meridian/iot-service/internal/ingestion"
@@ -33,7 +34,7 @@ func main() {
 	fleetManager.Start()
 	defer fleetManager.Stop()
 
-	anomalyDetector := anomaly.NewDetector(cfg.AnomalyThresholds)
+	anomalyDetector := anomaly.NewDetector(cfg.AnomalyThresholds, kafkaProducer)
 
 	// Initialize OTLP receivers
 	otlpGRPC := ingestion.NewOTLPGRPCReceiver(cfg.OTLPGRPCPort, kafkaProducer)
@@ -42,7 +43,7 @@ func main() {
 	// Initialize REST API server
 	apiServer := &http.Server{
 		Addr:    ":" + cfg.RESTAPIPort,
-		Handler: buildRouter(kafkaProducer, fleetManager, anomalyDetector),
+		Handler: api.NewRouter(kafkaProducer, fleetManager, anomalyDetector, cfg).Handler(),
 	}
 
 	// Start all services

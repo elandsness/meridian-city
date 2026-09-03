@@ -262,10 +262,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go 1.22
+      - name: Set up Go 1.26
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          # iot-service's go.mod requires go >= 1.26 (go.opentelemetry.io/collector/pdata
+          # v1.66.0). A newer toolchain still builds the other services' `go 1.22` modules
+          # fine (forward-compatible), so this is a safe shared bump for the whole matrix.
+          go-version: "1.26"
           # Use go.mod (always present) for cache key.
           # go.sum is generated below if not yet committed.
           cache-dependency-path: services/${{ matrix.service }}/go.mod

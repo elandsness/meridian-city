@@ -3,9 +3,8 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
-RUN mvn -q -e -B -e -C -o org.apache.maven.plugins:maven-dependency-plugin:3.6.1:go-offline
 COPY src ./src
-RUN mvn -q -e -B -e -C -o -DskipTests package
+RUN mvn -q -e -B -e -C -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

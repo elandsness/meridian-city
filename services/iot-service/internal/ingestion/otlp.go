@@ -10,10 +10,8 @@ import (
 
 	"github.com/meridian/iot-service/internal/kafka"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 // OTLPGRPCReceiver receives OTLP metrics via gRPC.
@@ -107,9 +105,15 @@ func (r *OTLPHTTPReceiver) handleMetrics(w http.ResponseWriter, req *http.Reques
 	defer req.Body.Close()
 
 	// Process metrics and publish to Kafka
-	for _, rm := range metrics.ResourceMetrics() {
-		for _, sm := range rm.ScopeMetrics() {
-			for _, m := range sm.Metrics() {
+	resourceMetrics := metrics.ResourceMetrics()
+	for i := 0; i < resourceMetrics.Len(); i++ {
+		rm := resourceMetrics.At(i)
+		scopeMetrics := rm.ScopeMetrics()
+		for j := 0; j < scopeMetrics.Len(); j++ {
+			sm := scopeMetrics.At(j)
+			metricSlice := sm.Metrics()
+			for k := 0; k < metricSlice.Len(); k++ {
+				m := metricSlice.At(k)
 				// Extract device_id from resource attributes
 				deviceID := extractDeviceID(rm)
 				if deviceID == "" {
@@ -163,7 +167,7 @@ func extractDeviceType(rm pmetric.ResourceMetrics) string {
 // extractMetricsMap extracts metric values from a metric.
 func extractMetricsMap(m pmetric.Metric) map[string]float64 {
 	metricsMap := make(map[string]float64)
-	if m.MetricType() == pmetric.MetricTypeGauge {
+	if m.Type() == pmetric.MetricTypeGauge {
 		gauge := m.Gauge()
 		for i := 0; i < gauge.DataPoints().Len(); i++ {
 			dp := gauge.DataPoints().At(i)

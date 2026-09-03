@@ -98,7 +98,7 @@ func (d *Detector) checkAnomalies() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	for key, window := range d.readings {
+	for _, window := range d.readings {
 		if window.Consecutive >= 3 {
 			d.emitAnomaly(window.DeviceID, "unknown", window.Metric, 0, window.Threshold)
 		}

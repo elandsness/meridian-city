@@ -36,7 +36,7 @@ public class FulfillmentScheduler {
     @Transactional
     public void advanceOrders() {
         List<Order> due = orderRepository
-                .findByStatusNotAndNextTransitionAtLessThanEqual("delivered", OffsetDateTime.now());
+                .findByStatusNotAndNextTransitionAtLessThanEqual(OffsetDateTime.now());
         for (Order order : due) {
             advance(order);
         }

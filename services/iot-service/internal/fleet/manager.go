@@ -104,7 +104,7 @@ func (fm *FleetManager) updateMetrics(device *Device) {
 		device.Metrics["co2_ppm"] = 400 + rand.Float64()*800 // 400-1200 ppm
 	case DeviceTypeMachine:
 		device.Metrics["vibration"] = 0.1 + rand.Float64()*1.5 // 0.1-1.6 mm/s
-		device.Metrics["cycle_count"] = rand.Intn(1000)
+		device.Metrics["cycle_count"] = float64(rand.Intn(1000))
 		device.Metrics["temp"] = 20 + rand.Float64()*80 // 20-100°C
 		device.Metrics["error_rate"] = rand.Float64() * 10 // 0-10%
 		device.Metrics["throughput"] = 50 + rand.Float64()*150 // 50-200 units/min
