@@ -7,12 +7,9 @@ import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, String> {
-
-    Optional<ServiceRequest> findByRequestId(String requestId);
 
     List<ServiceRequest> findByStatus(String status);
 
