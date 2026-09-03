@@ -39,6 +39,10 @@ jobs:
         service:
           - entity-engine
           - routing-service
+          - journey-service
+          - identity-service
+          - transaction-service
+          - workflow-service
     steps:
       - uses: actions/checkout@v4
 
@@ -109,6 +113,8 @@ jobs:
           - notification-service
           - demo-control-api
           - traffic-bot
+          - news-ticker-service
+          - weather-service
     steps:
       - uses: actions/checkout@v4
 
@@ -252,6 +258,7 @@ jobs:
           - iot-ingestion
           - iot-simulator
           - movement-service
+          - iot-service
     steps:
       - uses: actions/checkout@v4
 

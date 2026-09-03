@@ -183,27 +183,46 @@ restart_app_workloads() {
 cleanup_old_resources() {
   info "Cleaning up old resources..."
 
-  # Delete old ReplicaSets (keep 2 most recent per deployment for quick rollback).
-  # This significantly reduces the clutter of old pods listed by kubectl get pods.
+  # Delete old ReplicaSets (keep 2 most recent per Deployment for quick rollback).
+  # Group by the RS's actual owning Deployment (ownerReferences[0].name), NOT by
+  # the app.kubernetes.io/instance label -- that label holds the Helm RELEASE
+  # name and is identical across every ReplicaSet in the namespace, so the old
+  # `-l app.kubernetes.io/instance=$owner` lookup here never matched anything
+  # (an owner like "api-gateway" never equals the release's instance label
+  # "meridian-<hash>"), `count` was always 0, and this loop silently deleted
+  # nothing on every single upgrade -- every Deployment's old ReplicaSets piled
+  # up forever. Confirmed live: a single instance accumulated 133 ReplicaSets
+  # (down to 46 after a one-off manual cleanup) despite this function having
+  # run on every upgrade.
   local rs_deleted=0
-  for rs in $(kubectl get rs -n "$NAMESPACE" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[*].metadata.name}'); do
-    local owner
-    owner=$(kubectl get rs "$rs" -n "$NAMESPACE" -o jsonpath='{.metadata.ownerReferences[0].name}' 2>/dev/null)
-    if [[ -n "$owner" ]]; then
-      # Count how many RS this deployment has; if more than 2, delete the older ones.
-      local count
-      count=$(kubectl get rs -n "$NAMESPACE" -l "app.kubernetes.io/instance=$owner" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | wc -w)
-      if [[ $count -gt 2 ]]; then
-        kubectl delete rs "$rs" -n "$NAMESPACE" --ignore-not-found 2>/dev/null && ((rs_deleted++))
-      fi
-    fi
-  done
+  local rs_data
+  rs_data=$(kubectl get rs -n "$NAMESPACE" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.ownerReferences[0].name}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' 2>/dev/null)
+  local to_delete
+  to_delete=$(printf '%s\n' "$rs_data" | awk -F'\t' '$2 != ""' | sort -t $'\t' -k2,2 -k3,3 | awk -F'\t' '
+    { count[$2]++; rows[$2 SUBSEP count[$2]] = $1 }
+    END {
+      for (o in count) {
+        n = count[o]
+        if (n > 2) { for (i = 1; i <= n - 2; i++) print rows[o SUBSEP i] }
+      }
+    }')
+  while IFS= read -r rs; do
+    [[ -n "$rs" ]] || continue
+    kubectl delete rs "$rs" -n "$NAMESPACE" --ignore-not-found 2>/dev/null && ((rs_deleted++))
+  done <<< "$to_delete"
   [[ $rs_deleted -gt 0 ]] && info "  Deleted $rs_deleted old ReplicaSets."
 
   # Delete failed hook Jobs (storage-class-setup, etc) that have status 'Error' or 'Failed'.
   # These hook jobs run once at install and can accumulate if install is retried.
+  # NOTE: `status.failed` is not a supported field-selector for Jobs -- the API
+  # server rejects it outright ("field label \"status.failed\" not supported for
+  # Job"), so the old `--field-selector status.failed=1` version of this loop
+  # always errored (silenced by 2>/dev/null) and never deleted anything. Filter
+  # on the Job's actual status.failed count from JSON instead.
   local job_deleted=0
-  for job in $(kubectl get jobs -n "$NAMESPACE" --field-selector status.failed=1 -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+  for job in $(kubectl get jobs -n "$NAMESPACE" \
+      -o jsonpath='{range .items[?(@.status.failed>0)]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
     kubectl delete job "$job" -n "$NAMESPACE" --ignore-not-found 2>/dev/null && ((job_deleted++))
   done
   [[ $job_deleted -gt 0 ]] && info "  Deleted $job_deleted failed Jobs."

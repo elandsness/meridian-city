@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: identity-service
-          image: "{{ .Values.identityService.image.repository }}:{{ .Values.identityService.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "meridian.image" (dict "repository" .Values.identityService.image.repository "tag" .Values.identityService.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           ports:
             - name: http

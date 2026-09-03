@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: news-ticker-service
-          image: "{{ .Values.newsTickerService.image.repository }}:{{ .Values.newsTickerService.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "meridian.image" (dict "repository" .Values.newsTickerService.image.repository "tag" .Values.newsTickerService.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           ports:
             - name: http

@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: weather-service
-          image: "{{ .Values.weatherService.image.repository }}:{{ .Values.weatherService.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "meridian.image" (dict "repository" .Values.weatherService.image.repository "tag" .Values.weatherService.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           ports:
             - name: http
