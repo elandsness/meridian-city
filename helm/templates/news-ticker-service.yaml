@@ -32,7 +32,7 @@ spec:
             - name: PORT
               value: "8095"
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: {{ include "meridian.kafkaBootstrap" . }}
+              value: "{{ include "meridian.kafkaBootstrap" . }}:9092"
             {{- if .Values.newsTickerService.env }}
             {{- range $key, $value := .Values.newsTickerService.env }}
             - name: {{ $key }}

@@ -41,7 +41,7 @@ spec:
                   name: {{ include "meridian.fullname" . }}-db-credentials
                   key: password
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: {{ include "meridian.kafkaBootstrap" . }}
+              value: "{{ include "meridian.kafkaBootstrap" . }}:9092"
             {{- if .Values.transactionService.env }}
             {{- range $key, $value := .Values.transactionService.env }}
             - name: {{ $key }}
@@ -50,6 +50,16 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.transactionService.resources | nindent 12 }}
+          # See journey-service.yaml for why this needs a startupProbe: cold JVM start
+          # (Spring context + Flyway + Hibernate + Kafka admin) has been observed taking
+          # 77-90s on GKE Autopilot's default CPU request, well past the liveness
+          # probe's old ~60s failure budget.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 18
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

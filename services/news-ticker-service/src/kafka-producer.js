@@ -2,10 +2,8 @@ const kafka = require('kafka-node')
 
 class KafkaProducer {
   constructor(bootstrapServers) {
-    this.producer = new kafka.KafkaProducer(
-      new kafka.Client(bootstrapServers),
-      new kafka.HighLevelProducer()
-    )
+    const client = new kafka.KafkaClient({ kafkaHost: bootstrapServers })
+    this.producer = new kafka.HighLevelProducer(client)
   }
 
   publish(topic, message) {

@@ -41,7 +41,7 @@ spec:
                   name: {{ include "meridian.fullname" . }}-db-credentials
                   key: password
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: {{ include "meridian.kafkaBootstrap" . }}
+              value: "{{ include "meridian.kafkaBootstrap" . }}:9092"
             - name: JOURNEY_LIFECYCLE_ENABLED
               value: {{ .Values.journeyService.lifecycle.enabled | quote }}
             - name: JOURNEY_LIFECYCLE_MIN_SECONDS
@@ -69,6 +69,18 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.journeyService.resources | nindent 12 }}
+          # Cold JVM start (Spring context + Flyway + Hibernate + Kafka admin) has been
+          # observed taking 77-90s on GKE Autopilot's default CPU request -- well past
+          # the old liveness probe's ~60s failure budget (30s initialDelaySeconds + 3
+          # failures x 10s), which killed the container mid-boot every time. A
+          # startupProbe holds off liveness/readiness checks until the app is actually
+          # up, instead of guessing a fixed initialDelaySeconds.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 18
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

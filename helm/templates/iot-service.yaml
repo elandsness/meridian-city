@@ -50,7 +50,7 @@ spec:
                   name: {{ include "meridian.fullname" . }}-db-credentials
                   key: password
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: {{ include "meridian.kafkaBootstrap" . }}
+              value: "{{ include "meridian.kafkaBootstrap" . }}:9092"
             - name: SIMULATOR_ENABLED
               value: {{ .Values.iotService.simulator.enabled | quote }}
             - name: SIMULATOR_FLEET_VEHICLES_COUNT
