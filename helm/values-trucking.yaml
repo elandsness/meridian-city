@@ -147,8 +147,21 @@ industry:
       - demo-control
   home:
     public:
+      - { id: welcome-hero, position: full }
+      - id: freight-news
+        template: ticker
+        position: full
+        height: slim
+        label: "📦 FREIGHT UPDATES"
+        items:
+          - "I-5 corridor running on schedule — no delays reported"
+          - "New spoke added: Seattle DC to Wenatchee Hub, daily service"
+          - "Winter weather advisory: Snoqualmie Pass may affect Yakima/Spokane routes"
+          - "Meridian Freight adds 12 tractors to Puget Sound fleet"
+          - "Fuel surcharge adjusted for Q3 — see your invoice for details"
       - id: fleet-map
         template: entity-map
+        position: full
         entityType: journey
         viewBox: "0 0 1000 700"
         labelField: destination
@@ -190,15 +203,6 @@ industry:
             - { type: circle, cx: 800, cy: 280, r: 6, fill: "#38bdf8" }
       - quick-actions
       - { id: weather, template: weather-widget, mode: forecast }
-      - id: freight-news
-        template: ticker
-        label: "📦 FREIGHT UPDATES"
-        items:
-          - "I-5 corridor running on schedule — no delays reported"
-          - "New spoke added: Seattle DC to Wenatchee Hub, daily service"
-          - "Winter weather advisory: Snoqualmie Pass may affect Yakima/Spokane routes"
-          - "Meridian Freight adds 12 tractors to Puget Sound fleet"
-          - "Fuel surcharge adjusted for Q3 — see your invoice for details"
     ops:
       - { id: fleet-kpi, template: entity-summary-card, entityType: journey, label: "Shipments In Transit" }
       - ops-overview

@@ -48,8 +48,12 @@ export default function PageComposer({ pageId, config }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {modules.map((module, index) => {
-        // Check `type`, `template` (the schema's own field name), then `id`.
-        const componentKey = module.type || module.template || module.id
+        // A module is either a bare string (static module id, e.g. "quick-actions")
+        // or an object. Check `type`, `template` (the schema's own field name),
+        // then `id` -- but only after confirming it's an object, since strings have
+        // no such properties and would otherwise always resolve to undefined.
+        const isStringModule = typeof module === 'string'
+        const componentKey = isStringModule ? module : (module.type || module.template || module.id)
         const Component = componentKey ? COMPONENT_REGISTRY[componentKey] : undefined
 
         if (!Component) {
@@ -65,9 +69,10 @@ export default function PageComposer({ pageId, config }) {
         }
 
         // Strip layout-only/identifier keys before passing to the component.
-        const { type: _type, template: _template, id: _id, position: _position, ...moduleProps } = module
+        const { type: _type, template: _template, id: _id, position: _position, ...moduleProps } =
+          isStringModule ? {} : module
 
-        const isFullWidth = module.position === 'full' || module.position === 'sidebar'
+        const isFullWidth = !isStringModule && (module.position === 'full' || module.position === 'sidebar')
 
         return (
           <div

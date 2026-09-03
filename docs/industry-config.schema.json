@@ -189,7 +189,8 @@
             "properties": {
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
               "label": { "type": "string" },
-              "icon": { "type": "string" }
+              "icon": { "type": "string" },
+              "position": { "enum": ["top", "main", "full", "sidebar"], "description": "Home module layout only (PageComposer.jsx): 'full' spans both grid columns; 'top'/'main'/undefined is a standard half-width cell; 'sidebar' currently renders the same as 'full'. Ignored for screens." }
             }
           },
           {
@@ -199,6 +200,7 @@
             "additionalProperties": true,
             "properties": {
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "position": { "enum": ["top", "main", "full", "sidebar"], "description": "Home module layout only: 'full' spans both grid columns. See PageComposer.jsx." },
               "template": { "enum": ["ticker", "weather-widget", "clock-widget", "announcements", "entity-list-card", "entity-summary-card", "entity-kpi-row", "activity-feed"] },
               "height": { "enum": ["slim", "half", "full"], "description": "ticker height: slim = marquee bar (~40px), half = compact card, full = expanded card listing all items." },
               "mode": { "type": "string", "description": "weather-widget only: 'perfect' (always sunny) or 'forecast' (4-day rotating)." },
@@ -222,6 +224,7 @@
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
               "label": { "type": "string" },
               "icon": { "type": "string" },
+              "position": { "enum": ["top", "main", "full", "sidebar"], "description": "Home module layout only: 'full' spans both grid columns. See PageComposer.jsx." },
               "template": { "enum": ["entity-list", "entity-detail", "entity-map", "entity-analytics", "entity-journey"] },
               "entityType": { "type": "string" },
               "fields": { "type": "array", "items": { "type": "string" } },
@@ -272,6 +275,7 @@
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
               "label": { "type": "string" },
               "icon": { "type": "string" },
+              "position": { "enum": ["top", "main", "full", "sidebar"], "description": "Home module layout only: 'full' spans both grid columns. See PageComposer.jsx." },
               "title": { "type": "string", "description": "Heading shown above the map." },
               "template": { "const": "status-map" },
               "entityType": { "type": "string", "description": "Entity type to fetch status from. Omit when source='devices'." },

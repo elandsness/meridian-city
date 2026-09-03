@@ -40,7 +40,12 @@ export default function QuickActions() {
         <QuickAction icon="store" title="City store" subtitle="Mugs, tees & more" to="/store" />
       )}
       {activeScreens.has('billing') && (
-        <QuickAction icon="pay" title="Pay bills" subtitle="Tax bills & history" to="/billing" />
+        <QuickAction
+          icon="pay"
+          title={cfg.terminology?.billingTitle || 'Pay bills'}
+          subtitle={cfg.terminology?.billNoun ? `${cfg.terminology.billNoun}s & history` : 'Tax bills & history'}
+          to="/billing"
+        />
       )}
       {activeScreens.has('service-requests') && (
         <QuickAction icon="report" title="Report an issue" subtitle="Submit a request" to="/service-requests/new" />
