@@ -161,12 +161,24 @@ function checkDynatrace(cfg) {
     }
   }
 
-  // flows: only valid ids allowed
+  // flows: a legacy hand-written key (VALID_FLOW_IDS), OR the id of an entity type
+  // declared in industry.entities with states+initial -- the Dynatrace provisioner's
+  // derive_flow_specs_from_entity_config() auto-builds a flow for any such entity type,
+  // keyed by its own entity-type name, with zero hand-written flow spec required. See
+  // helm/files/provision-dynatrace-business-config.py.
+  const derivableEntityFlowIds = new Set(
+    Object.entries(cfg.entities ?? {})
+      .filter(([, def]) => def?.states && def?.initial)
+      .map(([id]) => id)
+  )
   for (const [i, flow] of (dt.flows ?? []).entries()) {
-    if (!VALID_FLOW_IDS.has(flow)) {
+    if (!VALID_FLOW_IDS.has(flow) && !derivableEntityFlowIds.has(flow)) {
       errors.push(
         `dynatrace.flows[${i}] "${flow}" is not a valid flow id. ` +
-        `Valid ids: ${[...VALID_FLOW_IDS].join(', ')}`
+        `Valid ids: ${[...VALID_FLOW_IDS].join(', ')}` +
+        (derivableEntityFlowIds.size
+          ? `, or one of this config's entity types: ${[...derivableEntityFlowIds].join(', ')}`
+          : '')
       )
     }
   }

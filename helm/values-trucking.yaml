@@ -282,11 +282,18 @@ industry:
       account-creation: "Shipper Account Setup"
       iot-incident: "Fleet Incident Resolution"
       tax-payment: "Freight Invoice Payment"
+      # "journey" isn't a legacy hand-written flow id -- it's auto-derived from
+      # entities.journey.states/transitions above (see AUTHORING_PROMPT.md Step 3b
+      # and provision-dynatrace-business-config.py's
+      # derive_flow_specs_from_entity_config()). journey-service must emit its
+      # business events as "journey.<status>" for this to actually populate.
+      journey: "Shipment Delivery"
     flows:
       - service-request
       - account-creation
       - iot-incident
       - tax-payment
+      - journey
 
 # -----------------------------------------------------------------------------
 # journeyService generator overrides — TOP-LEVEL (outside industry:), same as

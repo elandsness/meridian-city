@@ -229,9 +229,13 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] `dynatrace.serviceNames` keys are **exactly** from this list — the left side is fixed:
       `citizen-service`, `city-operations`, `service-dispatch`, `api-gateway`,
       `notification-service`, `billing-service`. Invented keys are silently ignored.
-- [ ] `dynatrace.flows` entries are **exactly** from:
+- [ ] `dynatrace.flows` entries are either one of the legacy ids —
       `service-request`, `account-creation`, `iot-incident`, `tax-payment`,
-      `aircraft-turnaround`, `passenger-journey`. No invented ids.
+      `aircraft-turnaround`, `passenger-journey` — or the exact key of an entity type
+      declared in `industry.entities` with `states`/`initial` (the provisioner
+      auto-derives a flow for it, steps named `<entity_type>.<state>` — see
+      AUTHORING_PROMPT.md Step 3b's "Getting a Dynatrace Business Flow" note). Any
+      other string is silently ignored.
 - [ ] If `billing` is in `screens.public`, then `tax-payment` is in `dynatrace.flows`
       and `dynatrace.flowLabels` has an entry for it.
 - [ ] `dynatrace.flowLabels` has an entry for every id listed in `dynatrace.flows`.
@@ -333,7 +337,7 @@ and Claude itself when generating industry configs. Read this list before writin
 | Missing `other` in `routing:` | Always add `other: "General Support"` or equivalent |
 | `entity-journey + ownerField` in `screens.public` | Replace with `entity-list` (no `ownerField`) |
 | Invented `serviceNames` keys (`grid-operations`, `field-service`, `customer-entity-service`) | Use only the six fixed keys |
-| Invented `flows` ids (`grid-fault-resolution`, `flight_departure`, `patient-care`) | Map to the 6 valid ids |
+| Invented `flows` ids not matching a legacy id or a real entity type key | Map to a legacy id, or use the exact key of an `industry.entities` type (auto-derived flow) |
 | `dynatrace.flows` missing `tax-payment` when billing screen is active | Add it + a `flowLabels` entry |
 | Entity with generator but no screen | Add `entity-list` screen, or remove the generator |
 | Transition with only `when: { probability }`, no `timer` | Add `timer:` — `when` is a filter, not a trigger |

@@ -269,6 +269,27 @@ you want the routes visible on the map (recommended for a fleet network), add
 matching `line` shapes to the screen's `background.shapes` (see 4a below) using the
 same coordinates as each route's `originX/Y`/`destX/Y`.
 
+**Getting a Dynatrace Business Flow for `journey` (or any custom entity) is a
+one-line opt-in, not a hand-written flow.** The provisioner
+(`helm/files/provision-dynatrace-business-config.py`) auto-derives a Business Flow
+for *any* entity type declared in `industry.entities` with `states`/`initial` —
+its steps come directly from that entity's states, using event names of the form
+`<entity_type>.<state>` (e.g. `journey.in_progress`, `journey.completed`). To turn
+this on for `journey`, just add `journey` to `dynatrace.flows` and give it a
+`dynatrace.flowLabels.journey` title:
+
+```yaml
+dynatrace:
+  flowLabels:
+    journey: "Shipment Delivery"     # any label you like
+  flows:
+    - journey                        # auto-derived from entities.journey.states — see above
+```
+
+This only works because journey-service's own business-event logger emits
+`journey.<status>` (matching this convention exactly) — if you're reading this
+after some future change broke that, that's the thing to check first.
+
 ---
 
 ## Step 4 — Compose the config using the catalog
@@ -680,10 +701,13 @@ dynatrace:
     - iot-incident
     # add: tax-payment only if billing screen is active
     # add: aircraft-turnaround / passenger-journey only for aviation
-    # ⚠️ The valid flow ids are EXACTLY: service-request, account-creation, iot-incident,
-    # tax-payment, aircraft-turnaround, passenger-journey.
-    # Do NOT invent flow ids (e.g. grid-fault-resolution, bill-payment-flow, etc.) —
-    # they will silently do nothing. Map your concept to the closest valid id above.
+    # ⚠️ The legacy hand-written flow ids are EXACTLY: service-request, account-creation,
+    # iot-incident, tax-payment, aircraft-turnaround, passenger-journey.
+    # Do NOT invent a flow id that isn't one of these (e.g. grid-fault-resolution,
+    # bill-payment-flow) UNLESS it's the exact key of an entity type you defined in
+    # industry.entities with states/initial -- those get an auto-derived flow for free
+    # (see Step 3b's "Getting a Dynatrace Business Flow for journey" for the mechanism
+    # and the required event-naming convention).
 ```
 
 ---
@@ -771,9 +795,11 @@ dynatrace:
     `citizen-service`, `city-operations`, `service-dispatch`, `api-gateway`,
     `notification-service`, `billing-service`. A key like `grid-operations` or `analytics-engine`
     won't rename anything — it's silently ignored. Map your industry labels to these fixed keys.
-27. **`dynatrace.flows` entries must be from the known list.** Valid flow ids: `service-request`,
-    `account-creation`, `iot-incident`, `tax-payment`, `aircraft-turnaround`, `passenger-journey`.
-    Any other string (e.g. `grid-fault-resolution`, `bill-payment-flow`) is silently ignored.
+27. **`dynatrace.flows` entries must be a legacy id or a declared entity type.** Legacy hand-written
+    ids: `service-request`, `account-creation`, `iot-incident`, `tax-payment`, `aircraft-turnaround`,
+    `passenger-journey`. Any OTHER string is only valid if it's the exact key of an entity type in
+    `industry.entities` with `states`/`initial` (auto-derived flow — see Step 3b). A string matching
+    neither (e.g. `grid-fault-resolution`, `bill-payment-flow`) is silently ignored.
 28. **`entity-journey` + `ownerField` never works for custom entity types in the public portal.**
     The portal has no mechanism to create custom entity type instances from user actions — only
     `service_request` records are created by the portal form. Entity-journey + ownerField is only
@@ -1178,7 +1204,10 @@ industry:
       service-dispatch: "Dispatch Operations"
     flowLabels:
       service-request: "Delivery Issue Resolution"
-    flows: [service-request]
+      journey: "Shipment Delivery"    # auto-derived from entities.journey.states below --
+                                      # the flow id must be "journey" (the entities: key),
+                                      # not the entity's displayName ("Shipment")
+    flows: [service-request, journey]
 
 # journeyService — TOP LEVEL, outside industry:. This is what actually makes the
 # fleet map move: without it, entityType: journey renders an empty map (or
