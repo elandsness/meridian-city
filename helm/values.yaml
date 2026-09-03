@@ -912,9 +912,12 @@ workflowService:
 # Transaction Service (Java / Spring Boot)
 # Generic transaction service merging commerce-service + billing-service.
 # Handles carts, orders, bills, and payments with configurable fulfillment state machine.
+# Default OFF: verified zero frontend callers -- billing/store currently go through
+# customer-entity-service (/api/v1/entities/bill) and commerce-service (/api/v1/store)
+# instead. Enable per-industry only once something actually calls /api/v1/transaction.
 # ---------------------------------------------------------------------------
 transactionService:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: "transaction-service"
@@ -959,9 +962,13 @@ transactionService:
 # Generic journey service merging flight-ops + passenger-service. Configurable
 # journey stages + position interpolation, used by the moving-map/entity-map
 # style home modules (industry.services.journey.stages).
+# Default OFF: only needed by industry configs that use entityType: journey (a
+# fleet/moving-map screen or home module) -- see AUTHORING_PROMPT.md Step 3b.
+# Those configs must set journeyService.enabled: true as a top-level override
+# (see helm/values-trucking.yaml for the pattern).
 # ---------------------------------------------------------------------------
 journeyService:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: "journey-service"
@@ -1039,9 +1046,13 @@ iotService:
 # News Ticker Service (Node.js)
 # Configurable headline pools per industry, served over REST for the ticker
 # home module.
+# Default OFF: the current `ticker` home module (frontends/*/src/components/home/
+# Ticker.jsx) is fully static/client-side and never calls this service's API --
+# verified zero callers. Left fully wired and toggleable (set enabled: true) for
+# when the ticker component is rebuilt to consume live data from here.
 # ---------------------------------------------------------------------------
 newsTickerService:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: "news-ticker-service"
@@ -1062,9 +1073,13 @@ newsTickerService:
 # Weather Service (Node.js)
 # Configurable location/units per industry, served over REST for the weather
 # home module.
+# Default OFF: the current `weather-widget` home module (frontends/*/src/components/
+# home/WeatherWidget.jsx) is a seeded fake-forecast generator and never calls this
+# service's API -- verified zero callers. Left fully wired and toggleable (set
+# enabled: true) for when the widget is rebuilt to consume live data from here.
 # ---------------------------------------------------------------------------
 weatherService:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: "weather-service"

@@ -224,6 +224,13 @@ function checkJourneyService(parsed, cfg, isValuesOverlay) {
   }
 
   if (usesJourneyEntityType && isValuesOverlay) {
+    if (parsed?.journeyService?.enabled !== true) {
+      errors.push(
+        'A screen or home module uses entityType: journey, but the top-level journeyService.enabled is not ' +
+        'set to true. journey-service is OFF by default in the base chart, so without this the pod never ' +
+        'runs at all and the fleet map is permanently empty.'
+      )
+    }
     const routes = parsed?.journeyService?.generator?.routes
     if (!Array.isArray(routes) || routes.length === 0) {
       errors.push(

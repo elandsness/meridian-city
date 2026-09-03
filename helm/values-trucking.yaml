@@ -295,6 +295,7 @@ industry:
 # normal demo session.
 # -----------------------------------------------------------------------------
 journeyService:
+  enabled: true   # off by default in the base chart -- this config needs it (entityType: journey)
   lifecycle:
     minSeconds: 25
     maxSeconds: 90

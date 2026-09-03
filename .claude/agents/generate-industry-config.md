@@ -185,6 +185,8 @@ The essentials:
 
   ```yaml
   journeyService:
+    enabled: true   # OFF by default in the base chart -- required for any config
+                     # using entityType: journey, or the fleet map is just empty.
     lifecycle: { minSeconds: 20, maxSeconds: 60 }   # default is 300-7200s (5min-2hr)
     generator:
       maxActive: 10
@@ -263,8 +265,9 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] Any fleet/moving-map screen or home module uses `entityType: journey` — never a custom name.
 - [ ] `entities.journey.states` keys are a subset of `initiated`, `in_progress`, `completed`.
 - [ ] `entities.journey` has no `computed.position` block.
-- [ ] A top-level `journeyService.generator` block exists (outside `industry:`) with
-      `entityTypes`, `initialStatuses`, and a non-empty `routes` list.
+- [ ] A top-level `journeyService` block exists (outside `industry:`) with `enabled: true`
+      plus a `generator` with `entityTypes`, `initialStatuses`, and a non-empty `routes` list.
+      journey-service is OFF by default — omitting `enabled: true` means the pod never runs.
 - [ ] `journey` is NOT added to `customerEntityService`/`opsEntityService` `ownedTypes`.
 - [ ] If routes should be visible, matching `line` shapes are added to `background.shapes`.
 
@@ -347,4 +350,5 @@ and Claude itself when generating industry configs. Read this list before writin
 | Inventing `journey` status names (`loading`, `customs`, `delivered`) | Only `initiated`/`in_progress`/`completed` exist — fixed globally, not per-industry |
 | `computed.position` added to `entities.journey` | Ignored — position comes from `journeyService.generator.routes`, not waypoints |
 | Fleet map defined with no top-level `journeyService.generator.routes` | Map renders empty (or shows flights/passengers) — the block is required, outside `industry:` |
+| Fleet map defined without `journeyService.enabled: true` | journey-service is OFF by default in the base chart — the pod never even runs |
 | `journey` added to `customerEntityService`/`opsEntityService` `ownedTypes` | Wrong — journey-service is a separate microservice, not the generic entity engine |

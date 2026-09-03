@@ -229,6 +229,9 @@ like `customerEntityService`/`opsEntityService` overrides):
 ```yaml
 # Outside industry: — configures the actual backend simulation, not just labels.
 journeyService:
+  enabled: true         # journey-service is OFF by default in the base chart —
+                         # any config using entityType: journey MUST set this,
+                         # or the fleet map renders empty (the pod never even runs).
   lifecycle:
     minSeconds: 20      # override the default 300–7200s (5min–2hr) band so
     maxSeconds: 60      # movement is visible within a normal demo session
@@ -779,11 +782,12 @@ dynatrace:
     `entity-map`/`entity-list` screen or home module is meant to show a moving fleet (trucks,
     vans, ships), its `entityType` must be exactly `journey`. A custom name like `truck` will
     404 — only `journey` is routed to journey-service.
-30. **A `journey`-backed fleet map needs the top-level `journeyService` block.** If `entities.journey`
-    is defined and used in a screen/home module, the config must also include a top-level
-    `journeyService.generator` block (outside `industry:`) with `entityTypes`, `initialStatuses`,
-    and a non-empty `routes` list — otherwise journey-service keeps generating flights/passengers
-    (or nothing) and the fleet map stays empty.
+30. **A `journey`-backed fleet map needs the top-level `journeyService` block, including `enabled: true`.**
+    journey-service is OFF by default in the base chart. If `entities.journey` is defined and used in a
+    screen/home module, the config must also include a top-level `journeyService` block (outside
+    `industry:`) with `enabled: true` plus a `generator` block with `entityTypes`, `initialStatuses`, and
+    a non-empty `routes` list — omitting `enabled: true` means the pod never runs at all, and omitting
+    the generator fields means it runs but generates flights/passengers (or nothing) instead.
 31. **`entities.journey.states` keys must be a subset of `initiated`, `in_progress`, `completed`.**
     These status names are fixed globally in journey-service and are not configurable per industry.
     An invented status (e.g. `loading`, `customs`) will never be entered by the backend.
@@ -1178,8 +1182,10 @@ industry:
 
 # journeyService — TOP LEVEL, outside industry:. This is what actually makes the
 # fleet map move: without it, entityType: journey renders an empty map (or
-# flights/passengers, journey-service's own defaults).
+# flights/passengers, journey-service's own defaults). journey-service is OFF by
+# default in the base chart, so `enabled: true` here is mandatory, not optional.
 journeyService:
+  enabled: true
   lifecycle:
     minSeconds: 20    # shortened from the 300-7200s default so movement is
     maxSeconds: 60    # visible within a normal demo session
