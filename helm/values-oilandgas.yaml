@@ -63,11 +63,11 @@ industry:
     iotIdPrefix2: "pl"
     iotIdPrefix3: "pp"
     iotZonePositions:
-      north-field:       { x: 200, y: 150 }
-      south-field:       { x: 700, y: 800 }
-      east-pipeline:     { x: 900, y: 400 }
-      west-pipeline:     { x: 100, y: 400 }
-      central-processing: { x: 500, y: 500 }
+      north-field:       { x: 200, "y": 150 }
+      south-field:       { x: 700, "y": 800 }
+      east-pipeline:     { x: 900, "y": 400 }
+      west-pipeline:     { x: 100, "y": 400 }
+      central-processing: { x: 500, "y": 500 }
 
   screens:
     public:

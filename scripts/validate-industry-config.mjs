@@ -26,6 +26,37 @@ const schema = JSON.parse(readFileSync(schemaPath, 'utf8'))
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 const validateSchema = ajv.compile(schema)
 
+// Helm renders these files with its Go-based YAML parser (YAML 1.1 core schema),
+// which resolves the bare scalars y/Y/yes/Yes/YES/n/N/no/No/NO/on/On/ON/off/Off/OFF
+// as booleans -- including when used as a flow-mapping KEY, e.g. `{ x: 5, y: 40 }`
+// silently becomes `{ x: 5, true: 40 }`. js-yaml (used by this validator, and by
+// most editors' YAML linters) follows the newer YAML 1.2 core schema and parses
+// `y:` as the ordinary string key "y", so this file can validate cleanly here while
+// rendering with every y-coordinate silently dropped once Helm actually deploys it.
+// This bit Meridian Airport's entity-map background shapes for real (every rect's
+// y attribute vanished, collapsing the whole airfield layout) before anyone noticed,
+// because nothing in the pipeline before the browser exercised Helm's parser.
+// Scan the raw text (not the already-parsed object, where the damage is invisible)
+// for the exact risky pattern this schema actually uses: a bare y/n key inside a
+// flow mapping.
+const YAML_1_1_BOOL_KEY_RE = /[{,]\s*(y|Y|yes|Yes|YES|n|N|no|No|NO|on|On|ON|off|Off|OFF)\s*:/g
+function checkYamlBooleanKeys(rawText) {
+  const errors = []
+  const lines = rawText.split('\n')
+  lines.forEach((line, i) => {
+    YAML_1_1_BOOL_KEY_RE.lastIndex = 0
+    let m
+    while ((m = YAML_1_1_BOOL_KEY_RE.exec(line))) {
+      errors.push(
+        `line ${i + 1}: bare key "${m[1]}:" is parsed as a boolean by Helm's YAML 1.1 ` +
+        `parser (though not by this validator's YAML 1.2 parser) -- quote it as "${m[1]}": ` +
+        `to keep the coordinate/value from silently disappearing on deploy.`
+      )
+    }
+  })
+  return errors
+}
+
 // --- semantic checks ajv can't express (cross-references within one document) ---
 function checkEntities(entities) {
   const errors = []
@@ -344,8 +375,16 @@ for (const path of files) {
   let cfg
   let parsed
   let isValuesOverlay = false
+  const rawText = readFileSync(path, 'utf8')
+  const yamlKeyErrors = checkYamlBooleanKeys(rawText)
+  if (yamlKeyErrors.length) {
+    console.error(`✗ ${path}: ${yamlKeyErrors.length} YAML boolean-key error(s):`)
+    for (const e of yamlKeyErrors) console.error(`  - ${e}`)
+    failures++
+    continue
+  }
   try {
-    parsed = yaml.load(readFileSync(path, 'utf8'))
+    parsed = yaml.load(rawText)
     const isObj = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
     if (isObj && 'industry' in parsed) {
       cfg = parsed.industry

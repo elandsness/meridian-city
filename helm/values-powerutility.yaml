@@ -55,11 +55,11 @@ industry:
     iotIdPrefix2: "sub"
     iotIdPrefix3: "mtr"
     iotZonePositions:
-      metro-substation:  { x: 500,  y: 400 }
-      valley-substation: { x: 300,  y: 700 }
-      north-region:      { x: 800,  y: 200 }
-      south-region:      { x: 900,  y: 800 }
-      industrial-park:   { x: 1300, y: 500 }
+      metro-substation:  { x: 500,  "y": 400 }
+      valley-substation: { x: 300,  "y": 700 }
+      north-region:      { x: 800,  "y": 200 }
+      south-region:      { x: 900,  "y": 800 }
+      industrial-park:   { x: 1300, "y": 500 }
 
   screens:
     public:

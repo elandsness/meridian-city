@@ -96,14 +96,14 @@ industry:
           kind: shapes
           shapes:
             # Terminal building
-            - { type: rect, x: 5, y: 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            - { type: rect, x: 5, "y": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
             # Gate jetbridge connectors (right edge of terminal)
-            - { type: rect, x: 185, y: 95, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, y: 155, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, y: 215, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, y: 340, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, y: 400, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, y: 460, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, "y": 95, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, "y": 155, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, "y": 215, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, "y": 340, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, "y": 400, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 185, "y": 460, width: 20, height: 8, fill: "#334155", rx: 2 }
             # Gate position dots
             - { type: circle, cx: 197, cy: 99, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 159, r: 5, fill: "#3b82f6" }
@@ -112,20 +112,20 @@ industry:
             - { type: circle, cx: 197, cy: 404, r: 5, fill: "#60a5fa" }
             - { type: circle, cx: 197, cy: 464, r: 5, fill: "#60a5fa" }
             # Taxiway (horizontal strip)
-            - { type: rect, x: 205, y: 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            - { type: rect, x: 205, "y": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
             # Runway (main)
-            - { type: rect, x: 375, y: 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
+            - { type: rect, x: 375, "y": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
             # Runway centerline dashes
             - { type: line, x1: 390, "y1": 260, x2: 885, "y2": 260, stroke: "#fbbf24", "stroke-width": 1, "stroke-dasharray": "20,10" }
             # Runway threshold marks
-            - { type: rect, x: 378, y: 220, width: 18, height: 80, fill: "#374151", rx: 1 }
+            - { type: rect, x: 378, "y": 220, width: 18, height: 80, fill: "#374151", rx: 1 }
             # Labels
-            - { type: text, x: 97, y: 262, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
-            - { type: text, x: 97, y: 280, text: "Departures", fill: "#475569", "font-size": 11, "text-anchor": middle }
-            - { type: text, x: 97, y: 410, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
-            - { type: text, x: 97, y: 428, text: "Arrivals", fill: "#475569", "font-size": 11, "text-anchor": middle }
-            - { type: text, x: 550, y: 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
-            - { type: text, x: 630, y: 165, text: "Taxiway Alpha", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
+            - { type: text, x: 97, "y": 262, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
+            - { type: text, x: 97, "y": 280, text: "Departures", fill: "#475569", "font-size": 11, "text-anchor": middle }
+            - { type: text, x: 97, "y": 410, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
+            - { type: text, x: 97, "y": 428, text: "Arrivals", fill: "#475569", "font-size": 11, "text-anchor": middle }
+            - { type: text, x: 550, "y": 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
+            - { type: text, x: 630, "y": 165, text: "Taxiway Alpha", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
       - { id: requests, label: "Maintenance queue" }
       - { id: iot, label: "Ground equipment" }
       - { id: incidents, label: "Operational incidents" }
@@ -153,7 +153,7 @@ industry:
           kind: shapes
           shapes:
             # Terminal building
-            - { type: rect, x: 5, y: 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            - { type: rect, x: 5, "y": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
             # Gate position dots (departures upper, arrivals lower)
             - { type: circle, cx: 197, cy: 99, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 159, r: 5, fill: "#3b82f6" }
@@ -162,15 +162,15 @@ industry:
             - { type: circle, cx: 197, cy: 404, r: 5, fill: "#60a5fa" }
             - { type: circle, cx: 197, cy: 464, r: 5, fill: "#60a5fa" }
             # Taxiway (horizontal strip, centerline y=182)
-            - { type: rect, x: 205, y: 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            - { type: rect, x: 205, "y": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
             # Runway (centerline y=260, spans x 375-890)
-            - { type: rect, x: 375, y: 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
+            - { type: rect, x: 375, "y": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
             - { type: line, x1: 390, "y1": 260, x2: 885, "y2": 260, stroke: "#fbbf24", "stroke-width": 1, "stroke-dasharray": "20,10" }
-            - { type: rect, x: 378, y: 220, width: 18, height: 80, fill: "#374151", rx: 1 }
+            - { type: rect, x: 378, "y": 220, width: 18, height: 80, fill: "#374151", rx: 1 }
             # Labels
-            - { type: text, x: 97, y: 262, text: "Terminal", fill: "#64748b", "font-size": 13, "text-anchor": middle }
-            - { type: text, x: 630, y: 165, text: "Taxiway", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
-            - { type: text, x: 630, y: 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
+            - { type: text, x: 97, "y": 262, text: "Terminal", fill: "#64748b", "font-size": 13, "text-anchor": middle }
+            - { type: text, x: 630, "y": 165, text: "Taxiway", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
+            - { type: text, x: 630, "y": 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
       - my-journey
       - quick-actions
       - id: airport-news
