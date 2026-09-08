@@ -291,13 +291,24 @@ FLOW_SPECS = [
      "kpiLabel": "Registered identities", "kpi": "identity.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "identity.registered",
      "steps": [("Identity created", "identity.registered")]},
+    # Event names below must match what EntityEventLogger.transitioned() actually
+    # emits for the generic entity engine's "incident"/"work_order" entity types:
+    # "<entity_type>.<state>", using the REAL state ids from industry.entities
+    # (incident: detecting/open/resolved -- there is no "created" state; work_order:
+    # created/assigned/acknowledged/resolved/escalated, entity type has an
+    # underscore so events are "work_order.*" not "workorder.*"). This spec
+    # previously used pre-entity-engine event names ("incident.created",
+    # "workorder.*") that nothing has emitted since city-operations/citizen-service
+    # were replaced by ops-entity-service/customer-entity-service -- the flow was
+    # silently stuck after its first step (iot.anomaly_detected, which
+    # telemetry-processor does still emit directly) for every industry using it.
     {"key": "iot-incident", "name": "IoT Incident Resolution", "correlationID": "incident.id",
      "kpiLabel": "Resolved incidents", "kpi": "incident.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "workorder.resolved",
-     "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident created", "incident.created"),
-               ("Work order created", "workorder.created"), ("Work order assigned", "workorder.assigned"),
-               ("Work order acknowledged", "workorder.acknowledged"),
-               ("Work order resolved", "workorder.resolved", ["workorder.escalated"])]},
+     "kpiEventName": "work_order.resolved",
+     "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident opened", "incident.open"),
+               ("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
+               ("Work order acknowledged", "work_order.acknowledged"),
+               ("Work order resolved", "work_order.resolved", ["work_order.escalated"])]},
     {"key": "purchase", "name": "City Store Purchase", "correlationID": "cart.id",
      "kpiLabel": "Revenue", "kpi": "order.total_cents", "kpiCalculation": "sum",
      "kpiEventName": "checkout.completed",
@@ -310,19 +321,20 @@ FLOW_SPECS = [
      "kpiEventName": "tax.payment_completed",
      "steps": [("Bill issued", "tax.bill_issued"),
                ("Payment completed", "tax.payment_completed", ["tax.payment_failed"])]},
-    # --- Airport vertical flows (provisioned only when DT_FLOWS selects them) ---
-    {"key": "aircraft-turnaround", "name": "Aircraft Turnaround", "correlationID": "flight.id",
-     "kpiLabel": "Departures", "kpi": "flight.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "flight.takeoff",
-     "steps": [("At gate", "flight.at_gate"), ("Servicing", "flight.servicing"),
-               ("Boarding", "flight.boarding", ["flight.cancelled"]), ("Pushback & taxi", "flight.taxiing"),
-               ("Takeoff", "flight.takeoff")]},
-    {"key": "passenger-journey", "name": "Passenger Journey", "correlationID": "passenger.id",
-     "kpiLabel": "Boarded passengers", "kpi": "passenger.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "passenger.boarded",
-     "steps": [("Checked in", "passenger.checked_in"), ("Bag checked", "passenger.bag_checked"),
-               ("Security cleared", "passenger.security_cleared", ["passenger.offloaded"]), ("Bag loaded", "passenger.bag_loaded"),
-               ("Boarded", "passenger.boarded")]},
+    # Airport's "aircraft-turnaround"/"passenger-journey" flows used to live here,
+    # hand-written against event names ("flight.at_gate", "flight.servicing", ...)
+    # from a pre-entity-engine "flight-service" that no longer exists. Since
+    # flight_departure/flight_arrival/passenger are now real industry.entities
+    # (states: at_gate/boarding/taxiing/takeoff/departed and
+    # checked_in/security_cleared/gate_ready/boarded), derive_flow_specs_from_entity_config()
+    # below builds correct flows for them automatically -- entity type IS the flow
+    # key ("flight_departure", "passenger"), event names are "<entity_type>.<state>"
+    # (matching EntityEventLogger's real output), and a "servicing"/"bag_checked"/
+    # "bag_loaded" step can't silently go missing because it's generated from the
+    # same states/transitions the entities actually run, not copied by hand.
+    # values-airport.yaml's dynatrace.flows/analytics.flows select "flight_departure"
+    # and "passenger" (flowLabels renames them to "Aircraft Turnaround"/"Passenger
+    # Journey" for display) instead of these dead keys.
 ]
 
 # City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)

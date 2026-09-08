@@ -245,28 +245,35 @@ industry:
       service-request: "Maintenance Request Lifecycle"
       account-creation: "Passenger Registration"
       iot-incident: "Ground Equipment Incident Resolution"
-      aircraft-turnaround: "Aircraft Turnaround"
-      passenger-journey: "Passenger Journey"
+      flight_departure: "Aircraft Turnaround"
+      passenger: "Passenger Journey"
     # Active Business Flows for the airport: operational + aviation hero flows.
+    # flight_departure/passenger are entity-derived flows (auto-built from
+    # entities.flight_departure/passenger's real states below by
+    # derive_flow_specs_from_entity_config()), not hand-written specs -- this used
+    # to reference dead "aircraft-turnaround"/"passenger-journey" keys whose
+    # hand-written event names (flight.at_gate, flight.servicing, ...) never
+    # matched what the entity engine actually emits (flight_departure.at_gate, no
+    # "servicing" state at all), so those two flows never received any data.
     flows:
       - service-request
       - account-creation
       - iot-incident
-      - aircraft-turnaround
-      - passenger-journey
+      - flight_departure
+      - passenger
   analytics:
     flows:
       - service-request
       - account-creation
       - iot-incident
-      - aircraft-turnaround
-      - passenger-journey
+      - flight_departure
+      - passenger
     flowLabels:
       service-request: "Maintenance Request Lifecycle"
       account-creation: "Passenger Registration"
       iot-incident: "Ground Equipment Incident Resolution"
-      aircraft-turnaround: "Aircraft Turnaround"
-      passenger-journey: "Passenger Journey"
+      flight_departure: "Aircraft Turnaround"
+      passenger: "Passenger Journey"
 
   # =========================================================================
   # Entity engine config — airport aviation entities.
