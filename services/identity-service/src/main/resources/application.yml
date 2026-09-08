@@ -2,6 +2,10 @@ spring:
   application:
     name: identity-service
 
+  jackson:
+    # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    property-naming-strategy: SNAKE_CASE
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:meridian-db-rw:5432}/${DB_NAME:meridian}
     username: ${DB_USERNAME:meridian}

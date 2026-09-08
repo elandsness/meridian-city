@@ -8,21 +8,27 @@ const { v4: uuidv4 } = require('uuid')
 function buildRouteTable (config) {
   return [
     {
-      // citizen registration + profile — rewritten to the entity engine's generic path.
+      // citizen registration + profile. identity-service's real controller is
+      // mapped at /api/v1/identity (IdentityController), NOT /api/v1/entities/citizen
+      // -- that path was never implemented; every request 302-redirected to Spring
+      // Security's default login page instead of creating anything. This was never
+      // caught because identity-service was never in CI's build matrix until this
+      // branch, so nobody had run it and actually clicked "Register" before.
       // Login is handled separately in auth.js (also hits customer-entity-service).
       prefix: '/api/v1/citizens',
       target: config.IDENTITY_SERVICE_URL,
       serviceName: 'identity-service',
       requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/citizen',
+      rewritePrefix: '/api/v1/identity',
     },
     {
-      // service requests — rewritten to the entity engine's generic path.
+      // service requests. workflow-service's real controller (ServiceRequestController)
+      // is mapped at /api/v1/service-requests -- the same path the frontend already
+      // calls -- not /api/v1/entities/service_request, which 404s (no such mapping).
       prefix: '/api/v1/service-requests',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/service_request',
     },
     {
       prefix: '/api/v1/dispatch',
@@ -37,25 +43,27 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
+      // AssetController is mapped at /api/v1/assets directly -- no rewrite needed
+      // (same 404 pattern as service-requests above).
       prefix: '/api/v1/assets',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/asset',
     },
     {
+      // IncidentController is mapped at /api/v1/incidents directly (matches what
+      // ops-dashboard's incidents.js already calls) -- no rewrite needed.
       prefix: '/api/v1/incidents',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/incident',
     },
     {
+      // WorkOrderController is mapped at /api/v1/work-orders directly -- no rewrite needed.
       prefix: '/api/v1/work-orders',
       target: config.WORKFLOW_SERVICE_URL,
       serviceName: 'workflow-service',
       requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/work_order',
     },
     {
       prefix: '/api/v1/flights',

@@ -79,8 +79,8 @@ spec:
             httpGet:
               path: /actuator/health/liveness
               port: http
-            periodSeconds: 10
-            failureThreshold: 18
+            periodSeconds: 15
+            failureThreshold: 40
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
