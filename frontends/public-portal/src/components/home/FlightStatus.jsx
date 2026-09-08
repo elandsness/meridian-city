@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import Card from '../../ui/Card.jsx'
-import { getFlights } from '../../api/flights.js'
+import { getFlightDepartures, getFlightArrivals } from '../../api/flights.js'
 
 const STATUS_LABEL = {
   at_gate: 'At gate',
-  servicing: 'Servicing',
   boarding: 'Boarding',
   taxiing: 'Taxiing',
   takeoff: 'Departing',
@@ -42,19 +41,23 @@ function Row({ f, endpoint }) {
 
 // Compact passenger-facing status board for the home page: live departures + arrivals.
 export default function FlightStatus() {
-  const { data, isError } = useQuery({
-    queryKey: ['flights'],
-    queryFn: () => getFlights(),
+  const { data: departureData, isError: departuresError } = useQuery({
+    queryKey: ['flights', 'flight_departure'],
+    queryFn: () => getFlightDepartures(),
     refetchInterval: 10000,
   })
-  const flights = unwrap(data)
-  const departures = flights.filter((f) => f.direction === 'departure' && f.status !== 'departed').slice(0, 6)
-  const arrivals = flights.filter((f) => f.direction === 'arrival' && f.status !== 'arrived').slice(0, 6)
+  const { data: arrivalData, isError: arrivalsError } = useQuery({
+    queryKey: ['flights', 'flight_arrival'],
+    queryFn: () => getFlightArrivals(),
+    refetchInterval: 10000,
+  })
+  const departures = unwrap(departureData).filter((f) => f.status !== 'departed' && f.status !== 'cancelled').slice(0, 6)
+  const arrivals = unwrap(arrivalData).filter((f) => f.status !== 'arrived' && f.status !== 'diverted').slice(0, 6)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card title="Departures">
-        {isError ? (
+        {departuresError ? (
           <p className="text-slate-500 text-sm py-4 text-center">Flight status unavailable.</p>
         ) : departures.length === 0 ? (
           <p className="text-slate-500 text-sm py-4 text-center">No departures right now.</p>
@@ -63,7 +66,7 @@ export default function FlightStatus() {
         )}
       </Card>
       <Card title="Arrivals">
-        {isError ? (
+        {arrivalsError ? (
           <p className="text-slate-500 text-sm py-4 text-center">Flight status unavailable.</p>
         ) : arrivals.length === 0 ? (
           <p className="text-slate-500 text-sm py-4 text-center">No arrivals right now.</p>
