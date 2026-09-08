@@ -14,6 +14,8 @@ public interface JourneyRepository extends JpaRepository<Journey, String> {
 
     List<Journey> findByEntityTypeOrderByCreatedAtDesc(String entityType);
 
+    long countByStatusIn(List<String> statuses);
+
     List<Journey> findByStatusInAndNextTransitionAtLessThanEqual(
             List<String> statuses, OffsetDateTime now);
 

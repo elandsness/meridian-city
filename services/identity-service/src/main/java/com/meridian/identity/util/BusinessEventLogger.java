@@ -1,47 +1,43 @@
 package com.meridian.identity.util;
 
+import net.logstash.logback.argument.StructuredArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 /**
- * Logs Dynatrace business events as JSON lines. The Dynatrace Kubernetes Log Module
- * (or the meridian log collector DaemonSet) captures these and extracts them as
- * Business Events in Grail. The "[Meridian] Account Creation" business flow uses
- * these to track the account-creation funnel.
+ * Structured Business Events for identity registration + the account-creation
+ * lifecycle. Discriminator key: "event.type" (see docs/INSTRUMENTATION.md §3).
+ * Feeds the "Identity Registration" and "[Meridian] Account Creation" business
+ * flows (provision-dynatrace-business-config.py), which expect event.type values
+ * "identity.registered" and "account.<stage>" respectively, correlated by
+ * identity.id. Previously built these as a nested Map.of(...), a different
+ * (unparsed) shape than every other service's BusinessEvents logger, logged
+ * under the class logger instead of "BusinessEvents", and with no JSON log
+ * encoder configured at all -- so even a successful call never reached
+ * Dynatrace as a business event. Map.of also throws NullPointerException on
+ * any null value, crashing every registration that omitted the optional
+ * zoneId field.
  */
 @Component
 public class BusinessEventLogger {
 
-    private static final Logger log = LoggerFactory.getLogger(BusinessEventLogger.class);
+    private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
 
     public void identityRegistered(String identityId, String email, String zoneId) {
-        Map<String, Object> event = Map.of(
-                "meridian.identity.registered",
-                Map.of(
-                        "identity.id", identityId,
-                        "email", email,
-                        "zoneId", zoneId
-                )
+        BUSINESS_EVENTS.info("identity.registered",
+                StructuredArguments.keyValue("event.type", "identity.registered"),
+                StructuredArguments.keyValue("identity.id", identityId),
+                StructuredArguments.keyValue("email", email),
+                StructuredArguments.keyValue("zone_id", zoneId)
         );
-        logBusinessEvent(event);
     }
 
     public void accountLifecycle(String eventType, String identityId, String email) {
-        Map<String, Object> event = Map.of(
-                "meridian.account.lifecycle",
-                Map.of(
-                        "identity.id", identityId,
-                        "email", email,
-                        "event_type", eventType
-                )
+        BUSINESS_EVENTS.info(eventType,
+                StructuredArguments.keyValue("event.type", eventType),
+                StructuredArguments.keyValue("identity.id", identityId),
+                StructuredArguments.keyValue("email", email)
         );
-        logBusinessEvent(event);
-    }
-
-    private void logBusinessEvent(Map<String, Object> event) {
-        log.info("BusinessEvent: {}", event);
     }
 }

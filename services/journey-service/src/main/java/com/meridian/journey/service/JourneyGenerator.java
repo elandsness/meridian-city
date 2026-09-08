@@ -35,7 +35,13 @@ public class JourneyGenerator {
             return;
         }
 
-        long activeCount = journeyRepository.count();
+        // Must count only non-terminal journeys, not every row ever created --
+        // repository.count() never decreases, so once total rows created reached
+        // maxActive the generator stopped forever even after every one of them
+        // finished and went to "completed". That's exactly what happened here:
+        // the trucking config's maxActive:12 was hit by the first generation burst
+        // and no truck has been generated since, regardless of how many completed.
+        long activeCount = journeyRepository.countByStatusIn(lifecycleProps.getActiveStatuses());
         if (activeCount >= props.getMaxActive()) {
             return;
         }
