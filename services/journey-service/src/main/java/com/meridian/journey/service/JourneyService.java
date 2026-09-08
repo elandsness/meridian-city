@@ -113,6 +113,7 @@ public class JourneyService {
                         .build())
                 .toList();
 
+        double liveProgress = effectiveProgress(j);
         return JourneyResponse.builder()
                 .id(j.getId())
                 .entityType(j.getEntityType())
@@ -123,8 +124,8 @@ public class JourneyService {
                 .destination(j.getDestination())
                 .status(j.getStatus())
                 .state(j.getStatus())
-                .progress(j.getProgress())
-                .position(interpolatePosition(j))
+                .progress(liveProgress)
+                .position(interpolatePosition(j, liveProgress))
                 .stages(stageResponses)
                 .scheduledAt(j.getScheduledAt())
                 .createdAt(j.getCreatedAt())
@@ -132,14 +133,44 @@ public class JourneyService {
                 .build();
     }
 
+    /**
+     * The stored {@code progress} column only changes at discrete status
+     * transitions, which for a short transition chain (trucking has exactly one:
+     * in_progress -> completed) means every in-flight journey reports the SAME
+     * fixed progress for its entire 25-90s stage -- every truck sits frozen at its
+     * origin coordinate the whole time, then jumps straight to the destination the
+     * instant it completes. Compute a continuously-advancing value instead: blend
+     * from this stage's stored progress to the next stage's configured progress,
+     * scaled by how far we are between when this stage started (updatedAt) and
+     * when it's due to end (nextTransitionAt). Falls back to the stored value for
+     * terminal journeys (nextTransitionAt null) or malformed windows.
+     */
+    private double effectiveProgress(Journey j) {
+        OffsetDateTime stageStart = j.getUpdatedAt();
+        OffsetDateTime stageEnd = j.getNextTransitionAt();
+        if (stageStart == null || stageEnd == null || !stageEnd.isAfter(stageStart)) {
+            return j.getProgress();
+        }
+        String nextStatus = lifecycleProperties.getNextStatus(j.getStatus());
+        if (nextStatus == null) {
+            return j.getProgress();
+        }
+        double stageStartProgress = j.getProgress();
+        double stageEndProgress = lifecycleProperties.progressFor(nextStatus);
+        long totalMillis = java.time.Duration.between(stageStart, stageEnd).toMillis();
+        long elapsedMillis = java.time.Duration.between(stageStart, OffsetDateTime.now()).toMillis();
+        double fraction = Math.max(0.0, Math.min(1.0, elapsedMillis / (double) totalMillis));
+        return stageStartProgress + (stageEndProgress - stageStartProgress) * fraction;
+    }
+
     /** Linear interpolation between origin/dest coordinates by progress. Null when
      * any coordinate is unset — a journey type with no map visualisation (e.g. a
      * loan application) simply has no position, rather than a guessed (0,0). */
-    private JourneyResponse.Position interpolatePosition(Journey j) {
+    private JourneyResponse.Position interpolatePosition(Journey j, double progress) {
         if (j.getOriginX() == null || j.getOriginY() == null || j.getDestX() == null || j.getDestY() == null) {
             return null;
         }
-        double t = Math.max(0.0, Math.min(1.0, j.getProgress()));
+        double t = Math.max(0.0, Math.min(1.0, progress));
         double x = j.getOriginX() + (j.getDestX() - j.getOriginX()) * t;
         double y = j.getOriginY() + (j.getDestY() - j.getOriginY()) * t;
         return JourneyResponse.Position.builder().x(x).y(y).build();
