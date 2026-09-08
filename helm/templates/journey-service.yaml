@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "meridian.fullname" . }}-journey-service
+  name: journey-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -97,7 +97,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "meridian.fullname" . }}-journey-service
+  name: journey-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}

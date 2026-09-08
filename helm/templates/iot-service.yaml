@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "meridian.fullname" . }}-iot-service
+  name: iot-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -22,7 +22,7 @@ spec:
         sidecar.istio.io/inject: "false"
         instrumentation.opentelemetry.io/inject-java: "false"
     spec:
-      serviceAccountName: {{ include "meridian.fullname" . }}-iot-service
+      serviceAccountName: iot-service
       containers:
         - name: iot-service
           image: {{ include "meridian.image" (dict "repository" .Values.iotService.image.repository "tag" .Values.iotService.image.tag "context" $) }}
@@ -83,7 +83,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "meridian.fullname" . }}-iot-service
+  name: iot-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -110,7 +110,7 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "meridian.fullname" . }}-iot-service
+  name: iot-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -118,7 +118,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "meridian.fullname" . }}-iot-service
+  name: iot-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
@@ -130,16 +130,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "meridian.fullname" . }}-iot-service
+  name: iot-service
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "meridian.fullname" . }}-iot-service
+  name: iot-service
 subjects:
   - kind: ServiceAccount
-    name: {{ include "meridian.fullname" . }}-iot-service
+    name: iot-service
     namespace: {{ include "meridian.namespace" . }}
 {{- end }}

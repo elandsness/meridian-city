@@ -52,6 +52,20 @@ spec:
               value: "http://customer-entity-service:8094"
             - name: OPS_ENTITY_SERVICE_URL
               value: "http://ops-entity-service:8094"
+            - name: IDENTITY_SERVICE_URL
+              value: "http://identity-service:8081"
+            - name: WORKFLOW_SERVICE_URL
+              value: "http://workflow-service:8083"
+            - name: TRANSACTION_SERVICE_URL
+              value: "http://transaction-service:8090"
+            - name: JOURNEY_SERVICE_URL
+              value: "http://journey-service:8093"
+            - name: IOT_SERVICE_URL
+              value: "http://iot-service:8086"
+            - name: NEWS_TICKER_SERVICE_URL
+              value: "http://news-ticker-service:8095"
+            - name: WEATHER_SERVICE_URL
+              value: "http://weather-service:8096"
             - name: ANALYTICS_SERVICE_URL
               value: "http://analytics-service:8084"
             - name: AI_SERVICE_URL
