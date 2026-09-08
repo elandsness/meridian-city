@@ -22,13 +22,18 @@ function buildRouteTable (config) {
       rewritePrefix: '/api/v1/identity',
     },
     {
-      // service requests. workflow-service's real controller (ServiceRequestController)
-      // is mapped at /api/v1/service-requests -- the same path the frontend already
-      // calls -- not /api/v1/entities/service_request, which 404s (no such mapping).
+      // service requests -- owned by the generic entity engine (customer-entity-
+      // service, ownedTypes includes service_request). NewRequest.jsx/ServiceRequests.jsx
+      // post/list plain fields against the engine's generic /api/v1/entities/service_request
+      // shape, NOT workflow-service's bespoke ServiceRequestController (which silently
+      // returns [] for any list call lacking a `status` param -- exactly what these
+      // frontends send). A bad merge (3f9f8ba) pointed this at workflow-service instead
+      // of the entity engine; every fix since patched around it without checking the target.
       prefix: '/api/v1/service-requests',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
+      target: config.CUSTOMER_ENTITY_SERVICE_URL,
+      serviceName: 'customer-entity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/service_request',
     },
     {
       prefix: '/api/v1/dispatch',
@@ -43,27 +48,34 @@ function buildRouteTable (config) {
       requiresAuth: false,
     },
     {
-      // AssetController is mapped at /api/v1/assets directly -- no rewrite needed
-      // (same 404 pattern as service-requests above).
+      // asset -- not an entity type owned by anything currently and not called by
+      // any frontend; routed to ops-entity-service for consistency with incident/
+      // work_order below, but effectively dead until a config defines "asset".
       prefix: '/api/v1/assets',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/asset',
     },
     {
-      // IncidentController is mapped at /api/v1/incidents directly (matches what
-      // ops-dashboard's incidents.js already calls) -- no rewrite needed.
+      // incident -- owned by ops-entity-service (ownedTypes: "incident,work_order").
+      // ops-dashboard/src/api/incidents.js is written against the entity engine's
+      // shape (`state` not `status`, /actions/{action} for transitions) -- it was
+      // never wired for workflow-service's bespoke IncidentController. Same bad-merge
+      // regression as service-requests above.
       prefix: '/api/v1/incidents',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/incident',
     },
     {
-      // WorkOrderController is mapped at /api/v1/work-orders directly -- no rewrite needed.
+      // work_order -- owned by ops-entity-service, same reasoning as incident above.
       prefix: '/api/v1/work-orders',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
+      target: config.OPS_ENTITY_SERVICE_URL,
+      serviceName: 'ops-entity-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/entities/work_order',
     },
     {
       prefix: '/api/v1/flights',
