@@ -109,6 +109,9 @@ spec:
             - name: scripts
               mountPath: /scripts
               readOnly: true
+          # Disable Dynatrace instrumentation to prevent pod eviction due to resource limits
+          annotations:
+            "dynatrace.com/instrumentation": "false"
       volumes:
         - name: scripts
           configMap:
@@ -216,6 +219,9 @@ spec:
             - name: scripts
               mountPath: /scripts
               readOnly: true
+          # Disable Dynatrace instrumentation to prevent pod eviction due to resource limits
+          annotations:
+            "dynatrace.com/instrumentation": "false"
       volumes:
         - name: scripts
           configMap:
