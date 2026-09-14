@@ -302,11 +302,14 @@ FLOW_SPECS = [
     # were replaced by ops-entity-service/customer-entity-service -- the flow was
     # silently stuck after its first step (iot.anomaly_detected, which
     # telemetry-processor does still emit directly) for every industry using it.
-    {"key": "iot-incident", "name": "IoT Incident Resolution", "correlationID": "incident.id",
-     "kpiLabel": "Resolved incidents", "kpi": "incident.id", "kpiCalculation": "lastEvent",
+    {"key": "iot-incident", "name": "IoT Incident Lifecycle", "correlationID": "incident.id",
+     "kpiLabel": "Incidents Opened", "kpi": "incident.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "incident.open",
+     "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident opened", "incident.open")]},
+{"key": "iot-work-order", "name": "IoT Work Order Lifecycle", "correlationID": "work_order.id",
+     "kpiLabel": "Resolved Work Orders", "kpi": "work_order.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "work_order.resolved",
-     "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident opened", "incident.open"),
-               ("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
+     "steps": [("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
                ("Work order acknowledged", "work_order.acknowledged"),
                ("Work order resolved", "work_order.resolved", ["work_order.escalated"])]},
     {"key": "purchase", "name": "City Store Purchase", "correlationID": "cart.id",
