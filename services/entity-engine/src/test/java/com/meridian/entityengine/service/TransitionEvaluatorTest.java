@@ -2,12 +2,17 @@ package com.meridian.entityengine.service;
 
 import com.meridian.entityengine.config.EntityDefinition;
 import com.meridian.entityengine.domain.EntityRecord;
+import com.meridian.entityengine.repository.EntityRecordRepository;
+import com.meridian.entityengine.service.FaultGateRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * Unit tests for the core, novel logic this whole initiative depends on: given
@@ -17,7 +22,16 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TransitionEvaluatorTest {
 
-    private final TransitionEvaluator evaluator = new TransitionEvaluator(new FaultGateRegistry());
+    private TransitionEvaluator evaluator;
+    private FaultGateRegistry registry;
+    private EntityRecordRepository repository;
+
+    @BeforeEach
+    void setUp() {
+        registry = mock(FaultGateRegistry.class);
+        repository = mock(EntityRecordRepository.class);
+        evaluator = new TransitionEvaluator(registry, repository);
+    }
 
     private static EntityDefinition.TransitionDef transition(String from, String to, Map<String, Object> when) {
         EntityDefinition.TransitionDef t = new EntityDefinition.TransitionDef();
