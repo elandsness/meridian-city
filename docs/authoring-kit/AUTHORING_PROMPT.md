@@ -1,12 +1,3 @@
-
-
-### ⚠️ THE DYNATRACE EVENT CONTRACT
-To prevent "Isolated Events" and broken KPIs in Dynatrace, you MUST follow these strict naming rules:
-1. **Correlation ID:** Always use `{entity_type}.id` (e.g., `service_request.id`). Never use generic names like `req_id` or `id`.
-2. **Event Names:** Every event MUST follow the pattern `{entity_type}.{state}` (e.g., `service_request.submitted`).
-3. **No Invention:** Do not invent descriptive event names. Use ONLY the `state` IDs defined in the `entities` block of the industry YAML.
-4. **One Entity per Flow:** A Business Flow can only track one correlation ID. If a process moves from one entity (e.g., Incident) to another (e.g., Work Order), you must define them as two separate flows.
-
 # Meridian Platform — Industry Demo Authoring Prompt
 
 > **How to use this file:** copy *everything below the line* into any capable LLM
@@ -77,6 +68,14 @@ and transitions. You don't write code; you write config.
 **When NOT to define a custom entity type:**
 - You're just renaming "service request" to "trouble ticket" — use `terminology` instead.
 - The workflow is identical to an existing entity with different labels.
+
+### ⚠️ THE DYNATRACE EVENT CONTRACT
+To prevent "Isolated Events" and broken KPIs in Dynatrace, you MUST follow these strict naming rules:
+1. **Correlation ID:** Always use `{entity_type}.id` (e.g., `service_request.id`). Never use generic names like `req_id` or `id`.
+2. **Event Names:** Every event MUST follow the pattern `{entity_type}.{state}` (e.g., `service_request.submitted`).
+3. **No Invention:** Do not invent descriptive event names. Use ONLY the `state` IDs defined in the `entities` block of the industry YAML.
+4. **One Entity per Flow:** A Business Flow can only track one correlation ID. If a process moves from one entity (e.g., Incident) to another (e.g., Work Order), you must define them as two separate flows.
+
 
 ### Entity type DSL
 
