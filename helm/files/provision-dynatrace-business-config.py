@@ -176,9 +176,9 @@ def upsert(schema, value, matches):
 #: in every raw log line but confirmed ABSENT from the resulting bizevent's fields
 #: precisely because nothing here names them.
 LEGACY_CORRELATION_KEYS = [
-    "request.id", "citizen.id", "cart.id", "order.id", "bill.id", "work_order.id",
+    "service_request.id", "citizen.id", "cart.id", "order.id", "bill.id", "work_order.id",
     "incident.id", "asset.id", "anomaly.type", "flight.id", "passenger.id",
-    "identity.id", "journey.id",
+    "journey.id",
     "assigned_department",
 ]
 
@@ -272,25 +272,25 @@ def routing_entry(pipeline_object_id):
 # work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
 # auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
 FLOW_SPECS = [
-    {"key": "service-request", "name": "Service Request Lifecycle", "correlationID": "request.id",
+    {"key": "service-request", "name": "Service Request Lifecycle", "correlationID": "service_request.id",
      "kpiLabel": "Resolved requests", "kpi": "request.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "service_request.resolved",
      "steps": [("Submitted", "service_request.submitted"),
                ("Validated", "service_request.validated", ["service_request.rejected"]),
                ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
                ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
-    {"key": "account-creation", "name": "Account Creation", "correlationID": "identity.id",
-     "kpiLabel": "Activations", "kpi": "identity.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "account.activated",
-     "steps": [("Registration started", "account.registration_started"),
-               ("Details submitted", "account.details_submitted"),
-               ("Verification sent", "account.verification_sent"),
-               ("Verified", "account.verified", ["account.verification_failed"]),
-               ("Activated", "account.activated", ["account.activation_failed"])]},
-    {"key": "identity-registration", "name": "Identity Registration", "correlationID": "identity.id",
-     "kpiLabel": "Registered identities", "kpi": "identity.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "identity.registered",
-     "steps": [("Identity created", "identity.registered")]},
+    {"key": "account-creation", "name": "Account Creation", "correlationID": "citizen.id",
+         "kpiLabel": "Activations", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
+         "kpiEventName": "citizen.activated",
+         "steps": [("Registration started", "citizen.registration_started"),
+                   ("Details submitted", "citizen.details_submitted"),
+                   ("Verification sent", "citizen.verification_sent"),
+                   ("Verified", "citizen.verified", ["citizen.verification_failed"]),
+                   ("Activated", "citizen.activated", ["citizen.activation_failed"])}),
+    {"key": "identity-registration", "name": "Identity Registration", "correlationID": "citizen.id",
+     "kpiLabel": "Registered identities", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "citizen.registered",
+     "steps": [("Identity created", "citizen.registered")]},
     # Event names below must match what EntityEventLogger.transitioned() actually
     # emits for the generic entity engine's "incident"/"work_order" entity types:
     # "<entity_type>.<state>", using the REAL state ids from industry.entities
