@@ -44,11 +44,11 @@ _FUNNELS: dict[str, list[str]] = {
     ],
     "iot-incident": [
         "iot.anomaly_detected",
-        "incident.created",
-        "workorder.created",
-        "workorder.assigned",
-        "workorder.acknowledged",
-        "workorder.resolved",
+        "incident.detecting",
+        "work_order.created",
+        "work_order.assigned",
+        "work_order.acknowledged",
+        "work_order.resolved",
     ],
     # Flow D — City Store purchase funnel (derived from entity events)
     "purchase": [
