@@ -178,7 +178,7 @@ def upsert(schema, value, matches):
 LEGACY_CORRELATION_KEYS = [
     "service_request.id", "citizen.id", "cart.id", "order.id", "bill.id", "work_order.id",
     "incident.id", "asset.id", "anomaly.type", "flight.id", "passenger.id",
-    "journey.id",
+    "journey.id", "maintenance_request.id", "flight_departure.id", "flight_arrival.id",
     "assigned_department",
 ]
 
