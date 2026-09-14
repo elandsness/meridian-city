@@ -1,23 +1,7 @@
 package com.meridian.journey.service;
 
 import com.meridian.journey.config.JourneyLifecycleProperties;
-import com.meridian.journey.domain.Journey;
-import com.meridian.journey.domain.JourneyStage;
-import com.meridian.journey.dto.CreateJourneyRequest;
-import com.meridian.journey.dto.JourneyResponse;
-import com.meridian.journey.messaging.JourneyEventPublisher;
-import com.meridian.journey.repository.JourneyRepository;
-import com.meridian.journey.repository.JourneyStageRepository;
-import com.meridian.journey.util.BusinessEventLogger;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.time.OffsetDateTime;
-import java.util.List;
+import com.meridian.journey.domain.Journey;\nimport com.meridian.journey.domain.JourneyStage;\nimport com.meridian.journey.dto.CreateJourneyRequest;\nimport com.meridian.journey.dto.JourneyResponse;\nimport com.meridian.journey.messaging.JourneyEventPublisher;\nimport com.meridian.journey.repository.JourneyRepository;\nimport com.meridian.journey.repository.JourneyStageRepository;\nimport com.meridian.journey.util.BusinessEventLogger;\nimport lombok.RequiredArgsConstructor;\nimport lombok.extern.slf4j.Slf4j;\nimport org.springframework.http.HttpStatus;\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Transactional;\nimport org.springframework.web.server.ResponseStatusException;\n\nimport java.time.OffsetDateTime;\nimport java.util.List;\nimport java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -64,8 +48,7 @@ public class JourneyService {
         return journeys.stream().map(this::toResponse).toList();
     }
 
-    @Transactional(readOnly = true)
-    public JourneyResponse get(String id) {
+    @Transactional(readOnly = true)\n    public JourneyResponse getForUser(String userId) {\n        Journey journey = journeyRepository.findByEntityTypeAndRelatedId(\"passenger\", userId)\n                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, \"personal journey not found for user: \" + userId));\n        return toResponse(journey);\n    }\n\n    @Transactional(readOnly = true)\n    public JourneyResponse get(String id) {
         Journey journey = journeyRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "journey not found: " + id));
         return toResponse(journey);

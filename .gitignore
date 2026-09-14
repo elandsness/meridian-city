@@ -56,3 +56,6 @@ logs/
 # k8s local overrides
 kubeconfig
 *.kubeconfig
+
+# Hermes Agent state
+.agent/
