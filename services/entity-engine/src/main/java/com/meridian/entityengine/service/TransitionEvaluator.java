@@ -2,6 +2,7 @@ package com.meridian.entityengine.service;
 
 import com.meridian.entityengine.config.EntityDefinition;
 import com.meridian.entityengine.domain.EntityRecord;
+import com.meridian.entityengine.repository.EntityRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class TransitionEvaluator {
 
     private final FaultGateRegistry faultGateRegistry;
+    private final EntityRecordRepository repository;
 
     /** Scheduler-driven advancement only -- a userTriggerable transition is reachable
      * exclusively via {@link #findMatchingUserAction}, never picked up by the automatic
@@ -72,12 +74,6 @@ public class TransitionEvaluator {
             return false;
         }
         if (when.containsKey("faultGate")) {
-            // faultGate generalizes today's hand-written FaultState.java {enabled, rate}
-            // on/off toggle. The value is a gate NAME looked up in the runtime registry;
-            // `probability` is only the config-authored default rate used the first time
-            // the gate is referenced (see FaultGateRegistry). An admin can flip enabled/
-            // rate at runtime via FaultGateAdminController, same as the old /admin/fault
-            // endpoints did per-service.
             String gateName = String.valueOf(when.get("faultGate"));
             double configuredDefaultRate = numberOf(when.get("probability"), 0.0);
             FaultGateRegistry.FaultGateState state = faultGateRegistry.get(gateName, configuredDefaultRate);
@@ -87,10 +83,23 @@ public class TransitionEvaluator {
             return rollProbability(when.get("probability"));
         }
         if (when.containsKey("link")) {
-            // {link: "<refField>", field: "<fieldOnLinkedEntity>", equals: ...}. Not
-            // exercised by the Stage 2 synthetic entities (no flow needs it yet);
-            // evaluated defensively (never matches) rather than throwing, so an
-            // as-yet-unused condition shape doesn't crash the scheduler.
+            // {link: "<refField>", field: "<fieldOnLinkedEntity>", equals: ...}
+            String refField = String.valueOf(when.get("link"));
+            String linkedId = record.getLink(refField);
+            if (linkedId == null) return false;
+
+            EntityRecord linkedRecord = repository.findById(linkedId).orElse(null);
+            if (linkedRecord == null) return false;
+
+            String linkedField = String.valueOf(when.get("field"));
+            Object actual = linkedRecord.getField(linkedField);
+
+            if (when.containsKey("equals")) {
+                return Objects.equals(stringify(actual), stringify(when.get("equals")));
+            }
+            if (when.containsKey("notEquals")) {
+                return !Objects.equals(stringify(actual), stringify(when.get("notEquals")));
+            }
             return false;
         }
         return true;
