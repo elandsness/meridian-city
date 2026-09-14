@@ -75,6 +75,8 @@ spec:
     metadata:
       labels:
         {{- include "meridian.labels" . | nindent 8 }}
+      annotations:
+        "dynatrace.com/instrumentation": "false"
     spec:
       restartPolicy: Never
       containers:
@@ -181,6 +183,8 @@ spec:
     metadata:
       labels:
         {{- include "meridian.labels" . | nindent 8 }}
+      annotations:
+        "dynatrace.com/instrumentation": "false"
     spec:
       restartPolicy: Never
       containers:
