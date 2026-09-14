@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface JourneyRepository extends JpaRepository<Journey, String> {
@@ -26,6 +27,10 @@ public interface JourneyRepository extends JpaRepository<Journey, String> {
     @Query("SELECT j FROM Journey j WHERE j.entityType = :entityType AND j.direction = :direction")
     List<Journey> findByEntityTypeAndDirection(@Param("entityType") String entityType,
                                                @Param("direction") String direction);
+
+    @Query("SELECT j FROM Journey j WHERE j.entityType = :entityType AND j.relatedId = :relatedId")
+    Optional<Journey> findByEntityTypeAndRelatedId(@Param("entityType") String entityType,
+                                                   @Param("relatedId") String relatedId);
 
     List<Journey> findByStatusOrderByCreatedAtDesc(String status);
 
