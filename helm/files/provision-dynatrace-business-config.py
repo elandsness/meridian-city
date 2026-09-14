@@ -286,7 +286,7 @@ FLOW_SPECS = [
                    ("Details submitted", "citizen.details_submitted"),
                    ("Verification sent", "citizen.verification_sent"),
                    ("Verified", "citizen.verified", ["citizen.verification_failed"]),
-                   ("Activated", "citizen.activated", ["citizen.activation_failed"])}),
+                   ("Activated", "citizen.activated", ["citizen.activation_failed"])]},
     {"key": "identity-registration", "name": "Identity Registration", "correlationID": "citizen.id",
      "kpiLabel": "Registered identities", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "citizen.registered",
