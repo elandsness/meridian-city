@@ -1,61 +1,65 @@
-# Helm
-helm/charts/*.tgz
-helm/Chart.lock
-helm/values-custom.yaml
-helm/values-*.local.yaml
+1|# Helm
+2|helm/charts/*.tgz
+3|helm/Chart.lock
+4|helm/values-custom.yaml
+5|helm/values-*.local.yaml
+6|
+7|# Secrets and local config
+8|*.env
+9|.env
+10|.env.*
+11|secrets/
+12|**/secrets.yaml
+13|**/secret.yaml
+14|
+15|# Claude Code per-user local config (machine-specific; not shared)
 
-# Secrets and local config
-*.env
-.env
-.env.*
-secrets/
-**/secrets.yaml
-**/secret.yaml
-
-# Claude Code per-user local config (machine-specific; not shared)
-.claude/settings.local.json
-
-# Build artifacts
-**/target/
-**/dist/
-**/build/
-**/.gradle/
-**/node_modules/
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/venv/
-**/.venv/
-**/bin/
-**/vendor/
-
-# IDE
-.idea/
-.vscode/
-*.iml
-*.iws
-*.ipr
-.DS_Store
-
-# Go
-# go.sum is intentionally NOT ignored — it should be committed for reproducible builds.
-# Generate with: cd services/<service> && go mod tidy
-
-# Java
-**/*.class
-**/*.jar
-**/*.war
-
-# Logs
-**/*.log
-logs/
-
-# Docker
-**/Dockerfile.local
-
-# k8s local overrides
-kubeconfig
-*.kubeconfig
-
-# Hermes Agent state
-.agent/
+17|
+18|# Build artifacts
+19|**/target/
+20|**/dist/
+21|**/build/
+22|**/.gradle/
+23|**/node_modules/
+24|**/__pycache__/
+25|**/*.pyc
+26|**/*.pyo
+27|**/venv/
+28|**/.venv/
+29|**/bin/
+30|**/vendor/
+31|
+32|# IDE
+33|.idea/
+34|.vscode/
+35|*.iml
+36|*.iws
+37|*.ipr
+38|.DS_Store
+39|
+40|# Go
+41|# go.sum is intentionally NOT ignored — it should be committed for reproducible builds.
+42|# Generate with: cd services/<service> && go mod tidy
+43|
+44|# Java
+45|**/*.class
+46|**/*.jar
+47|**/*.war
+48|
+49|# Logs
+50|**/*.log
+51|logs/
+52|
+53|# Docker
+54|**/Dockerfile.local
+55|
+56|# k8s local overrides
+57|kubeconfig
+58|*.kubeconfig
+59|
+60|# Hermes Agent state
+61|.agent/
+.claude-*
+!.claude/agents/
+.claude/*
+!.claude/agents/
