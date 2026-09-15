@@ -94,6 +94,7 @@ function buildRouteTable (config) {
       target: config.JOURNEY_SERVICE_URL,
       serviceName: 'journey-service',
       requiresAuth: false,
+      rewritePrefix: '/api/v1/journeys',
     },
     {
       prefix: '/api/v1/analytics',
