@@ -21,14 +21,7 @@ from .db import get_pool, safe_fetchval
 
 logger = logging.getLogger(__name__)
 
-# Funnels show a recent window of activity rather than an ever-growing all-time
-# total, so the numbers stay realistic in a long-running lab. Override via env.
 WINDOW_HOURS = os.getenv("FUNNEL_WINDOW_HOURS", "24")
-
-
-# ---------------------------------------------------------------------------
-# Funnel stage definitions
-# ---------------------------------------------------------------------------
 
 _FUNNELS: dict[str, list[str]] = {
     "service-request": [
@@ -50,7 +43,6 @@ _FUNNELS: dict[str, list[str]] = {
         "work_order.acknowledged",
         "work_order.resolved",
     ],
-    # Flow D — City Store purchase funnel (derived from entity events)
     "purchase": [
         "cart.item_added",
         "checkout.completed",
@@ -58,12 +50,10 @@ _FUNNELS: dict[str, list[str]] = {
         "order.shipped",
         "order.delivered",
     ],
-    # Flow E — Billing payment funnel (derived from entity events)
     "tax-payment": [
         "bill.outstanding",
         "bill.paid",
     ],
-    # Flow F — Loan application funnel (entity engine)
     "loan_application": [
         "loan_application.submitted",
         "loan_application.credit_check",
@@ -88,14 +78,7 @@ _FUNNELS: dict[str, list[str]] = {
 
 FUNNEL_NAMES = list(_FUNNELS.keys())
 
-
 async def get_funnel(funnel_name: str) -> List[dict]:
-    """
-    Return stage-by-stage event counts for the named funnel.
-
-    Queries request_events for Flow A/B and work_orders/incidents for Flow C.
-    Falls back to zero counts if tables don't yet exist.
-    """
     stages = _FUNNELS.get(funnel_name)
     if stages is None:
         return []
@@ -117,17 +100,7 @@ async def get_funnel(funnel_name: str) -> List[dict]:
     else:
         return await _query_iot_incident_funnel(pool, stages)
 
-
 async def _query_event_log(pool, stages: list[str]) -> list[dict]:
-    """
-    Count service-request events per stage from entities.entity_event.
-
-    Uses cohort-based counting: only consider entities whose CREATION falls
-    within the recent window, then count how many reached each stage regardless
-    of when that transition happened. This avoids the classic funnel inversion
-    where a rolling event-timestamp window counts later-stage events for
-    entities submitted before the window.
-    """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
@@ -142,12 +115,7 @@ async def _query_event_log(pool, stages: list[str]) -> list[dict]:
             result.append({"stage": stage, "count": int(count)})
     return result
 
-
 async def _query_account_funnel(pool, stages: list[str]) -> list[dict]:
-    """
-    Account-creation funnel from entities.entity_event (citizen entity lifecycle).
-    Citizen initial state is verification_sent; stages follow citizen.<state> naming.
-    """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
@@ -162,12 +130,7 @@ async def _query_account_funnel(pool, stages: list[str]) -> list[dict]:
             result.append({"stage": stage, "count": int(count)})
     return result
 
-
 async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
-    """
-    Derive IoT incident resolution funnel from iot.anomalies (owned by
-    telemetry-processor) and entities.entity_event (owned by entity engine).
-    """
     async with pool.acquire() as conn:
         anomalies   = await safe_fetchval(conn, """
             SELECT COUNT(*) FROM iot.anomalies
@@ -213,15 +176,10 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
         for stage, count in zip(stages, counts)
     ]
 
-
 async def _query_purchase_funnel(pool, stages: list[str]) -> list[dict]:
-    """
-    City Store purchase funnel from entities.entity_event (cart entity lifecycle).
-    Falls back gracefully to zero if the entity engine has no cart events yet.
-    """
     stage_events = [
-        "cart.open",          # cart created
-        "cart.checked_out",   # checkout completed
+        "cart.open",
+        "cart.checked_out",
         "cart.packed",
         "cart.shipped",
         "cart.delivered",
@@ -237,13 +195,7 @@ async def _query_purchase_funnel(pool, stages: list[str]) -> list[dict]:
             result.append({"stage": stage, "count": int(count)})
     return result
 
-
 async def _query_tax_funnel(pool, stages: list[str]) -> list[dict]:
-    """
-    Billing payment funnel from entities.entity_event (bill entity lifecycle).
-    Works for city (tax bills) and bank (credit card statements) — both use
-    the 'bill' entity type with outstanding→paid states.
-    """
     async with pool.acquire() as conn:
         issued = await safe_fetchval(conn, """
             SELECT COUNT(*) FROM entities.entity_event
@@ -262,12 +214,7 @@ async def _query_tax_funnel(pool, stages: list[str]) -> list[dict]:
         for stage, count in zip(stages, counts)
     ]
 
-
 async def _query_entity_event_funnel(pool, entity_type: str, stages: list[str]) -> list[dict]:
-    """
-    Generic funnel over entities.entity_event. Each stage key must match an
-    event_type emitted by the entity engine (<entityType>.<state>).
-    """
     result = []
     async with pool.acquire() as conn:
         for stage in stages:
