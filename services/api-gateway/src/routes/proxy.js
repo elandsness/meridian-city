@@ -264,6 +264,10 @@ function buildUpstreamHeaders (originalHeaders, requestId) {
   // byte length may differ. Let undici recompute it from the outgoing body.
   delete headers['content-length']
 
+  // Force connection close to prevent stale socket ECONNREFUSED when routing 
+  // through sidecars (Dynatrace) and K8s ClusterIPs.
+  headers['connection'] = 'close'
+
   headers['x-request-id'] = requestId
   headers['x-meridian-gateway'] = 'true'
 
@@ -301,7 +305,7 @@ async function proxyRoutes (fastify, opts) {
       let upstreamPath
       if (route.rewritePrefix !== undefined) {
         // Strip the route prefix and prepend the rewritePrefix
-        const remainder = path.slice(route.prefix.length) // e.g. "" or "/some/thing"
+        const remainder = path.slice(route.prefix.length) // e.g. \"\" or \"/some/thing\"
         upstreamPath = route.rewritePrefix + remainder
       } else {
         upstreamPath = path
