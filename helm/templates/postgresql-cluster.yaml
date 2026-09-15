@@ -8,9 +8,6 @@ metadata:
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
-    "helm.sh/hook-delete-policy": hook-failed
 spec:
   instances: 1
   # CNPG auto-creates a minAvailable:1 PDB for the primary; on a single-instance
