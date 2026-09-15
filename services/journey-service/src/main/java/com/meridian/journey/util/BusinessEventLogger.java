@@ -24,7 +24,7 @@ public class BusinessEventLogger {
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
 
     public void journeyStatus(com.meridian.journey.domain.Journey journey) {
-        String eventType = "journey." + journey.getStatus();
+        String eventType = journey.getEntityType() + "." + journey.getStatus();
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
                 StructuredArguments.keyValue("journey.id", journey.getId()),
