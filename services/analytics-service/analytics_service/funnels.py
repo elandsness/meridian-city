@@ -70,6 +70,20 @@ _FUNNELS: dict[str, list[str]] = {
         "loan_application.underwriting",
         "loan_application.approved",
     ],
+    "flight_departure": [
+        "flight_departure.at_gate",
+        "flight_departure.boarding",
+        "flight_departure.taxiing",
+        "flight_departure.takeoff",
+        "flight_departure.departed",
+    ],
+    "passenger": [
+        "passenger.checked_in",
+        "passenger.security_cleared",
+        "passenger.gate_ready",
+        "passenger.boarded",
+        "passenger.departed",
+    ],
 }
 
 FUNNEL_NAMES = list(_FUNNELS.keys())
@@ -98,6 +112,8 @@ async def get_funnel(funnel_name: str) -> List[dict]:
         return await _query_tax_funnel(pool, stages)
     elif funnel_name == "loan_application":
         return await _query_entity_event_funnel(pool, "loan_application", stages)
+    elif funnel_name in ["flight_departure", "passenger"]:
+        return await _query_entity_event_funnel(pool, funnel_name, stages)
     else:
         return await _query_iot_incident_funnel(pool, stages)
 
