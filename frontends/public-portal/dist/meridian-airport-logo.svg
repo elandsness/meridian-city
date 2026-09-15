@@ -1,0 +1,13 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Meridian Airport logo">
+  <circle cx="100" cy="100" r="96" fill="#0B3D91"/>
+  <circle cx="100" cy="100" r="96" fill="none" stroke="#38BDF8" stroke-width="3"/>
+  <!-- Paper plane ascending to the upper-right -->
+  <path d="M156 54 L52 100 L92 114 Z" fill="#FFFFFF"/>
+  <path d="M156 54 L92 114 L98 152 L114 116 Z" fill="#CDE7F5"/>
+  <!-- Speed lines -->
+  <g stroke="#38BDF8" stroke-width="6" stroke-linecap="round">
+    <line x1="40" y1="126" x2="66" y2="126"/>
+    <line x1="36" y1="142" x2="56" y2="142"/>
+    <line x1="44" y1="158" x2="60" y2="158"/>
+  </g>
+</svg>

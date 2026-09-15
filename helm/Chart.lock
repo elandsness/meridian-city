@@ -1,0 +1,12 @@
+dependencies:
+- name: cloudnative-pg
+  repository: https://cloudnative-pg.github.io/charts
+  version: 0.28.3
+- name: strimzi-kafka-operator
+  repository: https://strimzi.io/charts/
+  version: 1.0.0
+- name: opentelemetry-collector
+  repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+  version: 0.158.1
+digest: sha256:4ca828f40351f399470202124df72d10ef3e37ae16ef28759f5de063f50e8dff
+generated: "2026-06-10T15:17:30.213905576-04:00"

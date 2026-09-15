@@ -1,0 +1,79 @@
+{
+  "probe": {
+    "displayName": "Probe",
+    "displayNamePlural": "Probes",
+    "idPrefix": "prb",
+    "fields": {
+      "probe_code": { "type": "string" },
+      "zone": { "type": "enum", "values": ["north", "south"] },
+      "escalations": { "type": "number", "default": 0 }
+    },
+    "initial": "queued",
+    "states": {
+      "queued": { "label": "Queued", "tone": "slate" },
+      "scanning": { "label": "Scanning", "tone": "blue" },
+      "fault_detected": { "label": "Fault detected", "tone": "red", "terminal": true, "isError": true },
+      "validating": { "label": "Validating", "tone": "amber" },
+      "complete": { "label": "Complete", "tone": "green", "terminal": true, "isKpi": true }
+    },
+    "transitions": [
+      { "from": "queued", "to": "scanning", "timer": { "minSeconds": 2, "maxSeconds": 5 } },
+      { "from": "scanning", "to": "fault_detected", "when": { "faultGate": "probe-fault-detected", "probability": 0.2 }, "timer": { "minSeconds": 2, "maxSeconds": 5 } },
+      { "from": "scanning", "to": "validating", "timer": { "minSeconds": 2, "maxSeconds": 5 } },
+      { "from": "validating", "to": "complete", "timer": { "minSeconds": 2, "maxSeconds": 5 } }
+    ],
+    "computed": {
+      "position": {
+        "type": "point2d",
+        "interpolation": "easeInOut",
+        "waypoints": {
+          "queued": { "x": 10, "y": 100 },
+          "scanning": { "x": 50, "y": 100 },
+          "validating": { "x": 90, "y": 100 },
+          "complete": { "x": 130, "y": 100 },
+          "fault_detected": { "x": 50, "y": 160 }
+        }
+      }
+    },
+    "generator": { "strategy": "simpleSteadyState", "intervalMs": 8000, "maxActive": 5 }
+  },
+  "inspection": {
+    "displayName": "Inspection",
+    "displayNamePlural": "Inspections",
+    "idPrefix": "insp",
+    "fields": {
+      "thorough": { "type": "boolean", "default": false },
+      "probe_id": { "type": "ref", "entity": "probe" }
+    },
+    "linkOnCreate": {
+      "probe_id": {
+        "query": { "entity": "probe", "filter": { "stateNotIn": ["fault_detected", "complete"] } },
+        "strategy": "random",
+        "required": false
+      }
+    },
+    "initial": "assigned",
+    "states": {
+      "assigned": { "label": "Assigned", "tone": "slate" },
+      "detail_check": { "label": "Detail check", "tone": "amber" },
+      "approved": { "label": "Approved", "tone": "green", "terminal": true, "isKpi": true }
+    },
+    "transitions": [
+      { "from": "assigned", "to": "detail_check", "when": { "field": "thorough", "equals": true }, "timer": { "minSeconds": 2, "maxSeconds": 4 } },
+      {
+        "from": "assigned", "to": "approved", "when": { "field": "thorough", "equals": false },
+        "timer": { "minSeconds": 2, "maxSeconds": 4 },
+        "effects": [{ "target": "link.probe_id", "action": "increment", "field": "escalations" }]
+      },
+      {
+        "from": "detail_check", "to": "approved",
+        "timer": { "minSeconds": 2, "maxSeconds": 4 },
+        "effects": [{ "target": "link.probe_id", "action": "increment", "field": "escalations" }]
+      }
+    ],
+    "generator": {
+      "strategy": "simpleSteadyState", "intervalMs": 6000, "maxActive": 8,
+      "fields": { "thorough": { "probability": 0.5 } }
+    }
+  }
+}

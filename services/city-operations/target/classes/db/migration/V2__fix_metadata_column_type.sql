@@ -1,0 +1,11 @@
+-- Originally intended to ALTER city.assets.metadata from JSONB → TEXT to match
+-- the entity's @Column(columnDefinition = "TEXT") declaration.
+--
+-- The entity was updated to use @JdbcTypeCode(SqlTypes.JSON), which correctly
+-- maps a Java String field to PostgreSQL JSONB in Hibernate 6.  JSONB is the
+-- right storage type for JSON data (it validates JSON syntax, supports indexing,
+-- and is more efficient than TEXT).  No schema change is needed.
+--
+-- This migration is intentionally a no-op so that Flyway version numbering is
+-- preserved for databases where this entry may already exist in flyway_schema_history.
+SELECT 1;

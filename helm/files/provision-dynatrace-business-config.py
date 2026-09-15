@@ -175,12 +175,7 @@ def upsert(schema, value, matches):
 #: downstream never sees it -- e.g. `citizen.email` and `flight.gate` are present
 #: in every raw log line but confirmed ABSENT from the resulting bizevent's fields
 #: precisely because nothing here names them.
-LEGACY_CORRELATION_KEYS = [
-    "service_request.id", "citizen.id", "cart.id", "order.id", "bill.id", "work_order.id",
-    "incident.id", "asset.id", "anomaly.type", "flight.id", "passenger.id",
-    "journey.id", "maintenance_request.id", "flight_departure.id", "flight_arrival.id",
-    "assigned_department",
-]
+EXTRA_CORRELATION_KEYS = [k.strip() for k in os.environ.get("DT_EXTRA_CORRELATION_KEYS", "").split(",") if k.strip()]
 
 
 def _entity_correlation_keys():
@@ -198,7 +193,7 @@ def _entity_correlation_keys():
 
 
 def _build_dql_script():
-    keys = sorted(set(LEGACY_CORRELATION_KEYS) | _entity_correlation_keys())
+    keys = sorted(set(EXTRA_CORRELATION_KEYS) | _entity_correlation_keys())
     field_adds = ", ".join("`%s` = bizjson[`%s`]" % (k, k) for k in keys)
     return (
         'parse content, "JSON:bizjson"\n'

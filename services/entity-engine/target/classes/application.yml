@@ -1,0 +1,72 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: entity-engine
+  jackson:
+    # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${SPRING_DATASOURCE_USERNAME:meridian}
+    password: ${SPRING_DATASOURCE_PASSWORD:meridian-secret-change-me}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: entities
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    schemas: entities
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: java.util.HashMap
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+entity-engine:
+  # Path to the mounted industry entity-config JSON (rendered from
+  # `industry.entities` by a future Helm ConfigMap, mirroring industry-configmap.yaml).
+  # Falls back to a local dev fixture so the service is runnable without a mount.
+  config-path: ${ENTITY_CONFIG_PATH:classpath:dev-entity-config.json}
+  # Comma-separated allow-list of entity type ids this instance owns. Empty/unset =
+  # own every entity type found in the config (used for the Stage 2 synthetic proof;
+  # City/Airport retrofit will split this into customer-facing vs ops-facing sets).
+  owned-types: ${ENTITY_TYPES:}
+  # How often to evaluate due transitions and run generators.
+  scheduler-fixed-delay-ms: ${ENTITY_ENGINE_SCHEDULER_MS:5000}
+  # Kafka group ID for this instance -- set to a unique value per deployment so
+  # customer-entity-service and ops-entity-service don't compete for messages.
+  kafka-group-id: ${KAFKA_GROUP_ID:entity-engine-group}
+  # Set to true to enable Kafka trigger listeners (entity creation from Kafka messages).
+  # Only ops-entity-service should set this; customer-entity-service leaves it false.
+  kafka-triggers-enabled: ${KAFKA_TRIGGERS_ENABLED:false}

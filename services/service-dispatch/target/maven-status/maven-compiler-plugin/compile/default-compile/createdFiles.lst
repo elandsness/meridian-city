@@ -1,0 +1,17 @@
+com/meridian/dispatch/service/DispatchService.class
+com/meridian/dispatch/dto/DispatchResultDto$DispatchResultDtoBuilder.class
+com/meridian/dispatch/repository/DispatchLogRepository.class
+com/meridian/dispatch/dto/DispatchRequestDto$DispatchRequestDtoBuilder.class
+com/meridian/dispatch/util/BusinessEventLogger.class
+com/meridian/dispatch/config/KafkaConfig.class
+com/meridian/dispatch/domain/DispatchLog$DispatchLogBuilder.class
+com/meridian/dispatch/service/CityOperationsClient.class
+com/meridian/dispatch/dto/DispatchRequestDto.class
+com/meridian/dispatch/dto/CreateWorkOrderDto$CreateWorkOrderDtoBuilder.class
+com/meridian/dispatch/dto/DispatchResultDto.class
+com/meridian/dispatch/dto/CreateWorkOrderDto.class
+com/meridian/dispatch/domain/DispatchLog.class
+com/meridian/dispatch/web/DispatchController.class
+com/meridian/dispatch/config/AppConfig.class
+com/meridian/dispatch/ServiceDispatchApplication.class
+com/meridian/dispatch/service/RoutingEngine.class
