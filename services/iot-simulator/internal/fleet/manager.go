@@ -58,7 +58,12 @@ func NewManager(emitIntervalSeconds int) *Manager {
 // Initialize creates the initial device fleet and starts all goroutines.
 // Panics if instruments cannot be created (programming error / OTel misconfiguration).
 func (m *Manager) Initialize(ctx context.Context, vehicles, buildings, machines int) {
-	instr, err := telemetry.NewInstruments()
+	defaultMetrics := map[string]string{
+		"iot.vehicle.speed": "km/h", "iot.vehicle.engine_temp": "Cel", "iot.vehicle.fuel_level": "%", "iot.vehicle.gps_lat": "", "iot.vehicle.gps_lon": "",
+		"iot.building.hvac_temp": "Cel", "iot.building.hvac_setpoint": "Cel", "iot.building.energy_kwh": "kWh", "iot.building.occupancy": "{person}", "iot.building.co2_ppm": "ppm",
+		"iot.machine.vibration": "mm/s", "iot.machine.cycle_count": "", "iot.machine.temp": "Cel", "iot.machine.error_rate": "%", "iot.machine.throughput": "{unit}/min",
+	}
+	instr, err := telemetry.NewInstruments(defaultMetrics)
 	if err != nil {
 		panic(fmt.Sprintf("fleet: cannot create OTel instruments: %v", err))
 	}

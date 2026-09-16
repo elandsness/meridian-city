@@ -50,7 +50,7 @@ spec:
             - name: COMMERCE_SERVICE_URL
               value: "http://commerce-service:8090"
             - name: BILLING_SERVICE_URL
-              value: "http://billing-service:8091"
+              value: "http://transaction-service:8093"
             - name: FLIGHT_OPS_URL
               value: "http://flight-ops:8092"
             - name: PASSENGER_SERVICE_URL

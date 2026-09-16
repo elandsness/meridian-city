@@ -75,7 +75,7 @@ spec:
             - name: COMMERCE_SERVICE_URL
               value: "http://commerce-service:8090"
             - name: BILLING_SERVICE_URL
-              value: "http://billing-service:8091"
+              value: "http://transaction-service:8093"
             - name: TELEMETRY_PROCESSOR_URL
               value: "http://telemetry-processor:8086"
             - name: DEMO_CONTROL_API_URL
