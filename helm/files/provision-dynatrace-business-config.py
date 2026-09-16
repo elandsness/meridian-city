@@ -179,14 +179,21 @@ EXTRA_CORRELATION_KEYS = [k.strip() for k in os.environ.get("DT_EXTRA_CORRELATIO
 
 
 def _entity_correlation_keys():
-    """Every entity type's own `<type>.id`, plus any ref-field's target type's
-    `<type>.id` (so a linked entity's id -- e.g. an inspection's linked probe --
-    is also extractable), derived from DT_ENTITY_CONFIG. A brand-new entity type
-    needs zero manual edits here or anywhere in this pipeline."""
+    """Every entity type's own fields (id, state, from_state, and all business fields),
+    plus any ref-field's target type's <type>.id (so a linked entity's id -- e.g.
+    an inspection's linked probe -- is also extractable), derived from DT_ENTITY_CONFIG.
+    """
     keys = set()
     for entity_type, definition in ENTITY_CONFIG.items():
+        # Core lifecycle fields emitted by EntityEventLogger
         keys.add("%s.id" % entity_type)
-        for field_def in (definition.get("fields") or {}).values():
+        keys.add("%s.state" % entity_type)
+        keys.add("%s.from_state" % entity_type)
+        
+        # Business fields defined in the entity config
+        for field_name, field_def in (definition.get("fields") or {}).items():
+            keys.add("%s.%s" % (entity_type, field_name))
+            # Also extract the ID of the target entity if this is a reference
             if field_def.get("type") == "ref" and field_def.get("entity"):
                 keys.add("%s.id" % field_def["entity"])
     return keys
