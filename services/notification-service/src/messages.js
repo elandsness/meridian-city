@@ -25,9 +25,8 @@ async function listForCitizen (citizenId, { unreadOnly = false, limit = 50 } = {
   const lim = Math.min(parseInt(limit, 10) || 50, 200)
   const where = unreadOnly ? 'citizen_id = $1 AND read = false' : 'citizen_id = $1'
   const messages = (await getPool().query(
-    `SELECT id, citizen_id, type, title, body, read, created_at
-     FROM messages.messages WHERE ${where} ORDER BY created_at DESC LIMIT ${lim}`,
-    [citizenId]
+    `SELECT id, citizen_id, type, title, body, read, created_at\n     FROM messages.messages WHERE ${where} ORDER BY created_at DESC LIMIT $2`,
+    [citizenId, lim]
   )).rows
   const unread = (await getPool().query(
     'SELECT COUNT(*)::int AS c FROM messages.messages WHERE citizen_id = $1 AND read = false',

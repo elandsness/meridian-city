@@ -62,4 +62,4 @@
 .claude-*
 !.claude/agents/
 .claude/*
-!.claude/agents/
+!.claude/agents/helm/values-custom.yaml

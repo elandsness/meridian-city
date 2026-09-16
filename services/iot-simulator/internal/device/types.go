@@ -8,11 +8,6 @@ import (
 // Category identifies the class of IoT device.
 type Category string
 
-const (
-	CategoryVehicle  Category = "vehicle"
-	CategoryBuilding Category = "building"
-	CategoryMachine  Category = "machine"
-)
 
 // AnomalyType identifies a simulated fault condition.
 type AnomalyType string

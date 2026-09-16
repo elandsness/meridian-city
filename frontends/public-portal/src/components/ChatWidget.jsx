@@ -32,8 +32,8 @@ export default function ChatWidget({ assistantName, assistantPersona, config }) 
   const cfg = useConfig()
 
   // Resolve assistant identity: props > config > hardcoded default
-  const name = assistantName || cfg.company?.assistant?.name || 'Meri'
-  const persona = assistantPersona || cfg.company?.assistant?.persona || "Meridian City's virtual assistant"
+  const name = assistantName || cfg.company?.assistant?.name || 'Assistant'
+  const persona = assistantPersona || cfg.company?.assistant?.persona || "Virtual Assistant"
 
   const [messages, setMessages] = useState([
     { role: 'assistant', content: `Hi, I'm ${name} — ${persona}. How can I help you today?` },

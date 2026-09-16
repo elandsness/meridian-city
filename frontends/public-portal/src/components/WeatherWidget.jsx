@@ -46,10 +46,10 @@ export default function WeatherWidget({ location, units = 'fahrenheit', config }
   const locationName = location || cfg.company?.name || 'Meridian City'
   const displayUnits = units === 'celsius' ? 'celsius' : 'fahrenheit'
 
-  // Always-perfect-weather demo data — real impl would fetch from a weather API.
-  const highC = 24
-  const lowC = 22
-  const condition = 'Sunny'
+  // Weather data from props or config fallbacks
+  const highC = config?.highC ?? 24
+  const lowC = config?.lowC ?? 22
+  const condition = config?.condition ?? 'Sunny'
 
   const high = displayUnits === 'celsius' ? highC : celsiusToFahrenheit(highC)
   const low = displayUnits === 'celsius' ? lowC : celsiusToFahrenheit(lowC)

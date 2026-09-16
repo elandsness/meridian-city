@@ -85,10 +85,11 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-600 mt-4">
-          Demo credentials: <span className="text-gray-400">demo</span> /{' '}
-          <span className="text-gray-400">dynatrace</span>
-        </p>
+        {cfg.demo_hints && (
+          <p className="text-center text-xs text-gray-600 mt-4">
+            {cfg.demo_hints}
+          </p>
+        )}
       </div>
     </div>
   );

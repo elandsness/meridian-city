@@ -8,7 +8,7 @@
 
 import WeatherWidget from '../components/WeatherWidget'
 import NewsTicker from '../components/NewsTicker'
-import TransitPanel from '../components/TransitPanel'
+import NetworkMapWidget from '../components/NetworkMapWidget'
 import ChatWidget from '../components/ChatWidget'
 import EntityListPage from '../components/entity/EntityListPage'
 import EntityDetailPage from '../components/entity/EntityDetailPage'
@@ -40,7 +40,7 @@ export const COMPONENT_REGISTRY = {
   // Generic components
   'weather': WeatherWidget,
   'news-ticker': NewsTicker,
-  'transit-map': TransitPanel,
+  'transit-map': NetworkMapWidget,
   'chat-widget': ChatWidget,
   'entity-list': EntityListPage,
   'entity-detail': EntityDetailPage,

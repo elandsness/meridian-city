@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useConfig } from '../config/ConfigContext'
 
 // Configurable "breaking news" ticker for the home page.
 // Headlines come from the component's `headlines` prop (supplied by the
@@ -61,6 +62,7 @@ function shuffle(arr) {
 }
 
 export default function NewsTicker({ headlines, config }) {
+  const cfg = useConfig()
   const tickerHeadlines = useMemo(
     () => (headlines && headlines.length > 0 ? headlines : DEFAULT_HEADLINES),
     [headlines]
@@ -80,7 +82,7 @@ export default function NewsTicker({ headlines, config }) {
           <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
           Breaking
         </span>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Meridian News</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{cfg?.company?.name || 'City News'}</span>
       </div>
       <p
         key={i}

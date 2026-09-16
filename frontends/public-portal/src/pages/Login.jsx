@@ -78,10 +78,11 @@ export default function Login() {
           <p>
             Registered? Sign in with your <span className="text-slate-700">email</span> and password.
           </p>
-          <p>
-            Demo operator: <span className="font-mono text-slate-700">demo</span> /{' '}
-            <span className="font-mono text-slate-700">dynatrace</span>
-          </p>
+          {cfg.demo_hints && (
+            <p>
+              {cfg.demo_hints}
+            </p>
+          )}
         </div>
       </div>
     </AuthShell>
