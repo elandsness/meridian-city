@@ -1,7 +1,7 @@
 'use strict'
 
 const config = require('../config')
-const { JOURNEY_DEFINITIONS } = require('./journeyDefinitions')
+const { JOURNEY_DEFINITIONS } = require('../journeyDefinitions')
 const { runGenericJourney } = require('../genericJourney')
 
 const REGISTRY = Object.entries(JOURNEY_DEFINITIONS).map(([key, def]) => ({
