@@ -1,6 +1,6 @@
 'use strict'
 
-const data = require('../data')
+const data = require('./data')
 
 const JOURNEY_DEFINITIONS = {
   browsing: {
