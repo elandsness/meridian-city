@@ -21,7 +21,7 @@ func NewMachine(index int) *Machine {
 			ID:           fmt.Sprintf("mach-%03d", index),
 			Zone:         Zones[index%len(Zones)],
 			Manufacturer: machineManufacturers[index%len(machineManufacturers)],
-			Category:     CategoryMachine,
+			Category:     "machine",
 		},
 		baseVibration:  1.5 + float64(index%4),
 		baseCycleCount: float64(800 + index*60),

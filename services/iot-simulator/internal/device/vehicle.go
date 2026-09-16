@@ -21,7 +21,7 @@ func NewVehicle(index int) *Vehicle {
 			ID:           fmt.Sprintf("veh-%03d", index),
 			Zone:         Zones[index%len(Zones)],
 			Manufacturer: vehicleManufacturers[index%len(vehicleManufacturers)],
-			Category:     CategoryVehicle,
+			Category:     "vehicle",
 		},
 		baseSpeed:   40 + float64(index%25),
 		baseLat:     40.7128 + float64(index)*0.004,

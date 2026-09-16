@@ -21,7 +21,7 @@ func NewBuilding(index int) *Building {
 			ID:           fmt.Sprintf("bldg-%03d", index),
 			Zone:         Zones[index%len(Zones)],
 			Manufacturer: buildingManufacturers[index%len(buildingManufacturers)],
-			Category:     CategoryBuilding,
+			Category:     "building",
 		},
 		baseHVACTemp:  68 + float64(index%10),
 		baseHVACSet:   72.0,

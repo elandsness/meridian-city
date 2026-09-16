@@ -198,17 +198,17 @@ func (m *Manager) FleetStatus() FleetStatus {
 		info := w.Device.Info()
 		anomaly := string(w.State.GetAnomaly())
 		switch info.Category {
-		case device.CategoryVehicle:
+		case device.Category("vehicle"):
 			status.Vehicles.Count++
 			if anomaly != "" {
 				status.Vehicles.Anomalies[id] = anomaly
 			}
-		case device.CategoryBuilding:
+		case device.Category("building"):
 			status.Buildings.Count++
 			if anomaly != "" {
 				status.Buildings.Anomalies[id] = anomaly
 			}
-		case device.CategoryMachine:
+		case device.Category("machine"):
 			status.Machines.Count++
 			if anomaly != "" {
 				status.Machines.Anomalies[id] = anomaly
