@@ -35,6 +35,8 @@ spec:
         - name: entity-config
           configMap:
             name: entity-config
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: customer-entity-service
           image: {{ include "meridian.image" (dict "repository" .Values.customerEntityService.image.repository "tag" .Values.customerEntityService.image.tag "context" $) }}

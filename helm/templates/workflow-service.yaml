@@ -19,6 +19,8 @@ spec:
         {{- include "meridian.selectorLabels" (dict "component" "workflow-service" "context" $) | nindent 8 }}
         app.kubernetes.io/component: workflow-service
     spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: workflow-service
           image: {{ include "meridian.image" (dict "repository" .Values.workflowService.image.repository "tag" .Values.workflowService.image.tag "context" $) }}

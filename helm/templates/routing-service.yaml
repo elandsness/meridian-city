@@ -20,6 +20,8 @@ spec:
         {{- include "meridian.labels" . | nindent 8 }}
         app.kubernetes.io/component: routing-service
     spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: routing-service
           image: {{ include "meridian.image" (dict "repository" .Values.routingService.image.repository "tag" .Values.routingService.image.tag "context" $) }}

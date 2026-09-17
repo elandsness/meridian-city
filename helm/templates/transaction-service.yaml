@@ -19,6 +19,8 @@ spec:
         {{- include "meridian.selectorLabels" (dict "component" "transaction-service" "context" $) | nindent 8 }}
         app.kubernetes.io/component: transaction-service
     spec:
+      initContainers:
+        {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: transaction-service
           image: {{ include "meridian.image" (dict "repository" .Values.transactionService.image.repository "tag" .Values.transactionService.image.tag "context" $) }}
