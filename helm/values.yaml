@@ -860,9 +860,11 @@ identityService:
       # Right-sized to observed working set (~550 MiB) + headroom; the old 384Mi
       # request ran at ~143% memory-request saturation (Dynatrace OOM/saturation problem).
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
   # Account lifecycle configuration (overrides industry.services.identity.accountLifecycle)
   # Default states: registered → verification_sent → verified → activated
   accountLifecycle:
@@ -896,9 +898,11 @@ workflowService:
       cpu: "200m"
       # Right-sized to observed working set (~575 MiB) + headroom (was 384Mi → ~150% sat).
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
   # Workflow lifecycle configuration (overrides industry.services.workflow)
   workflowLifecycle:
     enabled: true
@@ -929,9 +933,11 @@ transactionService:
     requests:
       cpu: "200m"
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
   # Order fulfillment delays (placed -> packed -> shipped -> delivered)
   fulfillment:
     packedMinSeconds: 300
@@ -980,9 +986,11 @@ journeyService:
     requests:
       cpu: "200m"
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
   # Journey lifecycle timing (min-max seconds per stage transition)
   lifecycle:
     enabled: true
@@ -1028,9 +1036,11 @@ iotService:
     requests:
       cpu: "200m"
       memory: "512Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1Gi"
+      ephemeral-storage: "4Gi"
   simulator:
     enabled: true
     fleet:
@@ -1064,9 +1074,11 @@ newsTickerService:
     requests:
       cpu: "50m"
       memory: "128Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "200m"
       memory: "256Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1091,9 +1103,11 @@ weatherService:
     requests:
       cpu: "50m"
       memory: "128Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "200m"
       memory: "256Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1115,9 +1129,11 @@ citizenService:
     requests:
       cpu: "200m"
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1139,9 +1155,11 @@ commerceService:
       cpu: "200m"
       # Right-sized to observed working set (~520 MiB) + headroom (was 384Mi → ~134% sat).
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
   # Order fulfillment delays (placed -> packed -> shipped -> delivered) default to a
   # ~5 min – 2 hr band per transition (see fulfillment in commerce-service application.yml).
   # Override here to tune, e.g.:
@@ -1169,9 +1187,11 @@ billingService:
       cpu: "200m"
       # Right-sized to observed working set (~600 MiB) + headroom (was 384Mi → ~157% sat).
       memory: "768Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
+      ephemeral-storage: "4Gi"
 
 # ---------------------------------------------------------------------------
 # Service Dispatch (Java / Spring Boot)
@@ -1279,9 +1299,11 @@ passengerService:
     requests:
       cpu: "150m"
       memory: "512Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1024Mi"
+      ephemeral-storage: "4Gi"
   # Journey timing + generator (defaults in passenger-service application.yml).
   # Override per-instance, e.g.:
   #   env:
@@ -1341,9 +1363,11 @@ customerEntityService:
     requests:
       cpu: "150m"
       memory: "512Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1024Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1365,9 +1389,11 @@ opsEntityService:
     requests:
       cpu: "150m"
       memory: "512Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1024Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1389,9 +1415,11 @@ routingService:
     requests:
       cpu: "50m"
       memory: "256Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1442,9 +1470,11 @@ analyticsService:
     requests:
       cpu: "100m"
       memory: "256Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1538,9 +1568,11 @@ notificationService:
     requests:
       cpu: "100m"
       memory: "128Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
