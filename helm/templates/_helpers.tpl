@@ -197,6 +197,13 @@ Usage (inside a pod spec, before containers:):
 {{- $bootstrap := include "meridian.kafkaBootstrap" . -}}
 - name: wait-for-kafka
   image: busybox:1.36
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "64Mi"
   command:
     - sh
     - -c

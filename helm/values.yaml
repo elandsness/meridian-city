@@ -1906,11 +1906,6 @@ kafka:
       replicationFactor: 1
       config:
         retention.ms: "3600000"
-    - name: notifications.outbound
-      partitions: 1
-      replicationFactor: 1
-      config:
-        retention.ms: "3600000"
     - name: commerce.events
       partitions: 2
       replicationFactor: 1
@@ -1954,7 +1949,7 @@ opentelemetry-collector:
       ephemeral-storage: "2Gi"
     limits:
       cpu: "500m"
-      memory: "1Gi"
+      memory: "2Gi"
       ephemeral-storage: "4Gi"
 
 # ---------------------------------------------------------------------------
