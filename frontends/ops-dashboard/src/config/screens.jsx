@@ -10,6 +10,7 @@ import BusinessAnalytics from '../pages/BusinessAnalytics.jsx';
 import DemoControl from '../pages/DemoControl.jsx';
 import FlightBoard from '../pages/FlightBoard.jsx';
 import EntityListPage from '../components/entity/EntityListPage.jsx';
+import EntityGridListPage from '../components/entity/EntityGridListPage.jsx';
 import EntityDetailPage from '../components/entity/EntityDetailPage.jsx';
 import EntityMapPage from '../components/entity/EntityMapPage.jsx';
 import EntityAnalyticsPage from '../components/entity/EntityAnalyticsPage.jsx';
@@ -22,6 +23,7 @@ import StatusMapPage from '../components/entity/StatusMapPage.jsx';
 // docs/industry-config.schema.json's third screenList branch.
 const TEMPLATES = {
   'entity-list': EntityListPage,
+  'entity-grid-list': EntityGridListPage,
   'entity-detail': EntityDetailPage,
   'entity-map': EntityMapPage,
   'entity-analytics': EntityAnalyticsPage,
@@ -42,7 +44,7 @@ export const SCREENS = {
   },
   requests: { path: '/requests', label: 'Requests', icon: '📋', component: RequestQueue },
   analytics: { path: '/analytics', label: 'Business Analytics', icon: '📈', component: BusinessAnalytics },
-  'demo-control': { path: '/demo-control', label: 'Demo Control', icon: '🎛', component: DemoControl },
+  'demo-control': { path: '/demo-control', label: 'Demo Control', icon: '<0xF0><0x9F><0x8E><0x9B>', component: DemoControl },
 };
 
 // Resolve the ordered, active ops screens for a config: applies per-screen

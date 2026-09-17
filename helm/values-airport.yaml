@@ -62,12 +62,25 @@ industry:
       - messages
     ops:
       - overview
-      - { id: flight-board, label: "Flight Board" }
-      - id: arrivals-board
-        template: entity-list
-        entityType: flight_arrival
-        label: "Arrivals Board"
-        icon: "<0xF0><0x9F><0x9B><0xAC>"
+      - id: flight-board
+        template: entity-grid-list
+        label: "Flight Board"
+        icon: "✈️"
+        entities:
+          - id: departures
+            entityType: flight_departure
+            label: "Departures"
+            fields:
+              - { id: flight_number, label: "Flight", subfields: [airline] }
+              - { id: destination, label: "To" }
+              - { id: gate, label: "Gate" }
+          - id: arrivals
+            entityType: flight_arrival
+            label: "Arrivals"
+            fields:
+              - { id: flight_number, label: "Flight", subfields: [airline] }
+              - { id: origin, label: "From" }
+              - { id: gate, label: "Gate" }
       - id: airfield
         template: entity-map
         entityType: flight_departure
@@ -257,7 +270,7 @@ industry:
         approach: { label: "On Approach", tone: amber, glyph: "✈️" }
         landing: { label: "Landing", tone: blue, glyph: "✈️" }
         taxi_in: { label: "Taxiing In", tone: amber, glyph: "✈️" }
-        at_gate: { label: "At Gate", tone: blue, glyph: "<0xF0><0x9F><0x9B><0xAC>" }
+        at_gate: { label: "At Gate", tone: blue, glyph: "✈️" }
         diverted: { label: "Diverted", tone: red, terminal: true, isError: true }
         arrived: { label: "Arrived", tone: green, terminal: true, isKpi: true }
       transitions:

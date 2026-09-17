@@ -9,7 +9,7 @@ import { getEntityDef, getStateMeta, toneBadgeClass } from './entityConfig.js';
 // driven entirely by its config (fields to show, state->tone/label, optional
 // filter tabs) -- no entity-type-specific code. Generalizes RequestQueue.jsx/
 // IncidentsPage.jsx/IoTPage.jsx's shared shape.
-export default function EntityListPage({ entityType, fields, filters }) {
+export default function EntityListPage({ entityType, fields, filters, label }) {
   const config = useConfig();
   const navigate = useNavigate();
   const def = getEntityDef(config, entityType);
@@ -34,7 +34,7 @@ export default function EntityListPage({ entityType, fields, filters }) {
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">{def?.displayNamePlural ?? entityType}</h2>
+        <h2 className="text-lg font-semibold text-white">{label ?? def?.displayNamePlural ?? entityType}</h2>
         {filters && filters.length > 0 && (
           <div className="flex gap-2">
             <FilterTab label="All" active={!activeFilter} onClick={() => setActiveFilter(null)} />
@@ -55,9 +55,12 @@ export default function EntityListPage({ entityType, fields, filters }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b border-gray-800">
-                {columns.map((c) => (
-                  <th key={c} className="py-2 pr-4 font-medium">{c.replace(/_/g, ' ')}</th>
-                ))}
+                {columns.map((col) => {
+                  const isObj = typeof col === 'object' && col !== null;
+                  const id = isObj ? col.id : col;
+                  const label = isObj ? col.label : id.replace(/_/g, ' ');
+                  return <th key={id} className="py-2 pr-4 font-medium">{label}</th>;
+                })}
                 <th className="py-2 pr-4 font-medium">state</th>
               </tr>
             </thead>
@@ -70,9 +73,23 @@ export default function EntityListPage({ entityType, fields, filters }) {
                     className="border-b border-gray-800/60 last:border-0 hover:bg-gray-800/50 cursor-pointer"
                     onClick={() => navigate(`/entities/${entityType}/${row.id}`)}
                   >
-                    {columns.map((c) => (
-                      <td key={c} className="py-2.5 pr-4 text-gray-300">{formatValue(row[c])}</td>
-                    ))}
+                    {columns.map((col) => {
+                      const isObj = typeof col === 'object' && col !== null;
+                      const id = isObj ? col.id : col;
+                      const subfields = isObj ? col.subfields : [];
+                      return (
+                        <td key={id} className="py-2.5 pr-4">
+                          {subfields.length > 0 ? (
+                            <>
+                              <div className="text-white font-medium">{formatValue(row[id])}</div>
+                              {subfields.map(sf => <div key={sf} className="text-gray-500 text-xs">{formatValue(row[sf])}</div>)}
+                            </>
+                          ) : (
+                            <span className="text-gray-300">{formatValue(row[id])}</span>
+                          )}
+                        </td>
+                      );
+                    })}
                     <td className="py-2.5 pr-4">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${toneBadgeClass(meta.tone)}`}>
                         {meta.label ?? row.state}
