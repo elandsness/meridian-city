@@ -302,9 +302,14 @@ function checkJourneyService(parsed, cfg, isValuesOverlay) {
 function collectScreenEntityTypes(screens) {
   const types = new Set()
   for (const screen of screens ?? []) {
-    if (typeof screen === 'object' && screen?.entityType) types.add(screen.entityType)
-    if (typeof screen === 'object' && Array.isArray(screen?.entityTypes)) {
-      for (const t of screen.entityTypes) types.add(t)
+    if (typeof screen === 'object') {
+      if (screen?.entityType) types.add(screen.entityType)
+      if (Array.isArray(screen?.entityTypes)) {
+        for (const t of screen.entityTypes) types.add(t)
+      }
+      if (Array.isArray(screen?.entities)) {
+        for (const e of screen.entities) if (e?.entityType) types.add(e.entityType)
+      }
     }
   }
   return types
@@ -314,9 +319,14 @@ function collectHomeEntityTypes(home) {
   const types = new Set()
   const allModules = [...(home?.public ?? []), ...(home?.ops ?? [])]
   for (const mod of allModules) {
-    if (typeof mod === 'object' && mod?.entityType) types.add(mod.entityType)
-    if (typeof mod === 'object' && Array.isArray(mod?.entityTypes)) {
-      for (const t of mod.entityTypes) types.add(t)
+    if (typeof mod === 'object') {
+      if (mod?.entityType) types.add(mod.entityType)
+      if (Array.isArray(mod?.entityTypes)) {
+        for (const t of mod.entityTypes) types.add(t)
+      }
+      if (Array.isArray(mod?.entities)) {
+        for (const e of mod.entities) if (e?.entityType) types.add(e.entityType)
+      }
     }
   }
   return types

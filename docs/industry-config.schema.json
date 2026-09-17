@@ -217,6 +217,44 @@
           },
           {
             "type": "object",
+            "description": "A grid-list page showing multiple entity types side-by-side.",
+            "required": ["id", "template", "entities"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "label": { "type": "string" },
+              "icon": { "type": "string" },
+              "template": { "const": "entity-grid-list" },
+              "entities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "entityType"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": { "type": "string" },
+                    "entityType": { "type": "string" },
+                    "label": { "type": "string" },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "label"],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": { "type": "string" },
+                          "label": { "type": "string" },
+                          "subfields": { "type": "array", "items": { "type": "string" } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "A generic entity-template page or card — id must be unique within this list, entityType must be a key in the top-level entities map.",
             "required": ["id", "template", "entityType"],
             "additionalProperties": false,
