@@ -1465,9 +1465,11 @@ aiService:
     requests:
       cpu: "200m"
       memory: "256Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "1000m"
       memory: "1Gi"
+      ephemeral-storage: "4Gi"
   # Fault injection: simulated LLM latency (seconds)
   faultInjection:
     llmLatencyEnabled: false
