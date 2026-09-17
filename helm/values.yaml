@@ -1414,9 +1414,11 @@ movementService:
     requests:
       cpu: "100m"
       memory: "128Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "500m"
       memory: "256Mi"
+      ephemeral-storage: "4Gi"
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1915,9 +1917,11 @@ opentelemetry-collector:
     requests:
       cpu: "100m"
       memory: "256Mi"
+      ephemeral-storage: "2Gi"
     limits:
       cpu: "500m"
       memory: "1Gi"
+      ephemeral-storage: "4Gi"
 
 # ---------------------------------------------------------------------------
 # Infrastructure: Meridian log collector (DaemonSet) — DEFAULT ON for GKE Autopilot
