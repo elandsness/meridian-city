@@ -118,7 +118,7 @@ industry:
       - { id: iot, label: "Ground equipment" }
       - { id: incidents, label: "Operational incidents" }
       - { id: analytics, label: "On-time performance" }
-      - demo-control
+      - { id: demo-control, label: "Demo Control", icon: "⚙️" }
   journeyService:
     enabled: true
   home:
