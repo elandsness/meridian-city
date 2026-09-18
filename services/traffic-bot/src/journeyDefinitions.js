@@ -71,17 +71,18 @@ const JOURNEY_DEFINITIONS = {
     ]
   },
   // --- Industry Specifics ---
+  // Map these to the generic entity endpoints used by the entity engine
   flight_departure: {
     weight: 10,
     steps: [
-      { method: 'get', path: '/api/v1/flights/departures' },
-      { method: 'get', path: (ctx) => `/api/v1/flights/departure/${ctx.id}` },
+      { method: 'get', path: '/api/v1/entities/flight_departure' },
+      { method: 'get', path: (ctx) => `/api/v1/entities/flight_departure/${ctx.id}` },
     ]
   },
   passenger: {
     weight: 10,
     steps: [
-      { method: 'post', path: '/api/v1/passengers', body: () => ({ flight_id: 'fltd_123' }) },
+      { method: 'post', path: '/api/v1/entities/passenger', body: () => ({ flight_departure_id: 'fltd_123' }) },
     ]
   }
 }

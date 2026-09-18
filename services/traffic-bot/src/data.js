@@ -13,24 +13,16 @@ try {
 
 const INDUSTRY_ID = INDUSTRY_CONFIG.id || 'city'
 
-// Map generic domain paths to industry-specific ones.
-// If a key is missing, it defaults to the City path.
+// The platform uses generic API paths. The backend handles industry-specific 
+// data based on the deployment config.
 const PATH_MAP = {
-  airport: {
-    buildings: '/api/v1/airport/terminals',
-    assets: '/api/v1/airport/equipment',
-    incidents: '/api/v1/airport/incidents',
-  },
-  city: {
-    buildings: '/api/v1/city/buildings',
-    assets: '/api/v1/assets',
-    incidents: '/api/v1/incidents',
-  }
+  buildings: '/api/v1/city/buildings', 
+  assets: '/api/v1/assets',
+  incidents: '/api/v1/incidents',
 }
 
 const getPath = (key) => {
-  const industryPaths = PATH_MAP[INDUSTRY_ID] || PATH_MAP['city']
-  return industryPaths[key] || PATH_MAP['city'][key]
+  return PATH_MAP[key] || '/api/v1/unknown'
 }
 
 // ---------------------------------------------------------------------------
