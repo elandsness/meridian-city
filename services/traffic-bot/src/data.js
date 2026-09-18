@@ -1,10 +1,40 @@
 'use strict'
 
 // ---------------------------------------------------------------------------
-// Demo data pools. The City values below are the built-in fallback; an industry
-// overlay can override any pool via the INDUSTRY_DATA env var (JSON), delivered by
-// Helm from .Values.industry.data. This keeps generated traffic realistic per
-// industry with no rebuild. An empty/absent override => City defaults.
+// Industry Configuration & Mappings
+// ---------------------------------------------------------------------------
+
+let INDUSTRY_CONFIG = {}
+try {
+  if (process.env.INDUSTRY_CONFIG) INDUSTRY_CONFIG = JSON.parse(process.env.INDUSTRY_CONFIG)
+} catch (err) {
+  console.warn('[traffic-bot] INDUSTRY_CONFIG is not valid JSON:', err.message)
+}
+
+const INDUSTRY_ID = INDUSTRY_CONFIG.id || 'city'
+
+// Map generic domain paths to industry-specific ones.
+// If a key is missing, it defaults to the City path.
+const PATH_MAP = {
+  airport: {
+    buildings: '/api/v1/airport/terminals',
+    assets: '/api/v1/airport/equipment',
+    incidents: '/api/v1/airport/incidents',
+  },
+  city: {
+    buildings: '/api/v1/city/buildings',
+    assets: '/api/v1/assets',
+    incidents: '/api/v1/incidents',
+  }
+}
+
+const getPath = (key) => {
+  const industryPaths = PATH_MAP[INDUSTRY_ID] || PATH_MAP['city']
+  return industryPaths[key] || PATH_MAP['city'][key]
+}
+
+// ---------------------------------------------------------------------------
+// Demo data pools
 // ---------------------------------------------------------------------------
 
 let OVERRIDE = {}
@@ -15,7 +45,6 @@ try {
   OVERRIDE = {}
 }
 
-// Use the override array when it's a non-empty array; otherwise the City fallback.
 const pick = (key, fallback) =>
   Array.isArray(OVERRIDE[key]) && OVERRIDE[key].length ? OVERRIDE[key] : fallback
 
@@ -34,11 +63,8 @@ const LAST_NAMES = pick('lastNames', [
 ])
 
 const EMAIL_DOMAINS = pick('emailDomains', ['gmail.com', 'yahoo.com', 'outlook.com', 'meridianmail.com', 'cityresident.org'])
-
 const ZONES = pick('zones', ['zone-north', 'zone-south', 'zone-east', 'zone-west', 'zone-central'])
 
-// Service request templates — City defaults span all 5 categories for even
-// Business Events coverage; an industry overlay supplies its own set.
 const REQUEST_TEMPLATES = pick('requestTemplates', [
   { category: 'infrastructure', title: 'Pothole on Main St',        description: 'Large pothole near the intersection of Main St and Oak Ave causing vehicle damage.' },
   { category: 'infrastructure', title: 'Broken sidewalk',           description: 'Cracked and raised sidewalk panel creating a trip hazard on Elm Street.' },
@@ -59,9 +85,8 @@ const REQUEST_TEMPLATES = pick('requestTemplates', [
   { category: 'transport',      title: 'Bike lane obstruction',     description: 'Construction debris is blocking the bike lane on 2nd Avenue.' },
 ])
 
-const PRIORITIES = ['low', 'normal', 'normal', 'normal', 'high', 'urgent']  // weighted toward normal
+const PRIORITIES = ['low', 'normal', 'normal', 'normal', 'high', 'urgent']
 
-// Chatbot questions — City defaults; an industry overlay supplies its own.
 const CHAT_QUESTIONS = pick('chatQuestions', [
   'Where do I report a broken streetlight?',
   'How do I submit a service request for a pothole?',
@@ -71,7 +96,7 @@ const CHAT_QUESTIONS = pick('chatQuestions', [
   'How do I check the status of my service request?',
   'What categories of service requests can I submit?',
   'Are there any road closures today?',
-  'How do I contact the city utilities department?',
+  'How do I contact the city utilities and utilities department?',
   'What should I do if I see a downed power line?',
   'Is the recycling center open this weekend?',
   'How do I report illegal dumping in my neighborhood?',
@@ -84,10 +109,6 @@ const CHAT_QUESTIONS = pick('chatQuestions', [
   'Is there a water main break on Elm Street?',
   'How do I report graffiti?',
 ])
-
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
 
 function randomItem(arr) {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -125,4 +146,4 @@ function randomChatQuestion() {
   return randomItem(CHAT_QUESTIONS)
 }
 
-module.exports = { generateCitizen, generateServiceRequest, randomChatQuestion, ZONES }
+module.exports = { generateCitizen, generateServiceRequest, randomChatQuestion, ZONES, getPath, INDUSTRY_ID }

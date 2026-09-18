@@ -6,9 +6,9 @@ const JOURNEY_DEFINITIONS = {
   browsing: {
     weight: 25,
     steps: [
-      { method: 'get', path: '/api/v1/incidents' },
-      { method: 'get', path: '/api/v1/assets' },
-      { method: 'get', path: '/api/v1/city/buildings' },
+      { method: 'get', path: () => data.getPath('incidents') },
+      { method: 'get', path: () => data.getPath('assets') },
+      { method: 'get', path: () => data.getPath('buildings') },
     ]
   },
   accountCreation: {
@@ -35,7 +35,7 @@ const JOURNEY_DEFINITIONS = {
       },
       { 
         method: 'post', 
-        path: '/api/v1/requests', 
+        path: '/api/v1/service-requests', 
         body: (ctx) => data.generateServiceRequest(ctx.id) 
       },
     ]
@@ -68,6 +68,20 @@ const JOURNEY_DEFINITIONS = {
     weight: 8,
     steps: [
       { method: 'post', path: '/api/v1/systems/anomaly', body: { type: 'critical' } },
+    ]
+  },
+  // --- Industry Specifics ---
+  flight_departure: {
+    weight: 10,
+    steps: [
+      { method: 'get', path: '/api/v1/flights/departures' },
+      { method: 'get', path: (ctx) => `/api/v1/flights/departure/${ctx.id}` },
+    ]
+  },
+  passenger: {
+    weight: 10,
+    steps: [
+      { method: 'post', path: '/api/v1/passengers', body: () => ({ flight_id: 'fltd_123' }) },
     ]
   }
 }
