@@ -76,7 +76,7 @@ export default function EntityListPage({ entityType, fields, filters, label }) {
                     {columns.map((col) => {
                       const isObj = typeof col === 'object' && col !== null;
                       const id = isObj ? col.id : col;
-                      const subfields = isObj ? col.subfields : [];
+                      const subfields = isObj ? (col.subfields ?? []) : [];
                       return (
                         <td key={id} className="py-2.5 pr-4">
                           {subfields.length > 0 ? (
