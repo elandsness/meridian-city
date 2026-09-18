@@ -33,7 +33,6 @@ const TEMPLATES = {
 
 export const SCREENS = {
   overview: { path: '/overview', label: 'Overview', icon: '📊', component: Overview },
-  'flight-board': { path: '/flight-board', label: 'Flight Board', icon: '✈️', component: FlightBoard },
   iot: { path: '/iot', label: 'IoT Fleet', icon: '🌐', component: IoTPage },
   incidents: {
     path: '/incidents',
