@@ -27,9 +27,11 @@ public class WorkOrderService {
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * Channel 1: User-initiated Work Order (via Public Portal/API)
+     */
     @Transactional
     public WorkOrderResponse createWorkOrder(CreateWorkOrderDto request) {
-        // Use the fields actually present in the CreateWorkOrderDto record
         WorkOrder workOrder = WorkOrder.createFromRequest(
                 request.requestId(),
                 request.citizenId(),
@@ -41,10 +43,34 @@ public class WorkOrderService {
 
         workOrder = workOrderRepository.save(workOrder);
         
-        // EMIT EVENT
+        // Emit Event: work_order.created
         eventPublisher.publishEvent(workOrder.getId(), "work_order", "work_order.created");
 
-        log.info("Work order created: workOrderId={} requestId={}", workOrder.getId(), workOrder.getRequestId());
+        log.info("User-initiated work order created: workOrderId={} requestId={}", workOrder.getId(), workOrder.getRequestId());
+
+        return WorkOrderResponse.from(workOrder);
+    }
+
+    /**
+     * Channel 2: System-initiated Work Order (triggered by an Incident)
+     * This is the critical path for the Generic Engine's automated flows.
+     */
+    @Transactional
+    public WorkOrderResponse createWorkOrderFromIncident(String incidentId, String title, String department, String priority, String zoneId) {
+        WorkOrder workOrder = WorkOrder.createFromIncident(
+                incidentId,
+                title,
+                department,
+                priority,
+                zoneId
+        );
+
+        workOrder = workOrderRepository.save(workOrder);
+        
+        // Emit Event: work_order.created
+        eventPublisher.publishEvent(workOrder.getId(), "work_order", "work_order.created");
+
+        log.info("System-initiated work order created from incident: workOrderId={} incidentId={}", workOrder.getId(), incidentId);
 
         return WorkOrderResponse.from(workOrder);
     }
@@ -73,7 +99,7 @@ public class WorkOrderService {
         workOrder.setStatus(status);
         workOrder = workOrderRepository.save(workOrder);
         
-        // EMIT EVENT
+        // Emit Event: {status} (e.g., work_order.resolved)
         eventPublisher.publishEvent(workOrder.getId(), "work_order", status);
 
         log.info("Work order status updated: workOrderId={} status={}", workOrder.getId(), status);
