@@ -1,105 +1,97 @@
-'use strict'
-
-// ---------------------------------------------------------------------------
-// Industry Configuration & Mappings
-// ---------------------------------------------------------------------------
+\'use strict\'
 
 let INDUSTRY_CONFIG = {}
 try {
   if (process.env.INDUSTRY_CONFIG) INDUSTRY_CONFIG = JSON.parse(process.env.INDUSTRY_CONFIG)
 } catch (err) {
-  console.warn('[traffic-bot] INDUSTRY_CONFIG is not valid JSON:', err.message)
+  console.warn(\'[traffic-bot] INDUSTRY_CONFIG is not valid JSON:\', err.message)
 }
 
-const INDUSTRY_ID = INDUSTRY_CONFIG.id || 'city'
+// Use the config ID or default to "generic" (avoiding "city" hardcoding)
+const INDUSTRY_ID = INDUSTRY_CONFIG.id || \'generic\'
 
-// The platform uses generic API paths. The backend handles industry-specific 
-// data based on the deployment config.
+// GENERIC PLATFORM PATHS
 const PATH_MAP = {
-  buildings: '/api/v1/city/buildings', 
-  assets: '/api/v1/assets',
-  incidents: '/api/v1/incidents',
+  buildings: \'/api/v1/city/buildings\', 
+  assets: \'/api/v1/assets\',
+  incidents: \'/api/v1/incidents\',
 }
 
 const getPath = (key) => {
-  return PATH_MAP[key] || '/api/v1/unknown'
+  return PATH_MAP[key] || \'/api/v1/unknown\'
 }
-
-// ---------------------------------------------------------------------------
-// Demo data pools
-// ---------------------------------------------------------------------------
 
 let OVERRIDE = {}
 try {
   if (process.env.INDUSTRY_DATA) OVERRIDE = JSON.parse(process.env.INDUSTRY_DATA)
 } catch (err) {
-  console.warn('[traffic-bot] INDUSTRY_DATA is not valid JSON — using built-in city defaults:', err.message)
+  console.warn(\'[traffic-bot] INDUSTRY_DATA is not valid JSON:\', err.message)
   OVERRIDE = {}
 }
 
 const pick = (key, fallback) =>
   Array.isArray(OVERRIDE[key]) && OVERRIDE[key].length ? OVERRIDE[key] : fallback
 
-const FIRST_NAMES = pick('firstNames', [
-  'Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry',
-  'Iris', 'Jack', 'Karen', 'Leo', 'Maya', 'Noah', 'Olivia', 'Paul',
-  'Quinn', 'Rachel', 'Sam', 'Tara', 'Uma', 'Victor', 'Wendy', 'Xander',
-  'Yasmin', 'Zoe', 'Aaron', 'Brianna', 'Carlos', 'Diana',
+const FIRST_NAMES = pick(\'firstNames\', [
+  \'Alice\', \'Bob\', \'Carol\', \'David\', \'Emma\', \'Frank\', \'Grace\', \'Henry\',
+  \'Iris\', \'Jack\', \'Karen\', \'Leo\', \'Maya\', \'Noah\', \'Olivia\', \'Paul\',
+  \'Quinn\', \'Rachel\', \'Sam\', \'Tara\', \'Uma\', \'Victor\', \'Wendy\', \'Xander\',
+  \'Yasmin\', \'Zoe\', \'Aaron\', \'Brianna\', \'Carlos\', \'Diana\',
 ])
 
-const LAST_NAMES = pick('lastNames', [
-  'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller',
-  'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez',
-  'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin',
-  'Lee', 'Perez', 'Thompson', 'White', 'Harris',
+const LAST_NAMES = pick(\'lastNames\', [
+  \'Smith\', \'Johnson\', \'Williams\', \'Brown\', \'Jones\', \'Garcia\', \'Miller\',
+  \'Davis\', \'Rodriguez\', \'Martinez\', \'Hernandez\', \'Lopez\', \'Gonzalez\',
+  \'Wilson\', \'Anderson\', \'Thomas\', \'Taylor\', \'Moore\', \'Jackson\', \'Martin\',
+  \'Lee\', \'Perez\', \'Thompson\', \'White\', \'Harris\',
 ])
 
-const EMAIL_DOMAINS = pick('emailDomains', ['gmail.com', 'yahoo.com', 'outlook.com', 'meridianmail.com', 'cityresident.org'])
-const ZONES = pick('zones', ['zone-north', 'zone-south', 'zone-east', 'zone-west', 'zone-central'])
+const EMAIL_DOMAINS = pick(\'emailDomains\', [\'gmail.com\', \'yahoo.com\', \'outlook.com\', \'meridianmail.com\', \'generic-mail.org\'])
+const ZONES = pick(\'zones\', [\'zone-north\', \'zone-south\', \'zone-east\', \'zone-west\', \'zone-central\'])
 
-const REQUEST_TEMPLATES = pick('requestTemplates', [
-  { category: 'infrastructure', title: 'Pothole on Main St',        description: 'Large pothole near the intersection of Main St and Oak Ave causing vehicle damage.' },
-  { category: 'infrastructure', title: 'Broken sidewalk',           description: 'Cracked and raised sidewalk panel creating a trip hazard on Elm Street.' },
-  { category: 'infrastructure', title: 'Graffiti on bridge',        description: 'Graffiti has appeared on the underpass wall near Central Station.' },
-  { category: 'infrastructure', title: 'Damaged guardrail',         description: 'Guardrail on River Road bridge is bent and needs urgent repair.' },
-  { category: 'environment',    title: 'Illegal dumping',           description: 'Debris and waste illegally dumped in the vacant lot on Maple Drive.' },
-  { category: 'environment',    title: 'Fallen tree blocking path', description: 'Large fallen tree is blocking the bike path in Riverside Park.' },
-  { category: 'environment',    title: 'Overgrown vegetation',      description: 'Vegetation is encroaching on Heritage Lane, reducing visibility at the bend.' },
-  { category: 'environment',    title: 'Dead animal on road',       description: 'Dead animal on the roadway on Pine Avenue needs to be removed.' },
-  { category: 'safety',         title: 'Broken street light',       description: 'Street light on Cedar Boulevard has been out for over a week.' },
-  { category: 'safety',         title: 'Vandalism at bus stop',     description: 'Bus stop shelter at 5th and Broadway has been vandalized, glass broken.' },
-  { category: 'safety',         title: 'Abandoned vehicle',         description: 'Vehicle with no plates has been parked on Birch Street for two weeks.' },
-  { category: 'utilities',      title: 'Water leak',                description: 'Water leaking from pipe at Park Ave and 3rd Street, pavement damage visible.' },
-  { category: 'utilities',      title: 'No water pressure',         description: 'Residents on Willow Lane have experienced low water pressure for three days.' },
-  { category: 'utilities',      title: 'Street drain blocked',      description: 'Drain on the corner of Ash Road is blocked causing flooding during rain.' },
-  { category: 'transport',      title: 'Malfunctioning traffic light', description: 'Traffic lights at Oak St and Pine Ave are cycling incorrectly, causing congestion.' },
-  { category: 'transport',      title: 'Missing road sign',         description: 'Stop sign at Birch Rd and Highway 9 has been knocked down.' },
-  { category: 'transport',      title: 'Bike lane obstruction',     description: 'Construction debris is blocking the bike lane on 2nd Avenue.' },
+const REQUEST_TEMPLATES = pick(\'requestTemplates\', [
+  { category: \'infrastructure\', title: \'Pothole on Main St\',        description: \'Large pothole near the intersection of Main St and Oak Ave causing vehicle damage.\', },
+  { category: \'infrastructure\', title: \'Broken sidewalk\',           description: \'Cracked and raised sidewalk panel creating a trip hazard on Elm Street.\', },
+  { category: \'infrastructure\', title: \'Graffiti on bridge\',        description: \'Graffiti has appeared on the underpass wall near Central Station.\', },
+  { category: \'infrastructure\', title: \'Damaged guardrail\',         description: \'Guardrail on River Road bridge is bent and needs urgent repair.\', },
+  { category: \'environment\',    title: \'Illegal dumping\',           description: \'Debris and waste illegally dumped in the vacant lot on Maple Drive.\', },
+  { category: \'environment\',    title: \'Fallen tree blocking path\', description: \'Large fallen tree is blocking the bike path in Riverside Park.\', },
+  { category: \'environment\',    title: \'Overgrown vegetation\',      description: \'Vegetation is encroaching on Heritage Lane, reducing visibility at the bend.\', },
+  { category: \'environment\',    title: \'Dead animal on road\',       description: \'Dead animal on the roadway on Pine Avenue needs to be removed.\', },
+  { category: \'safety\',         title: \'Broken street light\',       description: \'Street light on Cedar Boulevard has been out for over a week.\', },
+  { category: \'safety\',         title: \'Vandalism at bus stop\',     description: \'Bus stop shelter at 5th and Broadway has been vandalized, glass broken.\', },
+  { category: \'safety\',         title: \'Abandoned vehicle\',         description: \'Vehicle with no plates has been parked on Birch Street for two weeks.\', },
+  { category: \'utilities\',      title: \'Water leak\',                description: \'Water leaking from pipe at Park Ave and 3rd Street, pavement damage visible.\', },
+  { category: \'utilities\',      title: \'No water pressure\',         description: \'Residents on Willow Lane have experienced low water pressure for three days.\', },
+  { category: \'utilities\',      title: \'Street drain blocked\',      description: \'Drain on the corner of Ash Road is blocked causing flooding during rain.\', },
+  { category: \'transport\',      title: \'Malfunctioning traffic light\', description: \'Traffic lights at Oak St and Pine Ave are cycling incorrectly, causing congestion.\', },
+  { category: \'transport\',      title: \'Missing road sign\',         description: \'Stop sign at Birch Rd and Highway 9 has been knocked down.\', },
+  { category: \'transport\',      title: \'Bike lane obstruction\',     description: \'Construction debris is blocking the bike lane on 2nd Avenue.\', },
 ])
 
-const PRIORITIES = ['low', 'normal', 'normal', 'normal', 'high', 'urgent']
+const PRIORITIES = [\'low\', \'normal\', \'normal\', \'normal\', \'high\', \'urgent\']
 
-const CHAT_QUESTIONS = pick('chatQuestions', [
-  'Where do I report a broken streetlight?',
-  'How do I submit a service request for a pothole?',
-  'What are the current active incidents in the city?',
-  'How long does it take to resolve a service request?',
-  'Is there a water outage in the north zone?',
-  'How do I check the status of my service request?',
-  'What categories of service requests can I submit?',
-  'Are there any road closures today?',
-  'How do I contact the city utilities and utilities department?',
-  'What should I do if I see a downed power line?',
-  'Is the recycling center open this weekend?',
-  'How do I report illegal dumping in my neighborhood?',
-  'Can I track my service request online?',
-  'Who do I contact about a noisy neighbor?',
-  'Is the park on Oak Avenue open during winter?',
-  'How do I apply for a street permit?',
-  'What happens after I submit a service request?',
-  'Can I attach photos to a service request?',
-  'Is there a water main break on Elm Street?',
-  'How do I report graffiti?',
+const CHAT_QUESTIONS = pick(\'chatQuestions\', [
+  \'Where do I report a broken streetlight?\',
+  \'How do I submit a service request for a pothole?\',
+  \'What are the current active incidents in the system?\',
+  \'How long does it take to resolve a service request?\',
+  \'Is there a water outage in the north zone?\',
+  \'How do I check the status of my service request?\',
+  \'What categories of service requests can I submit?\',
+  \'Are there any road closures today?\',
+  \'How do I contact the operator services and utilities department?\',
+  \'What should I do if I see a downed power line?\',
+  \'Is the recycling center open this weekend?\',
+  \'How do I report illegal dumping in my neighborhood?\',
+  \'Can I track my service request online?\',
+  \'Who do I contact about a noisy neighbor?\',
+  \'Is the park on Oak Avenue open during winter?\',
+  \'How do I apply for a street permit?\',
+  \'What happens after I submit a service request?\',
+  \'Can I attach photos to a service request?\',
+  \'Is there a water main break on Elm Street?\',
+  \'How do I report graffiti?\',
 ])
 
 function randomItem(arr) {
