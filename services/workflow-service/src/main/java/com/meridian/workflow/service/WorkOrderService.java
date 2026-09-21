@@ -29,12 +29,14 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderResponse createWorkOrder(CreateWorkOrderDto request) {
-        WorkOrder workOrder = WorkOrder.create(
-                request.incidentId(),
-                request.assetId(),
-                request.priority(),
+        // Use the fields actually present in the CreateWorkOrderDto record
+        WorkOrder workOrder = WorkOrder.createFromRequest(
+                request.requestId(),
+                request.citizenId(),
                 request.title(),
-                request.description()
+                request.department(),
+                request.priority(),
+                request.zoneId()
         );
 
         workOrder = workOrderRepository.save(workOrder);
@@ -42,7 +44,7 @@ public class WorkOrderService {
         // EMIT EVENT
         eventPublisher.publishEvent(workOrder.getId(), "work_order", "work_order.created");
 
-        log.info("Work order created: workOrderId={} incidentId={}", workOrder.getId(), workOrder.getIncidentId());
+        log.info("Work order created: workOrderId={} requestId={}", workOrder.getId(), workOrder.getRequestId());
 
         return WorkOrderResponse.from(workOrder);
     }
