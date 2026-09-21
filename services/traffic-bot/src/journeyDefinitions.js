@@ -11,7 +11,7 @@ const JOURNEY_DEFINITIONS = {
       { method: 'get', path: () => data.getPath('buildings') },
     ]
   },
-  accountCreation: {
+  'account-creation': {
     weight: 20,
     steps: [
       { 
@@ -25,7 +25,7 @@ const JOURNEY_DEFINITIONS = {
       },
     ]
   },
-  citizenRequest: {
+  'service-request': {
     weight: 25,
     steps: [
       { 
@@ -40,14 +40,14 @@ const JOURNEY_DEFINITIONS = {
       },
     ]
   },
-  storePurchase: {
+  purchase: {
     weight: 20,
     steps: [
       { method: 'get', path: '/api/v1/store/products' },
       { method: 'post', path: '/api/v1/store/orders', body: { item_id: 'prod_123', quantity: 1 } },
     ]
   },
-  payTax: {
+  'tax-payment': {
     weight: 15,
     steps: [
       { method: 'get', path: '/api/v1/taxes/balance' },
@@ -64,14 +64,13 @@ const JOURNEY_DEFINITIONS = {
       },
     ]
   },
-  injectAnomaly: {
+  'iot-incident': {
     weight: 8,
     steps: [
       { method: 'post', path: '/api/v1/systems/anomaly', body: { type: 'critical' } },
     ]
   },
   // --- Industry Specifics ---
-  // Map these to the generic entity endpoints used by the entity engine
   flight_departure: {
     weight: 10,
     steps: [
