@@ -860,7 +860,7 @@ identityService:
       # Right-sized to observed working set (~550 MiB) + headroom; the old 384Mi
       # request ran at ~143% memory-request saturation (Dynatrace OOM/saturation problem).
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -898,7 +898,7 @@ workflowService:
       cpu: "200m"
       # Right-sized to observed working set (~575 MiB) + headroom (was 384Mi → ~150% sat).
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -933,7 +933,7 @@ transactionService:
     requests:
       cpu: "200m"
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -986,7 +986,7 @@ journeyService:
     requests:
       cpu: "200m"
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -1036,7 +1036,7 @@ iotService:
     requests:
       cpu: "200m"
       memory: "512Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1Gi"
@@ -1074,7 +1074,7 @@ newsTickerService:
     requests:
       cpu: "50m"
       memory: "128Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "200m"
       memory: "256Mi"
@@ -1103,7 +1103,7 @@ weatherService:
     requests:
       cpu: "50m"
       memory: "128Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "200m"
       memory: "256Mi"
@@ -1129,7 +1129,7 @@ citizenService:
     requests:
       cpu: "200m"
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -1155,7 +1155,7 @@ commerceService:
       cpu: "200m"
       # Right-sized to observed working set (~520 MiB) + headroom (was 384Mi → ~134% sat).
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -1187,7 +1187,7 @@ billingService:
       cpu: "200m"
       # Right-sized to observed working set (~600 MiB) + headroom (was 384Mi → ~157% sat).
       memory: "768Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1536Mi"
@@ -1299,7 +1299,7 @@ passengerService:
     requests:
       cpu: "150m"
       memory: "512Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1024Mi"
@@ -1363,7 +1363,7 @@ customerEntityService:
     requests:
       cpu: "150m"
       memory: "512Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1024Mi"
@@ -1389,7 +1389,7 @@ opsEntityService:
     requests:
       cpu: "150m"
       memory: "512Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1024Mi"
@@ -1415,7 +1415,7 @@ routingService:
     requests:
       cpu: "50m"
       memory: "256Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
@@ -1442,7 +1442,7 @@ movementService:
     requests:
       cpu: "100m"
       memory: "128Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "256Mi"
@@ -1470,7 +1470,7 @@ analyticsService:
     requests:
       cpu: "100m"
       memory: "256Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
@@ -1495,7 +1495,7 @@ aiService:
     requests:
       cpu: "200m"
       memory: "256Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "1000m"
       memory: "1Gi"
@@ -1568,7 +1568,7 @@ notificationService:
     requests:
       cpu: "100m"
       memory: "128Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
@@ -1701,7 +1701,7 @@ publicPortal:
     requests:
       cpu: "100m"
       memory: "256Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
@@ -1737,7 +1737,7 @@ opsDashboard:
     requests:
       cpu: "100m"
       memory: "256Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "512Mi"
@@ -1946,7 +1946,7 @@ opentelemetry-collector:
     requests:
       cpu: "100m"
       memory: "256Mi"
-      ephemeral-storage: "2Gi"
+      ephemeral-storage: "4Gi"
     limits:
       cpu: "500m"
       memory: "2Gi"
