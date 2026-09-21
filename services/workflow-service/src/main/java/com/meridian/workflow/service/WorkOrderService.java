@@ -3,6 +3,7 @@ package com.meridian.workflow.service;
 import com.meridian.workflow.domain.WorkOrder;
 import com.meridian.workflow.dto.CreateWorkOrderDto;
 import com.meridian.workflow.dto.WorkOrderResponse;
+import com.meridian.workflow.messaging.EventPublisher;
 import com.meridian.workflow.repository.WorkOrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.OffsetDateTime;
+import java.util.List;
 
 @Service
 public class WorkOrderService {
@@ -19,27 +20,29 @@ public class WorkOrderService {
     private static final Logger log = LoggerFactory.getLogger(WorkOrderService.class);
 
     private final WorkOrderRepository workOrderRepository;
+    private final EventPublisher eventPublisher;
 
-    public WorkOrderService(WorkOrderRepository workOrderRepository) {
+    public WorkOrderService(WorkOrderRepository workOrderRepository, EventPublisher eventPublisher) {
         this.workOrderRepository = workOrderRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
     public WorkOrderResponse createWorkOrder(CreateWorkOrderDto request) {
-        requireField(request.title(), "title");
-
-        WorkOrder workOrder = WorkOrder.createFromRequest(
-                request.requestId(),
-                request.citizenId(),
-                request.title(),
-                request.department(),
+        WorkOrder workOrder = WorkOrder.create(
+                request.incidentId(),
+                request.assetId(),
                 request.priority(),
-                request.zoneId()
+                request.title(),
+                request.description()
         );
 
         workOrder = workOrderRepository.save(workOrder);
+        
+        // EMIT EVENT
+        eventPublisher.publishEvent(workOrder.getId(), "work_order", "work_order.created");
 
-        log.info("Work order created: workOrderId={} requestId={}", workOrder.getId(), workOrder.getRequestId());
+        log.info("Work order created: workOrderId={} incidentId={}", workOrder.getId(), workOrder.getIncidentId());
 
         return WorkOrderResponse.from(workOrder);
     }
@@ -53,7 +56,7 @@ public class WorkOrderService {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<WorkOrderResponse> listByStatus(String status) {
+    public List<WorkOrderResponse> listByStatus(String status) {
         return workOrderRepository.findByStatus(status).stream()
                 .map(WorkOrderResponse::from)
                 .toList();
@@ -66,21 +69,13 @@ public class WorkOrderService {
                         HttpStatus.NOT_FOUND, "Work order not found: " + id));
 
         workOrder.setStatus(status);
-
-        if ("resolved".equals(status) || "closed".equals(status)) {
-            workOrder.setResolvedAt(OffsetDateTime.now());
-        }
-
         workOrder = workOrderRepository.save(workOrder);
+        
+        // EMIT EVENT
+        eventPublisher.publishEvent(workOrder.getId(), "work_order", status);
 
         log.info("Work order status updated: workOrderId={} status={}", workOrder.getId(), status);
 
         return WorkOrderResponse.from(workOrder);
-    }
-
-    private static void requireField(String value, String name) {
-        if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, name + " is required");
-        }
     }
 }

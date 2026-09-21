@@ -3,6 +3,7 @@ package com.meridian.workflow.service;
 import com.meridian.workflow.domain.Incident;
 import com.meridian.workflow.dto.CreateIncidentDto;
 import com.meridian.workflow.dto.IncidentResponse;
+import com.meridian.workflow.messaging.EventPublisher;
 import com.meridian.workflow.repository.IncidentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,9 +21,11 @@ public class IncidentService {
     private static final Logger log = LoggerFactory.getLogger(IncidentService.class);
 
     private final IncidentRepository incidentRepository;
+    private final EventPublisher eventPublisher;
 
-    public IncidentService(IncidentRepository incidentRepository) {
+    public IncidentService(IncidentRepository incidentRepository, EventPublisher eventPublisher) {
         this.incidentRepository = incidentRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -38,6 +41,9 @@ public class IncidentService {
         );
 
         incident = incidentRepository.save(incident);
+        
+        // EMIT EVENT
+        eventPublisher.publishEvent(incident.getId(), "incident", "incident.detecting");
 
         log.info("Incident created: incidentId={} source={}", incident.getId(), incident.getSource());
 
@@ -72,6 +78,9 @@ public class IncidentService {
         }
 
         incident = incidentRepository.save(incident);
+        
+        // EMIT EVENT
+        eventPublisher.publishEvent(incident.getId(), "incident", status);
 
         log.info("Incident status updated: incidentId={} status={}", incident.getId(), status);
 
