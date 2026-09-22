@@ -1,3 +1,5 @@
+
+
 """
 KPI computation for analytics-service.
 Derived from the Generic Entity Engine configuration.
@@ -7,6 +9,7 @@ import logging
 import os
 import json
 from datetime import datetime, timezone
+from typing import Any
 from .db import get_pool, safe_fetchval
 from .fault import fault_state
 
@@ -36,17 +39,23 @@ async def compute_kpis() -> dict:
     await fault_state.maybe_delay()
     
     # Derive the state lists from the config
+    config = load_industry_config()
+    terminology = config.get("terminology", {})
+    
+    req_type = terminology.get("request", "service_request")
+    inc_type = terminology.get("incident", "incident")
+    
     # For requests: terminal = resolved/closed
-    request_resolved_states = get_states_by_property("service_request", "terminal")
+    request_resolved_states = get_states_by_property(req_type, "terminal")
     # For incidents: terminal = resolved/closed
-    incident_resolved_states = get_states_by_property("incident", "terminal")
+    incident_resolved_states = get_states_by_property(inc_type, "terminal")
     
     pool = await get_pool()
     async with pool.acquire() as conn:
         # 1. Requests Today
-        requests_today = await safe_fetchval(conn, """
+        requests_today = await safe_fetchval(conn, f"""
             SELECT COUNT(*) FROM entities.entity
-            WHERE entity_type = 'service_request'
+            WHERE entity_type = '{req_type}'
               AND created_at >= CURRENT_DATE
         """)
 
@@ -55,7 +64,7 @@ async def compute_kpis() -> dict:
         resolved_list = tuple(request_resolved_states) if request_resolved_states else ("'NONE'",)
         requests_open = await safe_fetchval(conn, f"""
             SELECT COUNT(*) FROM entities.entity
-            WHERE entity_type = 'service_request'
+            WHERE entity_type = '{req_type}'
               AND state NOT IN {resolved_list}
         """)
 
@@ -63,7 +72,7 @@ async def compute_kpis() -> dict:
         resolved_list_str = ",".join([f"'{s}'" for s in request_resolved_states]) if request_resolved_states else "''"
         requests_resolved_today = await safe_fetchval(conn, f"""
             SELECT COUNT(*) FROM entities.entity
-            WHERE entity_type = 'service_request'
+            WHERE entity_type = '{req_type}'
               AND state IN ({resolved_list_str})
               AND updated_at >= CURRENT_DATE
         """)
@@ -72,28 +81,26 @@ async def compute_kpis() -> dict:
         inc_resolved_list = tuple(incident_resolved_states) if incident_resolved_states else ("'NONE'",)
         incidents_open = await safe_fetchval(conn, f"""
             SELECT COUNT(*) FROM entities.entity
-            WHERE entity_type = 'incident'
+            WHERE entity_type = '{inc_type}'
               AND state NOT IN {inc_resolved_list}
         """)
 
         # 5. IoT Anomalies (Incidents with source='iot' created in 24h)
-        # Note: We assume 'source' is a field in the entity table for incidents.
-        iot_anomalies_24h = await safe_fetchval(conn, """
+        iot_anomalies_24h = await safe_fetchval(conn, f"""
             SELECT COUNT(*) FROM entities.entity
-            WHERE entity_type = 'incident'
+            WHERE entity_type = '{inc_type}'
               AND (links->>'source' = 'iot' OR source = 'iot')
               AND created_at >= NOW() - INTERVAL '24 hours'
         """)
 
         # 6. Avg Resolution Time (Last 30 days)
-        # Based on entities that reached a terminal state
         avg_resolution_minutes_raw = await safe_fetchval(conn, f"""
             SELECT COALESCE(
                 EXTRACT(EPOCH FROM AVG(updated_at - created_at)) / 60,
                 0
             )
             FROM entities.entity
-            WHERE entity_type = 'service_request'
+            WHERE entity_type = '{req_type}'
               AND state IN ({resolved_list_str})
               AND updated_at >= NOW() - INTERVAL '30 days'
         """, default=0.0)

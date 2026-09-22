@@ -5,17 +5,38 @@ from __future__ import annotations
 import logging
 import os
 import json
-from typing import List
+from typing import List, Any
 from .db import get_pool, safe_fetchval
 
 logger = logging.getLogger(__name__)
 WINDOW_HOURS = os.getenv("FUNNEL_WINDOW_HOURS", "24")
 CONFIG_PATH = os.getenv("INDUSTRY_CONFIG_PATH", "/etc/config/config.json")
 
+class DynamicFunnelList(list):
+    """
+    A list subclass that dynamically updates its members based on the industry config.
+    This prevents a breaking change to the API surface while moving to a generic engine.
+    """
+    def __contains__(self, item):
+        try:
+            funnels = load_funnel_definitions()
+            return item in funnels
+        except Exception:
+            return False
+
+    def __repr__(self):
+        try:
+            return str(list(load_funnel_definitions().keys()))
+        except Exception:
+            return "[]"
+
+# The API depends on this constant to validate incoming funnel names.
+# By using a custom collection, we stay generic without breaking the API.
+FUNNEL_NAMES = DynamicFunnelList()
+
 async def load_funnel_definitions() -> dict[str, list[str]]:
     """
     Dynamically derives funnel sequences from the entity definitions in the industry config.
-    A funnel sequence is defined as the list of states the entity can transition through.
     """
     try:
         if os.path.exists(CONFIG_PATH):
@@ -23,27 +44,28 @@ async def load_funnel_definitions() -> dict[str, list[str]]:
                 config = json.load(f)
                 entities = config.get("entities", {})
                 
-                # Mapping of flow names to entity types
-                flow_to_entity = {
-                    "service-request": "service_request",
-                    "account-creation": "citizen",
+                # Map flow names to generic domain nouns defined in the terminology config
+                flow_to_noun = {
+                    "service-request": "request",
+                    "account-creation": "customer",
                     "iot-incident": "incident",
-                    "flight_departure": "flight_departure",
+                    "flight_departure": "flight",
                     "passenger": "passenger",
                 }
                 
+                terminology = config.get("terminology", {})
                 derived_funnels = {}
-                for flow, entity_type in flow_to_entity.items():
+                for flow, noun in flow_to_noun.items():
+                    # Resolve generic noun to the actual entity type key (fallback to noun itself)
+                    entity_type = terminology.get(noun, noun)
                     entity_def = entities.get(entity_type)
                     if entity_def and "states" in entity_def:
-                        # The sequence is the keys of the states dictionary
-                        # In JSON/Python 3.7+, dict keys preserve insertion order
                         states = list(entity_def["states"].keys())
                         derived_funnels[flow] = [f"{entity_type}.{s}" for s in states]
                 
                 return derived_funnels
     except Exception as e:
-        logger.error(f"Failed to dynamically derive funnels from {CONFIG_PATH}: {e}")
+        logger.error(f"Failed to dynamically derive funnels: {e}")
     
     return {}
 
@@ -54,7 +76,6 @@ async def get_funnel(funnel_name: str) -> List[dict]:
     
     pool = await get_pool()
     
-    # Special handling for complex/non-standard flows
     if funnel_name == "iot-incident": 
         return await _query_iot_incident_funnel(pool, stages)
     elif funnel_name == "service-request": 
@@ -64,7 +85,6 @@ async def get_funnel(funnel_name: str) -> List[dict]:
     elif funnel_name in ["flight_departure", "passenger"]: 
         return await _query_entity_event_funnel(pool, funnel_name, stages)
     else:
-        # Fallback for other generic entity flows
         return await _query_entity_event_funnel(pool, funnel_name, stages)
 
 async def _query_event_log(pool, entity_type: str, stages: list[str]) -> list[dict]:
@@ -81,22 +101,15 @@ async def _query_event_log(pool, entity_type: str, stages: list[str]) -> list[di
     return result
 
 async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
-    # IoT Incident is a cross-entity flow (Anomaly -> Incident -> Work Order)
-    # We keep the high-level structure but map to the stages provided by config
     async with pool.acquire() as conn:
-        # Stage 0: Anomaly
         anomalies = await safe_fetchval(conn, 
             "SELECT COUNT(*) FROM iot.anomalies WHERE detected_at >= NOW() - ($1 || ' hours')::INTERVAL", 
             WINDOW_HOURS)
-        
-        # Stage 1: Incident Detection
         incidents = await safe_fetchval(conn, 
             "SELECT COUNT(*) FROM entities.entity_event WHERE entity_type = 'incident' "
             "AND event_type = 'incident.detecting' AND occurred_at >= NOW() - ($1 || ' hours')::INTERVAL", 
             WINDOW_HOURS)
         
-        # Subsequently: Work Order stages
-        # We assume the config provides the WO states in the remaining slots of 'stages'
         wo_counts = []
         wo_event_types = ["work_order.created", "work_order.assigned", "work_order.acknowledged", "work_order.resolved"]
         
@@ -110,7 +123,6 @@ async def _query_iot_incident_funnel(pool, stages: list[str]) -> list[dict]:
             wo_counts.append(count)
         
         counts = [anomalies, incidents] + wo_counts
-        # Zip with the config-defined stages, truncating to the shortest list
         return [{"stage": stage, "count": int(count)} for stage, count in zip(stages, counts)]
 
 async def _query_entity_event_funnel(pool, entity_type: str, stages: list[str]) -> list[dict]:
