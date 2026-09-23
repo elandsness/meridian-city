@@ -4,6 +4,34 @@
 industry:
   version: 1
   id: airport
+  primaryFlow: flight_departure
+  flows:
+    service-request:
+      entityType: service_request
+      stages: [created, assigned, acknowledged, resolved]
+      activeStates: [assigned, acknowledged]
+      terminalStates: [resolved]
+    account-creation:
+      entityType: citizen
+      stages: [submitted, verifying, active]
+      activeStates: [verifying]
+      terminalStates: [active]
+    iot-incident:
+      entityType: incident
+      stages: [detecting, investigating, resolved]
+      activeStates: [investigating]
+      terminalStates: [resolved]
+    flight_departure:
+      entityType: flight_departure
+      stages: [at_gate, boarding, taxiing, takeoff, departed]
+      activeStates: [at_gate, boarding, taxiing]
+      terminalStates: [departed, cancelled]
+    passenger:
+      entityType: passenger
+      stages: [checked_in, security_cleared, gate_ready, boarded, departed]
+      activeStates: [checked_in, security_cleared, gate_ready]
+      terminalStates: [departed, offloaded]
+
   company:
     name: "Meridian Airport"
     short: "Meridian"
