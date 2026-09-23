@@ -86,6 +86,7 @@ FLOW_LABELS = _load_json_env("DT_FLOW_LABELS")      # {flow key: Business Flow d
 #   - Array of full flow definitions: [{key, name, correlationID, kpiLabel, kpi, kpiCalculation, kpiEventName, steps}, ...]
 FLOW_KEYS_OR_SPECS = _load_json_env("DT_FLOWS")      # [flow key | flow spec, ...]
 ENTITY_CONFIG = _load_json_env("DT_ENTITY_CONFIG")  # {entity type id: {fields,states,transitions,...}}
+FLOWS_CONFIG = _load_json_env("DT_FLOWS_CONFIG")      # {flow_id: {entityType, stages}}
 
 # Per-instance identity. With a hash, every name carries it so concurrent installs
 # on the shared tenant stay isolated; without one we keep the legacy single-instance
