@@ -3,6 +3,7 @@ package com.meridian.identity.util;
 import net.logstash.logback.argument.StructuredArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,6 +22,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class BusinessEventLogger {
+
+@Value("${meridian.observability.correlation-id.account-creation:account.id}")
+    private String accountCorrelationId;
 
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
 

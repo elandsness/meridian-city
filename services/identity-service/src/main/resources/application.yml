@@ -46,6 +46,11 @@ management:
     health:
       show-details: always
 
+meridian:
+  observability:
+    correlation-id:
+      account-creation: account.id
+
 logging:
   level:
     com.meridian.identity: INFO

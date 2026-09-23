@@ -275,14 +275,14 @@ def routing_entry(pipeline_object_id):
 # work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
 # auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
 FLOW_SPECS = [
-    {"key": "service-request", "name": "Service Request Lifecycle", "correlationID": "service_request.id",
+    {"key": "service-request", "name": "Service Request Lifecycle", 
      "kpiLabel": "Resolved requests", "kpi": "service_request.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "service_request.resolved",
      "steps": [("Submitted", "service_request.submitted"),
                ("Validated", "service_request.validated", ["service_request.rejected"]),
                ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
                ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
-    {"key": "account-creation", "name": "Account Creation", "correlationID": "account.id",
+    {"key": "account-creation", "name": "Account Creation", 
          "kpiLabel": "Activations", "kpi": "account.id", "kpiCalculation": "lastEvent",
          "kpiEventName": "account.activated",
          "steps": [("Registration started", "account.registration_started"),
@@ -290,7 +290,7 @@ FLOW_SPECS = [
                    ("Verification sent", "account.verification_sent"),
                    ("Verified", "account.verified", ["account.verification_failed"]),
                    ("Activated", "account.activated", ["account.activation_failed"])]},
-    {"key": "identity-registration", "name": "Identity Registration", "correlationID": "citizen.id",
+    {"key": "identity-registration", "name": "Identity Registration", 
      "kpiLabel": "Registered identities", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "citizen.registered",
      "steps": [("Identity created", "citizen.registered")]},
@@ -305,24 +305,24 @@ FLOW_SPECS = [
     # were replaced by ops-entity-service/customer-entity-service -- the flow was
     # silently stuck after its first step (iot.anomaly_detected, which
     # telemetry-processor does still emit directly) for every industry using it.
-    {"key": "iot-incident", "name": "IoT Incident Lifecycle", "correlationID": "incident.id",
+    {"key": "iot-incident", "name": "IoT Incident Lifecycle", 
      "kpiLabel": "Incidents Opened", "kpi": "incident.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "incident.open",
      "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident opened", "incident.open")]},
-{"key": "iot-work-order", "name": "IoT Work Order Lifecycle", "correlationID": "work_order.id",
+{"key": "iot-work-order", "name": "IoT Work Order Lifecycle", 
      "kpiLabel": "Resolved Work Orders", "kpi": "work_order.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "work_order.resolved",
      "steps": [("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
                ("Work order acknowledged", "work_order.acknowledged"),
                ("Work order resolved", "work_order.resolved", ["work_order.escalated"])]},
-    {"key": "purchase", "name": "City Store Purchase", "correlationID": "cart.id",
+    {"key": "purchase", "name": "City Store Purchase", 
      "kpiLabel": "Revenue", "kpi": "order.total_cents", "kpiCalculation": "sum",
      "kpiEventName": "checkout.completed",
      "steps": [("Item added", "cart.item_added"),
                ("Checkout completed", "checkout.completed", ["checkout.payment_declined"]),
                ("Order packed", "order.packed"), ("Order shipped", "order.shipped"),
                ("Order delivered", "order.delivered", ["order.delivery_failed"])]},
-    {"key": "tax-payment", "name": "Tax Payment", "correlationID": "bill.id",
+    {"key": "tax-payment", "name": "Tax Payment", 
      "kpiLabel": "Tax collected", "kpi": "bill.amount_cents", "kpiCalculation": "sum",
      "kpiEventName": "tax.payment_completed",
      "steps": [("Bill issued", "tax.bill_issued"),
@@ -467,8 +467,8 @@ def _flow_keys_from_env():
     if not FLOW_KEYS_OR_SPECS:
         return None
     first = FLOW_KEYS_OR_SPECS[0]
-    if isinstance(first, dict) and "key" in first:
-        return [s["key"] for s in FLOW_KEYS_OR_SPECS]
+    if isinstance(first, dict) and "id" in first:
+        return [s["id"] for s in FLOW_KEYS_OR_SPECS]
     return FLOW_KEYS_OR_SPECS
 
 
@@ -488,8 +488,26 @@ _ACTIVE_KEYS = _flow_keys_from_env()
 # flows, some entity-config-derived ones, some fully custom -- can select
 # precisely).
 DERIVED_FLOW_SPECS = derive_flow_specs_from_entity_config()
-_LEGACY_ACTIVE = [s for s in FLOW_SPECS if s["key"] in (_ACTIVE_KEYS or DEFAULT_FLOW_KEYS)]
-_DERIVED_ACTIVE = [s for s in DERIVED_FLOW_SPECS if not _ACTIVE_KEYS or s["key"] in _ACTIVE_KEYS]
+_LEGACY_ACTIVE = []
+for s in FLOW_SPECS:
+    if s["key"] in (_ACTIVE_KEYS or DEFAULT_FLOW_KEYS):
+        spec = s.copy()
+        if isinstance(FLOW_KEYS_OR_SPECS, list):
+            override = next((o for o in FLOW_KEYS_OR_SPECS if isinstance(o, dict) and o.get("id") == s["key"]), None)
+            if override and "correlationID" in override:
+                spec["correlationID"] = override["correlationID"]
+        _LEGACY_ACTIVE.append(spec)
+
+_DERIVED_ACTIVE = []
+for s in DERIVED_FLOW_SPECS:
+    if not _ACTIVE_KEYS or s["key"] in _ACTIVE_KEYS:
+        spec = s.copy()
+        if isinstance(FLOW_KEYS_OR_SPECS, list):
+            override = next((o for o in FLOW_KEYS_OR_SPECS if isinstance(o, dict) and o.get("id") == s["key"]), None)
+            if override and "correlationID" in override:
+                spec["correlationID"] = override["correlationID"]
+        _DERIVED_ACTIVE.append(spec)
+
 _CUSTOM_ACTIVE = _custom_flow_specs_from_env()
 ACTIVE_FLOW_SPECS = _LEGACY_ACTIVE + _DERIVED_ACTIVE + _CUSTOM_ACTIVE
 

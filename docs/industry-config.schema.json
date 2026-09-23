@@ -168,8 +168,15 @@
         },
         "flows": {
           "type": "array",
-          "description": "Which business-flow keys to actually provision for this industry.",
-          "items": { "type": "string" }
+          "description": "Which business-flow keys to provision, with optional overrides for correlation IDs.",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string", "description": "The flow key (e.g. 'account-creation')." },
+              "correlationID": { "type": "string", "description": "Override for the correlation ID (e.g. 'account.id')." }
+            }
+          }
         }
       }
     }

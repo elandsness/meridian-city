@@ -203,14 +203,21 @@ function checkDynatrace(cfg) {
       .map(([id]) => id)
   )
   for (const [i, flow] of (dt.flows ?? []).entries()) {
-    if (!VALID_FLOW_IDS.has(flow) && !derivableEntityFlowIds.has(flow)) {
+    if (typeof flow !== "object" || !flow.id) {
+      errors.push(`dynatrace.flows[${i}] must be an object with an "id" (e.g. { id: "account-creation", correlationID: "account.id" })`);
+      continue;
+    }
+    if (!flow.correlationID) {
+      errors.push(`dynatrace.flows[${i}].id "${flow.id}" is missing a required "correlationID"`);
+    }
+    if (!VALID_FLOW_IDS.has(flow.id) && !derivableEntityFlowIds.has(flow.id)) {
       errors.push(
-        `dynatrace.flows[${i}] "${flow}" is not a valid flow id. ` +
+        `dynatrace.flows[${i}].id "${flow.id}" is not a valid flow id. ` +
         `Valid ids: ${[...VALID_FLOW_IDS].join(', ')}` +
         (derivableEntityFlowIds.size
           ? `, or one of this config's entity types: ${[...derivableEntityFlowIds].join(', ')}`
           : '')
-      )
+      );
     }
   }
 
