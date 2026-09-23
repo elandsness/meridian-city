@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <!-- 80s Retro Orange Gradient -->
+    <linearGradient id="gradOrange" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF983D" />
+      <stop offset="100%" stop-color="#CC5F00" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Retro Teal Neon Triangle -->
+  <polygon points="60,15 10,100 110,100" fill="none" stroke="#2EC4B6" stroke-width="8" stroke-linejoin="round" />
+  
+  <!-- Classic 80s Lightning Bolt -->
+  <polygon points="70,5 40,60 65,60 50,115 100,45 70,45" fill="url(#gradOrange)" />
+</svg>
+
