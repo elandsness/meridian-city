@@ -70,32 +70,32 @@ public class EntityFactory {
     public void recordCreation(EntityRecord record, EntityDefinition def) {
         String currentState = record.getState();
         List<String> sequence = new ArrayList<>();
-        String trace = currentState;
         
-        // Walk back from current state to the initial state using the definition's transitions.
-        while (trace != null && !trace.equals(def.getInitial())) {
+        // We use a temporary variable and a loop to rebuild the sequence.
+        // Since Java lambdas require effectively final variables, we avoid using 
+        // a variable that changes inside the loop in the filter.
+        String targetState = currentState;
+        while (targetState != null && !targetState.equals(def.getInitial())) {
+            final String currentTarget = targetState; // Create effectively final copy for lambda
             String prev = def.getTransitions().stream()
-                    .filter(t -> t.getTo().equals(trace))
+                    .filter(t -> t.getTo().equals(currentTarget))
                     .map(EntityDefinition.TransitionDef::getFrom)
                     .findFirst()
                     .orElse(null);
             if (prev == null) break;
             sequence.add(0, prev);
-            trace = prev;
+            targetState = prev;
         }
 
         OffsetDateTime now = OffsetDateTime.now();
-        // Distribute history over the last 30 to 60 minutes.
         long totalOffsetMins = 30 + ThreadLocalRandom.current().nextInt(31);
         
-        // 1. Emit the la-backend source event (null -> initial)
         OffsetDateTime firstEventTime = now.minusMinutes(totalOffsetMins);
         EntityEventRecord firstEvent = EntityEventRecord.of(record, null, def.getInitial());
         firstEvent.setOccurredAt(firstEventTime);
         eventRepository.save(firstEvent);
         eventLogger.transitioned(record, null, def, firstEventTime);
 
-        // 2. Backfill intermediate transitions with realistic staggered gaps.
         if (!sequence.isEmpty()) {
             long gapMins = totalOffsetMins / (sequence.size() + 1);
             for (int i = 0; i < sequence.size(); i++) {
@@ -109,10 +109,6 @@ public class EntityFactory {
                 eventLogger.transitioned(record, fromState, def, eventTime);
             }
         }
-        
-        // The final event (the actual state the record is created in) is emitted 
-        // at 'now' by the caller usually, but since we've backfilled up to the current state's
-        // transition, this record now possesses a perfect linear history.
     }
 
     private Object generateFieldValue(String fieldName, EntityDefinition.FieldDef fieldDef, EntityDefinition def) {
