@@ -57,13 +57,16 @@ export default function BusinessAnalytics() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Business Analytics</h1>
 
-      {flows.map((key) => (
-        <FunnelSection
-          key={key}
-          flowKey={key}
-          label={flowLabels[key] ?? toTitleCase(key)}
-        />
-      ))}
+      {flows.map((flow) => {
+        const key = typeof flow === 'object' ? flow.id : flow;
+        return (
+          <FunnelSection
+            key={key}
+            flowKey={key}
+            label={flowLabels[key] ?? toTitleCase(key)}
+          />
+        );
+      })}
     </div>
   );
 }
