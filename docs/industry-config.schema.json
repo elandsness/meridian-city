@@ -17,6 +17,10 @@
       "pattern": "^[a-z][a-z0-9-]*$",
       "description": "Short industry id, e.g. 'city', 'airport', 'energy'."
     },
+    "primaryFlow": {
+      "type": "string",
+      "description": "The main business flow to highlight in the Ops Dashboard (must be a key in the flows map)."
+    },
     "company": {
       "type": "object",
       "required": ["name"],

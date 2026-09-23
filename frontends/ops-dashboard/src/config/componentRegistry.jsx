@@ -19,7 +19,7 @@ import StatusMapPage from '../components/entity/StatusMapPage'
 
 // Home-page components (legacy homeModules keys)
 import OpsOverview from '../components/home/OpsOverview'
-import FlightSummary from '../components/home/FlightSummary'
+import PrimaryFlowSummary from '../components/home/PrimaryFlowSummary'
 
 // Widget templates from the industry-config schema's screenList $defs
 // (docs/industry-config.schema.json) -- keyed by the schema's own `template`
@@ -47,7 +47,7 @@ export const COMPONENT_REGISTRY = {
 
   // Home-page components (legacy homeModules keys)
   'ops-overview': OpsOverview,
-  'flight-summary': FlightSummary,
+  'primary-flow-summary': PrimaryFlowSummary,
 
   // Schema `template:` widget keys
   'ticker': Ticker,

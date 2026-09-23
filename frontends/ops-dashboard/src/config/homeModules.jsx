@@ -3,7 +3,7 @@
 // standard ops overview so the default dashboard is unchanged. Mirrors the public
 // portal's homeModules.jsx and the screen registry pattern.
 import OpsOverview from '../components/home/OpsOverview.jsx';
-import FlightSummary from '../components/home/FlightSummary.jsx';
+import PrimaryFlowSummary from '../components/home/PrimaryFlowSummary.jsx';
 import EntityMapCard from '../components/entity/EntityMapCard.jsx';
 import StatusMapPage from '../components/entity/StatusMapPage.jsx';
 import WelcomeHero from '../components/home/WelcomeHero.jsx';
@@ -20,7 +20,7 @@ import IotAlertsCard from '../components/home/IotAlertsCard.jsx';
 // sensible defaults that don't require per-instance configuration).
 export const HOME_MODULES = {
   'ops-overview': OpsOverview,
-  'flight-summary': FlightSummary,
+  'primary-flow-summary': PrimaryFlowSummary,
   'welcome-hero': WelcomeHero,
   'iot-alerts-card': IotAlertsCard,
 };

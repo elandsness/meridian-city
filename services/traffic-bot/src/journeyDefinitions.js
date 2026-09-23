@@ -2,7 +2,8 @@
 
 const data = require('./data')
 
-const JOURNEY_DEFINITIONS = {
+// These are the stable, cross-industry journeys
+const BASE_JOURNEYS = {
   browsing: {
     weight: 25,
     steps: [
@@ -69,21 +70,31 @@ const JOURNEY_DEFINITIONS = {
     steps: [
       { method: 'post', path: '/api/v1/systems/anomaly', body: { type: 'critical' } },
     ]
-  },
-  // --- Industry Specifics ---
-  flight_departure: {
-    weight: 10,
-    steps: [
-      { method: 'get', path: '/api/v1/entities/flight_departure' },
-      { method: 'get', path: (ctx) => `/api/v1/entities/flight_departure/${ctx.id}` },
-    ]
-  },
-  passenger: {
-    weight: 10,
-    steps: [
-      { method: 'post', path: '/api/v1/entities/passenger', body: () => ({ flight_departure_id: 'fltd_123' }) },
-    ]
   }
 }
+
+// Dynamic flow generation based on the Industry Config (passed via process.env.INDUSTRY_FLOWS)
+function generateDynamicJourneys() {
+  try {
+    const flowsConfig = JSON.parse(process.env.INDUSTRY_FLOWS || '{}')
+    const dynamic = {}
+    for (const [flowId, config] of Object.entries(flowsConfig)) {
+      const entityType = config.entityType
+      dynamic[flowId] = {
+        weight: 10,
+        steps: [
+          { method: 'get', path: `/api/v1/entities/${entityType}` },
+          { method: 'get', path: (ctx) => `/api/v1/entities/${entityType}/${ctx.id}` },
+        ]
+      }
+    }
+    return dynamic
+  } catch (e) {
+    console.error('Failed to parse INDUSTRY_FLOWS config, skipping dynamic journeys', e)
+    return {}
+  }
+}
+
+const JOURNEY_DEFINITIONS = { ...BASE_JOURNEYS, ...generateDynamicJourneys() }
 
 module.exports = { JOURNEY_DEFINITIONS }
