@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,9 +32,14 @@ public class EntityEventLogger {
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
 
     public void transitioned(EntityRecord record, String fromState, EntityDefinition def) {
+        transitioned(record, fromState, def, OffsetDateTime.now());
+    }
+
+    public void transitioned(EntityRecord record, String fromState, EntityDefinition def, OffsetDateTime timestamp) {
         String eventType = record.getEntityType() + "." + record.getState();
         List<Object> args = new ArrayList<>(List.of(
                 StructuredArguments.keyValue("event.type", eventType),
+                StructuredArguments.keyValue("event.timestamp", timestamp),
                 StructuredArguments.keyValue(record.getEntityType() + ".id", record.getId()),
                 StructuredArguments.keyValue(record.getEntityType() + ".from_state", fromState),
                 StructuredArguments.keyValue(record.getEntityType() + ".state", record.getState())));
