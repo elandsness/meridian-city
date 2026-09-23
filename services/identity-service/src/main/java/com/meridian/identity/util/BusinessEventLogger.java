@@ -33,7 +33,8 @@ public class BusinessEventLogger {
                 StructuredArguments.keyValue("event.type", "identity.registered"),
                 StructuredArguments.keyValue("identity.id", identityId),
                 StructuredArguments.keyValue("email", email),
-                StructuredArguments.keyValue("zone_id", zoneId)
+                StructuredArguments.keyValue("zone_id", zoneId),
+                StructuredArguments.keyValue("registration_source", "portal")
         );
     }
 
