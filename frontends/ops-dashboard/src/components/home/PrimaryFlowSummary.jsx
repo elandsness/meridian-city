@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import KpiTile from '../KpiTile.jsx';
 import { getEntities, unwrapEntities } from '../../api/entities.js';
-import { useConfig } from '../../context/ConfigContext.jsx';
+import { useConfig } from '../../config/ConfigContext.jsx';
 
 export default function PrimaryFlowSummary() {
   const { config } = useConfig();
