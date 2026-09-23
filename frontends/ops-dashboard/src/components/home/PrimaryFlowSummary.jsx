@@ -29,11 +29,11 @@ export default function PrimaryFlowSummary() {
   const boardingCount = items.filter((i) => i.state === 'boarding').length;
 
   return (
-    <div className=\"grid grid-cols-2 sm:gap-3 sm:grid-cols-4 gap-3\">
-      <KpiTile label={`${flowLabel} (Active)`} value={activeCount} color=\"cyan\" />
-      <KpiTile label={`${flowLabel} (Terminal)`} value={terminalCount} color=\"yellow\" />
-      <KpiTile label=\"Boarding/Processing\" value={boardingCount} color=\"green\" />
-      <KpiTile label=\"Issues\" value={items.filter(i => i.state === 'cancelled' || i.state === 'error').length} color=\"rose\" />
+    <div className="grid grid-cols-2 sm:gap-3 sm:grid-cols-4 gap-3">
+      <KpiTile label={`${flowLabel} (Active)`} value={activeCount} color="cyan" />
+      <KpiTile label={`${flowLabel} (Terminal)`} value={terminalCount} color="yellow" />
+      <KpiTile label="Boarding/Processing" value={boardingCount} color="green" />
+      <KpiTile label="Issues" value={items.filter(i => i.state === 'cancelled' || i.state === 'error').length} color="rose" />
     </div>
   );
 }
