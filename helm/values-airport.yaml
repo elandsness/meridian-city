@@ -238,9 +238,19 @@ industry:
       iot-incident: "Ground Equipment Incident Resolution"
       flight_departure: "Aircraft Turnaround"
       passenger: "Passenger Journey"
-    flows: [service-request, account-creation, iot-incident, flight_departure, passenger]
+    flows:
+      - { id: service-request, correlationID: service_request.id }
+      - { id: account-creation, correlationID: account.id }
+      - { id: iot-incident, correlationID: incident.id }
+      - { id: flight_departure, correlationID: flight_departure.id }
+      - { id: passenger, correlationID: passenger.id }
   analytics:
-    flows: [service-request, account-creation, iot-incident, flight_departure, passenger]
+    flows:
+      - { id: service-request, correlationID: service_request.id }
+      - { id: account-creation, correlationID: account.id }
+      - { id: iot-incident, correlationID: incident.id }
+      - { id: flight_departure, correlationID: flight_departure.id }
+      - { id: passenger, correlationID: passenger.id }
     flowLabels:
       service-request: "Maintenance Request Lifecycle"
       account-creation: "Passenger Registration"
