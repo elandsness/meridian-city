@@ -3,6 +3,7 @@ package com.meridian.journey.util;
 import net.logstash.logback.argument.StructuredArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,9 +31,9 @@ public class BusinessEventLogger {
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
                 StructuredArguments.keyValue(journeyType + ".id", journey.getId()),
-                StructuredArguments.keyValue(keys.getTypeKey(), journey.getEntityType()),
-                StructuredArguments.keyValue(keys.getStatusKey(), journey.getStatus()),
-                StructuredArguments.keyValue(keys.getProgressKey(), journey.getProgress())
+                StructuredArguments.keyValue("journey.type", journey.getEntityType()),
+                StructuredArguments.keyValue("journey.status", journey.getStatus()),
+                StructuredArguments.keyValue("journey.progress", journey.getProgress())
         );
     }
 }
