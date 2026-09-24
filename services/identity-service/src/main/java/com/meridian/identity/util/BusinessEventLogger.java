@@ -23,15 +23,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class BusinessEventLogger {
 
-@Value("${meridian.observability.correlation-id.account-creation:account.id}")
-    private String accountCorrelationId;
-
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
+    private final CorrelationKeyProvider keys;
+
+    public BusinessEventLogger(CorrelationKeyProvider keys) {
+        this.keys = keys;
+    }
 
     public void identityRegistered(String identityId, String email, String zoneId) {
         BUSINESS_EVENTS.info("identity.registered",
                 StructuredArguments.keyValue("event.type", "identity.registered"),
-                StructuredArguments.keyValue("identity.id", identityId),
+                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
                 StructuredArguments.keyValue("email", email),
                 StructuredArguments.keyValue("zone_id", zoneId),
                 StructuredArguments.keyValue("registration_source", "portal")
@@ -41,7 +43,7 @@ public class BusinessEventLogger {
     public void accountLifecycle(String eventType, String identityId, String email) {
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue("identity.id", identityId),
+                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
                 StructuredArguments.keyValue("email", email)
         );
     }
