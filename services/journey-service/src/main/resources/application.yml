@@ -94,3 +94,11 @@ generator:
 fault:
   failures-enabled: ${FAULT_FAILURES_ENABLED:false}
   failure-rate: ${FAULT_FAILURES_RATE:0.0}
+
+meridian:
+  observability:
+    correlation-keys:
+      journey: "journey.id"
+      type: "entity.type"
+      status: "journey.status"
+      progress: "journey.progress"
