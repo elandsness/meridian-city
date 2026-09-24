@@ -1,7 +1,10 @@
 <configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-      <customFields>{"service":"identity-service"}</customFields>
+      <customFields>{"service":"${spring.application.name}"}</customFields>
+      <!-- Force structured arguments to be treated as top-level fields -->
+      <includeContext>true</includeContext>
+      <includeMdc>true</includeContext>
     </encoder>
   </appender>
   <root level="INFO">
