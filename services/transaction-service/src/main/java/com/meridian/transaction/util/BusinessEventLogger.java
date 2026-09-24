@@ -13,19 +13,18 @@ import org.springframework.stereotype.Component;
 public class BusinessEventLogger {
 
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
-    private final CorrelationKeyProvider keys;
-
-    public BusinessEventLogger(CorrelationKeyProvider keys) {
-        this.keys = keys;
-    }
+@Value("${meridian.observability.entity-types.cart:cart}") private String cartType;
+@Value("${meridian.observability.entity-types.order:order}") private String orderType;
+@Value("${meridian.observability.entity-types.bill:bill}") private String billType;
+@Value("${meridian.observability.entity-types.identity:identity}") private String identityType;
 
     // Cart events
     public void cartItemAdded(String cartId, String identityId, String productId, int quantity) {
         String eventType = "cart.item_added";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getCartKey(), cartId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(cartType + ".id", cartId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("product.id", productId),
                 StructuredArguments.keyValue("cart.item_quantity", quantity)
         );
@@ -36,9 +35,9 @@ public class BusinessEventLogger {
         String eventType = "order.checkout_completed";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getOrderKey(), orderId),
-                StructuredArguments.keyValue(keys.getCartKey(), cartId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(orderType + ".id", orderId),
+                StructuredArguments.keyValue(cartType + ".id", cartId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("checkout.total_cents", totalCents),
                 StructuredArguments.keyValue("checkout.item_count", itemCount)
         );
@@ -48,8 +47,8 @@ public class BusinessEventLogger {
         String eventType = "cart.payment_failed";
         BUSINESS_EVENTS.warn(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getCartKey(), cartId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(cartType + ".id", cartId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("checkout.total_cents", totalCents),
                 StructuredArguments.keyValue("checkout.item_count", itemCount)
         );
@@ -60,9 +59,9 @@ public class BusinessEventLogger {
         String eventType = "order.packed";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getOrderKey(), orderId),
-                StructuredArguments.keyValue(keys.getCartKey(), cartId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId)
+                StructuredArguments.keyValue(orderType + ".id", orderId),
+                StructuredArguments.keyValue(cartType + ".id", cartId),
+                StructuredArguments.keyValue(identityType + ".id", identityId)
         );
     }
 
@@ -70,9 +69,9 @@ public class BusinessEventLogger {
         String eventType = "order.shipped";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getOrderKey(), orderId),
-                StructuredArguments.keyValue(keys.getCartKey(), cartId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(orderType + ".id", orderId),
+                StructuredArguments.keyValue(cartType + ".id", cartId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("order.carrier", carrier)
         );
     }
@@ -81,9 +80,9 @@ public class BusinessEventLogger {
         String eventType = "order.delivered";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getOrderKey(), orderId),
-                StructuredArguments.keyValue(keys.getCartKey(), cartId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId)
+                StructuredArguments.keyValue(orderType + ".id", orderId),
+                StructuredArguments.keyValue(cartType + ".id", cartId),
+                StructuredArguments.keyValue(identityType + ".id", identityId)
         );
     }
 
@@ -92,8 +91,8 @@ public class BusinessEventLogger {
         String eventType = "bill.issued";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getBillKey(), billId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(billType + ".id", billId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("bill.period", period),
                 StructuredArguments.keyValue("bill.amount_cents", amountCents)
         );
@@ -103,8 +102,8 @@ public class BusinessEventLogger {
         String eventType = "bill.payment_completed";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getBillKey(), billId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(billType + ".id", billId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("bill.amount_cents", amountCents)
         );
     }
@@ -113,8 +112,8 @@ public class BusinessEventLogger {
         String eventType = "bill.payment_failed";
         BUSINESS_EVENTS.warn(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getBillKey(), billId),
-                StructuredArguments.keyValue(keys.getIdentityKey(), identityId),
+                StructuredArguments.keyValue(billType + ".id", billId),
+                StructuredArguments.keyValue(identityType + ".id", identityId),
                 StructuredArguments.keyValue("bill.amount_cents", amountCents)
         );
     }

@@ -88,8 +88,8 @@ fault:
 
 meridian:
   observability:
-    correlation-keys:
-      cart: "cart.id"
-      order: "order.id"
-      bill: "bill.id"
-      identity: "identity.id"
+    entity-types:
+      cart: "cart"
+      order: "order"
+      bill: "bill"
+      identity: "identity"

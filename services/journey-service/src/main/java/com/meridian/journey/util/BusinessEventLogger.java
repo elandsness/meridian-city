@@ -22,17 +22,14 @@ import org.springframework.stereotype.Component;
 public class BusinessEventLogger {
 
     private static final Logger BUSINESS_EVENTS = LoggerFactory.getLogger("BusinessEvents");
-    private final CorrelationKeyProvider keys;
-
-    public BusinessEventLogger(CorrelationKeyProvider keys) {
-        this.keys = keys;
-    }
+@Value("${meridian.observability.entity-types.journey:journey}")
+    private String journeyType;
 
     public void journeyStatus(com.meridian.journey.domain.Journey journey) {
         String eventType = journey.getEntityType() + "." + journey.getStatus();
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
-                StructuredArguments.keyValue(keys.getJourneyKey(), journey.getId()),
+                StructuredArguments.keyValue(journeyType + ".id", journey.getId()),
                 StructuredArguments.keyValue(keys.getTypeKey(), journey.getEntityType()),
                 StructuredArguments.keyValue(keys.getStatusKey(), journey.getStatus()),
                 StructuredArguments.keyValue(keys.getProgressKey(), journey.getProgress())

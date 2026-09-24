@@ -97,8 +97,5 @@ fault:
 
 meridian:
   observability:
-    correlation-keys:
-      journey: "journey.id"
-      type: "entity.type"
-      status: "journey.status"
-      progress: "journey.progress"
+    entity-types:
+      journey: "journey"
