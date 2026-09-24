@@ -85,3 +85,11 @@ fault:
   payment-fail:
     enabled: ${FAULT_PAYMENT_FAIL_ENABLED:false}
     rate: ${FAULT_PAYMENT_FAIL_RATE:0.0}
+
+meridian:
+  observability:
+    correlation-keys:
+      cart: "cart.id"
+      order: "order.id"
+      bill: "bill.id"
+      identity: "identity.id"
