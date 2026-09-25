@@ -339,6 +339,26 @@ function collectHomeEntityTypes(home) {
   return types
 }
 
+function checkRuntimeOwnership(parsed, cfg) {
+  const errors = []
+  if (!cfg.entities) return errors
+
+  const entityIds = Object.keys(cfg.entities)
+  const customerOwned = (parsed?.customerEntityService?.ownedTypes ?? '').split(',').map(s => s.trim())
+  const opsOwned = (parsed?.opsEntityService?.ownedTypes ?? '').split(',').map(s => s.trim())
+
+  for (const entityId of entityIds) {
+    if (!customerOwned.includes(entityId) && !opsOwned.includes(entityId)) {
+      errors.push(
+        `Entity type \"${entityId}\" is defined in industry.entities but is not assigned to either ` +
+        `customerEntityService.ownedTypes or opsEntityService.ownedTypes. ` +
+        `This will result in a "ghost entity" that emits no business events and populates no flows.`
+      )
+    }
+  }
+  return errors
+}
+
 function checkScreens(cfg) {
   const errors = []
   const warnings = []
@@ -427,6 +447,7 @@ for (const path of files) {
     const semanticErrors = [
       ...checkEntities(cfg.entities),
       ...checkJourneyService(parsed, cfg, isValuesOverlay),
+      ...checkRuntimeOwnership(parsed, cfg),
     ]
     if (semanticErrors.length) {
       console.error(`✗ ${path}: ${semanticErrors.length} error(s) (partial overlay):`)
@@ -447,6 +468,7 @@ for (const path of files) {
     ...checkDynatrace(cfg),
     ...checkScreens(cfg),
     ...checkJourneyService(parsed, cfg, isValuesOverlay),
+    ...checkRuntimeOwnership(parsed, cfg),
   ]
   // Only surface raw AJV errors that aren't already explained by a semantic check.
   const semanticPaths = new Set(semanticErrors.map((e) => e.split(':')[0].trim()))
