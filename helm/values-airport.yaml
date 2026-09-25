@@ -85,8 +85,9 @@ industry:
   screens:
     public:
       - home
-      - { id: my-journey, label: "My Journey" }
-      - { id: service-requests, label: "Help & requests" }
+      - { id: my-journey, label: "My Journey", template: entity-journey, entityType: passenger }
+      - { id: account-status, label: "Account Status", template: entity-journey, entityType: passenger_account }
+      - { id: service-requests, label: "Help & requests", template: entity-grid-list, entityType: service_request }
       - messages
     ops:
       - overview
@@ -142,9 +143,9 @@ industry:
             - { type: text, x: 97, 'y': 428, text: "Arrivals", fill: "#475469", font-size: 11, text-anchor: middle }
             - { type: text, x: 550, 'y': 300, text: "Runway 10/28", fill: "#4b5563", font-size: 12, text-anchor: middle }
             - { type: text, x: 630, 'y': 165, text: "Taxiway Alpha", fill: "#4b5563", font-size: 11, text-anchor: middle }
-      - { id: requests, label: "Maintenance queue" }
-      - { id: iot, label: "Ground equipment" }
-      - { id: incidents, label: "Operational incidents" }
+      - { id: requests, label: "Maintenance queue", template: entity-grid-list, entityType: service_request }
+      - { id: iot, label: "Ground equipment", template: entity-grid-list, entityType: work_order }
+      - { id: incidents, label: "Operational incidents", template: entity-grid-list, entityType: incident }
       - { id: analytics, label: "On-time performance" }
       - { id: demo-control, label: "Demo Control", icon: "⚙️" }
   journeyService:
@@ -334,10 +335,6 @@ industry:
       fields:
         has_bag: { type: boolean }
         flight_departure_id: { type: ref, entity: flight_departure }
-        # Added for Account Creation flow
-        email: { type: string }
-        first_name: { type: string }
-        last_name: { type: string }
       initial: checked_in
       states:
         checked_in: { label: "Checked In", tone: blue }
@@ -346,24 +343,35 @@ industry:
         boarded: { label: "Boarded", tone: green }
         offloaded: { label: "Offloaded", tone: red, terminal: true, isError: true }
         departed: { label: "Departed", tone: green, terminal: true, isKpi: true }
-        # Account Creation states
-        submitted: { label: "Submitted", tone: slate }
-        verifying: { label: "Verifying", tone: amber }
-        active: { label: "Active", tone: green, terminal: true, isKpi: true }
-        verification_failed: { label: "Verification Failed", tone: red, terminal: true, isError: true }
-        activation_failed: { label: "Activation Failed", tone: red, terminal: true, isError: true }
       transitions:
         - { from: checked_in, to: security_cleared, timer: { minSeconds: 60, maxSeconds: 600 } }
         - { from: security_cleared, to: gate_ready, timer: { minSeconds: 120, maxSeconds: 900 } }
         - { from: gate_ready, to: offloaded, when: { faultGate: "passenger-offloaded", probability: 0.05 }, timer: { minSeconds: 120, maxSeconds: 600 } }
         - { from: gate_ready, to: boarded, timer: { minSeconds: 120, maxSeconds: 600 } }
         - { from: boarded, to: departed, timer: { minSeconds: 60, maxSeconds: 300 } }
-        # Account Creation transitions
+      generator: { strategy: simpleSteadyState, maxActive: 60, intervalMs: 25000 }
+
+    passenger_account:
+      displayName: "Passenger Account"
+      displayNamePlural: "Passenger Accounts"
+      idPrefix: "paxacc"
+      fields:
+        email: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+      initial: submitted
+      states:
+        submitted: { label: "Submitted", tone: slate }
+        verifying: { label: "Verifying", tone: amber }
+        active: { label: "Active", tone: green, terminal: true, isKpi: true }
+        verification_failed: { label: "Verification Failed", tone: red, terminal: true, isError: true }
+        activation_failed: { label: "Activation Failed", tone: red, terminal: true, isError: true }
+      transitions:
         - { from: submitted, to: verifying, timer: { minSeconds: 300, maxSeconds: 7200 } }
         - { from: verifying, to: active, timer: { minSeconds: 300, maxSeconds: 7200 }, when: { probability: 0.92 } }
         - { from: verifying, to: verification_failed, when: { faultGate: "account-verification-failed", probability: 0.05 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
         - { from: verifying, to: activation_failed, when: { faultGate: "account-activation-failed", probability: 0.05 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
-      generator: { strategy: simpleSteadyState, maxActive: 60, intervalMs: 25000 }
+      generator: { strategy: simpleSteadyState, maxActive: 15, intervalMs: 60000 }
     service_request:
       displayName: "Service Request"
       displayNamePlural: "Service Requests"
@@ -439,7 +447,7 @@ industry:
       generator: { strategy: simpleSteadyState, maxActive: 15, intervalMs: 35000 }
 
 customerEntityService:
-  ownedTypes: "passenger,service_request"
+  ownedTypes: "passenger,passenger_account,service_request"
 
 opsEntityService:
   ownedTypes: "incident,work_order,flight_departure,flight_arrival"
