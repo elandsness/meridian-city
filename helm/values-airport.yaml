@@ -350,7 +350,6 @@ industry:
         - { from: gate_ready, to: boarded, timer: { minSeconds: 120, maxSeconds: 600 } }
         - { from: boarded, to: departed, timer: { minSeconds: 60, maxSeconds: 300 } }
       generator: { strategy: simpleSteadyState, maxActive: 60, intervalMs: 25000 }
-
     passenger_account:
       displayName: "Passenger Account"
       displayNamePlural: "Passenger Accounts"
