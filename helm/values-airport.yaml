@@ -12,7 +12,7 @@ industry:
       activeStates: [assigned, acknowledged]
       terminalStates: [resolved]
     account-creation:
-      entityType: citizen
+      entityType: passenger
       stages: [submitted, verifying, active]
       activeStates: [verifying]
       terminalStates: [active]
@@ -119,29 +119,29 @@ industry:
         background:
           kind: shapes
           shapes:
-            - { type: rect, x: 5, "y": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
-            - { type: rect, x: 185, "y": 95, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, "y": 155, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, "y": 215, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, "y": 340, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, "y": 400, width: 20, height: 8, fill: "#334155", rx: 2 }
-            - { type: rect, x: 185, "y": 460, width: 20, height: 8, fill: "#334155", rx: 2 }
+            - { type: rect, x: 5, 'y': 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            - { type: rect, x: 185, 'y': 95, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: rect, x: 185, 'y': 155, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: rect, x: 185, 'y': 215, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: rect, x: 185, 'y': 340, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: rect, x: 185, 'y': 400, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: rect, x: 185, 'y': 460, width: 20, height: 8, fill: "#335533", rx: 2 }
             - { type: circle, cx: 197, cy: 99, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 159, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 219, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 344, r: 5, fill: "#60a5fa" }
             - { type: circle, cx: 197, cy: 404, r: 5, fill: "#60a5fa" }
             - { type: circle, cx: 197, cy: 464, r: 5, fill: "#60a5fa" }
-            - { type: rect, x: 205, "y": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
-            - { type: rect, x: 375, "y": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
-            - { type: line, x1: 390, "y1": 260, x2: 885, "y2": 260, stroke: "#fbbf24", "stroke-width": 1, "stroke-dasharray": "20,10" }
-            - { type: rect, x: 378, "y": 220, width: 18, height: 80, fill: "#374151", rx: 1 }
-            - { type: text, x: 97, "y": 262, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
-            - { type: text, x: 97, "y": 280, text: "Departures", fill: "#475569", "font-size": 11, "text-anchor": middle }
-            - { type: text, x: 97, "y": 410, text: "Terminal A", fill: "#64748b", "font-size": 13, "text-anchor": middle }
-            - { type: text, x: 97, "y": 428, text: "Arrivals", fill: "#475569", "font-size": 11, "text-anchor": middle }
-            - { type: text, x: 550, "y": 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
-            - { type: text, x: 630, "y": 165, text: "Taxiway Alpha", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
+            - { type: rect, x: 205, 'y': 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            - { type: rect, x: 375, 'y': 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", stroke-width: 2, rx: 2 }
+            - { type: line, x1: 390, 'y1': 260, x2: 885, 'y2': 260, stroke: "#fbbf24", stroke-width: 1, stroke-dasharray: "20,10" }
+            - { type: rect, x: 378, 'y': 220, width: 18, height: 80, fill: "#374151", rx: 1 }
+            - { type: text, x: 97, 'y': 262, text: "Terminal A", fill: "#64748b", font-size: 13, text-anchor: middle }
+            - { type: text, x: 97, 'y': 280, text: "Departures", fill: "#475469", font-size: 11, text-anchor: middle }
+            - { type: text, x: 97, 'y': 410, text: "Terminal A", fill: "#64748b", font-size: 13, text-anchor: middle }
+            - { type: text, x: 97, 'y': 428, text: "Arrivals", fill: "#475469", font-size: 11, text-anchor: middle }
+            - { type: text, x: 550, 'y': 300, text: "Runway 10/28", fill: "#4b5563", font-size: 12, text-anchor: middle }
+            - { type: text, x: 630, 'y': 165, text: "Taxiway Alpha", fill: "#4b5563", font-size: 11, text-anchor: middle }
       - { id: requests, label: "Maintenance queue" }
       - { id: iot, label: "Ground equipment" }
       - { id: incidents, label: "Operational incidents" }
@@ -160,20 +160,20 @@ industry:
         background:
           kind: shapes
           shapes:
-            - { type: rect, x: 5, "y": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            - { type: rect, x: 5, 'y': 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
             - { type: circle, cx: 197, cy: 99, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 159, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 219, r: 5, fill: "#3b82f6" }
             - { type: circle, cx: 197, cy: 344, r: 5, fill: "#60a5fa" }
             - { type: circle, cx: 197, cy: 404, r: 5, fill: "#60a5fa" }
             - { type: circle, cx: 197, cy: 464, r: 5, fill: "#60a5fa" }
-            - { type: rect, x: 205, "y": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
-            - { type: rect, x: 375, "y": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", "stroke-width": 2, rx: 2 }
-            - { type: line, x1: 390, "y1": 260, x2: 885, "y2": 260, stroke: "#fbbf24", "stroke-width": 1, "stroke-dasharray": "20,10" }
-            - { type: rect, x: 378, "y": 220, width: 18, height: 80, fill: "#374151", rx: 1 }
-            - { type: text, x: 97, "y": 262, text: "Terminal", fill: "#64748b", "font-size": 13, "text-anchor": middle }
-            - { type: text, x: 630, "y": 165, text: "Taxiway", fill: "#4b5563", "font-size": 11, "text-anchor": middle }
-            - { type: text, x: 630, "y": 300, text: "Runway 10/28", fill: "#4b5563", "font-size": 12, "text-anchor": middle }
+            - { type: rect, x: 205, 'y': 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            - { type: rect, x: 375, 'y': 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", stroke-width: 2, rx: 2 }
+            - { type: line, x1: 390, 'y1': 260, x2: 885, 'y2': 260, stroke: "#fbbf24", stroke-width: 1, stroke-dasharray: "20,10" }
+            - { type: rect, x: 378, 'y': 220, width: 18, height: 80, fill: "#374151", rx: 1 }
+            - { type: text, x: 97, 'y': 262, text: "Terminal", fill: "#64748b", font-size: 13, text-anchor: middle }
+            - { type: text, x: 630, 'y': 165, text: "Taxiway", fill: "#4b5563", font-size: 11, text-anchor: middle }
+            - { type: text, x: 630, 'y': 300, text: "Runway 10/28", fill: "#4b5563", font-size: 12, text-anchor: middle }
       - my-journey
       - quick-actions
       - id: airport-news
@@ -286,12 +286,12 @@ industry:
       computed:
         position:
           waypoints:
-            at_gate:   { x: 197, "y": 99 }
-            boarding:  { x: 197, "y": 159 }
-            taxiing:   { x: 310, "y": 182 }
-            takeoff:   { x: 620, "y": 260 }
-            departed:  { x: 895, "y": 240 }
-            cancelled: { x: 197, "y": 219 }
+            at_gate:   { x: 197, 'y': 99 }
+            boarding:  { x: 197, 'y': 159 }
+            taxiing:   { x: 310, 'y': 182 }
+            takeoff:   { x: 620, 'y': 260 }
+            departed:  { x: 895, 'y': 240 }
+            cancelled: { x: 197, 'y': 219 }
       generator: { strategy: simpleSteadyState, maxActive: 8, intervalMs: 20000 }
     flight_arrival:
       displayName: "Arrival"
@@ -320,12 +320,12 @@ industry:
       computed:
         position:
           waypoints:
-            approach: { x: 895, "y": 280 }
-            landing:  { x: 560, "y": 260 }
-            taxi_in:  { x: 290, "y": 182 }
-            at_gate:  { x: 197, "y": 344 }
-            arrived:  { x: 197, "y": 404 }
-            diverted: { x: 680, "y": 130 }
+            approach: { x: 895, 'y': 280 }
+            landing:  { x: 560, 'y': 260 }
+            taxi_in:  { x: 290, 'y': 182 }
+            at_gate:  { x: 197, 'y': 344 }
+            arrived:  { x: 197, 'y': 404 }
+            diverted: { x: 680, 'y': 130 }
       generator: { strategy: simpleSteadyState, maxActive: 8, intervalMs: 25000 }
     passenger:
       displayName: "Passenger"
@@ -334,6 +334,10 @@ industry:
       fields:
         has_bag: { type: boolean }
         flight_departure_id: { type: ref, entity: flight_departure }
+        # Added for Account Creation flow
+        email: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
       initial: checked_in
       states:
         checked_in: { label: "Checked In", tone: blue }
@@ -342,15 +346,100 @@ industry:
         boarded: { label: "Boarded", tone: green }
         offloaded: { label: "Offloaded", tone: red, terminal: true, isError: true }
         departed: { label: "Departed", tone: green, terminal: true, isKpi: true }
+        # Account Creation states
+        submitted: { label: "Submitted", tone: slate }
+        verifying: { label: "Verifying", tone: amber }
+        active: { label: "Active", tone: green, terminal: true, isKpi: true }
+        verification_failed: { label: "Verification Failed", tone: red, terminal: true, isError: true }
+        activation_failed: { label: "Activation Failed", tone: red, terminal: true, isError: true }
       transitions:
         - { from: checked_in, to: security_cleared, timer: { minSeconds: 60, maxSeconds: 600 } }
         - { from: security_cleared, to: gate_ready, timer: { minSeconds: 120, maxSeconds: 900 } }
         - { from: gate_ready, to: offloaded, when: { faultGate: "passenger-offloaded", probability: 0.05 }, timer: { minSeconds: 120, maxSeconds: 600 } }
         - { from: gate_ready, to: boarded, timer: { minSeconds: 120, maxSeconds: 600 } }
         - { from: boarded, to: departed, timer: { minSeconds: 60, maxSeconds: 300 } }
+        # Account Creation transitions
+        - { from: submitted, to: verifying, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: verifying, to: active, timer: { minSeconds: 300, maxSeconds: 7200 }, when: { probability: 0.92 } }
+        - { from: verifying, to: verification_failed, when: { faultGate: "account-verification-failed", probability: 0.05 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: verifying, to: activation_failed, when: { faultGate: "account-activation-failed", probability: 0.05 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
+      generator: { strategy: simpleSteadyState, maxActive: 60, intervalMs: 25000 }
+    service_request:
+      displayName: "Service Request"
+      displayNamePlural: "Service Requests"
+      idPrefix: "req"
+      fields:
+        passenger_id: { type: string }
+        category: { type: string }
+        priority: { type: enum, values: [low, normal, high, urgent], default: normal }
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+        assigned_department: { type: string }
+        assigned_to: { type: string }
+      initial: submitted
+      states:
+        submitted: { label: "Submitted", tone: slate }
+        rejected: { label: "Rejected", tone: red, terminal: true, isError: true }
+        validated: { label: "Validated", tone: blue }
+        in_progress: { label: "In Progress", tone: amber, isKpi: true }
+        resolved: { label: "Resolved", tone: green, terminal: true, isKpi: true }
+        abandoned: { label: "Abandoned", tone: slate, terminal: true }
+      transitions:
+        - { from: submitted, to: validated, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: submitted, to: rejected, when: { faultGate: "service-request-rejected", probability: 0.1 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: validated, to: in_progress, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: in_progress, to: resolved, when: { probability: 0.88 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: in_progress, to: abandoned, timer: { minSeconds: 300, maxSeconds: 7200 } }
+      generator: { strategy: simpleSteadyState, maxActive: 15, intervalMs: 30000 }
+    incident:
+      displayName: "Incident"
+      displayNamePlural: "Incidents"
+      idPrefix: "inc"
+      fields:
+        asset_id: { type: string }
+        source: { type: enum, values: [manual, iot], default: manual }
+        severity: { type: enum, values: [low, medium, high, critical], default: medium }
+        title: { type: string }
+        description: { type: string }
+        zone_id: { type: string }
+      initial: detecting
+      states:
+        detecting: { label: "Detecting", tone: amber }
+        open: { label: "Open", tone: red, isKpi: true }
+        resolved: { label: "Resolved", tone: green, terminal: true, isKpi: true, externallyTriggered: true }
+      transitions:
+        - { from: detecting, to: open, timer: { minSeconds: 5, maxSeconds: 30 } }
+        - { from: open, to: resolved, timer: { minSeconds: 3600, maxSeconds: 7200 } }
+      generator: { strategy: simpleSteadyState, maxActive: 10, intervalMs: 45000 }
+    work_order:
+      displayName: "Work Order"
+      displayNamePlural: "Work Orders"
+      idPrefix: "wo"
+      fields:
+        incident_id: { type: ref, entity: incident }
+        request_id: { type: string }
+        title: { type: string }
+        assigned_department: { type: string }
+        assigned_to: { type: string }
+        priority: { type: enum, values: [normal, high, urgent], default: normal }
+        zone_id: { type: string }
+      initial: created
+      states:
+        created: { label: "Created", tone: slate }
+        assigned: { label: "Assigned", tone: blue }
+        acknowledged: { label: "Acknowledged", tone: amber }
+        resolved: { label: "Resolved", tone: green, terminal: true, isKpi: true }
+        escalated: { label: "Escalated", tone: red, terminal: true, isError: true }
+      transitions:
+        - { from: created, to: assigned, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: assigned, to: acknowledged, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: acknowledged, to: resolved, when: { probability: 0.85 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
+        - { from: acknowledged, to: escalated, when: { faultGate: "work-order-escalated", probability: 0.1 }, timer: { minSeconds: 300, maxSeconds: 7200 } }
+      generator: { strategy: simpleSteadyState, maxActive: 15, intervalMs: 35000 }
 
 customerEntityService:
-  ownedTypes: "citizen,service_request,bill,cart,passenger"
+  ownedTypes: "passenger,service_request"
 
 opsEntityService:
   ownedTypes: "incident,work_order,flight_departure,flight_arrival"
