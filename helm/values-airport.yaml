@@ -12,7 +12,7 @@ industry:
       activeStates: [assigned, acknowledged]
       terminalStates: [resolved]
     account-creation:
-      entityType: passenger
+      entityType: passenger_account
       stages: [submitted, verifying, active]
       activeStates: [verifying]
       terminalStates: [active]
