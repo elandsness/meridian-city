@@ -1,100 +1,44 @@
 'use strict'
 
-const data = require('./data')
+const blueprints = require('./blueprints')
+const config = require('./config')
 
-// These are the stable, cross-industry journeys
-const BASE_JOURNEYS = {
-  browsing: {
-    weight: 25,
-    steps: [
-      { method: 'get', path: () => data.getPath('incidents') },
-      { method: 'get', path: () => data.getPath('assets') },
-      { method: 'get', path: () => data.getPath('buildings') },
-    ]
-  },
-  'account-creation': {
-    weight: 20,
-    steps: [
-      { 
-        method: 'post', 
-        path: '/api/v1/citizens', 
-        body: () => data.generateCitizen() 
-      },
-      { 
-        method: 'get', 
-        path: (ctx) => `/api/v1/citizens/${ctx.id}` 
-      },
-    ]
-  },
-  'service-request': {
-    weight: 25,
-    steps: [
-      { 
-        method: 'post', 
-        path: '/api/v1/citizens', 
-        body: () => data.generateCitizen() 
-      },
-      { 
-        method: 'post', 
-        path: '/api/v1/service-requests', 
-        body: (ctx) => data.generateServiceRequest(ctx.id) 
-      },
-    ]
-  },
-  purchase: {
-    weight: 20,
-    steps: [
-      { method: 'get', path: '/api/v1/store/products' },
-      { method: 'post', path: '/api/v1/store/orders', body: { item_id: 'prod_123', quantity: 1 } },
-    ]
-  },
-  'tax-payment': {
-    weight: 15,
-    steps: [
-      { method: 'get', path: '/api/v1/taxes/balance' },
-      { method: 'post', path: '/api/v1/taxes/payment', body: { amount: 100 } },
-    ]
-  },
-  chatbot: {
-    weight: 5,
-    steps: [
-      { 
-        method: 'post', 
-        path: '/api/v1/chat', 
-        body: () => ({ question: data.randomChatQuestion() }) 
-      },
-    ]
-  },
-  'iot-incident': {
-    weight: 8,
-    steps: [
-      { method: 'post', path: '/api/v1/systems/anomaly', body: { type: 'critical' } },
-    ]
-  }
+/**
+ * Map the a business flow ID (from INDUSTRY_CONFIG) to a Behavioral Blueprint.
+ */
+const FLOW_TO_BLUEPRINT_MAP = {
+  'account-creation': 'registration',
+  'service-request':  'serviceRequest',
+  'browsing':         'browsing',
+  'chatbot':          'chatbot'
 }
 
-// Dynamic flow generation based on the Industry Config (passed via process.env.INDUSTRY_FLOWS)
-function generateDynamicJourneys() {
-  try {
-    const flowsConfig = JSON.parse(process.env.INDUSTRY_FLOWS || '{}')
-    const dynamic = {}
-    for (const [flowId, config] of Object.entries(flowsConfig)) {
-      const entityType = config.entityType
-      dynamic[flowId] = {
-        weight: 10,
-        steps: [
-          { method: 'get', path: `/api/v1/entities/${entityType}` },
-          { method: 'get', path: (ctx) => `/api/v1/entities/${entityType}/${ctx.id}` },
-        ]
+/**
+ * Derive the journey definitions entirely from the industry configuration.
+ * A flow is simulated only if it is listed in the industry's analytics flows.
+ */
+function resolveJourneys() {
+  const flows = config.INDUSTRY_CONFIG.analytics?.flows || []
+  const definitions = {}
+
+  flows.forEach(flowId => {
+    const blueprintKey = FLOW_TO_BLUEPRINT_MAP[flowId]
+    const blueprint = blueprints[blueprintKey]
+
+    if (blueprint) {
+      definitions[flowId] = {
+        name: blueprint.name,
+        weight: 25, // Default balanced weight
+        steps: blueprint.steps
       }
+    } else {
+      console.warn(`[journeyDefinitions] No blueprint found for flow: ${flowId}`)
     }
-    return dynamic
-  } catch (e) {
-    console.error('Failed to parse INDUSTRY_FLOWS config, skipping dynamic journeys', e)
-    return {}
-  }
+  })
+
+  return definitions
 }
 
-const JOURNEY_DEFINITIONS = { ...BASE_JOURNEYS, ...generateDynamicJourneys() }
+const JOURNEY_DEFINITIONS = resolveJourneys()
 
 module.exports = { JOURNEY_DEFINITIONS }
