@@ -10,7 +10,8 @@ module.exports = {
 
   // Strictly config-driven: a journey is enabled ONLY if its ID is in the industry flows list.
   SCENARIOS: flows.reduce((acc, flow) => {
-    acc[flow] = true;
+    const id = typeof flow === 'string' ? flow : flow.id;
+    if (id) acc[id] = true;
     return acc;
   }, {}),
 

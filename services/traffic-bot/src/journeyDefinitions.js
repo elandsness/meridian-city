@@ -21,7 +21,10 @@ function resolveJourneys() {
   const flows = config.INDUSTRY_CONFIG.analytics?.flows || []
   const definitions = {}
 
-  flows.forEach(flowId => {
+  flows.forEach(flow => {
+    const flowId = typeof flow === 'string' ? flow : flow.id;
+    if (!flowId) return;
+
     const blueprintKey = FLOW_TO_BLUEPRINT_MAP[flowId]
     const blueprint = blueprints[blueprintKey]
 
