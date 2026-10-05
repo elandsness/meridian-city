@@ -93,7 +93,7 @@ public class EntityFactory {
         EntityEventRecord firstEvent = EntityEventRecord.of(record, null, def.getInitial());
         firstEvent.setOccurredAt(firstEventTime);
         eventRepository.save(firstEvent);
-        eventLogger.transitioned(record, null, def, firstEventTime);
+        eventLogger.transitioned(record, null, null, def, firstEventTime);
 
         if (!sequence.isEmpty()) {
             long gapMins = totalOffsetMins / (sequence.size() + 1);
