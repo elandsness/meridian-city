@@ -1,6 +1,4 @@
-# =============================================================================
-# Meridian Airport — High-Fidelity Semantic Configuration
-# =============================================================================
+
 industry:
   version: 1
   id: airport
@@ -87,18 +85,18 @@ industry:
         background:
           kind: "shapes"
           shapes:
-            - { type: "rect", x: 5, \"y\": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
-            - { type: "rect", x: 185, \"y\": 95, width: 20, height: 8, fill: "#335533", rx: 2 }
-            - { type: "rect", x: 185, \"y\": 155, width: 20, height: 8, fill: "#335533", rx: 2 }
-            - { type: "rect", x: 185, \"y\": 215, width: 20, height: 8, fill: "#335533", rx: 2 }
-            - { type: "rect", x: 185, \"y\": 340, width: 20, height: 8, fill: "#335533", rx: 2 }
-            - { type: "rect", x: 185, \"y\": 400, width: 20, height: 8, fill: "#335533", rx: 2 }
-            - { type: "rect", x: 185, \"y\": 460, width: 20, height: 8, fill: "#335533", rx: 2 }
-            - { type: "rect", x: 205, \"y\": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
-            - { type: "rect", x: 375, \"y\": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", stroke-width: 2, rx: 2 }
-            - { type: "line", x1: 390, \"y1\": 260, x2: 885, \"y2\": 260, stroke: "#fbbf24", stroke-width: 1, stroke-dasharray: "20,10" }
-            - { type: "text", x: 97, \"y\": 262, text: "Terminal A", fill: "#64748b", font-size: 13, text-anchor: middle }
-            - { type: "text", x: 550, \"y\": 300, text: "Runway 10/28", fill: "#4b5563", font-size: 12, text-anchor: middle }
+            - { type: "rect", x: 5, "y": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            - { type: "rect", x: 185, "y": 95, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: "rect", x: 185, "y": 155, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: "rect", x: 185, "y": 215, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: "rect", x: 185, "y": 340, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: "rect", x: 185, "y": 400, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: "rect", x: 185, "y": 460, width: 20, height: 8, fill: "#335533", rx: 2 }
+            - { type: "rect", x: 205, "y": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            - { type: "rect", x: 375, "y": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", stroke-width: 2, rx: 2 }
+            - { type: "line", x1: 390, "y1": 260, x2: 885, "y2": 260, stroke: "#fbbf24", stroke-width: 1, stroke-dasharray: "20,10" }
+            - { type: "text", x: 97, "y": 262, text: "Terminal A", fill: "#64748b", font-size: 13, text-anchor: middle }
+            - { type: "text", x: 550, "y": 300, text: "Runway 10/28", fill: "#4b5563", font-size: 12, text-anchor: middle }
       - id: "turnaround-ops"
         label: "Aircraft Turnaround"
         template: "entity-list"
@@ -121,9 +119,9 @@ industry:
         background:
           kind: "shapes"
           shapes:
-            - { type: "rect", x: 5, \"y\": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
-            - { type: "rect", x: 205, \"y\": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
-            - { type: "rect", x: 375, \"y\": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", stroke-width: 2, rx: 2 }
+            - { type: "rect", x: 5, "y": 40, width: 185, height: 440, fill: "#1e293b", rx: 6 }
+            - { type: "rect", x: 205, "y": 172, width: 685, height: 20, fill: "#374151", rx: 3 }
+            - { type: "rect", x: 375, "y": 216, width: 515, height: 88, fill: "#1f2937", stroke: "#4b5563", stroke-width: 2, rx: 2 }
       - "my-journey"
     ops:
       - { id: "ops-overview", label: "Overview" }
@@ -157,13 +155,13 @@ industry:
     flowLabels:
       "passenger-journey": "Passenger Journey"
       "aircraft-turnaround": "Aircraft Turnaround"
-      "luggage-flow": "Luggage Logistics"
-      "flight-departure": "Departure Flow"
+      "luggage": "Luggage Logistics"
+      "flight_departure": "Departure Flow"
       "flight_arrival": "Arrival Flow"
     flows:
       - { id: "passenger-journey", correlationID: "passenger.id" }
       - { id: "aircraft-turnaround", correlationID: "aircraft.id" }
-      - { id: "luggage-flow", correlationID: "luggage.id" }
+      - { id: "luggage", correlationID: "luggage.id" }
       - { id: "flight_departure", correlationID: "flight_departure.id" }
       - { id: "flight_arrival", correlationID: "flight_arrival.id" }
 
@@ -178,7 +176,7 @@ industry:
       initial: "checked_in"
       states:
         checked_in: { label: "Checked In", tone: "blue", glyph: "🎟️" }
-        bag_drop: { label: "Baggage Drop", tone: "blue", glyph: "<0xF0><0x9F><0xA7><0xB3>" }
+        bag_drop: { label: "Baggage Drop", tone: "blue", glyph: "💼" }
         security_cleared: { label: "Security Cleared", tone: "blue", glyph: "🛡️" }
         gate_ready: { label: "At Gate", tone: "amber", glyph: "🛫", isKpi: true }
         boarded: { label: "Boarded", tone: "green", glyph: "✅" }
@@ -221,7 +219,7 @@ industry:
         weight: { type: "number" }
       initial: "checked_in"
       states:
-        checked_in: { label: "Checked In", tone: "blue", glyph: "<0xF0><0x9F><0xA7><0xB3>" }
+        checked_in: { label: "Checked In", tone: "blue", glyph: "💼" }
         security_scan: { label: "Security Scan", tone: "blue", glyph: "🔍" }
         sorted: { label: "Sorted", tone: "blue", glyph: "📦" }
         transferred: { label: "Transferred to Plane", tone: "amber", glyph: "✈️" }
@@ -325,11 +323,11 @@ industry:
           type: point2d
           interpolation: linear
           waypoints:
-            at_gate:   { x: 197, \"y\": 99 }
-            boarding:  { x: 197, \"y\": 159 }
-            taxiing:   { x: 310, \"y\": 182 }
-            takeoff:   { x: 620, \"y\": 260 }
-            departed:  { x: 895, \"y\": 240 }
+            at_gate:   { x: 197, "y": 99 }
+            boarding:  { x: 197, "y": 159 }
+            taxiing:   { x: 310, "y": 182 }
+            takeoff:   { x: 620, "y": 260 }
+            departed:  { x: 895, "y": 240 }
       generator: { strategy: "simpleSteadyState", maxActive: 8, intervalMs: 20000 }
 
     flight_arrival:
@@ -369,11 +367,11 @@ industry:
           type: point2d
           interpolation: linear
           waypoints:
-            approach: { x: 895, \"y\": 280 }
-            landing:  { x: 560, \"y\": 260 }
-            taxi_in:  { x: 290, \"y\": 182 }
-            at_gate:  { x: 197, \"y\": 344 }
-            arrived:  { x: 197, \"y\": 404 }
+            approach: { x: 895, "y": 280 }
+            landing:  { x: 560, "y": 260 }
+            taxi_in:  { x: 290, "y": 182 }
+            at_gate:  { x: 197, "y": 344 }
+            arrived:  { x: 197, "y": 404 }
       generator: { strategy: "simpleSteadyState", maxActive: 8, intervalMs: 25000 }
 
     service_request:

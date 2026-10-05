@@ -1,489 +1,296 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Meridian industry config",
-  "description": "Re-skins a Meridian deployment for a target industry. This is the full authored `industry:` block from a `values-<industry>.yaml` overlay. Root additionalProperties stays open for forward compatibility.",
+  "title": "Meridian Semantic Industry Config",
   "type": "object",
-  "required": ["version", "company", "theme", "screens"],
-  "additionalProperties": true,
+  "required": [
+    "version",
+    "company",
+    "theme",
+    "screens"
+  ],
   "properties": {
     "version": {
       "type": "integer",
-      "const": 1,
-      "description": "Config schema version."
+      "const": 1
     },
     "id": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "Short industry id, e.g. 'city', 'airport', 'energy'."
+      "pattern": "^[a-z][a-z0-9-]*$"
     },
     "primaryFlow": {
-      "type": "string",
-      "description": "The main business flow to highlight in the Ops Dashboard (must be a key in the flows map)."
+      "type": "string"
     },
     "company": {
       "type": "object",
-      "required": ["name"],
-      "additionalProperties": true,
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "description": "Full brand name shown in the UI (e.g. 'Meridian City')." },
-        "short": { "type": "string", "minLength": 1, "description": "Short brand name (e.g. 'Meridian'), used where space is tight." },
-        "tagline": { "type": "string" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "short": {
+          "type": "string"
+        },
+        "tagline": {
+          "type": "string"
+        },
         "assistant": {
           "type": "object",
-          "additionalProperties": true,
           "properties": {
-            "name": { "type": "string", "description": "AI assistant display name (e.g. 'Meri')." },
-            "persona": { "type": "string", "description": "One-line persona used in the assistant system prompt." },
-            "supportPhone": { "type": "string" },
-            "systemPrompt": { "type": "string" }
+            "name": {
+              "type": "string"
+            },
+            "persona": {
+              "type": "string"
+            },
+            "supportPhone": {
+              "type": "string"
+            },
+            "systemPrompt": {
+              "type": "string"
+            }
           }
         }
       }
     },
     "theme": {
       "type": "object",
-      "required": ["colors"],
-      "additionalProperties": true,
+      "required": [
+        "colors"
+      ],
       "properties": {
         "colors": {
           "type": "object",
-          "description": "Brand palette as hex; mapped to CSS variables (--brand, --accent, …) at runtime.",
-          "required": ["brand", "accent"],
-          "additionalProperties": false,
+          "required": [
+            "brand",
+            "accent"
+          ],
           "properties": {
-            "brand": { "$ref": "#/$defs/hexColor" },
-            "brandDeep": { "$ref": "#/$defs/hexColor" },
-            "brandSoft": { "$ref": "#/$defs/hexColor" },
-            "brandTint": { "$ref": "#/$defs/hexColor" },
-            "accent": { "$ref": "#/$defs/hexColor" },
-            "accentSoft": { "$ref": "#/$defs/hexColor" },
-            "accentInk": { "$ref": "#/$defs/hexColor" }
+            "brand": {
+              "$ref": "#/definitions/hexColor"
+            },
+            "brandDeep": {
+              "$ref": "#/definitions/hexColor"
+            },
+            "brandSoft": {
+              "$ref": "#/definitions/hexColor"
+            },
+            "brandTint": {
+              "$ref": "#/definitions/hexColor"
+            },
+            "accent": {
+              "$ref": "#/definitions/hexColor"
+            },
+            "accentSoft": {
+              "$ref": "#/definitions/hexColor"
+            },
+            "accentInk": {
+              "$ref": "#/definitions/hexColor"
+            }
           }
         },
-        "logo": { "type": "string", "description": "URL or path to the brand logo." },
-        "favicon": { "type": "string", "description": "URL or path to the favicon." },
-        "heroImage": { "type": "string", "description": "URL to a background photo shown behind the brand gradient in the WelcomeHero card." }
+        "logo": {
+          "type": "string"
+        },
+        "favicon": {
+          "type": "string"
+        }
       }
     },
     "terminology": {
       "type": "object",
-      "description": "Maps generic domain nouns (customer, request, incident, asset, workOrder, …) to industry-specific nouns.",
+      "additionalProperties": {
+        "type": "string"
+      },
       "properties": {
         "requestCategories": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Dropdown options for the Submit a request form. Always end with 'other'."
-        },
-        "iotZoneLabels": {
-          "type": "object",
-          "additionalProperties": { "type": "string" },
-          "description": "Maps raw zone IDs (e.g. 'zone-north') to industry-appropriate display labels."
-        },
-        "iotAnomalyLabels": {
-          "type": "object",
-          "additionalProperties": { "type": "string" },
-          "description": "Maps raw anomaly_type values (e.g. 'engine_overtemp') to industry-appropriate display labels."
-        },
-        "iotZonePositions": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "x": { "type": "number" },
-              "y": { "type": "number" }
-            },
-            "required": ["x", "y"],
-            "additionalProperties": false
-          },
-          "description": "Maps zone IDs to {x,y} cluster centers on the status-map viewBox for auto-clustering IoT devices."
+          "items": {
+            "type": "string"
+          }
         }
-      },
-      "additionalProperties": { "type": "string" }
+      }
     },
     "screens": {
       "type": "object",
-      "description": "Which curated screen modules (or generic entity-template pages) each SPA mounts.",
-      "additionalProperties": false,
       "properties": {
-        "public": { "$ref": "#/$defs/screenList" },
-        "ops": { "$ref": "#/$defs/screenList" },
-        "disabled": { "$ref": "#/$defs/screenList" }
+        "public": {
+          "$ref": "#/definitions/screenList"
+        },
+        "ops": {
+          "$ref": "#/definitions/screenList"
+        },
+        "disabled": {
+          "$ref": "#/definitions/screenList"
+        }
       }
     },
     "home": {
       "type": "object",
-      "description": "Home-page module composition per SPA (module ids from the home-module registry, or generic entity-template cards).",
-      "additionalProperties": false,
       "properties": {
-        "public": { "$ref": "#/$defs/screenList" },
-        "ops": { "$ref": "#/$defs/screenList" }
+        "public": {
+          "$ref": "#/definitions/screenList"
+        },
+        "ops": {
+          "$ref": "#/definitions/screenList"
+        }
       }
     },
     "entities": {
       "type": "object",
-      "description": "Config-driven entity/lifecycle definitions — the generic entity engine.",
-      "additionalProperties": { "$ref": "#/$defs/entityType" }
+      "additionalProperties": {
+        "$ref": "#/definitions/entityType"
+      }
     },
     "data": {
       "type": "object",
-      "description": "Backend-only demo data seeds, delivered to traffic-bot via the INDUSTRY_DATA env var.",
-      "additionalProperties": true,
       "properties": {
-        "zones": { "type": "array", "items": { "type": "string" } },
+        "zones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "requestTemplates": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["category", "title", "description"],
-            "properties": {
-              "category": { "type": "string" },
-              "title": { "type": "string" },
-              "description": { "type": "string" }
-            }
+            "required": [
+              "category",
+              "title",
+              "description"
+            ]
           }
         },
-        "chatQuestions": { "type": "array", "items": { "type": "string" } }
+        "chatQuestions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "routing": {
       "type": "object",
-      "description": "Backend-only category→department map, delivered to service-dispatch's RoutingEngine via the ROUTING_MAP env var.",
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "dynatrace": {
       "type": "object",
-      "description": "Backend-only Dynatrace naming + Business Flow config, consumed by the per-instance provisioner.",
-      "additionalProperties": true,
       "properties": {
         "serviceNames": {
           "type": "object",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "flowLabels": {
           "type": "object",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "flows": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id"],
+            "required": [
+              "id"
+            ],
             "properties": {
-              "id": { "type": "string", "description": "The flow key (e.g. 'account-creation')." },
-              "correlationID": { "type": "string", "description": "Override for the correlation ID (e.g. 'account.id')." }
+              "id": {
+                "type": "string"
+              },
+              "correlationID": {
+                "type": "string"
+              }
             }
           }
         }
       }
     }
   },
-  "$defs": {
+  "definitions": {
     "hexColor": {
       "type": "string",
       "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
     },
     "screenList": {
       "type": "array",
-      "uniqueItems": true,
       "items": {
-        "oneOf": [
-          { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "anyOf": [
           {
-            "type": "object",
-            "required": ["id"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "label": { "type": "string" },
-              "icon": { "type": "string" },
-              "position": { "enum": ["top", "main", "full", "sidebar"] }
-            }
+            "type": "string"
           },
           {
             "type": "object",
-            "required": ["id", "template"],
-            "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "position": { "enum": ["top", "main", "full", "sidebar"] },
-              "template": { "enum": ["ticker", "weather-widget", "clock-widget", "announcements", "entity-list-card", "entity-summary-card", "entity-kpi-row", "activity-feed"] },
-              "height": { "enum": ["slim", "half", "full"] },
-              "mode": { "type": "string" },
-              "label": { "type": "string" },
-              "title": { "type": "string" },
-              "preset": { "enum": ["stocks", "sports"] },
-              "items": { "type": "array", "items": {} },
-              "timezones": { "type": "array", "items": { "type": "object" } },
-              "entityType": { "type": "string" },
-              "entityTypes": { "type": "array", "items": { "type": "string" } },
-              "label": { "type": "string" },
-              "maxItems": { "type": "integer" }
-            }
-          },
-          {
-            "type": "object",
-            "required": ["id", "template", "entities"],
-            "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "label": { "type": "string" },
-              "icon": { "type": "string" },
-              "template": { "const": "entity-grid-list" },
-              "entities": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["id", "entityType"],
-                  "properties": {
-                    "id": { "type": "string" },
-                    "entityType": { "type": "string" },
-                    "label": { "type": "string" },
-                    "fields": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": ["id", "label"],
-                        "properties": {
-                          "id": { "type": "string" },
-                          "label": { "type": "string" },
-                          "subfields": { "type": "array", "items": { "type": "string" } }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": ["id", "template", "entityType"],
-            "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "label": { "type": "string" },
-              "icon": { "type": "string" },
-              "position": { "enum": ["top", "main", "full", "sidebar"] },
-              "template": { "enum": ["entity-list", "entity-detail", "entity-map", "entity-analytics", "entity-journey"] },
-              "entityType": { "type": "string" },
-              "fields": { "type": "array", "items": { "type": "string" } },
-              "filters": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["id", "label", "match"],
-                  "properties": {
-                    "id": { "type": "string" },
-                    "label": { "type": "string" },
-                    "match": { "type": "object" }
-                  }
-                }
-              },
-              "viewBox": { "type": "string" },
-              "background": { "type": "object" },
-              "legend": { "type": "array" },
-              "labelField": { "type": "string" },
-              "steps": {
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "type": "string" },
-                    {
-                      "type": "object",
-                      "required": ["state"],
-                      "properties": {
-                        "state": { "type": "string" },
-                        "label": { "type": "string" }
-                      }
-                    }
-                  ]
-                }
-              },
-              "ownerField": { "type": "string" },
-              "description": { "type": "string" }
-            }
-          },
-          {
-            "type": "object",
-            "required": ["id", "template"],
-            "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "label": { "type": "string" },
-              "icon": { "type": "string" },
-              "position": { "enum": ["top", "main", "full", "sidebar"] },
-              "title": { "type": "string" },
-              "template": { "const": "status-map" },
-              "entityType": { "type": "string" },
-              "source": { "type": "string", "enum": ["devices", "entity-engine"] },
-              "clusterBy": { "type": "string", "enum": ["zone"] },
-              "locations": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["id", "x", "y"],
-                  "properties": {
-                    "id": { "type": "string" },
-                    "x": { "type": "number" },
-                    "y": { "type": "number" },
-                    "label": { "type": "string" }
-                  }
-                }
-              },
-              "viewBox": { "type": "string" },
-              "background": { "type": "object" },
-              "statusColors": { "type": "object", "additionalProperties": { "type": "string" } },
-              "labelField": { "type": "string" }
-            }
+            "required": [
+              "id"
+            ]
           }
         ]
-      },
-      "entityType": {
-        "type": "object",
-        "required": ["displayName", "fields", "initial", "states"],
-        "additionalProperties": false,
-        "properties": {
-          "displayName": { "type": "string" },
-          "displayNamePlural": { "type": "string" },
-          "idPrefix": { "type": "string", "pattern": "^[a-z][a-z0-9]*$" },
-          "fields": {
+      }
+    },
+    "entityType": {
+      "type": "object",
+      "required": [
+        "displayName",
+        "fields",
+        "initial",
+        "states"
+      ],
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "object"
+        },
+        "initial": {
+          "type": "string"
+        },
+        "states": {
+          "type": "object"
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
             "type": "object",
-            "additionalProperties": {
-              "type": "object",
-              "required": ["type"],
-              "properties": {
-                "type": { "enum": ["string", "number", "boolean", "date", "enum", "ref", "password"] },
-                "required": { "type": "boolean" },
-                "default": {},
-                "values": { "type": "array", "items": { "type": "string" } },
-                "entity": { "type": "string" }
-              }
-            }
-          },
-          "initial": { "type": "string" },
-          "states": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "label": { "type": "string" },
-                "tone": { "enum": ["slate", "blue", "amber", "orange", "green", "red"] },
-                "terminal": { "type": "boolean" },
-                "isError": { "type": "boolean" },
-                "isKpi": { "type": "boolean" },
-                "kpiField": { "type": "string" },
-                "externallyTriggered": { "type": "boolean" },
-                "glyph": { "type": "string" }
-              }
-            }
-          },
-          "transitions": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["from", "to"],
-              "properties": {
-                "from": { "type": "string" },
-                "to": { "type": "string" },
-                "label": { "type": "string" },
-                "userTriggerable": { "type": "boolean" },
-                "when": { "type": "object" },
-                "timer": {
-                  "type": "object",
-                  "properties": {
-                    "minSeconds": { "type": "number" },
-                    "maxSeconds": { "type": "number" }
-                  }
-                },
-                "effects": {
-                  "type": "array",
-                  "items": { "type": "object" }
-                },
-                "signal": { "$ref": "#/$defs/signalDef" }
-              }
-            }
-          },
-          "linkOnCreate": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "query": { "type": "object" },
-                "strategy": { "type": "string" },
-                "required": { "type": "boolean" }
-              }
-            }
-          },
-          "computed": {
-            "type": "object",
+            "required": [
+              "from",
+              "to",
+              "signal"
+            ],
             "properties": {
-              "position": {
-                "type": "object",
-                "properties": {
-                  "type": { "const": "point2d" },
-                  "interpolation": { "enum": ["linear", "easeInOut"] },
-                  "waypoints": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "object",
-                      "required": ["x", "y"],
-                      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "generator": {
-            "type": "object",
-            "properties": {
-              "strategy": { "enum": ["simpleSteadyState", "periodicHistoryBackfill"] },
-              "intervalMs": { "type": "number" },
-              "maxActive": { "type": "integer" },
-              "fields": { "type": "object" },
-              "ownerEntityType": { "type": "string" },
-              "ownerField": { "type": "string" },
-              "periodField": { "type": "string" },
-              "periodFrequency": { "type": "string" },
-              "backfill": {
-                "type": "object",
-                "properties": {
-                  "minPeriods": { "type": "integer" },
-                  "maxPeriods": { "type": "integer" },
-                  "outstandingMin": { "type": "integer" },
-                  "outstandingMax": { "type": "integer" }
-                }
+              "from": {
+                "type": "string"
               },
-              "amount": {
-                "type": "object",
-                "properties": {
-                  "minCents": { "type": "integer" },
-                  "maxCents": { "type": "integer" }
-                }
+              "to": {
+                "type": "string"
               },
-              "dueDays": { "type": "integer" }
-            }
-          },
-          "triggers": {
-            "type": "object",
-            "properties": {
-              "kafka": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["topic"],
-                  "properties": {
-                    "topic": { "type": "string" },
-                    "fieldMapping": { "type": "object" }
-                  }
-                }
+              "signal": {
+                "$ref": "#/definitions/signalDef"
               }
             }
           }
         }
-      },
-      "signalDef": {
-        "type": "object",
-        "required": ["eventType", "correlationId"],
-        "properties": {
-          "eventType": { "type": "string", "description": "The semantic event name (e.g. 'passenger.boarded')." },
-          "correlationId": { "type": "string", "description": "The entity field used as the correlation ID (e.g. 'passenger.id')." }
+      }
+    },
+    "signalDef": {
+      "type": "object",
+      "required": [
+        "eventType",
+        "correlationId"
+      ],
+      "properties": {
+        "eventType": {
+          "type": "string"
+        },
+        "correlationId": {
+          "type": "string"
         }
       }
     }
