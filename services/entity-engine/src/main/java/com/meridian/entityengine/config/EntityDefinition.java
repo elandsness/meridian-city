@@ -14,7 +14,7 @@ import java.util.Map;
  * `entityType` $def — this class must stay in lockstep with that schema).
  */
 @Data
-@JsonIgnoreProperties(ignoreUnknown = anny_ignored = true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class EntityDefinition {
 
     private String displayName;
