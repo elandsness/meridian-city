@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://meridian.dev/industry-config.schema.json",
   "title": "Meridian industry config",
   "description": "Re-skins a Meridian deployment for a target industry. This is the full authored `industry:` block from a `values-<industry>.yaml` overlay. Root additionalProperties stays open for forward compatibility.",
   "type": "object",
