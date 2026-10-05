@@ -77,14 +77,13 @@ public class EntityFactory {
         String targetState = currentState;
         while (targetState != null && !targetState.equals(def.getInitial())) {
             final String currentTarget = targetState; // Create effectively final copy for lambda
-            String prev = def.getTransitions().stream()
+            EntityDefinition.TransitionDef transition = def.getTransitions().stream()
                     .filter(t -> t.getTo().equals(currentTarget))
-                    .map(EntityDefinition.TransitionDef::getFrom)
                     .findFirst()
                     .orElse(null);
-            if (prev == null) break;
-            sequence.add(0, prev);
-            targetState = prev;
+            if (transition == null) break;
+            sequence.add(0, transition.getFrom());
+            targetState = transition.getFrom();
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -103,10 +102,14 @@ public class EntityFactory {
                 OffsetDateTime eventTime = firstEventTime.plusMinutes(gapMins * (i + 1));
                 
                 String fromState = (i == 0) ? def.getInitial() : sequence.get(i - 1);
+                EntityDefinition.TransitionDef transition = def.getTransitions().stream()
+                        .filter(t -> t.getTo().equals(state))
+                        .findFirst()
+                        .orElse(null);
                 EntityEventRecord event = EntityEventRecord.of(record, fromState, state);
                 event.setOccurredAt(eventTime);
                 eventRepository.save(event);
-                eventLogger.transitioned(record, fromState, def, eventTime);
+                eventLogger.transitioned(record, fromState, transition, def, eventTime);
             }
         }
     }
