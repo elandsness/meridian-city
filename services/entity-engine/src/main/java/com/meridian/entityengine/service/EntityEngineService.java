@@ -109,7 +109,7 @@ public class EntityEngineService {
         EntityDefinition.TransitionDef transition = transitionEvaluator.findMatchingTransition(record, def);
         if (transition == null) {
             // No declared transition's condition currently passes; re-check on the
-            // next tick rather than spinning forever (e.g. a probability roll that
+            // next tick rather than spinning forever (e.g., a probability roll that
             // hasn't hit yet).
             record.setNextTransitionAt(OffsetDateTime.now().plusSeconds(1));
             repository.save(record);
@@ -130,7 +130,7 @@ public class EntityEngineService {
 
         repository.save(record);
         eventRepository.save(EntityEventRecord.of(record, fromState, transition.getTo()));
-        eventLogger.transitioned(record, fromState, def);
+        eventLogger.transitioned(record, fromState, transition, def);
         kafkaPublisher.publish(record);
         return record;
     }
