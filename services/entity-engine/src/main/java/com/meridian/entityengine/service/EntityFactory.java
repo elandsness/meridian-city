@@ -144,6 +144,9 @@ public class EntityFactory {
             if ("firstName".equals(faker)) return randomFirstName();
             if ("lastName".equals(faker)) return randomLastName();
             if ("streetAddress".equals(faker)) return randomAddress();
+            if (hint.get("values") instanceof List<?> vals && !vals.isEmpty()) {
+                return String.valueOf(vals.get(ThreadLocalRandom.current().nextInt(vals.size())));
+            }
         }
         return null;
     }
