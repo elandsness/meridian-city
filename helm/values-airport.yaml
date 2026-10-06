@@ -438,7 +438,9 @@ journeyService:
     bagProbability: 0.7
     entityTypes: ["passenger"]
     routes: []
-    initialStatuses: []
+    initialStatuses:
+      passenger: "checked_in"
+      flight: "at_gate"
   service:
     type: ClusterIP
     port: 8093
