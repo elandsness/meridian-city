@@ -422,5 +422,8 @@ industry:
 customerEntityService:
   ownedTypes: "passenger,service_request"
 
+journeyService:
+  ownedTypes: "passenger"
+
 opsEntityService:
   ownedTypes: "aircraft,luggage,flight_departure,flight_arrival"
