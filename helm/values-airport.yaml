@@ -423,7 +423,32 @@ customerEntityService:
   ownedTypes: "passenger,service_request"
 
 journeyService:
-  ownedTypes: "passenger"
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/elandsness/meridian-city/journey-service
+    tag: branch-feat-semantic-engine
+  lifecycle:
+    enabled: true
+    minSeconds: 60
+    maxSeconds: 300
+  generator:
+    maxActive: 50
+    passengerMaxActive: 50
+    bagProbability: 0.7
+    entityTypes: ["passenger"]
+    routes: []
+    initialStatuses: []
+  service:
+    type: ClusterIP
+    port: 8093
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
 
 opsEntityService:
   ownedTypes: "aircraft,luggage,flight_departure,flight_arrival"
