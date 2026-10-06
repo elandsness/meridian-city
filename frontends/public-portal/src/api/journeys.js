@@ -10,5 +10,5 @@ export function getPassenger(id) {
 
 // The logged-in user's own journey (created on first visit by passenger-service).
 export function getMyJourney(userId, name) {
-  return client.get('/api/v1/passengers/me', { params: { user_id: userId, name } }).then((r) => r.data)
+  return client.get('/api/v1/journeys/me', { params: { user_id: userId, name } }).then((r) => r.data)
 }
