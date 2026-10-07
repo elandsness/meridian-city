@@ -252,6 +252,11 @@
         "initial": {
           "type": "string"
         },
+        "sequence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The ideal linear sequence of states for the journey progress bar."
+        },
         "states": {
           "type": "object"
         },

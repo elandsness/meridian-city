@@ -6,37 +6,32 @@ import { getPassengers, getMyJourney } from '../api/journeys.js'
 import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
 
-const ORDER = ['checked_in', 'bag_checked', 'security_cleared', 'bag_loaded', 'boarded']
-const STEPS = [
-  { key: 'checked_in', label: 'Checked in' },
-  { key: 'bag_checked', label: 'Bag checked', bagOnly: true },
-  { key: 'security_cleared', label: 'Security' },
-  { key: 'bag_loaded', label: 'Bag loaded', bagOnly: true },
-  { key: 'boarded', label: 'Boarded' },
-]
-const STEP_LABEL = {
-  checked_in: 'Checked in',
-  bag_checked: 'Bag checked',
-  security_cleared: 'Security cleared',
-  bag_loaded: 'Bag loaded',
-  boarded: 'Boarded',
-}
-
 function unwrapArray(d) {
   return Array.isArray(d) ? d : d?.items ?? d?.passengers ?? []
 }
 
-function JourneyStepper({ status, hasBag }) {
-  const steps = STEPS.filter((s) => !s.bagOnly || hasBag)
-  const currentIdx = ORDER.indexOf(status)
+function JourneyStepper({ status, hasBag, entityConfig }) {
+  if (!entityConfig || !entityConfig.sequence) {
+    return <div className="text-xs text-red-500">Journey configuration missing</div>
+  }
+
+  const sequence = entityConfig.sequence
+  const statesCfg = entityConfig.states || {}
+  const currentIdx = sequence.indexOf(status)
+
   return (
     <div className="flex items-center">
-      {steps.map((s, i) => {
-        const idx = ORDER.indexOf(s.key)
-        const done = currentIdx >= idx
-        const current = status === s.key
+      {sequence.map((stateKey, i) => {
+        const stateCfg = statesCfg[stateKey] || {}
+        const done = currentIdx >= i
+        const current = status === stateKey
+        
+        // Match original logic: skip 'bag' states if no bag
+        const isBagOnly = stateKey.includes('bag')
+        if (isBagOnly && !hasBag) return null
+
         return (
-          <div key={s.key} className="flex items-center flex-1 last:flex-none">
+          <div key={stateKey} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center">
               <div
                 className={`w-3 h-3 rounded-full transition-colors ${
@@ -48,11 +43,11 @@ function JourneyStepper({ status, hasBag }) {
                   done ? 'text-slate-700 font-medium' : 'text-slate-400'
                 }`}
               >
-                {s.label}
+                {stateCfg.label ?? stateKey}
               </span>
             </div>
-            {i < steps.length - 1 && (
-              <div className={`h-0.5 flex-1 mx-1 mb-4 ${currentIdx > idx ? 'bg-meridian-blue' : 'bg-slate-200'}`} />
+            {i < sequence.length - 1 && (
+              <div className={`h-0.5 flex-1 mx-1 mb-4 ${currentIdx > i ? 'bg-meridian-blue' : 'bg-slate-200'}`} />
             )}
           </div>
         )
@@ -61,7 +56,7 @@ function JourneyStepper({ status, hasBag }) {
   )
 }
 
-function PassengerCard({ p }) {
+function PassengerCard({ p, entityConfig }) {
   return (
     <Card>
       <div className="flex items-start justify-between gap-2">
@@ -74,18 +69,18 @@ function PassengerCard({ p }) {
           </p>
         </div>
         <span className="text-xs text-slate-400 whitespace-nowrap">
-          {p.has_bag ? '🧳 Checked bag' : '🎒 Carry-on'}
+          {p.has_bag ? '<0xF0><0x9F><0xA7><0xB3> Checked bag' : '🎒 Carry-on'}
         </span>
       </div>
       <div className="mt-3">
-        <JourneyStepper status={p.status} hasBag={p.has_bag} />
+        <JourneyStepper status={p.status} hasBag={p.has_bag} entityConfig={entityConfig} />
       </div>
     </Card>
   )
 }
 
-// Signed-in passenger: their own journey, created on first visit and progressing live.
 function MyOwnJourney({ userId, name, cfg }) {
+  const passengerCfg = cfg.entities?.passenger
   const { data: p, isLoading, isError } = useQuery({
     queryKey: ['my-journey', userId],
     queryFn: () => getMyJourney(userId, name),
@@ -116,16 +111,16 @@ function MyOwnJourney({ userId, name, cfg }) {
               </p>
             </div>
             <span className="text-xs text-slate-500 whitespace-nowrap">
-              {p.has_bag ? '🧳 Checked bag' : '🎒 Carry-on only'}
+              {p.has_bag ? '<0xF0><0x9F><0xA7><0xB3> Checked bag' : '🎒 Carry-on only'}
             </span>
           </div>
           <div className="mt-5">
-            <JourneyStepper status={p.status} hasBag={p.has_bag} />
+            <JourneyStepper status={p.status} hasBag={p.has_bag} entityConfig={passengerCfg} />
           </div>
           <p className="mt-5 text-sm text-slate-600">
             {p.status === 'boarded'
               ? 'You are all boarded — have a great flight! ✈️'
-              : `Current step: ${STEP_LABEL[p.status] ?? p.status}.`}
+              : `Current step: ${passengerCfg?.states?.[p.status]?.label ?? p.status}.`}
           </p>
         </Card>
       )}
@@ -133,8 +128,8 @@ function MyOwnJourney({ userId, name, cfg }) {
   )
 }
 
-// Operator / logged-out: the live board of journeys across the airport.
 function LiveBoard({ cfg, isAuthenticated }) {
+  const passengerCfg = cfg.entities?.passenger
   const { data, isLoading, isError } = useQuery({
     queryKey: ['passengers'],
     queryFn: () => getPassengers(),
@@ -171,7 +166,7 @@ function LiveBoard({ cfg, isAuthenticated }) {
 
       <div className="grid gap-4 md:grid-cols-2">
         {passengers.map((p) => (
-          <PassengerCard key={p.id} p={p} />
+          <PassengerCard key={p.id} p={p} entityConfig={passengerCfg} />
         ))}
       </div>
     </div>
@@ -182,7 +177,14 @@ export default function MyJourney() {
   const cfg = useConfig()
   const { isAuthenticated, user } = useAuth()
   const myId = user?.id
-  // A logged-in passenger has an identity (user.id); the demo operator does not.
-  if (myId) return <MyOwnJourney userId={myId} name={displayName(user)} cfg={cfg} />
-  return <LiveBoard cfg={cfg} isAuthenticated={isAuthenticated} />
+
+  if (!myId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <p className="text-slate-500">Please log in to view your journey.</p>
+      </div>
+    )
+  }
+
+  return <MyOwnJourney userId={myId} name={displayName(user)} cfg={cfg} />
 }
