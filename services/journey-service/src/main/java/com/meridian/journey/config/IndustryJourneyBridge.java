@@ -20,23 +20,25 @@ public class IndustryJourneyBridge {
     // that matches the industry.entities.<type>.states and transitions.
     
     @Value("${journey.industry.transitions:[]}")
-    private List<Map<String, Object>> industryTransitions;
+    private String industryTransitionsRaw;
 
     @Value("${journey.industry.states:[]}")
-    private List<Map<String, Object>> industryStates;
+    private String industryStatesRaw;
 
     @PostConstruct
     public void alignWithIndustry() {
-        if (industryTransitions == null || industryTransitions.isEmpty()) {
+        List<Map<String, Object>> transitions = parseJsonList(industryTransitionsRaw);
+        List<Map<String, Object>> states = parseJsonList(industryStatesRaw);
+
+        if (transitions == null || transitions.isEmpty()) {
             log.info("No industry transitions found, using defaults.");
             return;
         }
 
         log.info("Aligning journey lifecycle with industry config...");
         
-        // 1. Build transitions map: from -> to
         Map<String, String> transMap = new HashMap<>();
-        for (Map<String, Object> t : industryTransitions) {
+        for (Map<String, Object> t : transitions) {
             String from = (String) t.get("from");
             String to = (String) t.get("to");
             if (from != null && to != null) {
@@ -45,14 +47,11 @@ public class IndustryJourneyBridge {
         }
         props.setTransitions(transMap);
 
-        // 2. Build progress map: status -> progress (approximate based on order)
-        // Since the industry config doesn't explicitly define progress for every status,
-        // we calculate it linearly based on the number of states.
-        if (industryStates != null && !industryStates.isEmpty()) {
+        if (states != null && !states.isEmpty()) {
             Map<String, Double> progMap = new HashMap<>();
-            int total = industryStates.size();
+            int total = states.size();
             for (int i = 0; i < total; i++) {
-                Map<String, Object> s = industryStates.get(i);
+                Map<String, Object> s = states.get(i);
                 String name = (String) s.get("id") != null ? (String) s.get("id") : (String) s.get("name");
                 if (name != null) {
                     progMap.put(name, (double) i / (total - 1));
@@ -60,10 +59,9 @@ public class IndustryJourneyBridge {
             }
             props.setProgressMap(progMap);
             
-            // 3. Define active statuses (all except terminal)
             List<String> active = new ArrayList<>();
             for (int i = 0; i < total - 1; i++) {
-                Map<String, Object> s = industryStates.get(i);
+                Map<String, Object> s = states.get(i);
                 String name = (String) s.get("id") != null ? (String) s.get("id") : (String) s.get("name");
                 if (name != null) active.add(name);
             }
@@ -71,5 +69,18 @@ public class IndustryJourneyBridge {
         }
         
         log.info("Industry alignment complete. Transitions: {}, Active: {}", transMap.keySet(), props.getActiveStatuses());
+    }
+
+    private List<Map<String, Object>> parseJsonList(String json) {
+        if (json == null || json.equals("[]") || json.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            log.warn("Failed to parse industry JSON: {}", e.getMessage());
+            return Collections.emptyList();
+        }
     }
 }
