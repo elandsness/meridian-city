@@ -1,4 +1,3 @@
-
 industry:
   version: 1
   id: airport
@@ -419,3 +418,39 @@ industry:
           timer: { minSeconds: 300, maxSeconds: 7200 }
           signal: { eventType: "request.resolved", correlationId: "service_request.id" }
       generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000 }
+
+customerEntityService:
+  ownedTypes: "passenger,service_request"
+
+journeyService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: journey-service
+    tag: branch-feat-semantic-engine
+  lifecycle:
+    enabled: true
+    minSeconds: 60
+    maxSeconds: 300
+  generator:
+    maxActive: 50
+    passengerMaxActive: 50
+    bagProbability: 0.7
+    entityTypes: ["passenger"]
+    routes: []
+    initialStatuses:
+      passenger: "checked_in"
+      flight: "at_gate"
+  service:
+    type: ClusterIP
+    port: 8093
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+opsEntityService:
+  ownedTypes: "aircraft,luggage,flight_departure,flight_arrival"
