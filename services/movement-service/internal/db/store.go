@@ -7,6 +7,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -61,9 +62,19 @@ func FetchActive(db *sql.DB, entityTypes []string) ([]EntityRow, error) {
 // column via jsonb_set -- never a whole-row read-modify-write -- so it can
 // never clobber a concurrent field/state change made by entity-engine.
 func UpdatePosition(db *sql.DB, id string, x, y, tx, ty float64, path []float64) error {
-	_, err := db.Exec(
+	pathJSON, err := json.Marshal(path)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(
 		`UPDATE entities.entity
-		    SET data = jsonb_set(data, '{position}', jsonb_build_object('x', $2::float8, 'y', $3::float8, 'target_x', $4::float8, 'target_y', $5::float8, 'path', $6)),
+		    SET data = jsonb_set(data, '{position}', jsonb_build_object('x', $2::float8, 'y', $3::float8, 'target_x', $4::float8, 'target_y', $5::float8, 'path', $6::jsonb)),
+		        updated_at = now()
+		  WHERE id = $1`,
+		id, x, y, tx, ty, string(pathJSON),
+	)
+	return err
+}', jsonb_build_object('x', $2::float8, 'y', $3::float8, 'target_x', $4::float8, 'target_y', $5::float8, 'path', $6)),
 		        updated_at = now()
 		  WHERE id = $1`,
 		id, x, y, tx, ty, path,
