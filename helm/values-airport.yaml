@@ -330,7 +330,7 @@ industry:
             departed: [{ "x": 895, "y": 240 }]
       generator:
         strategy: "simpleSteadyState"
-        maxActive: 8
+        maxActive: 20
         intervalMs: 20000
         fields:
           flight_number: [{ values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }]
@@ -381,7 +381,7 @@ industry:
             arrived: [{ "x": 197, "y": 404 }]
       generator:
         strategy: "simpleSteadyState"
-        maxActive: 8
+        maxActive: 20
         intervalMs: 25000
         fields:
           flight_number: [{ values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }]
