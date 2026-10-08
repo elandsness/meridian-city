@@ -20,8 +20,8 @@ const TONE_COLOR = {
 // Terminal-state entities (config-declared terminal:true) are excluded --
 // found via an actual live check: the entity API never stops returning
 // completed/historical rows, so without this a "live" map silently
-// accumulates every entity that ever finished, piling sprites on top of each
-// other at the terminal waypoint forever. Generalizes AirfieldMap.jsx's own
+// accumulates every entity that ever finished, piling sprites on top of
+// each other at the terminal waypoint forever. Generalizes AirfieldMap.jsx's own
 // hardcoded TERMINAL_STATES filter (departed/arrived/cancelled) via config
 // instead of a hardcoded status list.
 export function toSprites(entities, def, labelField) {
@@ -35,10 +35,8 @@ export function toSprites(entities, def, labelField) {
         coordinate: { x: e.position.x, y: e.position.y },
         target: { x: e.position.target_x, y: e.position.target_y },
         path: e.position.path,
-        rotation: (typeof e.position.target_x === "number" && typeof e.position.target_y === "number")
-            rotation: (typeof e.position?.target_x === "number" && typeof e.position?.target_y === "number")
-                ? Math.atan2(e.position.target_y - e.position.y, e.position.target_x - e.position.x) * (180 / Math.PI) + 90
-                : 0,
+        rotation: (typeof e.position?.target_x === "number" && typeof e.position?.target_y === "number")
+            ? Math.atan2(e.position.target_y - e.position.y, e.position.target_x - e.position.x) * (180 / Math.PI) + 90
             : 0,
         glyph: meta.glyph,
         color: TONE_COLOR[meta.tone] || TONE_COLOR.slate,
