@@ -18,9 +18,38 @@ import (
 // coordinate could be determined at all (false if the current state has no
 // declared waypoint).
 func Compute(entity config.MovableEntity, state string, stateEnteredAt time.Time, nextTransitionAt *time.Time, now time.Time) (config.Waypoint, bool) {
-	current, ok := entity.Paths[state]
-	if !ok {
+	path, ok := entity.Paths[state]
+	if !ok || len(path) == 0 {
 		return config.Waypoint{}, false
+	}
+
+	if len(path) == 1 {
+		return path[0], true
+	}
+
+	totalSeconds := nextTransitionAt.Sub(stateEnteredAt).Seconds()
+	if totalSeconds <= 0 {
+		return path[len(path)-1], true
+	}
+
+	frac := clamp01(now.Sub(stateEnteredAt).Seconds() / totalSeconds)
+	eased := easeInOut(frac)
+
+	segmentFrac := eased * float64(len(path)-1)
+	segmentIdx := int(segmentFrac)
+	if segmentIdx >= len(path)-1 {
+		return path[len(path)-1], true
+	}
+
+	localFrac := segmentFrac - float64(segmentIdx)
+	p1 := path[segmentIdx]
+	p2 := path[segmentIdx+1]
+
+	return config.Waypoint{
+		X: p1.X + (p2.X-p1.X)*localFrac,
+		Y: p1.Y + (p2.Y-p1.Y)*localFrac,
+	}, true
+}
 	}
 
 	nextState, hasNext := entity.NextState[state]
