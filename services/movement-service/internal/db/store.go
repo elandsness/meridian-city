@@ -29,8 +29,8 @@ func Open(host, port, user, password, dbname string) (*sql.DB, error) {
 }
 
 // FetchActive returns every entity of the given types (regardless of state --
-// even a terminal entity keeps its final position rendered until it's no
-// longer polled by the frontend).
+// even a terminal entity keeps its final position rendered until it's
+// no longer polled by the frontend).
 func FetchActive(db *sql.DB, entityTypes []string) ([]EntityRow, error) {
 	rows, err := db.Query(
 		`SELECT id, entity_type, state, state_entered_at, next_transition_at
@@ -72,12 +72,6 @@ func UpdatePosition(db *sql.DB, id string, x, y, tx, ty float64, path []float64)
 		        updated_at = now()
 		  WHERE id = $1`,
 		id, x, y, tx, ty, string(pathJSON),
-	)
-	return err
-}', jsonb_build_object('x', $2::float8, 'y', $3::float8, 'target_x', $4::float8, 'target_y', $5::float8, 'path', $6)),
-		        updated_at = now()
-		  WHERE id = $1`,
-		id, x, y, tx, ty, path,
 	)
 	return err
 }
