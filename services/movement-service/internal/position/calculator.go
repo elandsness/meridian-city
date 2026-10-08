@@ -18,7 +18,7 @@ import (
 // coordinate could be determined at all (false if the current state has no
 // declared waypoint).
 func Compute(entity config.MovableEntity, state string, stateEnteredAt time.Time, nextTransitionAt *time.Time, now time.Time) (config.Waypoint, bool) {
-	current, ok := entity.Waypoints[state]
+	current, ok := entity.Paths[state]
 	if !ok {
 		return config.Waypoint{}, false
 	}
