@@ -323,11 +323,11 @@ industry:
           type: point2d
           interpolation: linear
           paths:
-            at_gate: [{ x: 197, "y": 99 }]
-            boarding: [{ x: 197, "y": 159 }]
-            taxiing: [{ x: 310, "y": 182 }]
-            takeoff: [{ x: 620, "y": 260 }]
-            departed: [{ x: 895, "y": 240 }]
+            at_gate: [{ x: 197, y: 99 }]
+            boarding: [{ x: 197, y: 159 }]
+            taxiing: [{ x: 197, y: 159 }, { x: 250, y: 159 }, { x: 310, y: 182 }, { x: 450, y: 182 }]
+            takeoff: [{ x: 450, y: 182 }, { x: 550, y: 230 }, { x: 620, y: 260 }, { x: 895, y: 240 }]
+            departed: [{ x: 895, y: 240 }]
       generator:
         strategy: "simpleSteadyState"
         maxActive: 8
@@ -374,11 +374,11 @@ industry:
           type: point2d
           interpolation: linear
           paths:
-            approach: [{ x: 895, "y": 280 }]
-            landing: [{ x: 560, "y": 260 }]
-            taxi_in: [{ x: 290, "y": 182 }]
-            at_gate: [{ x: 197, "y": 344 }]
-            arrived: [{ x: 197, "y": 404 }]
+            approach: [{ x: 895, y: 280 }, { x: 750, y: 280 }, { x: 650, y: 270 }]
+            landing: [{ x: 650, y: 270 }, { x: 560, y: 260 }]
+            taxi_in: [{ x: 560, y: 260 }, { x: 400, y: 260 }, { x: 310, y: 182 }, { x: 290, y: 182 }]
+            at_gate: [{ x: 290, y: 182 }, { x: 197, y: 344 }]
+            arrived: [{ x: 197, y: 404 }]
       generator:
         strategy: "simpleSteadyState"
         maxActive: 8
