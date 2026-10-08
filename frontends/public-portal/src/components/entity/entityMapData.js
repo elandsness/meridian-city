@@ -33,6 +33,9 @@ export function toSprites(entities, def, labelField) {
       return {
         id: e.id,
         coordinate: { x: e.position.x, y: e.position.y },
+        target: { x: e.position.target_x, y: e.position.target_y },
+        path: e.position.path,
+        rotation: Math.atan2(e.position.target_y - e.position.y, e.position.target_x - e.position.x) * (180 / Math.PI) + 90,
         glyph: meta.glyph,
         color: TONE_COLOR[meta.tone] || TONE_COLOR.slate,
         label: labelField ? e[labelField] : undefined,

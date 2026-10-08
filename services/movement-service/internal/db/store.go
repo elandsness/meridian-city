@@ -60,13 +60,13 @@ func FetchActive(db *sql.DB, entityTypes []string) ([]EntityRow, error) {
 // UpdatePosition writes only the `position` key inside the `data` JSONB
 // column via jsonb_set -- never a whole-row read-modify-write -- so it can
 // never clobber a concurrent field/state change made by entity-engine.
-func UpdatePosition(db *sql.DB, id string, x, y float64) error {
+func UpdatePosition(db *sql.DB, id string, x, y, tx, ty float64, path []float64) error {
 	_, err := db.Exec(
 		`UPDATE entities.entity
-		    SET data = jsonb_set(data, '{position}', jsonb_build_object('x', $2::float8, 'y', $3::float8)),
+		    SET data = jsonb_set(data, '{position}', jsonb_build_object('x', $2::float8, 'y', $3::float8, 'target_x', $4::float8, 'target_y', $5::float8, 'path', $6)),
 		        updated_at = now()
 		  WHERE id = $1`,
-		id, x, y,
+		id, x, y, tx, ty, path,
 	)
 	return err
 }

@@ -35,7 +35,10 @@ export default function EntityMap({
           <circle key={w.id} cx={w.x} cy={w.y} r={4} fill={w.color || '#94a3b8'} />
         ))}
         {sprites.map((s) => (
-          <Sprite key={s.id} sprite={s} transitionMs={transitionMs} />
+          <>
+            <PathTrace sprite={s} transitionMs={transitionMs} />
+            <Sprite key={s.id} sprite={s} transitionMs={transitionMs} />
+          </>
         ))}
       </svg>
       {!hasContent && emptyMessage && (
@@ -58,6 +61,30 @@ export default function EntityMap({
         </div>
       )}
     </div>
+  )
+}
+
+function PathTrace({ sprite, transitionMs }) {
+  const { coordinate, path } = sprite
+  if (!path || path.length < 2) return null
+  
+  const pts = []
+  for (let i = 0; i < path.length; i += 2) {
+    pts.push(`${path[i]} ${path[i+1]}`)
+  }
+  
+  const d = `M ${coordinate.x} ${coordinate.y} L ${pts.join(' L ')}`
+  
+  return (
+    <path
+      d={d}
+      fill="none"
+      stroke={sprite.color}
+      strokeWidth="1.5"
+      strokeOpacity="0.3"
+      strokeDasharray="4 4"
+      style={{ transition: `all ${transitionMs}ms ease-in-out` }}
+    />
   )
 }
 

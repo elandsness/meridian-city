@@ -89,7 +89,30 @@ func runTick(sqlDB *sql.DB, entities map[string]config.MovableEntity, entityType
 		if !ok {
 			continue
 		}
-		if err := db.UpdatePosition(sqlDB, r.ID, wp.X, wp.Y); err != nil {
+		// Extract current path for the DB record
+		var pathPoints []float64
+		for _, p := range entity.Paths[r.State] {
+			pathPoints = append(pathPoints, p.X, p.Y)
+		}
+
+		// Determine target (next waypoint in path, or hold if at end)
+		tx, ty := wp.X, wp.Y
+		if len(entity.Paths[r.State]) > 1 {
+			// Find which segment the entity is currently in
+			totalSeconds := r.NextTransitionAt.Sub(r.StateEnteredAt).Seconds()
+			if totalSeconds > 0 {
+				frac := (float64(time.Now().Sub(r.StateEnteredAt).Seconds()) / totalSeconds)
+				segIdx := int(frac * float64(len(entity.Paths[r.State])-1))
+				if segIdx < len(entity.Paths[r.State]) - 1 {
+					nextPt := entity.Paths[r.State][segIdx+1]
+					tx, ty = nextPt.X, nextPt.Y
+				} else {
+					tx, ty = entity.Paths[r.State][len(entity.Paths[r.State])-1].X, entity.Paths[r.State][len(entity.Paths[r.State])-1].Y
+				}
+			}
+		}
+
+		if err := db.UpdatePosition(sqlDB, r.ID, wp.X, wp.Y, tx, ty, pathPoints); err != nil {
 			log.Printf("[tick] position update failed for id=%s: %v", r.ID, err)
 		}
 	}
