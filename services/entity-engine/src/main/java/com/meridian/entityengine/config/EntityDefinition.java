@@ -98,7 +98,7 @@ public class EntityDefinition {
     public static class PositionDef {
         private String type; // "point2d"
         private String interpolation; // linear | easeInOut
-        private Map<String, Waypoint> waypoints; // state -> {x,y}
+        private Map<String, java.util.List<Waypoint>> waypoints; // state -> {x,y}
     }
 
     @Data
