@@ -50,28 +50,6 @@ func Compute(entity config.MovableEntity, state string, stateEnteredAt time.Time
 		Y: p1.Y + (p2.Y-p1.Y)*localFrac,
 	}, true
 }
-	}
-
-	nextState, hasNext := entity.NextState[state]
-	target, hasTargetWaypoint := entity.Waypoints[nextState]
-	if !hasNext || !hasTargetWaypoint || nextTransitionAt == nil {
-		// Terminal state, or the next state has no waypoint of its own -- hold
-		// position rather than guessing where to glide.
-		return current, true
-	}
-
-	totalSeconds := nextTransitionAt.Sub(stateEnteredAt).Seconds()
-	if totalSeconds <= 0 {
-		return target, true // already past the scheduled transition time
-	}
-	frac := clamp01(now.Sub(stateEnteredAt).Seconds() / totalSeconds)
-	eased := easeInOut(frac)
-
-	return config.Waypoint{
-		X: current.X + (target.X-current.X)*eased,
-		Y: current.Y + (target.Y-current.Y)*eased,
-	}, true
-}
 
 func clamp01(v float64) float64 {
 	if v < 0 {
