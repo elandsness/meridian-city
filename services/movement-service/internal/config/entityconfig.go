@@ -41,7 +41,7 @@ type Waypoint struct {
 }
 
 type position struct {
-	Waypoints map[string]Waypoint `json:"waypoints"`
+	Waypoints map[string][]Waypoint `json:"waypoints"`
 }
 
 type computed struct {
@@ -59,7 +59,7 @@ type entityDefinition struct {
 // TransitionEvaluator remains the sole authority on which transition actually
 // fires.
 type MovableEntity struct {
-	Waypoints map[string]Waypoint
+	Paths map[string][]Waypoint
 	NextState map[string]string
 }
 
@@ -102,7 +102,7 @@ func Load(path string) (map[string]MovableEntity, error) {
 			}
 		}
 		result[entityType] = MovableEntity{
-			Waypoints: def.Computed.Position.Waypoints,
+			Paths: def.Computed.Position.Waypoints,
 			NextState: nextState,
 		}
 	}
