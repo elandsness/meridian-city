@@ -322,20 +322,20 @@ industry:
         position:
           type: point2d
           interpolation: linear
-          waypoints:
-            at_gate:   { x: 197, "y": 99 }
-            boarding:  { x: 197, "y": 159 }
-            taxiing:   { x: 310, "y": 182 }
-            takeoff:   { x: 620, "y": 260 }
-            departed:  { x: 895, "y": 240 }
+          paths:
+            at_gate: [{ x: 197, "y": 99 }]
+            boarding: [{ x: 197, "y": 159 }]
+            taxiing: [{ x: 310, "y": 182 }]
+            takeoff: [{ x: 620, "y": 260 }]
+            departed: [{ x: 895, "y": 240 }]
       generator:
         strategy: "simpleSteadyState"
         maxActive: 8
         intervalMs: 20000
         fields:
-          flight_number: { values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }
-          destination: { values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }
-          gate: { values: ["A1", "A2", "B5", "B12", "C3", "D8"] }
+          flight_number: [{ values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }]
+          destination: [{ values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }]
+          gate: [{ values: ["A1", "A2", "B5", "B12", "C3", "D8"] }]
 
     flight_arrival:
       displayName: "Arrival"
@@ -373,20 +373,20 @@ industry:
         position:
           type: point2d
           interpolation: linear
-          waypoints:
-            approach: { x: 895, "y": 280 }
-            landing:  { x: 560, "y": 260 }
-            taxi_in:  { x: 290, "y": 182 }
-            at_gate:  { x: 197, "y": 344 }
-            arrived:  { x: 197, "y": 404 }
+          paths:
+            approach: [{ x: 895, "y": 280 }]
+            landing: [{ x: 560, "y": 260 }]
+            taxi_in: [{ x: 290, "y": 182 }]
+            at_gate: [{ x: 197, "y": 344 }]
+            arrived: [{ x: 197, "y": 404 }]
       generator:
         strategy: "simpleSteadyState"
         maxActive: 8
         intervalMs: 25000
         fields:
-          flight_number: { values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }
-          origin: { values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }
-          gate: { values: ["A1", "A2", "B5", "B12", "C3", "D8"] }
+          flight_number: [{ values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }]
+          origin: [{ values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }]
+          gate: [{ values: ["A1", "A2", "B5", "B12", "C3", "D8"] }]
 
     service_request:
       displayName: "Service Request"
