@@ -1,10 +1,3 @@
-// Package config loads the same mounted industry entity-config JSON the Java
-// entity-engine reads (see entity-engine's EntityConfigLoader), but only cares
-// about the two things movement-service needs: each entity type's declared
-// position waypoints, and the state graph (to know which waypoint to glide
-// toward next). Every other key in the file (fields, generator, ...) is
-// present in the JSON but simply has no matching struct field here, so
-// encoding/json ignores it.
 package config
 
 import (
@@ -18,11 +11,6 @@ type transition struct {
 	When map[string]interface{} `json:"when"`
 }
 
-// isStochastic reports whether a transition's condition is a probability/
-// faultGate roll (the ~20%-chance branches like a fault/error path) rather
-// than a deterministic one -- used only to pick a sane default glide target
-// below, never to decide which transition actually fires (that stays entirely
-// entity-engine's job).
 func isStochastic(when map[string]interface{}) bool {
 	if when == nil {
 		return false
@@ -32,16 +20,14 @@ func isStochastic(when map[string]interface{}) bool {
 	return hasProbability || hasFaultGate
 }
 
-// Waypoint is a scene coordinate for one state, in whatever scene-local units
-// the entity type's config declares (e.g. an SVG viewBox) -- movement-service
-// is geometry-agnostic beyond interpolating between two of these.
 type Waypoint struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 }
 
 type position struct {
-	Waypoints map[string][]Waypoint `json:"waypoints"`
+	// Use interface{} to capture either a single Waypoint or a slice of Waypoints
+	Waypoints map[string]interface{} `json:"waypoints"`
 }
 
 type computed struct {
@@ -53,18 +39,11 @@ type entityDefinition struct {
 	Computed    *computed    `json:"computed"`
 }
 
-// MovableEntity is the subset of one entity type's config movement-service
-// actually needs: its coordinate space and a state -> next-state map, used
-// only to pick which waypoint to glide toward -- entity-engine's
-// TransitionEvaluator remains the sole authority on which transition actually
-// fires.
 type MovableEntity struct {
 	Paths map[string][]Waypoint
 	NextState map[string]string
 }
 
-// Load reads the entity-config JSON at path and returns the entity types that
-// declare a computed.position block.
 func Load(path string) (map[string]MovableEntity, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -77,15 +56,37 @@ func Load(path string) (map[string]MovableEntity, error) {
 
 	result := make(map[string]MovableEntity)
 	for entityType, def := range all {
-		if def.Computed == nil || def.Computed.Position == nil || len(def.Computed.Position.Waypoints) == 0 {
+		if def.Computed == nil || def.Computed.Position == nil || def.Computed.Position.Waypoints == nil {
 			continue
 		}
-		// Prefer the first DETERMINISTIC outgoing transition per state as the
-		// glide target -- e.g. for "scanning: fault_detected (20% chance) |
-		// validating (otherwise)", declared in that order, glide toward
-		// "validating" (the common case) rather than "fault_detected" (a rare
-		// branch declared first). Falls back to the first declared transition
-		// for any state where every outgoing transition is stochastic.
+
+		paths := make(map[string][]Waypoint)
+		for state, val := range def.Computed.Position.Waypoints {
+			// Case 1: It's already a slice ([]interface{})
+			if slice, ok := val.([]interface{}); ok {
+				pts := make([]Waypoint, 0, len(slice))
+				for _, item := range slice {
+					if m, ok := item.(map[string]interface{}); ok {
+						pts = append(pts, Waypoint{
+							X: castFloat(m["x"]),
+							Y: castFloat(m["y"]),
+						})
+					}
+				}
+				paths[state] = pts
+			} else if m, ok := val.(map[string]interface{}); ok {
+				// Case 2: It's a single point map - wrap it in a slice for the engine
+				paths[state] = []Waypoint{{
+					X: castFloat(m["x"]),
+					Y: castFloat(m["y"]),
+				}}
+			}
+		}
+
+		if len(paths) == 0 {
+			continue
+		}
+
 		firstAny := make(map[string]string)
 		nextState := make(map[string]string)
 		for _, t := range def.Transitions {
@@ -102,9 +103,16 @@ func Load(path string) (map[string]MovableEntity, error) {
 			}
 		}
 		result[entityType] = MovableEntity{
-			Paths: def.Computed.Position.Waypoints,
+			Paths: paths,
 			NextState: nextState,
 		}
 	}
 	return result, nil
+}
+
+func castFloat(i interface{}) float64 {
+	if f, ok := i.(float64); ok {
+		return f
+	}
+	return 0.0
 }
