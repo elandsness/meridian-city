@@ -9,7 +9,7 @@ import (
 
 func testEntity() config.MovableEntity {
 	return config.MovableEntity{
-		Waypoints: map[string]config.Waypoint{
+		Paths: map[string]config.Waypoint{
 			"queued":   {X: 0, Y: 0},
 			"scanning": {X: 100, Y: 0},
 			"complete": {X: 200, Y: 0},
