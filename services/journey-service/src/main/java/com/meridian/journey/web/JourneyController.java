@@ -34,6 +34,16 @@ public class JourneyController {
         return journeyService.board(entityType, status, direction);
     }
 
+    @GetMapping("/departures")
+    public List<JourneyResponse> departures() {
+        return journeyService.board(null, null, "departure");
+    }
+
+    @GetMapping("/arrivals")
+    public List<JourneyResponse> arrivals() {
+        return journeyService.board(null, null, "arrival");
+    }
+
     @GetMapping("/me")
     public ResponseEntity<JourneyResponse> getMe(@RequestParam("user_id") String userId) {
         return ResponseEntity.ok(journeyService.getForUser(userId));
