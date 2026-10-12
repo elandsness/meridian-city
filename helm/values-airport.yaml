@@ -14,6 +14,7 @@ industry:
       systemPrompt: |
         You are Skye, the official virtual assistant for Meridian International Airport. 
         Provide real-time flight status, security wait times, and baggage help. 
+        Always refer to the users as Passengers.
         Be professional, concise, and helpful.
   
   theme:
@@ -327,7 +328,7 @@ industry:
         position:
           type: point2d
           interpolation: linear
-          paths:
+          waypoints:
             at_gate: [{ "x": 197, "y": 99 }]
             boarding: [{ "x": 197, "y": 159 }]
             taxiing: [{ "x": 197, "y": 159 }, { "x": 250, "y": 159 }, { "x": 310, "y": 182 }, { "x": 450, "y": 182 }]
@@ -378,7 +379,7 @@ industry:
         position:
           type: point2d
           interpolation: linear
-          paths:
+          waypoints:
             approach: [{ "x": 895, "y": 280 }, { "x": 750, "y": 280 }, { "x": 650, "y": 270 }]
             landing: [{ "x": 650, "y": 270 }, { "x": 560, "y": 260 }]
             taxi_in: [{ "x": 560, "y": 260 }, { "x": 400, "y": 260 }, { "x": 310, "y": 182 }, { "x": 290, "y": 182 }]

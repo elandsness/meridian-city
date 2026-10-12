@@ -3,8 +3,8 @@ ChatService — core chatbot orchestration.
 
 Responsibilities:
   1. Maintain per-session conversation history (in-memory, capped at MAX_HISTORY_TURNS)
-  2. Build a Meridian City Assistant system prompt
-  3. Optionally enrich context from citizen-service / city-operations
+  2. Resolve industry-specific system prompts dynamically at runtime
+  3. Optionally enrich context from identity/customer services
   4. Apply fault injection (LLM latency)
   5. Call the LLM provider (OpenLLMetry auto-instruments it)
   6. Attach session.id correlation to the trace
@@ -37,43 +37,11 @@ biz_logger = logging.getLogger("BusinessEvents")
 # Maximum number of turns (user+assistant pairs) to retain per session.
 MAX_HISTORY_TURNS = 10
 
-# Assistant persona is config-driven (Phase 1). The industry config supplies the
-# assistant name + company (and, optionally, a full ASSISTANT_SYSTEM_PROMPT override
-# and SUPPORT_PHONE for non-city industries). Defaults reproduce the Meridian City
-# persona exactly.
-ASSISTANT_NAME = os.getenv("ASSISTANT_NAME", "Meri")
-COMPANY_NAME = os.getenv("COMPANY_NAME", "Meridian City")
-SUPPORT_PHONE = os.getenv("SUPPORT_PHONE", "1-555-MERIDIAN (1-555-637-4326)")
-
-
-def _default_system_prompt(name: str, company: str, phone: str) -> str:
-    return f"""\
-You are {name}, the official virtual assistant for {company} — a real,
-mid-sized city. Always respond as though {company} genuinely exists and you
-are its assistant. Never say you are a generic AI model or that the city is
-fictional, and never break character.
-
-You help residents with:
-- Reporting city issues (potholes, broken streetlights, water main breaks, graffiti)
-  — remind residents they can file a service request in the {company} Portal.
-- Checking the status of a submitted service request (by request ID, e.g. req-00123).
-- Current incidents and city service information (parks, libraries, transit, permits).
-- Paying city tax bills and shopping the {company} store — both in the portal.
-
-If a resident needs to reach a person, give the {company} services line:
-{phone}, available Mon–Fri 8 am – 6 pm, or direct them to
-submit a service request in the portal.
-
-Be concise, warm, and professional. Acknowledge the resident's concern before
-providing information. If a service request ID is mentioned, use the context below
-to give a specific update.\
-"""
-
-
-# Full override wins; otherwise build the default from the brand env vars.
-_SYSTEM_PROMPT = os.getenv("ASSISTANT_SYSTEM_PROMPT") or _default_system_prompt(
-    ASSISTANT_NAME, COMPANY_NAME, SUPPORT_PHONE
-)
+# Generic fallback for when no runtime config is available.
+def _get_generic_fallback_prompt(name: str, company: str, phone: str) -> str:
+    return f"""You are {name}, the official virtual assistant for {company}. 
+Be professional, concise, and helpful. If a user needs to reach a person, 
+give the support line: {phone}, or direct them to the official portal."""
 
 # Regex to extract a service request ID embedded in the user's message (e.g., "req-00123").
 _REQUEST_ID_RE = re.compile(r"\breq[-_]?(\d+)\b", re.IGNORECASE)
@@ -86,7 +54,6 @@ def _associate_session(session_id: str) -> None:
     """
     try:
         from traceloop.sdk import Traceloop
-
         Traceloop.set_association_properties({"session_id": session_id})
     except Exception:
         pass
@@ -95,8 +62,12 @@ def _associate_session(session_id: str) -> None:
 class ChatService:
     def __init__(self, provider: LLMProvider) -> None:
         self._provider = provider
-        self._citizen_url = os.getenv("CITIZEN_SERVICE_URL", "http://citizen-service:8081")
-        self._city_ops_url = os.getenv("CITY_OPERATIONS_URL", "http://city-operations:8083")
+        # Semantically renamed from _citizen_url
+        self._customer_url = os.getenv("CUSTOMER_SERVICE_URL", "http://identity-service:8081")
+        self._ops_url = os.getenv("OPS_SERVICE_URL", "http://ops-engine:8083")
+        # New: URL to the industry persona config (e.g., demo-control-api or a config-service)
+        self._config_url = os.getenv("INDUSTRY_CONFIG_URL")
+        
         self._http = httpx.AsyncClient(timeout=5.0)
         # session_id → list of LLMMessage (excludes the system prompt)
         self._sessions: Dict[str, List[LLMMessage]] = defaultdict(list)
@@ -115,7 +86,7 @@ class ChatService:
         request_id: Optional[str] = None,
     ) -> LLMResponse:
         """
-        Process a citizen chat message and return an LLM response.
+        Process a customer chat message and return an LLM response.
         Stores conversation history for multi-turn context.
         """
         tracer = get_tracer()
@@ -128,13 +99,15 @@ class ChatService:
                 request_id = f"req-{m.group(1).zfill(5)}"
 
         context = await self._fetch_context(request_id)
-
+        
+        # Resolve prompt dynamically for this specific request (Runtime Persona)
+        system_prompt = await self._resolve_system_prompt()
+        
         # Build full message list: system prompt + history + new user turn
         history = self._sessions[session_id]
-        messages = self._build_messages(message, context, history)
+        messages = self._build_messages(message, context, history, system_prompt)
 
-        # Associate the session id with every span in this trace, including the
-        # gen_ai.* span OpenLLMetry emits for the provider call below.
+        # Associate the session id with every span in this trace
         _associate_session(session_id)
 
         with tracer.start_as_current_span("meridian.chat") as span:
@@ -209,15 +182,37 @@ class ChatService:
     # Internals
     # ------------------------------------------------------------------
 
+    async def _resolve_system_prompt(self) -> str:
+        """
+        Dynamic Persona Resolution.
+        Fetch the system prompt from the configured runtime endpoint.
+        Falls back to generic parameters if fetch fails or is not configured.
+        """
+        name = os.getenv("ASSISTANT_NAME", "Assistant")
+        company = os.getenv("COMPANY_NAME", "Meridian")
+        phone = os.getenv("SUPPORT_PHONE", "1-555-GENERIC")
+
+        if self._config_url:
+            try:
+                # Endpoint expected to return { "systemPrompt": "..." }
+                resp = await self._http.get(f"{self._config_url}/persona")
+                if resp.status_code == 200:
+                    return resp.json().get("systemPrompt", _get_generic_fallback_prompt(name, company, phone))
+            except Exception as exc:
+                logger.debug("runtime persona fetch failed: %s", exc)
+        
+        return _get_generic_fallback_prompt(name, company, phone)
+
     def _build_messages(
         self,
         user_message: str,
         context: str,
         history: List[LLMMessage],
+        system_prompt: str,
     ) -> List[LLMMessage]:
-        system = _SYSTEM_PROMPT
+        system = system_prompt
         if context:
-            system += f"\n\n---\nService Request Context:\n{context}"
+            system += f"\n\n---\nEntity Context:\n{context}"
 
         messages: List[LLMMessage] = [LLMMessage(role="system", content=system)]
         messages.extend(history)
@@ -227,13 +222,13 @@ class ChatService:
     def _trim_history(self, session_id: str) -> None:
         """Keep only the last MAX_HISTORY_TURNS turn pairs."""
         history = self._sessions[session_id]
-        max_messages = MAX_HISTORY_TURNS * 2  # each turn = user + assistant
+        max_messages = MAX_HISTORY_TURNS * 2
         if len(history) > max_messages:
             self._sessions[session_id] = history[-max_messages:]
 
     async def _fetch_context(self, request_id: Optional[str]) -> str:
         """
-        Fetch a service request from citizen-service for chatbot context.
+        Fetch entity context from the customer service for chatbot context.
         Returns an empty string if unavailable — never blocks the chat flow.
         """
         if not request_id:
@@ -241,7 +236,7 @@ class ChatService:
 
         try:
             resp = await self._http.get(
-                f"{self._citizen_url}/api/v1/requests/{request_id}"
+                f"{self._customer_url}/api/v1/requests/{request_id}"
             )
             if resp.status_code == 200:
                 data = resp.json()

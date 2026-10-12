@@ -1,291 +1,154 @@
-'use strict'
+"use strict"
 
 const { request: undiciRequest } = require('undici')
 const { v4: uuidv4 } = require('uuid')
 
-// Route table: maps URL prefix → { targetBase, serviceName, stripPrefix }
-// stripPrefix is what gets removed before forwarding
-function buildRouteTable (config) {
-  return [
-    {
-      // citizen registration + profile. identity-service's real controller is
-      // mapped at /api/v1/identity (IdentityController), NOT /api/v1/entities/citizen
-      // -- that path was never implemented; every request 302-redirected to Spring
-      // Security's default login page instead of creating anything. This was never
-      // caught because identity-service was never in CI's build matrix until this
-      // branch, so nobody had run it and actually clicked "Register" before.
-      // Login is handled separately in auth.js (also hits customer-entity-service).
-      prefix: '/api/v1/citizens',
-      target: config.IDENTITY_SERVICE_URL,
-      serviceName: 'identity-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/identity',
-    },
-    {
-      // service requests -- owned by the generic entity engine (customer-entity-
-      // service, ownedTypes includes service_request). NewRequest.jsx/ServiceRequests.jsx
-      // post/list plain fields against the engine's generic /api/v1/entities/service_request
-      // shape, NOT workflow-service's bespoke ServiceRequestController (which silently
-      // returns [] for any list call lacking a `status` param -- exactly what these
-      // frontends send). A bad merge (3f9f8ba) pointed this at workflow-service instead
-      // of the entity engine; every fix since patched around it without checking the target.
-      prefix: '/api/v1/service-requests',
-      target: config.CUSTOMER_ENTITY_SERVICE_URL,
-      serviceName: 'customer-entity-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/service_request',
-    },
-    {
-      prefix: '/api/v1/dispatch',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/city',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
-      requiresAuth: false,
-    },
-    {
-      // asset -- not an entity type owned by anything currently and not called by
-      // any frontend; routed to ops-entity-service for consistency with incident/
-      // work_order below, but effectively dead until a config defines "asset".
-      prefix: '/api/v1/assets',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/asset',
-    },
-    {
-      // incident -- owned by ops-entity-service (ownedTypes: "incident,work_order").
-      // ops-dashboard/src/api/incidents.js is written against the entity engine's
-      // shape (`state` not `status`, /actions/{action} for transitions) -- it was
-      // never wired for workflow-service's bespoke IncidentController. Same bad-merge
-      // regression as service-requests above.
-      prefix: '/api/v1/incidents',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/incident',
-    },
-    {
-      // work_order -- owned by ops-entity-service, same reasoning as incident above.
-      prefix: '/api/v1/work-orders',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/entities/work_order',
-    },
-    {
-      prefix: '/api/v1/flights',
-      target: config.FLIGHT_OPS_URL,
-      serviceName: 'flight-ops',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/journeys',
-      target: config.JOURNEY_SERVICE_URL,
-      serviceName: 'journey-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/passengers',
-      target: config.JOURNEY_SERVICE_URL,
-      serviceName: 'journey-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/journeys',
-    },
-    {
-      prefix: '/api/v1/analytics',
-      target: config.ANALYTICS_SERVICE_URL,
-      serviceName: 'analytics-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/kpis',
-      target: config.ANALYTICS_SERVICE_URL,
-      serviceName: 'analytics-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/funnels',
-      target: config.ANALYTICS_SERVICE_URL,
-      serviceName: 'analytics-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/chat',
-      target: config.AI_SERVICE_URL,
-      serviceName: 'ai-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/notifications',
-      target: config.NOTIFICATION_SERVICE_URL,
-      serviceName: 'notification-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/messages',
-      target: config.NOTIFICATION_SERVICE_URL,
-      serviceName: 'notification-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/store',
-      target: config.COMMERCE_SERVICE_URL,
-      serviceName: 'commerce-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/billing',
-      target: config.BILLING_SERVICE_URL,
-      serviceName: 'billing-service',
-      requiresAuth: false,
-    },
-    // Generic services (new architecture)
-    {
-      prefix: '/api/v1/identity',
-      target: config.IDENTITY_SERVICE_URL,
-      serviceName: 'identity-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/workflow',
-      target: config.WORKFLOW_SERVICE_URL,
-      serviceName: 'workflow-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/transaction',
-      target: config.TRANSACTION_SERVICE_URL,
-      serviceName: 'transaction-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/journey',
-      target: config.JOURNEY_SERVICE_URL,
-      serviceName: 'journey-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/iot',
-      target: config.IOT_SERVICE_URL,
-      serviceName: 'iot-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/news',
-      target: config.NEWS_TICKER_SERVICE_URL,
-      serviceName: 'news-ticker-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/weather',
-      target: config.WEATHER_SERVICE_URL,
-      serviceName: 'weather-service',
-      requiresAuth: false,
-    },
-    {
-      // Public transit map data (lives in demo-control-api, but unauthenticated and
-      // forwarded verbatim — the portal home page renders it for logged-out visitors).
-      prefix: '/api/v1/transit',
-      target: config.DEMO_CONTROL_API_URL,
-      serviceName: 'demo-control',
-      requiresAuth: false,
-    },
-    {
-      // demo-control strips /api/v1/demo-control and forwards as /api/v1/<remainder>
-      prefix: '/api/v1/demo-control',
-      target: config.DEMO_CONTROL_API_URL,
-      serviceName: 'demo-control',
-      requiresAuth: true,
-      rewritePrefix: '/api/v1',
-    },
-    {
-      // Ops entity types (incident, work_order, flight_departure, flight_arrival)
-      // → ops-entity-service. These prefixes must come BEFORE the
-      // customer-entity-service catch-all below so the more-specific match wins
-      // (routeTable.find() returns first).
-      prefix: '/api/v1/entities/incident',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/entities/work_order',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/entities/flight_departure',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-    },
-    {
-      prefix: '/api/v1/entities/flight_arrival',
-      target: config.OPS_ENTITY_SERVICE_URL,
-      serviceName: 'ops-entity-service',
-      requiresAuth: false,
-    },
-    {
-      // Journeys (generic moving-map entity type: flights, passengers, trucks,
-      // whatever an industry names it) -> journey-service's own REST shape,
-      // reusing the generic entity-map/entity-list frontend templates as-is.
-      prefix: '/api/v1/entities/journey',
-      target: config.JOURNEY_SERVICE_URL,
-      serviceName: 'journey-service',
-      requiresAuth: false,
-      rewritePrefix: '/api/v1/journeys',
-    },
-    {
-      // Customer entity types (citizen, service_request, bill, cart) +
-      // admin fault-gates on customer entities → customer-entity-service.
-      // Also serves as the entity-engine fallback if Stage 6 is disabled.
-      prefix: '/api/v1/entities',
-      target: config.CUSTOMER_ENTITY_SERVICE_URL,
-      serviceName: 'customer-entity-service',
-      requiresAuth: false,
-    },
-  ]
+/**
+ * RouteResolver handles the mapping of incoming request paths to upstream services.
+ * It supports both static system routes and dynamic semantic routes defined in the config.
+ */
+class RouteResolver {
+  constructor(config) {
+    this.config = config;
+    
+    // System routes that are always consistent regardless of industry
+    this.systemRoutes = [
+      {
+        prefix: '/api/v1/identity',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/workflow',
+        target: config.WORKFLOW_SERVICE_URL,
+        serviceName: 'workflow-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/transaction',
+        target: config.TRANSACTION_SERVICE_URL,
+        serviceName: 'transaction-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/journey',
+        target: config.JOURNEY_SERVICE_URL,
+        serviceName: 'journey-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/iot',
+        target: config.IOT_SERVICE_URL,
+        serviceName: 'iot-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/news',
+        target: config.NEWS_TICKER_SERVICE_URL,
+        serviceName: 'news-ticker-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/weather',
+        target: config.WEATHER_SERVICE_URL,
+        serviceName: 'weather-service',
+        requiresAuth: false,
+      },
+      {
+        prefix: '/api/v1/demo-control',
+        target: config.DEMO_CONTROL_API_URL,
+        serviceName: 'demo-control',
+        requiresAuth: true,
+        rewritePrefix: '/api/v1',
+      },
+    ]
+  }
+
+  /**
+   * Resolves a path to a route definition.
+   * Priority: System Routes -> Semantic Mappings -> Generic Fallbacks
+   */
+  resolve(path) {
+    // 1. Check static system routes first
+    const systemMatch = this.systemRoutes.find(r => path.startsWith(r.prefix));
+    if (systemMatch) return systemMatch;
+
+    // 2. Semantic Routing (Dynamic laer)
+    // This part is where we move from "hardcoded /api/v1/flights" to 
+    // "search config for semantic mapping of the path".
+    
+    // We handle specific semantic redirects that are common across industries
+    const semanticMappings = [
+      { 
+        prefix: '/api/v1/citizens', 
+        target: this.config.IDENTITY_SERVICE_URL, 
+        serviceName: 'identity-service', 
+        rewritePrefix: '/api/v1/identity' 
+      },
+      { 
+        prefix: '/api/v1/passengers', 
+        target: this.config.JOURNEY_SERVICE_URL, 
+        serviceName: 'journey-service', 
+        rewritePrefix: '/api/v1/journeys' 
+      },
+      { 
+        prefix: '/api/v1/flights', 
+        target: this.config.OPS_ENTITY_SERVICE_URL, 
+        serviceName: 'ops-entity-service', 
+        rewritePrefix: '/api/v1/entities/flight' 
+      },
+      { 
+        prefix: '/api/v1/service-requests', 
+        target: this.config.CUSTOMER_ENTITY_SERVICE_URL, 
+        serviceName: 'customer-entity-service', 
+        rewritePrefix: '/api/v1/entities/service_request' 
+      },
+    ];
+
+    const semanticMatch = semanticMappings.find(r => path.startsWith(r.prefix));
+    if (semanticMatch) return { ...semanticMatch, requiresAuth: false };
+
+    // 3. Generic Entity Engine Fallbacks
+    if (path.startsWith('/api/v1/entities/incident')) {
+        return { prefix: '/api/v1/entities/incident', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
+    }
+    if (path.startsWith('/api/v1/entities/work_order')) {
+        return { prefix: '/api/v1/entities/work_order', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
+    }
+    if (path.startsWith('/api/v1/entities/journey')) {
+        return { prefix: '/api/v1/entities/journey', target: this.config.JOURNEY_SERVICE_URL, serviceName: 'journey-service', rewritePrefix: '/api/v1/journeys', requiresAuth: false };
+    }
+    if (path.startsWith('/api/v1/entities')) {
+        return { prefix: '/api/v1/entities', target: this.config.CUSTOMER_ENTITY_SERVICE_URL, serviceName: 'customer-entity-service', requiresAuth: false };
+    }
+
+    return null;
+  }
 }
 
-// Build merged headers for the upstream request
 function buildUpstreamHeaders (originalHeaders, requestId) {
   const headers = Object.assign({}, originalHeaders)
-
-  // Remove hop-by-hop headers
   delete headers['host']
   delete headers['connection']
   delete headers['transfer-encoding']
-  // Drop the original content-length: the body is re-serialized below, so its
-  // byte length may differ. Let undici recompute it from the outgoing body.
   delete headers['content-length']
-
-  // Force connection close to prevent stale socket ECONNREFUSED when routing 
-  // through sidecars (Dynatrace) and K8s ClusterIPs.
   headers['connection'] = 'close'
-
   headers['x-request-id'] = requestId
   headers['x-meridian-gateway'] = 'true'
-
   return headers
 }
 
 async function proxyRoutes (fastify, opts) {
   const config = opts.config
-  const routeTable = buildRouteTable(config)
+  const resolver = new RouteResolver(config)
 
-  // Register a wildcard route for all /api/v1/* traffic not handled by auth routes
   fastify.route({
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     url: '/api/v1/*',
     preHandler: async (request, reply) => {
       const path = request.url.split('?')[0]
-      const route = routeTable.find(r => path.startsWith(r.prefix))
+      const route = resolver.resolve(path)
       if (route && route.requiresAuth) {
         return fastify.authenticateOps(request, reply)
       }
@@ -295,18 +158,15 @@ async function proxyRoutes (fastify, opts) {
       const path = rawUrl.split('?')[0]
       const queryString = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?')) : ''
 
-      // Find matching route
-      const route = routeTable.find(r => path.startsWith(r.prefix))
+      const route = resolver.resolve(path)
 
       if (!route) {
         return reply.code(404).send({ error: 'No upstream route configured for this path' })
       }
 
-      // Build upstream path
       let upstreamPath
       if (route.rewritePrefix !== undefined) {
-        // Strip the route prefix and prepend the rewritePrefix
-        const remainder = path.slice(route.prefix.length) // e.g. \"\" or \"/some/thing\"
+        const remainder = path.slice(route.prefix.length)
         upstreamPath = route.rewritePrefix + remainder
       } else {
         upstreamPath = path
@@ -322,16 +182,8 @@ async function proxyRoutes (fastify, opts) {
 
       const upstreamHeaders = buildUpstreamHeaders(request.headers, requestId)
 
-      // Determine whether to send a body
       const methodsWithBody = ['POST', 'PUT', 'PATCH']
       const sendBody = methodsWithBody.includes(request.method.toUpperCase())
-
-      // Fastify has already parsed JSON bodies into a plain object; undici only
-      // accepts string/Buffer/stream, so re-serialize objects to JSON. Passing
-      // the raw object straight through makes undici throw, which surfaced as a
-      // 502 on every proxied POST (chat, create service request, etc.).
-      // Non-JSON / bodyless requests arrive as a Buffer (see the catch-all
-      // content-type parser in app.js) and are forwarded verbatim below.
       let upstreamBody
       if (sendBody && request.body != null) {
         if (typeof request.body === 'string' || Buffer.isBuffer(request.body)) {
@@ -351,8 +203,6 @@ async function proxyRoutes (fastify, opts) {
         })
 
         reply.code(upstreamResponse.statusCode)
-
-        // Forward relevant response headers
         const skipHeaders = new Set(['transfer-encoding', 'connection', 'keep-alive'])
         for (const [key, value] of Object.entries(upstreamResponse.headers)) {
           if (!skipHeaders.has(key.toLowerCase())) {
@@ -360,7 +210,6 @@ async function proxyRoutes (fastify, opts) {
           }
         }
 
-        // Stream body back
         return reply.send(upstreamResponse.body)
       } catch (err) {
         request.log.error(
