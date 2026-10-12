@@ -117,35 +117,48 @@ public class EntityFactory {
     private Object generateFieldValue(String fieldName, EntityDefinition.FieldDef fieldDef, EntityDefinition def) {
         if (fieldDef.getDefaultValue() != null) return fieldDef.getDefaultValue();
         Object rawHint = def.getGenerator() == null ? null : def.getGenerator().getFields().get(fieldName);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> hint = rawHint instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+        if (rawHint == null) return null;
+
         String type = fieldDef.getType();
-        if ("boolean".equals(type)) {
-            double probability = hint != null && hint.get("probability") instanceof Number n ? n.doubleValue() : 0.5;
-            return ThreadLocalRandom.current().nextDouble() < probability;
+
+        if (rawHint instanceof List<?> list && !list.isEmpty()) {
+            Object picked = list.get(ThreadLocalRandom.current().nextInt(list.size()));
+            if (picked instanceof Map<?, ?> map) {
+                Object vals = map.get("values");
+                if (vals instanceof List<?> values && !values.isEmpty()) {
+                    return String.valueOf(values.get(ThreadLocalRandom.current().nextInt(values.size())));
+                }
+            }
+            return String.valueOf(picked);
         }
-        if ("enum".equals(type) && fieldDef.getValues() != null && !fieldDef.getValues().isEmpty()) {
-            List<String> values = fieldDef.getValues();
-            return values.get(ThreadLocalRandom.current().nextInt(values.size()));
-        }
-        if ("number".equals(type)) {
-            if (hint != null) {
+
+        if (rawHint instanceof Map<?, ?> rawMap) {
+            Map<String, Object> hint = (Map<String, Object>) rawMap;
+            if ("boolean".equals(type)) {
+                double probability = hint.get("probability") instanceof Number n ? n.doubleValue() : 0.5;
+                return ThreadLocalRandom.current().nextDouble() < probability;
+            }
+            if ("enum".equals(type) && fieldDef.getValues() != null && !fieldDef.getValues().isEmpty()) {
+                List<String> values = fieldDef.getValues();
+                return values.get(ThreadLocalRandom.current().nextInt(values.size()));
+            }
+            if ("number".equals(type)) {
                 Number min = hint.get("min") instanceof Number n ? n : null;
                 Number max = hint.get("max") instanceof Number n ? n : null;
                 if (min != null && max != null) {
                     return Math.round(ThreadLocalRandom.current().nextDouble(min.doubleValue(), max.doubleValue()));
                 }
+                return 0;
             }
-            return 0;
-        }
-        if ("string".equals(type) && hint != null) {
-            String faker = hint.get("faker") instanceof String s ? s : null;
-            if ("fullName".equals(faker)) return randomFullName();
-            if ("firstName".equals(faker)) return randomFirstName();
-            if ("lastName".equals(faker)) return randomLastName();
-            if ("streetAddress".equals(faker)) return randomAddress();
-            if (hint.get("values") instanceof List<?> vals && !vals.isEmpty()) {
-                return String.valueOf(vals.get(ThreadLocalRandom.current().nextInt(vals.size())));
+            if ("string".equals(type)) {
+                String faker = hint.get("faker") instanceof String s ? s : null;
+                if ("fullName".equals(faker)) return randomFullName();
+                if ("firstName".equals(faker)) return randomFirstName();
+                if ("lastName".equals(faker)) return randomLastName();
+                if ("streetAddress".equals(faker)) return randomAddress();
+                if (hint.get("values") instanceof List<?> vals && !vals.isEmpty()) {
+                    return String.valueOf(vals.get(ThreadLocalRandom.current().nextInt(vals.size())));
+                }
             }
         }
         return null;
