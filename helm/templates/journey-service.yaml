@@ -62,7 +62,7 @@ spec:
             # This is how an industry config gives journey-service a moving map
             # (routes with coordinates) purely through Helm values, no code change.
             - name: SPRING_APPLICATION_JSON
-              value: {{ dict "generator" (dict "entityTypes" .Values.journeyService.generator.entityTypes "routes" .Values.journeyService.generator.routes "initialStatuses" .Values.journeyService.generator.initialStatuses) | toJson | quote }}
+              value: {{ dict "generator" (dict "entityTypes" .Values.journeyService.generator.entityTypes "routes" .Values.journeyService.generator.routes "initialStatuses" .Values.journeyService.generator.initialStatuses) "journey" (dict "industry" (dict "entities" .Values.industry.entities)) | toJson | quote }}
             {{- if .Values.journeyService.env }}
             {{- range $key, $value := .Values.journeyService.env }}
             - name: {{ $key }}
