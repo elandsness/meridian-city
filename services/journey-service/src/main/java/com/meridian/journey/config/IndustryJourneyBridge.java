@@ -19,39 +19,49 @@ public class IndustryJourneyBridge {
     // We expect a JSON structure passed via SPRING_APPLICATION_JSON from Helm
     // that matches the industry.entities.<type>.states and transitions.
     
-    @Value("${journey.industry.transitions:[]}")
-    private String industryTransitionsRaw;
-
-    @Value("${journey.industry.states:[]}")
-    private String industryStatesRaw;
+    @Value("${journey.industry.entities:{}}")
+    private String industryEntitiesRaw;
 
     @PostConstruct
     public void alignWithIndustry() {
-        List<Map<String, Object>> transitions = parseJsonList(industryTransitionsRaw);
-        List<Map<String, Object>> states = parseJsonList(industryStatesRaw);
+        Map<String, Object> entities = parseJsonMap(industryEntitiesRaw);
 
-        if (transitions == null || transitions.isEmpty()) {
-            log.info("No industry transitions found, using defaults.");
+        if (entities == null || entities.isEmpty()) {
+            log.info("No industry entities found, using defaults.");
             return;
         }
 
         log.info("Aligning journey lifecycle with industry config...");
         
         Map<String, String> transMap = new HashMap<>();
-        for (Map<String, Object> t : transitions) {
-            String from = (String) t.get("from");
-            String to = (String) t.get("to");
-            if (from != null && to != null) {
-                transMap.put(from, to);
+        List<Map<String, Object>> allStates = new ArrayList<>();
+        
+        for (Map.Entry<String, Object> entry : entities.entrySet()) {
+            Map<String, Object> entityCfg = (Map<String, Object>) entry.getValue();
+            
+            List<Map<String, Object>> transitions = (List<Map<String, Object>>) entityCfg.get("transitions");
+            if (transitions != null) {
+                for (Map<String, Object> t : transitions) {
+                    String from = (String) t.get("from");
+                    String to = (String) t.get("to");
+                    if (from != null && to != null) {
+                        transMap.put(from, to);
+                    }
+                }
+            }
+
+            List<Map<String, Object>> states = (List<Map<String, Object>>) entityCfg.get("states");
+            if (states != null) {
+                allStates.addAll(states);
             }
         }
         props.setTransitions(transMap);
 
-        if (states != null && !states.isEmpty()) {
+        if (!allStates.isEmpty()) {
             Map<String, Double> progMap = new HashMap<>();
-            int total = states.size();
+            int total = allStates.size();
             for (int i = 0; i < total; i++) {
-                Map<String, Object> s = states.get(i);
+                Map<String, Object> s = allStates.get(i);
                 String name = (String) s.get("id") != null ? (String) s.get("id") : (String) s.get("name");
                 if (name != null) {
                     progMap.put(name, (double) i / (total - 1));
@@ -61,7 +71,7 @@ public class IndustryJourneyBridge {
             
             List<String> active = new ArrayList<>();
             for (int i = 0; i < total - 1; i++) {
-                Map<String, Object> s = states.get(i);
+                Map<String, Object> s = allStates.get(i);
                 String name = (String) s.get("id") != null ? (String) s.get("id") : (String) s.get("name");
                 if (name != null) active.add(name);
             }
@@ -71,16 +81,16 @@ public class IndustryJourneyBridge {
         log.info("Industry alignment complete. Transitions: {}, Active: {}", transMap.keySet(), props.getActiveStatuses());
     }
 
-    private List<Map<String, Object>> parseJsonList(String json) {
-        if (json == null || json.equals("[]") || json.trim().isEmpty()) {
-            return Collections.emptyList();
+    private Map<String, Object> parseJsonMap(String json) {
+        if (json == null || json.equals("{}") || json.trim().isEmpty()) {
+            return Collections.emptyMap();
         }
         try {
             return new com.fasterxml.jackson.databind.ObjectMapper()
-                .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+                .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.warn("Failed to parse industry JSON: {}", e.getMessage());
-            return Collections.emptyList();
+            log.warn("Failed to parse industry JSON map: {}", e.getMessage());
+            return Collections.emptyMap();
         }
     }
 }
