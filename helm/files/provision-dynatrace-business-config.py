@@ -171,8 +171,8 @@ def upsert(schema, value, matches):
 #: Hand-written correlation keys for flows not yet expressed via DT_ENTITY_CONFIG
 #: (City's 5 + Airport's 2 + the generic-services backend's identity/journey ids).
 #: Verified against live Grail data (2026-07-24) that OpenPipeline's fieldsAdd is a
-#: strict allowlist: a JSON key inside `bizjson` that is never named here stays
-#: buried in `bizjson`, which is removed below, so fieldExtraction:includeAll
+#: strict allowlist: a JSON key inside `bizjson["event.type"] that is never named here stays
+#: buried in `bizjson["event.type"], which is removed below, so fieldExtraction:includeAll
 #: downstream never sees it -- e.g. `citizen.email` and `flight.gate` are present
 #: in every raw log line but confirmed ABSENT from the resulting bizevent's fields
 #: precisely because nothing here names them.
