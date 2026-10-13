@@ -27,6 +27,10 @@ func Compute(entity config.MovableEntity, state string, stateEnteredAt time.Time
 		return path[0], true
 	}
 
+	if nextTransitionAt == nil {
+		return path[len(path)-1], true
+	}
+
 	totalSeconds := nextTransitionAt.Sub(stateEnteredAt).Seconds()
 	if totalSeconds <= 0 {
 		return path[len(path)-1], true
