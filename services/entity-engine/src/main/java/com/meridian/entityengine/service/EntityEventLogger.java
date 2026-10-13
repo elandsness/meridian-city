@@ -29,25 +29,23 @@ public class EntityEventLogger {
     }
 
     public void transitioned(EntityRecord record, String fromState, EntityDefinition.TransitionDef transition, EntityDefinition def, OffsetDateTime timestamp) {
-        String eventType;
+        // Use the semantic state as the absolute system-of-record event identity.
+        // This ensures that auto-derived Business Flows (based on the state machine) always have data.
+        String eventType = record.getEntityType() + "." + record.getState();
         List<Object> args = new ArrayList<>();
+        
+        args.add(StructuredArguments.keyValue("event.type", eventType));
+        args.add(StructuredArguments.keyValue(record.getEntityType() + ".id", record.getId()));
 
-        // 1. Semantic Mapping: Check if the transition has a defined semantic signal
+        // If a semantic signal alias exists, add it as a supplementary attribute for legacy/pretty reporting.
         if (transition != null && transition.getSignal() != null) {
             EntityDefinition.SignalDef signal = transition.getSignal();
-            eventType = signal.getEventType();
+            args.add(StructuredArguments.keyValue("event.signal", signal.getEventType()));
             
-            // Use the configured correlation ID field from the entity record
             String corrIdField = signal.getCorrelationId();
-            Object corrIdValue = corrIdField != null ? record.getField(corrIdField) : record.getId();
-            
-            args.add(StructuredArguments.keyValue("event.type", eventType));
-            args.add(StructuredArguments.keyValue(corrIdField != null ? corrIdField : "entity.id", corrIdValue));
-        } else {
-            // Fallback to generic format for debugging/system events
-            eventType = record.getEntityType() + "." + record.getState();
-            args.add(StructuredArguments.keyValue("event.type", eventType));
-            args.add(StructuredArguments.keyValue(record.getEntityType() + ".id", record.getId()));
+            if (corrIdField != null) {
+                args.add(StructuredArguments.keyValue(corrIdField, record.getField(corrIdField)));
+            }
         }
 
         // 2. Enrichment: Always add metadata and the full state of the entity
