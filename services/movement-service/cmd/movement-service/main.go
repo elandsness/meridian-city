@@ -42,10 +42,6 @@ func main() {
 
 	entities, err := config.Load(configPath)
 	if err != nil {
-		// No entity types declare a position to track without this file -- fail
-		// open (health stays up, the tick loop just has nothing to do) rather
-		// than crash-loop, since a Stage-2/synthetic-only deploy may not mount
-		// one yet.
 		log.Printf("[main] warning: could not load entity config at %s: %v -- tracking no entity types", configPath, err)
 		entities = map[string]config.MovableEntity{}
 	}
@@ -85,29 +81,32 @@ func runTick(sqlDB *sql.DB, entities map[string]config.MovableEntity, entityType
 		if !ok {
 			continue
 		}
+
+		path, pathOk := entity.Paths[r.State]
+		if !pathOk || len(path) == 0 {
+			continue
+		}
+
 		wp, ok := position.Compute(entity, r.State, r.StateEnteredAt, r.NextTransitionAt, now)
 		if !ok {
 			continue
 		}
-		// Extract current path for the DB record
 		var pathPoints []float64
-		for _, p := range entity.Paths[r.State] {
+		for _, p := range path {
 			pathPoints = append(pathPoints, p.X, p.Y)
 		}
 
-		// Determine target (next waypoint in path, or hold if at end)
 		tx, ty := wp.X, wp.Y
-		if len(entity.Paths[r.State]) > 1 {
-			// Find which segment the entity is currently in
+		if len(path) > 1 {
 			totalSeconds := r.NextTransitionAt.Sub(r.StateEnteredAt).Seconds()
 			if totalSeconds > 0 {
 				frac := (float64(time.Now().Sub(r.StateEnteredAt).Seconds()) / totalSeconds)
-				segIdx := int(frac * float64(len(entity.Paths[r.State])-1))
-				if segIdx < len(entity.Paths[r.State]) - 1 {
-					nextPt := entity.Paths[r.State][segIdx+1]
+				segIdx := int(frac * float64(len(path)-1))
+				if segIdx < len(path) - 1 {
+					nextPt := path[segIdx+1]
 					tx, ty = nextPt.X, nextPt.Y
 				} else {
-					tx, ty = entity.Paths[r.State][len(entity.Paths[r.State])-1].X, entity.Paths[r.State][len(entity.Paths[r.State])-1].Y
+					tx, ty = path[len(path)-1].X, path[len(path)-1].Y
 				}
 			}
 		}
