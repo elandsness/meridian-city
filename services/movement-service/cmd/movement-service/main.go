@@ -97,7 +97,7 @@ func runTick(sqlDB *sql.DB, entities map[string]config.MovableEntity, entityType
 		}
 
 		tx, ty := wp.X, wp.Y
-		if len(path) > 1 {
+		if len(path) > 1 && r.NextTransitionAt != nil {
 			totalSeconds := r.NextTransitionAt.Sub(r.StateEnteredAt).Seconds()
 			if totalSeconds > 0 {
 				frac := (float64(time.Now().Sub(r.StateEnteredAt).Seconds()) / totalSeconds)
