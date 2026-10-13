@@ -3,16 +3,15 @@ import os
 import sys
 import json
 import subprocess
-import requests
 import random
+import yaml
 from typing import List, Dict, Any
 
 # =============================================================================
-# Semantic Seeder — AI-Driven Data Generation
+# Semantic Seeder — Direct LLM Integration
 # =============================================================================
-# This script replaces the legacy seed-data.sh for semantic deployments.
-# It reads industry configuration, uses the platform's AI service to generate
-# realistic industry-specific entity data, and injects it into the DB.
+# This script generates industry-specific entity data by talking directly
+# to the LLM provider, bypassing the internal application API.
 # =============================================================================
 
 def run_cmd(cmd: List[str], check=True):
@@ -22,14 +21,84 @@ def run_cmd(cmd: List[str], check=True):
         sys.exit(1)
     return res
 
-def get_env_or_default(key: str, default: str):
-    return os.environ.get(key, default)
+def load_ai_config(custom_values_path: str):
+    """Extracts LLM config from values-custom.yaml"""
+    if not os.path.exists(custom_values_path):
+        print(f"[WARN] {custom_values_path} not found. Using environment variables.")
+        return {
+            "provider": os.environ.get("LLM_PROVIDER", "openai"),
+            "apiKey": os.environ.get("LLM_API_KEY"),
+            "model": os.environ.get("LLM_MODEL", "gpt-4o")
+        }
+    
+    with open(custom_values_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    llm = config.get('llm', {})
+    provider = llm.get('provider', 'openai')
+    
+    # Extract provider-specific keys
+    provider_cfg = llm.get(provider, {})
+    return {
+        "provider": provider,
+        "apiKey": provider_cfg.get('apiKey'),
+        "model": provider_cfg.get('model', 'gpt-4o')
+    }
+
+class LLMClient:
+    def __init__(self, config: Dict[str, Any]):
+        self.provider = config['provider']
+        self.apiKey = config['apiKey']
+        self.model = config['model']
+
+    def generate(self, prompt: str) -> str:
+        if not self.apiKey:
+            raise ValueError("LLM API Key is missing. Please set it in values-custom.yaml or env.")
+
+        if self.provider == "openai":
+            return self._call_openai(prompt)
+        elif self.provider == "anthropic":
+            return self._call_anthropic(prompt)
+        else:
+            print(f"[WARN] Provider {self.provider} not implemented in seeder. Falling back to mock.")
+            return "[]"
+
+    def _call_openai(self, prompt: str) -> str:
+        import requests
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {self.apiKey}", "Content-Type": "application/json"}
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "system", "content": "You are a data generation engine. Return ONLY valid JSON arrays."},
+                         {"role": "user", "content": prompt}],
+            "temperature": 0.7
+        }
+        resp = requests.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()['choices'][0]['message']['content']
+
+    def _call_anthropic(self, prompt: str) -> str:
+        import requests
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "x-api-key": self.apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        payload = {
+            "model": self.model,
+            "max_tokens": 2000,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        resp = requests.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()['content'][0]['text']
 
 def main():
     # 1. Resolve Context
-    namespace = get_env_or_default("NAMESPACE", "meridian")
-    release_name = get_env_or_default("RELEASE_NAME", namespace)
-    db_pod = None
+    namespace = os.environ.get("NAMESPACE", "meridian")
+    release_name = os.environ.get("RELEASE_NAME", namespace)
+    custom_values_path = os.environ.get("CUSTOM_VALUES_PATH", "helm/values-custom.yaml")
     
     print(f"[SEED] Target: namespace={namespace} release={release_name}")
     
@@ -44,7 +113,7 @@ def main():
         sys.exit(1)
     print(f"[SEED] Using DB pod: {db_pod}")
 
-    # Load Configs
+    # Load Industry Configs
     try:
         with open('industry_config.json', 'r') as f:
             industry_cfg = json.load(f)
@@ -58,7 +127,7 @@ def main():
     terms = industry_cfg['industry']['terminology']
     print(f"[SEED] Industry detected: {industry_id}")
 
-    # Identify required entities to seed
+    # Identify required entities
     required_entities = set()
     for entity in movement_cfg:
         required_entities.add(entity)
@@ -69,19 +138,11 @@ def main():
         if isinstance(screen, dict) and 'entities' in screen:
             for ent in screen['entities']:
                 required_entities.add(ent['entityType'])
-    
-    # Ensure essential base entities are present
     required_entities.update(['passenger', 'passenger_account'])
 
-    # 2. Setup AI Connection
-    # Note: In a real deploy, we'd use a K8s service URL. 
-    # For seed-time, we can route through the API Gateway or use a proxy.
-    # Here we assume the seeder runs in an environment where it can reach 
-    # the gateway or the service directly.
-    ai_url = "http://localhost:3000/api/v1/chat" 
-    # If specifically told to use internal K8s DNS (e.g. when running as a Job)
-    if os.environ.get("INTERNAL_K8S_DNS") == "true":
-        ai_url = "http://api-gateway:3000/api/v1/chat"
+    # 2. Initialize AI Client
+    ai_config = load_ai_config(custom_values_path)
+    llm = LLMClient(ai_config)
 
     def generate_data(entity_type: str, count: int = 20) -> List[Dict[str, Any]]:
         print(f"[SEED] Generating {count} records for {entity_type}...")
@@ -92,40 +153,28 @@ def main():
             f"Terminology guidance: {json.dumps(terms)}. "
             f"Each record must be a JSON object with a unique ID (prefix 'sem-{entity_type}-') "
             f"and realistic data attributes appropriate for a {industry_id} in a professional setting. "
-            f"Return ONLY a JSON array of objects. No markdown, no preamble."
+            f"Return ONLY a JSON array of objects. No markdown, no preamble, no explanation."
         )
         
         try:
-            resp = requests.post(ai_url, json={"message": prompt, "session_id": "seeder"})
-            resp.raise_for_status()
-            text = resp.json()['response']
-            # Strip markdown backticks if LLM insisted on them
+            text = llm.generate(prompt)
+            # Clean Markdown formatting if LLM includes it
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0]
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0]
-            
             return json.loads(text)
         except Exception as e:
             print(f"[WARN] AI generation failed for {entity_type}: {e}. Using fallback defaults.")
-            # Simple fallback to prevent total failure
             return [{"id": f"sem-{entity_type}-{i}", "data": {"name": f"Generated {i}"}} for i in range(count)]
 
     # 3. Injection Phase
     print("[SEED] Injecting data into entities schema...")
-    
     for entity_type in required_entities:
         data = generate_data(entity_type)
-        
         for record in data:
             rec_id = record.get('id', f"sem-{entity_type}-{random.randint(1000,9999)}")
-            # The entity table expects specific columns. Data goes into the 'data' jsonb column.
-            # We assume the LLM might have put everything in the root, so we wrap it.
             rec_data = record if 'data' in record else record
-            
-            # Construct SQL for the entities table
-            # Table: entities.entity (id, entity_type, state, data, links, created_at, updated_at, state_entered_at)
-            # We'll set a generic initial state for the industry
             initial_state = "active" if "account" in entity_type else "at_gate" if "flight" in entity_type else "initial"
             
             sql = (
@@ -134,7 +183,6 @@ def main():
                 f"'{json.dumps(rec_data)}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), NOW()) "
                 f"ON CONFLICT (id) DO NOTHING;"
             )
-            
             run_cmd(["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian", "-c", sql])
 
     print("[SUCCESS] Semantic seeding complete.")
