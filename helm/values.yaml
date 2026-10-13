@@ -15,6 +15,7 @@
 appImageRegistry: "ghcr.io/your-org/meridian-city-platform"
 
 global:
+  localMode: false
   imageTag: "latest"
   # Namespace the instance's app resources deploy into. Leave empty to follow the
   # Helm release namespace (the `-n` flag) — scripts/deploy.sh installs each
@@ -1639,7 +1640,7 @@ iotSimulator:
 # Drives realistic distributed traces through the full service stack.
 # ---------------------------------------------------------------------------
 trafficBot:
-  enabled: true
+  enabled: false
   image:
     repository: "traffic-bot"
     tag: ""

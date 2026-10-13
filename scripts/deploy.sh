@@ -501,7 +501,7 @@ install_or_upgrade() {
   # Seed demo data on a fresh install (idempotent — safe to re-run on upgrade too).
   echo ""
   info "Seeding demo data..."
-  if RELEASE_NAME="$RELEASE_NAME" NAMESPACE="$NAMESPACE" bash "${SCRIPT_DIR}/seed-data.sh"; then
+  if RELEASE_NAME="$RELEASE_NAME" NAMESPACE="$NAMESPACE" python3 "${SCRIPT_DIR}/semantic-seed.py"; then
     echo ""
   else
     warn "Seed data failed — platform is up but demo data may be missing."
@@ -708,7 +708,7 @@ case "${1:-}" in
   seed)
     shift
     resolve_instance seed
-    RELEASE_NAME="$RELEASE_NAME" NAMESPACE="$NAMESPACE" bash "${SCRIPT_DIR}/seed-data.sh" "$@"
+    RELEASE_NAME="$RELEASE_NAME" NAMESPACE="$NAMESPACE" python3 "${SCRIPT_DIR}/semantic-seed.py" "$@"
     ;;
   status)
     resolve_instance status
