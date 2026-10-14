@@ -9,10 +9,10 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
 # =============================================================================
-# Semantic Seeder — Direct LLM Integration
+# Semantic Seeder — High Performance Edition
 # =============================================================================
 # This script generates industry-specific entity data by talking directly
-# to the LLM provider, bypassing the internal application API.
+# to the LLM provider. It batches SQL writes to avoid kubectl overhead.
 # =============================================================================
 
 def run_cmd(cmd: List[str], check=True):
@@ -150,7 +150,9 @@ def main():
                 "origin": "SFO", "destination": "LHR", "airline": "GenericAir"
             } for i in range(count)]
 
-    print("[SEED] Injecting data into entities schema...")
+    print("[SEED] Generating all data buffers...")
+    all_sql_statements = []
+    
     for entity_type in required_entities:
         data = generate_data(entity_type)
         for record in data:
@@ -159,7 +161,6 @@ def main():
             
             entered_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             transition_at = (datetime.utcnow() + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
-            
             initial_state = "active" if "account" in entity_type else "at_gate" if "flight" in entity_type else "initial"
             
             sql = (
@@ -168,7 +169,20 @@ def main():
                 f"'{json.dumps(rec_data)}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), '{entered_at}', '{transition_at}') "
                 f"ON CONFLICT (id) DO UPDATE SET state_entered_at='{entered_at}', next_transition_at='{transition_at}';"
             )
-            run_cmd(["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian", "-c", sql])
+            all_sql_statements.append(sql)
+
+    print(f"[SEED] Injecting {len(all_sql_statements)} records in a single transaction...")
+    full_sql = "BEGIN;\n" + "\n".join(all_sql_statements) + "\nCOMMIT;"
+    
+    process = subprocess.Popen(
+        ["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    stdout, stderr = process.communicate(input=full_sql)
+    
+    if process.returncode != 0:
+        print(f"[ERROR] Database injection failed: {stderr}")
+        sys.exit(1)
 
     print("[SUCCESS] Semantic seeding complete.")
 
