@@ -975,7 +975,7 @@ transactionService:
 # (see helm/values-trucking.yaml for the pattern).
 # ---------------------------------------------------------------------------
 journeyService:
-  enabled: false
+  enabled: true
   replicaCount: 1
   image:
     repository: "journey-service"
@@ -1334,7 +1334,7 @@ entityEngine:
   service:
     type: ClusterIP
     port: 8094
-  ownedTypes: ""
+  serviceRole: "generic"
   resources:
     requests:
       cpu: "150m"
@@ -1359,7 +1359,7 @@ customerEntityService:
   service:
     type: ClusterIP
     port: 8094
-  ownedTypes: "citizen,service_request,bill,cart,loan_application,patient_admission,concession_order,outage_restoration"
+  serviceRole: "customer"
   resources:
     requests:
       cpu: "150m"
@@ -1385,7 +1385,7 @@ opsEntityService:
   service:
     type: ClusterIP
     port: 8094
-  ownedTypes: "incident,work_order"
+  serviceRole: "ops"
   resources:
     requests:
       cpu: "150m"

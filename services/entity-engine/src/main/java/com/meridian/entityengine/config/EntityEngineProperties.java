@@ -14,17 +14,12 @@ public class EntityEngineProperties {
     /** Spring resource location of the entity-config JSON (classpath: or a filesystem path). */
     private String configPath = "classpath:dev-entity-config.json";
 
-    /** Comma-separated allow-list of entity type ids this instance owns; empty = own everything. */
-    private String ownedTypes = "";
+    /** The role of this instance (e.g. 'customer', 'ops'). Used to discover owned entities. */
+    private String serviceRole = "";
 
     private long schedulerFixedDelayMs = 5000;
 
     private String kafkaGroupId = "entity-engine-group";
 
     private boolean kafkaTriggersEnabled = false;
-
-    public List<String> ownedTypesList() {
-        if (ownedTypes == null || ownedTypes.isBlank()) return List.of();
-        return List.of(ownedTypes.split(",")).stream().map(String::trim).filter(s -> !s.isBlank()).toList();
-    }
 }

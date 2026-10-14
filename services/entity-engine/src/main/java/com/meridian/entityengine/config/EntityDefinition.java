@@ -20,6 +20,7 @@ public class EntityDefinition {
     private String displayName;
     private String displayNamePlural;
     private String idPrefix;
+    private String domain; // The ownership domain (e.g. 'customer', 'ops')
     private Map<String, FieldDef> fields = new LinkedHashMap<>();
     private String initial;
     private Map<String, StateDef> states = new LinkedHashMap<>();

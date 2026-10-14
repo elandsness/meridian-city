@@ -14,15 +14,11 @@ import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Loads the entity-config JSON once at startup (mirrors how RoutingEngine parses
- * ROUTING_MAP once at construction) and filters it down to the entity types this
- * instance owns. Uses its OWN ObjectMapper (default camelCase) rather than the
- * Spring-managed request/response one, which is globally configured SNAKE_CASE
- * for the HTTP API (API_CONVENTIONS §1) — the entity-config's structural keys
- * (displayName, idPrefix, minSeconds, ...) are camelCase per the authoring
- * convention, a different naming domain entirely from the API wire format.
+ * Loads the entity-config JSON once at startup and filters it down to the 
+ * entity types this instance owns based on its assigned service role.
  */
 @Component
 @RequiredArgsConstructor
@@ -54,15 +50,21 @@ public class EntityConfigLoader {
             throw new IllegalStateException("Failed to parse entity config at " + properties.getConfigPath(), e);
         }
 
-        Set<String> owned = Set.copyOf(properties.ownedTypesList());
-        ownedDefinitions = owned.isEmpty()
-                ? allDefinitions
-                : allDefinitions.entrySet().stream()
-                    .filter(e -> owned.contains(e.getKey()))
-                    .collect(LinkedHashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), LinkedHashMap::putAll);
-
-        log.info("Loaded {} entity type(s) from {}; this instance owns: {}",
-                allDefinitions.size(), properties.getConfigPath(), ownedDefinitions.keySet());
+        String role = properties.getServiceRole();
+        if (role == null || role.isBlank()) {
+            log.info("No service role defined for this instance — owning ALL entity types.");
+            ownedDefinitions = allDefinitions;
+        } else {
+            ownedDefinitions = allDefinitions.entrySet().stream()
+                    .filter(e -> role.equalsIgnoreCase(e.getValue().getDomain()))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, 
+                            Map.Entry::getValue, 
+                            (v1, v2) -> v1, 
+                            LinkedHashMap::new));
+            log.info("Service role '{}' detected. Loaded {}/{} entity types.", 
+                    role, ownedDefinitions.size(), allDefinitions.size());
+        }
     }
 
     public EntityDefinition require(String entityType) {

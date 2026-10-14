@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import argparse
 import json
 import subprocess
 import random
@@ -9,10 +10,11 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 # =============================================================================
-# Semantic Seeder — High Performance & Robust Edition
+# Semantic Seeder — GENERIC REFLECTION EDITION
 # =============================================================================
-# This script generates industry-specific entity data by talking directly
-# to the LLM provider. It uses batches and strictly validates SQL and AI output.
+# This script is a pure reflection engine. It reads the industry configuration
+# and generates data based on those definitions, knowing nothing about the
+# domain (e.g., not knowing what a "flight" is).
 # =============================================================================
 
 def run_cmd(cmd: List[str], check=True):
@@ -23,18 +25,14 @@ def run_cmd(cmd: List[str], check=True):
     return res
 
 def load_ai_config(custom_values_path: str):
-    """Extracts LLM config from values-custom.yaml"""
     if not os.path.exists(custom_values_path):
-        print(f"[WARN] {custom_values_path} not found. Using environment variables.")
         return {
             "provider": os.environ.get("LLM_PROVIDER", "openai"),
             "apiKey": os.environ.get("LLM_API_KEY"),
             "model": os.environ.get("LLM_MODEL", "gpt-4o")
         }
-    
     with open(custom_values_path, 'r') as f:
         config = yaml.safe_load(f)
-    
     llm = config.get('llm', {})
     provider = llm.get('provider', 'openai')
     provider_cfg = llm.get(provider, {})
@@ -52,15 +50,12 @@ class LLMClient:
 
     def generate(self, prompt: str) -> str:
         if not self.apiKey:
-            raise ValueError("LLM API Key is missing. Please set it in values-custom.yaml or env.")
-
+            raise ValueError("LLM API Key is missing.")
         if self.provider == "openai":
             return self._call_openai(prompt)
         elif self.provider == "anthropic":
             return self._call_anthropic(prompt)
-        else:
-            print(f"[WARN] Provider {self.provider} not implemented in seeder. Falling back to mock.")
-            return "[]"
+        return "[]"
 
     def _call_openai(self, prompt: str) -> str:
         import requests
@@ -86,21 +81,22 @@ class LLMClient:
         return resp.json()['content'][0]['text']
 
 def main():
-    namespace = os.environ.get("NAMESPACE", "meridian")
-    release_name = os.environ.get("RELEASE_NAME", namespace)
-    custom_values_path = os.environ.get("CUSTOM_VALUES_PATH", "helm/values-custom.yaml")
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--namespace", default=os.environ.get("NAMESPACE", "meridian"))
+    parser.add_argument("--release", default=os.environ.get("RELEASE_NAME", os.environ.get("NAMESPACE", "meridian")))
+    parser.add_argument("--config-path", default=os.environ.get("CUSTOM_VALUES_PATH", "helm/values-custom.yaml"))
+    args = parser.parse_args()
+
+    namespace, release_name, custom_values_path = args.namespace, args.release, args.config_path
     print(f"[SEED] Target: namespace={namespace} release={release_name}")
-    
+
     pod_res = run_cmd(["kubectl", "get", "pods", "-n", namespace, 
-                       "-l", "cnpg.io/cluster=" + f"{release_name}-db", 
-                       "--field-selector=status.phase=Running", 
-                       "-o", "jsonpath={.items[0].metadata.name}"])
+                      "-l", "cnpg.io/cluster=" + f"{release_name}-db", 
+                      "--field-selector=status.phase=Running", 
+                      "-o", "jsonpath={.items[0].metadata.name}"])
     db_pod = pod_res.stdout.strip()
     if not db_pod:
-        print("[ERROR] Could not find running DB pod.")
-        sys.exit(1)
-    print(f"[SEED] Using DB pod: {db_pod}")
+        print("[ERROR] DB pod not found."); sys.exit(1)
 
     try:
         with open('industry_config.json', 'r') as f:
@@ -108,95 +104,89 @@ def main():
         with open('movement_config.json', 'r') as f:
             movement_cfg = json.load(f)
     except FileNotFoundError:
-        print("[ERROR] Config files not found.")
-        sys.exit(1)
+        print("[ERROR] Config files missing."); sys.exit(1)
 
-    industry_id = industry_cfg['industry']['id']
-    terms = industry_cfg['industry']['terminology']
-    print(f"[SEED] Industry detected: {industry_id}")
+    industry_meta = industry_cfg.get('industry', {})
+    industry_id = industry_meta.get('id', 'generic')
+    terminology = industry_meta.get('terminology', {})
 
-    required_entities = set()
-    for entity in movement_cfg: required_entities.add(entity)
-    for screen in industry_cfg['industry']['screens']['public']:
-        if isinstance(screen, dict) and 'entityType' in screen: required_entities.add(screen['entityType'])
-    for screen in industry_cfg['industry']['screens']['ops']:
-        if isinstance(screen, dict) and 'entities' in screen:
-            for ent in screen['entities']: required_entities.add(ent['entityType'])
-    required_entities.update(['passenger', 'passenger_account'])
+    entities_to_seed = {} 
+    for ent_type in movement_cfg:
+        entities_to_seed[ent_type] = {} 
+
+    screens = industry_meta.get('screens', {})
+    for section in screens.values():
+        if isinstance(section, list):
+            for s in section:
+                if isinstance(s, dict) and 'entityType' in s:
+                    entities_to_seed[s['entityType']] = {}
+                if isinstance(s, dict) and 'entities' in s:
+                    for e in s['entities']:
+                        entities_to_seed[e['entityType']] = {}
+
+    all_ent_defs = industry_cfg.get('entities', {})
+    for etype in entities_to_seed:
+        defn = all_ent_defs.get(etype, {})
+        entities_to_seed[etype]['fields'] = defn.get('fields', {})
+        entities_to_seed[etype]['initial'] = defn.get('initial', 'initial')
 
     ai_config = load_ai_config(custom_values_path)
     llm = LLMClient(ai_config)
 
-    def generate_data(entity_type: str, count: int = 20) -> List[Dict[str, Any]]:
-        print(f"[SEED] Generating {count} records for {entity_type}...")
+    def generate_generic_data(etype: str, schema: Dict, count: int = 20) -> List[Dict]:
+        print(f"[SEED] Reflecting {etype}... Generating {count} records...")
+        field_descriptions = [f"- {k}: {v}" for k, v in schema.items()]
+        fields_str = "\n".join(field_descriptions)
         prompt = (
             f"Act as a high-fidelity data generator for a {industry_id} simulation. "
-            f"Generate {count} realistic records for '{entity_type}'. "
-            f"Required fields: id (sem-{entity_type}-...), plus industry-specific data "
-            f"(e.g. for flights: flightNumber, origin, destination, airline). "
-            f"Terminology: {json.dumps(terms)}. "
-            f"Return ONLY a JSON array of objects. No markdown, no preamble."
+            f"Generate {count} realistic records for the entity type '{etype}'. "
+            f"Each record MUST be a JSON object. "
+            f"Required fields to populate:\n{fields_str}\n"
+            f"Also include 'id' matching the pattern 'sem-{etype}-...'. "
+            f"Industry Terminology: {json.dumps(terminology)}. "
+            f"Return ONLY a JSON array of objects. No markdown."
         )
         try:
             text = llm.generate(prompt)
             if "```json" in text: text = text.split("```json")[1].split("```")[0]
             elif "```" in text: text = text.split("```")[1].split("```")[0]
-            res = json.loads(text)
-            if not isinstance(res, list):
-                raise ValueError("AI did not return a list")
-            return res
+            return json.loads(text)
         except Exception as e:
-            print(f"[WARN] AI failed for {entity_type}: {e}. Using high-quality fallback.")
-            return [{
-                "id": f"sem-{entity_type}-{i}",
-                "flightNumber": f"GEN-{random.randint(100,999)}",
-                "origin": "SFO", "destination": "LHR", "airline": "GenericAir"
-            } for i in range(count)]
+            print(f"[WARN] Reflection failed for {etype}: {e}. Creating skeletal records.")
+            return [{"id": f"sem-{etype}-{i}", "fallback": True} for i in range(count)]
 
-    print("[SEED] Generating all data buffers...")
-    all_sql_statements = []
-    
-    for entity_type in required_entities:
-        data = generate_data(entity_type)
+    all_sql = []
+    for etype, meta in entities_to_seed.items():
+        data = generate_generic_data(etype, meta.get('fields', {}))
         for record in data:
-            rec_id = record.get('id')
-            if not rec_id:
-                rec_id = f"sem-{entity_type}-{random.randint(1000,9999)}"
-            
+            rec_id = record.get('id', f"sem-{etype}-{random.randint(1000,9999)}")
             rec_data = record if 'data' not in record else record['data']
-            if not isinstance(rec_data, dict):
-                rec_data = {"name": str(rec_data)}
-            
             entered_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
             transition_at = (datetime.now(timezone.utc) + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
-            initial_state = "active" if "account" in entity_type else "at_gate" if "flight" in entity_type else "initial"
-            
+            initial_state = meta.get('initial', 'initial')
             json_str = json.dumps(rec_data).replace("'", "''")
-            
             sql = (
                 f"INSERT INTO entities.entity (id, entity_type, state, data, links, created_at, updated_at, state_entered_at, next_transition_at) "
-                f"VALUES ('{rec_id}', '{entity_type}', '{initial_state}', "
+                f"VALUES ('{rec_id}', '{etype}', '{initial_state}', "
                 f"'{json_str}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), '{entered_at}', '{transition_at}') "
                 f"ON CONFLICT (id) DO UPDATE SET state_entered_at='{entered_at}', next_transition_at='{transition_at}', data='{json_str}'::jsonb;"
             )
-            all_sql_statements.append(sql)
+            all_sql.append(sql)
 
-    print(f"[SEED] Injecting {len(all_sql_statements)} records...")
+    print(f"[SEED] Injecting {len(all_sql)} generic records...")
     batch_size = 50
-    for i in range(0, len(all_sql_statements), batch_size):
-        batch = all_sql_statements[i:i+batch_size]
-        full_sql = "BEGIN;\\n" + "\\n".join(batch) + "\\nCOMMIT;"
-        
+    for i in range(0, len(all_sql), batch_size):
+        batch = all_sql[i:i+batch_size]
+        full_sql = "BEGIN;\n" + "\n".join(batch) + "\nCOMMIT;"
         process = subprocess.Popen(
             ["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
         stdout, stderr = process.communicate(input=full_sql)
-        
         if process.returncode != 0 or "ERROR" in stdout or "ERROR" in stderr:
             print(f"[ERROR] Batch {i//batch_size + 1} failed: {stderr} {stdout}")
-    
-    print("[SUCCESS] Semantic seeding complete.")
+
+    print("[SUCCESS] Semantic reflection seeding complete.")
 
 if __name__ == "__main__":
     main()
