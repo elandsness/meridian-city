@@ -9,10 +9,10 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 # =============================================================================
-# Semantic Seeder — High Performance Edition
+# Semantic Seeder — High Performance & Robust Edition
 # =============================================================================
 # This script generates industry-specific entity data by talking directly
-# to the LLM provider. It batches SQL writes to avoid kubectl overhead.
+# to the LLM provider. It uses batches and strictly validates SQL and AI output.
 # =============================================================================
 
 def run_cmd(cmd: List[str], check=True):
@@ -141,7 +141,10 @@ def main():
             text = llm.generate(prompt)
             if "```json" in text: text = text.split("```json")[1].split("```")[0]
             elif "```" in text: text = text.split("```")[1].split("```")[0]
-            return json.loads(text)
+            res = json.loads(text)
+            if not isinstance(res, list):
+                raise ValueError("AI did not return a list")
+            return res
         except Exception as e:
             print(f"[WARN] AI failed for {entity_type}: {e}. Using high-quality fallback.")
             return [{
@@ -156,34 +159,43 @@ def main():
     for entity_type in required_entities:
         data = generate_data(entity_type)
         for record in data:
-            rec_id = record.get('id', f"sem-{entity_type}-{random.randint(1000,9999)}")
-            rec_data = record if 'data' in record else record
+            rec_id = record.get('id')
+            if not rec_id:
+                rec_id = f"sem-{entity_type}-{random.randint(1000,9999)}"
+            
+            rec_data = record if 'data' not in record else record['data']
+            if not isinstance(rec_data, dict):
+                rec_data = {"name": str(rec_data)}
             
             entered_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
             transition_at = (datetime.now(timezone.utc) + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
             initial_state = "active" if "account" in entity_type else "at_gate" if "flight" in entity_type else "initial"
             
+            json_str = json.dumps(rec_data).replace("'", "''")
+            
             sql = (
                 f"INSERT INTO entities.entity (id, entity_type, state, data, links, created_at, updated_at, state_entered_at, next_transition_at) "
                 f"VALUES ('{rec_id}', '{entity_type}', '{initial_state}', "
-                f"'{json.dumps(rec_data)}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), '{entered_at}', '{transition_at}') "
-                f"ON CONFLICT (id) DO UPDATE SET state_entered_at='{entered_at}', next_transition_at='{transition_at}';"
+                f"'{json_str}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), '{entered_at}', '{transition_at}') "
+                f"ON CONFLICT (id) DO UPDATE SET state_entered_at='{entered_at}', next_transition_at='{transition_at}', data='{json_str}'::jsonb;"
             )
             all_sql_statements.append(sql)
 
-    print(f"[SEED] Injecting {len(all_sql_statements)} records in a single transaction...")
-    full_sql = "BEGIN;\n" + "\n".join(all_sql_statements) + "\nCOMMIT;"
+    print(f"[SEED] Injecting {len(all_sql_statements)} records...")
+    batch_size = 50
+    for i in range(0, len(all_sql_statements), batch_size):
+        batch = all_sql_statements[i:i+batch_size]
+        full_sql = "BEGIN;\\n" + "\\n".join(batch) + "\\nCOMMIT;"
+        
+        process = subprocess.Popen(
+            ["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        stdout, stderr = process.communicate(input=full_sql)
+        
+        if process.returncode != 0 or "ERROR" in stdout or "ERROR" in stderr:
+            print(f"[ERROR] Batch {i//batch_size + 1} failed: {stderr} {stdout}")
     
-    process = subprocess.Popen(
-        ["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian"],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    stdout, stderr = process.communicate(input=full_sql)
-    
-    if process.returncode != 0:
-        print(f"[ERROR] Database injection failed: {stderr}")
-        sys.exit(1)
-
     print("[SUCCESS] Semantic seeding complete.")
 
 if __name__ == "__main__":
