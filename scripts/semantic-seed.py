@@ -5,7 +5,7 @@ import json
 import subprocess
 import random
 import yaml
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 # =============================================================================
@@ -159,8 +159,8 @@ def main():
             rec_id = record.get('id', f"sem-{entity_type}-{random.randint(1000,9999)}")
             rec_data = record if 'data' in record else record
             
-            entered_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-            transition_at = (datetime.utcnow() + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
+            entered_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            transition_at = (datetime.now(timezone.utc) + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
             initial_state = "active" if "account" in entity_type else "at_gate" if "flight" in entity_type else "initial"
             
             sql = (
