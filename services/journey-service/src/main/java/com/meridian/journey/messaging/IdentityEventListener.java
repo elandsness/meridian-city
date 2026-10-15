@@ -7,6 +7,8 @@ import com.meridian.journey.repository.JourneyConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,7 +28,7 @@ public class IdentityEventListener {
     private final JourneyConfigRepository configRepository;
 
     @KafkaListener(topics = "identity.events", groupId = "journey-service-group")
-    public void onIdentityEvent(@Header(org.springframework.kafka.support.KafkaHeaders.RECEIVED_MESSAGE_KEY) String key, Map<String, Object> payload) {
+    public void onIdentityEvent(@Header(KafkaHeaders.RECEIVED_MESSAGE_KEY) String key, Map<String, Object> payload) {
         String eventType = (String) payload.get("eventType");
         if (!"identity.registered".equals(eventType)) {
             return;
