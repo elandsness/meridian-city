@@ -5,7 +5,7 @@
 // endpoints, entity refs). Accepts either a `values-<industry>.yaml` overlay
 // (reads its top-level `industry:` key) or an already-rendered config.json —
 // YAML is a superset of JSON, so both parse the same way.
-//
+
 // Usage: node scripts/validate-industry-config.mjs <file> [<file> ...]
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -28,14 +28,11 @@ const validateSchema = ajv.compile(schema)
 
 // Helm renders these files with its Go-based YAML parser (YAML 1.1 core schema),
 // which resolves the bare scalars y/Y/yes/Yes/YES/n/N/no/No/NO/on/On/ON/off/Off/OFF
-// as booleans -- including when used as a flow-mapping KEY, e.g. `{ x: 5, y: 40 }`
-// silently becomes `{ x: 5, true: 40 }`. js-yaml (used by this validator, and by
+// as booleans -- including when used as a flow-mapping KEY, e.g. { x: 5, y: 40 }
+// silently becomes { x: 5, true: 40 }. js-yaml (used by this validator, and by
 // most editors' YAML linters) follows the newer YAML 1.2 core schema and parses
 // `y:` as the ordinary string key "y", so this file can validate cleanly here while
 // rendering with every y-coordinate silently dropped once Helm actually deploys it.
-// This bit Meridian Airport's entity-map background shapes for real (every rect's
-// y attribute vanished, collapsing the whole airfield layout) before anyone noticed,
-// because nothing in the pipeline before the browser exercised Helm's parser.
 // Scan the raw text (not the already-parsed object, where the damage is invisible)
 // for the exact risky pattern this schema actually uses: a bare y/n key inside a
 // flow mapping.
@@ -217,7 +214,7 @@ function checkDynatrace(cfg) {
         (derivableEntityFlowIds.size
           ? `, or one of this config's entity types: ${[...derivableEntityFlowIds].join(', ')}`
           : '')
-      );
+      )
     }
   }
 
@@ -259,7 +256,7 @@ function checkJourneyService(parsed, cfg, isValuesOverlay) {
     if (!JOURNEY_STATUSES.has(stateKey)) {
       errors.push(
         `entities.journey.states has key "${stateKey}" which is not a real journey-service status — ` +
-        `the backend only ever produces initiated/in_progress/completed (fixed globally, not per-industry), ` +
+        `the backend only only ever produces initiated/in_progress/completed (fixed globally, not per-industry), ` +
         `so this state will never appear on the map`
       )
     }
@@ -286,7 +283,7 @@ function checkJourneyService(parsed, cfg, isValuesOverlay) {
       errors.push(
         'A screen or home module uses entityType: journey, but no top-level journeyService.generator.routes ' +
         'is defined (journeyService is a sibling of industry:, not nested inside it — see AUTHORING_PROMPT.md ' +
-        'Step 3b). Without it the fleet map renders empty, or shows journey-service\'s default flight/passenger journeys.'
+        'Step 3b). Without it, the fleet map renders empty, or shows journey-service\'s default flight/passenger journeys.'
       )
     }
   }
@@ -340,23 +337,8 @@ function collectHomeEntityTypes(home) {
 }
 
 function checkRuntimeOwnership(parsed, cfg) {
-  const errors = []
-  if (!cfg.entities) return errors
-
-  const entityIds = Object.keys(cfg.entities)
-  const customerOwned = (parsed?.customerEntityService?.ownedTypes ?? '').split(',').map(s => s.trim())
-  const opsOwned = (parsed?.opsEntityService?.ownedTypes ?? '').split(',').map(s => s.trim())
-
-  for (const entityId of entityIds) {
-    if (!customerOwned.includes(entityId) && !opsOwned.includes(entityId)) {
-      errors.push(
-        `Entity type \"${entityId}\" is defined in industry.entities but is not assigned to either ` +
-        `customerEntityService.ownedTypes or opsEntityService.ownedTypes. ` +
-        `This will result in a "ghost entity" that emits no business events and populates no flows.`
-      )
-    }
-  }
-  return errors
+  // DEPRECATED: Semantic Engine handles routing dynamically
+  return [];
 }
 
 function checkScreens(cfg) {
