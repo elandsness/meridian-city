@@ -46,6 +46,12 @@ public class JourneyConfig {
     @Column(columnDefinition = "jsonb")
     private String faultRules;
 
+    @Column(name = "is_user_linked")
+    private boolean isUserLinked = false;
+
+    @Column(name = "owner_field")
+    private String ownerField;
+
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 

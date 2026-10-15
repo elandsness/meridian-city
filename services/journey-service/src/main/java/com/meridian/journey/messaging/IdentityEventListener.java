@@ -1,18 +1,21 @@
 package com.meridian.journey.messaging;
 
 import com.meridian.journey.domain.Journey;
+import com.meridian.journey.domain.JourneyConfig;
 import com.meridian.journey.service.JourneyService;
+import com.meridian.journey.repository.JourneyConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 /**
  * Listens for identity lifecycle events from the identity-service.
- * When a new citizen is registered, it automatically triggers the creation
- * of a personal journey flow.
+ * When a new citizen is registered, it checks industry config for
+ * user-linked entities and spawns a journey for each.
  */
 @Component
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ import java.util.Map;
 public class IdentityEventListener {
 
     private final JourneyService journeyService;
+    private final JourneyConfigRepository configRepository;
 
     @KafkaListener(topics = "identity.events", groupId = "journey-service-group")
     public void onIdentityEvent(String key, Map<String, Object> payload) {
@@ -31,22 +35,31 @@ public class IdentityEventListener {
         String identityId = (String) payload.get("identityId");
         String email = (String) payload.get("email");
 
-        log.info("Received identity.registered event for userId={} (email={}). Spawning personal journey...", identityId, email);
+        log.info("Received identity.registered event for userId={} (email={}). Checking for user-linked journeys...", identityId, email);
 
-        // Create a personal journey for this user.
-        // For a demo, we use a simplified 'passenger' journey.
-        Journey journey = Journey.create(
-                "passenger",
-                email != null ? email : "Guest Passenger",
-                identityId,
-                "inbound",
-                "Registration",
-                "Journey Start",
-                null,
-                "initiated"
-        );
+        // Find all journey types that are flagged as tied to users
+        List<JourneyConfig> linkedConfigs = configRepository.findByIsUserLinkedTrue();
 
-        journeyService.create(journey);
-        log.info("Personal journey created for user {}: id={}", identityId, journey.getId());
+        if (linkedConfigs.isEmpty()) {
+            log.info("No user-linked journeys configured. Skipping.");
+            return;
+        }
+
+        for (JourneyConfig cfg : linkedConfigs) {
+            log.info("Spawning personal journey for user {} of type {}", identityId, cfg.getEntityType());
+            
+            Journey journey = Journey.create(
+                    cfg.getEntityType(),
+                    email != null ? email : "Guest",
+                    identityId,
+                    "inbound",
+                    "Registration",
+                    "Journey Start",
+                    null,
+                    "initiated"
+            );
+
+            journeyService.create(journey);
+        }
     }
 }
