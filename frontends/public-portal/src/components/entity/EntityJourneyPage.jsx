@@ -28,7 +28,7 @@ export default function EntityJourneyPage({ entityType, label, ownerField, steps
   // Use user.name (first + last from JWT) as the owner identity so the ownerField
   // in the entity data (e.g. applicant_name, patient_name) contains a readable name
   // rather than the opaque numeric citizen id.
-  const userName = user?.name
+  const userName = user?.name || user?.email || user?.id
   const showPersonal = !!(ownerField && userName)
 
   if (showPersonal) return <MyOwnJourney entityType={entityType} userName={userName} ownerField={ownerField} label={label} stepsProp={stepsProp} description={description} cfg={cfg} def={def} />
