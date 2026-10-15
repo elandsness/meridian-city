@@ -2,6 +2,11 @@ industry:
   version: 1
   id: airport
   primaryFlow: "aircraft_turnaround"
+  customerEntityService:
+    ownedTypes: ["passenger", "service_request"]
+  opsEntityService:
+    ownedTypes: ["luggage", "aircraft", "flight_departure", "flight_arrival"]
+
   
   company:
     name: "Meridian International Airport"
@@ -424,4 +429,3 @@ industry:
           timer: { minSeconds: 300, maxSeconds: 7200 }
           signal: { eventType: "request.resolved", correlationId: "service_request.id" }
       generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000 }
-
