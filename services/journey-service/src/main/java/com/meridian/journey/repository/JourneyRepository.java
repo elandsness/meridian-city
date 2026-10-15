@@ -4,6 +4,7 @@ import com.meridian.journey.domain.Journey;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,4 +24,8 @@ public interface JourneyRepository extends JpaRepository<Journey, String> {
     List<Journey> findByStatusOrderByCreatedAtDesc(String status);
 
     List<Journey> findAllByOrderByCreatedAtDesc();
+
+    long countByStatusIn(List<String> statuses);
+
+    List<Journey> findByStatusInAndNextTransitionAtLessThanEqual(List<String> statuses, OffsetDateTime now);
 }

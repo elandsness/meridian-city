@@ -41,7 +41,6 @@ public class JourneyService {
                 .toList();
     }
 
-    /** Live journey board. entityType/status/direction are all optional filters. */
     @Transactional(readOnly = true)
     public List<JourneyResponse> board(String entityType, String status, String direction) {
         List<Journey> journeys;
@@ -79,7 +78,7 @@ public class JourneyService {
 
     @Transactional
     public Journey create(Journey journey) {
-        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.getNextDelaySeconds()));
+        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.nextDelaySeconds()));
         journey = journeyRepository.save(journey);
         log.info("Created journey id={} entityType={} name={}", journey.getId(), journey.getEntityType(), journey.getName());
         return journey;
@@ -88,11 +87,11 @@ public class JourneyService {
     @Transactional
     public JourneyResponse createFromRequest(CreateJourneyRequest req) {
         Journey journey = Journey.create(
-                req.getEntityType(), req.getName(), req.getRelatedId(), req.getDirection(),
-                req.getOrigin(), req.getDestination(), req.getMetadata(),
+                req.getEntityType(), req.getName(), req.getRelatedId(), req.getRelatedId(), 
+                req.getDirection(), req.getOrigin(), req.getDestination(), req.getMetadata(),
                 req.getInitialStatus() != null ? req.getInitialStatus() : "in_progress",
                 req.getOriginX(), req.getOriginY(), req.getDestX(), req.getDestY());
-        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.getNextDelaySeconds()));
+        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.nextDelaySeconds()));
         journey = journeyRepository.save(journey);
         businessEventLogger.journeyStatus(journey);
         journeyEventPublisher.publishJourneyEvent("journey.created", journey);
