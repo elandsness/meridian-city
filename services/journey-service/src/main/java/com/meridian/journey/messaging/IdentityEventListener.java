@@ -28,7 +28,7 @@ public class IdentityEventListener {
     private final JourneyConfigRepository configRepository;
 
     @KafkaListener(topics = "identity.events", groupId = "journey-service-group")
-    public void onIdentityEvent(@Header(KafkaHeaders.RECEIVED_MESSAGE_KEY) String key, Map<String, Object> payload) {
+    public void onIdentityEvent(@Header(KafkaHeaders.RECEIVED_KEY) String key, Map<String, Object> payload) {
         String eventType = (String) payload.get("eventType");
         if (!"identity.registered".equals(eventType)) {
             return;
