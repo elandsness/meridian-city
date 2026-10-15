@@ -4,6 +4,7 @@ import com.meridian.journey.dto.CreateJourneyRequest;
 import com.meridian.journey.dto.JourneyResponse;
 import com.meridian.journey.service.JourneyService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,11 +22,11 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/v1/journeys")
 @RequiredArgsConstructor
+@Slf4j
 public class JourneyController {
 
     private final JourneyService journeyService;
 
-    /** Live journey board. Optional ?entity_type=, ?status=, or ?direction= filters. */
     @GetMapping
     public List<JourneyResponse> board(
             @RequestParam(required = false) String entityType,
@@ -46,6 +47,7 @@ public class JourneyController {
 
     @GetMapping("/me")
     public ResponseEntity<JourneyResponse> getMe(@RequestParam("user_id") String userId) {
+        log.info("Request for personal journey: userId={}", userId);
         return ResponseEntity.ok(journeyService.getForUser(userId));
     }
 
@@ -55,9 +57,6 @@ public class JourneyController {
         return ResponseEntity.ok(journey);
     }
 
-    /** Creates a journey externally (traffic-bot, seed scripts) — e.g. a freight
-     * delivery with real map coordinates. Journeys created this way are advanced
-     * by the same JourneyLifecycleScheduler as generator-created ones. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public JourneyResponse create(@RequestBody CreateJourneyRequest request) {
