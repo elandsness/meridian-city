@@ -41,9 +41,7 @@ public class JourneyService {
                 .toList();
     }
 
-    /** Live journey board. entityType/status/direction are all optional filters —
-     * an absent entityType returns every journey (e.g. a fleet map that doesn't
-     * care about entity type), not an empty list. */
+    /** Live journey board. entityType/status/direction are all optional filters. */
     @Transactional(readOnly = true)
     public List<JourneyResponse> board(String entityType, String status, String direction) {
         List<Journey> journeys;
@@ -67,7 +65,7 @@ public class JourneyService {
 
     @Transactional(readOnly = true)
     public JourneyResponse getForUser(String userId) {
-        Journey journey = journeyRepository.findByEntityTypeAndRelatedId("passenger", userId)
+        Journey journey = journeyRepository.findByEntityTypeAndUserId("passenger", userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "personal journey not found for user: " + userId));
         return toResponse(journey);
     }
@@ -81,19 +79,12 @@ public class JourneyService {
 
     @Transactional
     public Journey create(Journey journey) {
-        // Without an initial next_transition_at, JourneyLifecycleScheduler's
-        // next_transition_at <= now query never matches (NULL <= now is unknown in
-        // SQL) and the journey would sit at its initial status/progress forever.
-        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.nextDelaySeconds()));
+        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.getNextDelaySeconds()));
         journey = journeyRepository.save(journey);
         log.info("Created journey id={} entityType={} name={}", journey.getId(), journey.getEntityType(), journey.getName());
         return journey;
     }
 
-    /** Creates a journey from an external request (traffic-bot, seed scripts) and
-     * emits the same create-time business event + Kafka event the internal
-     * generator's journeys get, so external and generated journeys look identical
-     * downstream. */
     @Transactional
     public JourneyResponse createFromRequest(CreateJourneyRequest req) {
         Journey journey = Journey.create(
@@ -101,7 +92,7 @@ public class JourneyService {
                 req.getOrigin(), req.getDestination(), req.getMetadata(),
                 req.getInitialStatus() != null ? req.getInitialStatus() : "in_progress",
                 req.getOriginX(), req.getOriginY(), req.getDestX(), req.getDestY());
-        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.nextDelaySeconds()));
+        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.getNextDelaySeconds()));
         journey = journeyRepository.save(journey);
         businessEventLogger.journeyStatus(journey);
         journeyEventPublisher.publishJourneyEvent("journey.created", journey);
@@ -141,18 +132,6 @@ public class JourneyService {
                 .build();
     }
 
-    /**
-     * The stored {@code progress} column only changes at discrete status
-     * transitions, which for a short transition chain (trucking has exactly one:
-     * in_progress -> completed) means every in-flight journey reports the SAME
-     * fixed progress for its entire 25-90s stage -- every truck sits frozen at its
-     * origin coordinate the whole time, then jumps straight to the destination the
-     * instant it completes. Compute a continuously-advancing value instead: blend
-     * from this stage's stored progress to the next stage's configured progress,
-     * scaled by how far we are between when this stage started (updatedAt) and
-     * when it's due to end (nextTransitionAt). Falls back to the stored value for
-     * terminal journeys (nextTransitionAt null) or malformed windows.
-     */
     private double effectiveProgress(Journey j) {
         OffsetDateTime stageStart = j.getUpdatedAt();
         OffsetDateTime stageEnd = j.getNextTransitionAt();
@@ -171,9 +150,6 @@ public class JourneyService {
         return stageStartProgress + (stageEndProgress - stageStartProgress) * fraction;
     }
 
-    /** Linear interpolation between origin/dest coordinates by progress. Null when
-     * any coordinate is unset — a journey type with no map visualisation (e.g. a
-     * loan application) simply has no position, rather than a guessed (0,0). */
     private JourneyResponse.Position interpolatePosition(Journey j, double progress) {
         if (j.getOriginX() == null || j.getOriginY() == null || j.getDestX() == null || j.getDestY() == null) {
             return null;

@@ -54,6 +54,7 @@ public class IdentityEventListener {
                     cfg.getEntityType(),
                     email != null ? email : "Guest",
                     identityId,
+                    identityId,
                     "inbound",
                     "Registration",
                     "Journey Start",
