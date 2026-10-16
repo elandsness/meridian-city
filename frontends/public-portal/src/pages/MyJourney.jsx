@@ -1,18 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useConfig } from '../config/ConfigContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { getEntities, createEntity, unwrapEntities } from '../api/entities.js'
+import { createEntity, unwrapEntities } from '../api/entities.js'
+import { getMyJourney } from '../api/journeys.js'
 import { displayName } from '../lib/format.js'
 import Card from '../ui/Card.jsx'
 import Button from '../ui/Button.jsx'
-import EntityCard from '../components/entity/EntityCard.jsx' // Assuming we can import the card
+import EntityCard from '../components/entity/EntityCard.jsx'
 
 export default function MyJourney() {
   const cfg = useConfig()
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
-  // These are the la-mile airport defaults
   const entityType = 'passenger'
   const ownerField = 'user_id'
   const label = 'My Journey'
@@ -22,7 +22,7 @@ export default function MyJourney() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['my-journey-personal', userId],
-    queryFn: () => getEntities(entityType, { [ownerField]: userId }),
+    queryFn: () => getMyJourney(userId, userName),
     enabled: !!userId,
     refetchInterval: 8000,
   })
@@ -60,4 +60,8 @@ export default function MyJourney() {
       )}
     </div>
   )
+}
+
+function unwrapEntities(d) {
+  return Array.isArray(d) ? d : d?.entities ?? d?.items ?? []
 }
