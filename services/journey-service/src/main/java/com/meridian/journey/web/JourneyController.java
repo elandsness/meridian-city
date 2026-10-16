@@ -25,6 +25,11 @@ import java.util.Optional;
 @Slf4j
 public class JourneyController {
 
+    @GetMapping("/me")
+    public com.meridian.journey.dto.JourneyResponse getMyJourney(@RequestParam("user_id") String userId) {
+        return journeyService.getForUser(userId);
+    }
+
     private final JourneyService journeyService;
 
     @GetMapping
