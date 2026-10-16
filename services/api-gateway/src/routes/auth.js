@@ -12,6 +12,23 @@ async function authRoutes (fastify, opts) {
   //      against citizen-service. On success, mint a citizen JWT carrying the
   //      citizen id so the public portal can attach it to requests.
   fastify.post('/api/v1/auth/login', async (request, reply) => {
+pi/v1/auth/login', async (request, reply) => {/i 
+  fastify.get('/api/v1/auth/me', async (request, reply) => {
+    const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_SERVICE_URL || config.CITIZEN_SERVICE_URL
+    try {
+      const res = await undiciRequest(`/api/v1/auth/me`, {
+        method: 'GET',
+        headers: { 'Authorization': request.headers.authorization, 'content-type': 'application/json' },
+        headersTimeout: 5000, bodyTimeout: 5000,
+      })
+      if (res.statusCode >= 200 && res.statusCode < 300) return reply.code(200).send(await res.body.json())
+      await res.body.text().catch(() => {}));
+      return reply.code(res.statusCode).send({ error: 'Identity service error' })
+    } catch (err) {
+      request.log.error({ err: err.message }, 'auth /me upstream failed')
+      return reply.code(502).send({ error: 'Authentication service unavailable' })
+    }
+  })
     const { username, password } = request.body || {}
 
     if (!username || !password) {
