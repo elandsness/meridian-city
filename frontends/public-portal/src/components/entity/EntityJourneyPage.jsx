@@ -2,75 +2,40 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useConfig } from '../../config/ConfigContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getEntities, createEntity, unwrapEntities } from '../../api/entities.js'
-import { getEntityDef, getStateOrder } from './entityConfig.js'
+import { displayName } from '../../lib/format.js'
 import Card from '../../ui/Card.jsx'
 import Button from '../../ui/Button.jsx'
 
-// Generic, decoratable journey tracker template — config-driven analogue of
-// MyJourney.jsx's hard-coded passenger flow. Works for any step-based entity
-// (luggage tracking, order journey, check-in flow, etc.).
-//
-// Config shape (inside screens.public):
-//   { id, template: 'entity-journey', entityType, label?,
-//     ownerField?, steps?, icon?, description? }
-//
-// ownerField: entity field whose value should match the logged-in user's id.
-//   When set + user is authenticated, the personal view shows their own entity.
-//   When absent, always shows the live board.
-// steps: optional explicit ordered list of state keys to show as journey steps
-//   (subset of the entity's states). If omitted, all non-error states in
-//   declaration order are used.
-export default function EntityJourneyPage({ entityType, label, ownerField, steps: stepsProp, description }) {
-  const cfg = useConfig()
-  const { isAuthenticated, user } = useAuth()
-  const def = getEntityDef(cfg, entityType)
-
-  // Use user.name (first + last from JWT) as the owner identity so the ownerField
-  // in the entity data (e.g. applicant_name, patient_name) contains a readable name
-  // rather than the opaque numeric citizen id.
-  const userName = user?.name || user?.email || user?.id
-  const showPersonal = !!(ownerField && userName)
-
-  if (showPersonal) return <MyOwnJourney entityType={entityType} userName={userName} ownerField={ownerField} label={label} stepsProp={stepsProp} description={description} cfg={cfg} def={def} />
-  return <LiveBoard entityType={entityType} label={label} description={description} cfg={cfg} def={def} stepsProp={stepsProp} isAuthenticated={isAuthenticated} />
-}
-
-// Normalize steps to [{state, label}] regardless of whether the caller passed
-// strings ("state_key") or objects ({state, label}) — schema allows both forms.
-function resolveSteps(def, stepsProp) {
-  const order = stepsProp ?? getStateOrder(def)
-  return order
-    .map((s) => (typeof s === 'string' ? { state: s } : s))
-    .filter(({ state }) => !def?.states?.[state]?.isError)
-}
+// --- Sub-components ---
 
 function JourneyStepper({ entity, def, stepsProp }) {
+  const resolveSteps = (d, s) => {
+    const order = s ?? (d?.stages ? Object.keys(d.stages) : [])
+    return order
+      .map((stateKey) => (typeof stateKey === 'string' ? { state: stateKey } : stateKey))
+      .filter(({ state }) => !d?.states?.[state]?.isError)
+  }
+
   const steps = resolveSteps(def, stepsProp)
   const currentIdx = steps.findIndex(({ state }) => state === entity?.state)
+
   return (
-    <div className="overflow-x-auto">
-      <div className="flex items-start min-w-max">
+    <div className="overflow-auto">
+      <div className="flex items-center min-w-max">
         {steps.map(({ state, label: stepLabel }, i) => {
           const stateMeta = def?.states?.[state] ?? {}
           const done = currentIdx >= i
           const current = entity?.state === state
-          const isLast = i === steps.length - 1
           const displayLabel = stepLabel ?? stateMeta.label ?? state.replace(/_/g, ' ')
           return (
             <div key={state} className="flex items-center">
               <div className="flex flex-col items-center w-20">
-                <div
-                  className={`w-4 h-4 rounded-full border-2 transition-colors ${
-                    done
-                      ? 'bg-[rgb(var(--brand))] border-[rgb(var(--brand))]'
-                      : 'bg-white border-slate-300'
-                  } ${current ? 'ring-4 ring-[rgb(var(--brand))]/20 scale-125' : ''}`}
-                />
+                <div className={`w-4 h-4 rounded-full border-2 transition-colors ${done ? 'bg-[rgb(var(--brand))] border-[rgb(var(--brand))]' : 'bg-white border-slate-300'} ${current ? 'ring-4 ring-[rgb(var(--brand))]/20 scale-125' : ''}`} />
                 <span className={`mt-1.5 text-[10px] leading-tight text-center px-1 ${done ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
                   {displayLabel}
                 </span>
               </div>
-              {!isLast && (
+              {! (i === steps.length - 1) && (
                 <div className={`h-0.5 w-6 mb-5 ${currentIdx > i ? 'bg-[rgb(var(--brand))]' : 'bg-slate-200'}`} />
               )}
             </div>
@@ -111,22 +76,20 @@ function EntityCard({ entity, def, stepsProp, label }) {
   )
 }
 
-function MyOwnJourney({ entityType, userName, ownerField, label, stepsProp, description, cfg, def }) {
+function PersonalJourney({ entityType, userId, userName, ownerField, label, stepsProp, description, cfg, def }) {
   const queryClient = useQueryClient()
-  const queryKey = ['entity-journey-mine', entityType, userName]
+  const queryKey = ['entity-journey-mine', entityType, userId]
 
   const { data, isLoading, isError } = useQuery({
     queryKey,
-    queryFn: () => getEntities(entityType, { [ownerField]: userName }),
+    queryFn: () => getEntities(entityType, { [ownerField]: userId }),
     refetchInterval: 8000,
   })
   const entities = unwrapEntities(data)
   const entity = entities[0]
 
-  // Auto-create on first visit: if authenticated and no entity exists for this user,
-  // create one (mirrors the old passenger-service /me "create if not found" pattern).
   const { mutate: create, isPending: isCreating } = useMutation({
-    mutationFn: () => createEntity(entityType, { [ownerField]: userName }),
+    mutationFn: () => createEntity(entityType, { [ownerField]: userId, name: userName }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   })
 
@@ -140,12 +103,12 @@ function MyOwnJourney({ entityType, userName, ownerField, label, stepsProp, desc
       </div>
 
       {(isLoading || isCreating) && <p className="text-slate-500 text-sm">Loading…</p>}
-      {isError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">Couldn't load your journey.</p>}
+      {isError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">Couldn\'t load your journey.</p>}
 
       {noEntity && (
         <Card>
           <div className="text-center py-8 space-y-3">
-            <p className="text-slate-500">You don't have an active {def?.displayName ?? label ?? 'journey'} yet.</p>
+            <p className="text-slate-500">You don\'t have an active {def?.displayName ?? label ?? 'journey'} yet.</p>
             <Button variant="primary" size="sm" onClick={() => create()}>
               Start a {def?.displayName ?? label ?? 'journey'}
             </Button>
@@ -168,7 +131,7 @@ function LiveBoard({ entityType, label, description, cfg, def, stepsProp, isAuth
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{label ?? def?.displayNamePlural ?? 'Journeys'}</h1>
           <p className="text-slate-500 text-sm mt-1">{description ?? `Live journey tracking through ${cfg.company.name}.`}</p>
@@ -196,4 +159,46 @@ function LiveBoard({ entityType, label, description, cfg, def, stepsProp, isAuth
       </div>
     </div>
   )
+}
+
+export default function EntityJourneyPage({ entityType, label, ownerField, steps: stepsProp, description }) {
+  const cfg = useConfig()
+  const { isAuthenticated, user } = useAuth()
+  const def = getEntityDef(cfg, entityType)
+
+  const userId = user?.id
+  const userName = displayName(user)
+  const showPersonal = !!(ownerField && userId)
+
+  if (showPersonal) {
+    return (
+      <PersonalJourney 
+        entityType={entityType} 
+        userId={userId} 
+        userName={userName} 
+        ownerField={ownerField} 
+        label={label} 
+        stepsProp={stepsProp} 
+        description={description} 
+        cfg={cfg} 
+        def={def} 
+      />
+    )
+  }
+
+  return (
+    <LiveBoard 
+      entityType={entityType} 
+      label={label} 
+      description={description} 
+      cfg={cfg} 
+      def={def} 
+      stepsProp={stepsProp} 
+      isAuthenticated={isAuthenticated} 
+    />
+  )
+}
+
+function unwrapEntities(d) {
+  return Array.isArray(d) ? d : d?.entities ?? d?.items ?? []
 }
