@@ -32,7 +32,7 @@ class RouteResolver {
         requiresAuth: false,
       },
       {
-        prefix: '/api/v1/journey',
+        prefix: '/api/v1/journeys',
         target: config.JOURNEY_SERVICE_URL,
         serviceName: 'journey-service',
         requiresAuth: false,
