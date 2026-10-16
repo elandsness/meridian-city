@@ -36,6 +36,23 @@ public class AuthController {
         this.passwordEncoder = passwordEncoder;
     }
 
+        @GetMapping("/me")
+    public java.util.Map<String, String> me(java.security.Principal principal) {
+        if (principal == null) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "No principal found");
+        }
+        
+        String identityId = principal.getName();
+        var identity = identityRepository.findById(identityId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Identity not found"));
+
+        return java.util.Map.of(
+                "id", identity.getId(),
+                "email", identity.getEmail(),
+                "name", identity.getFirstName() + " " + identity.getLastName()
+        );
+    }
+
     @PostMapping("/login")
     public Map<String, String> login(@RequestBody Map<String, String> credentials) {
         String email = credentials.get("email");
