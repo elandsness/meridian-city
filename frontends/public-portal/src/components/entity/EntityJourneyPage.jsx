@@ -6,76 +6,7 @@ import { displayName } from '../../lib/format.js'
 import Card from '../../ui/Card.jsx'
 import Button from '../../ui/Button.jsx'
 import { getEntityDef } from './entityConfig.js'
-
-// --- Sub-components ---
-
-function JourneyStepper({ entity, def, stepsProp }) {
-  const resolveSteps = (d, s) => {
-    const order = s ?? (d?.stages ? Object.keys(d.stages) : [])
-    return order
-      .map((stateKey) => (typeof stateKey === 'string' ? { state: stateKey } : stateKey))
-      .filter(({ state }) => !d?.states?.[state]?.isError)
-  }
-
-  const steps = resolveSteps(def, stepsProp)
-  const currentIdx = steps.findIndex(({ state }) => state === entity?.state)
-
-  return (
-    <div className="overflow-auto">
-      <div className="flex items-center min-w-max">
-        {steps.map(({ state, label: stepLabel }, i) => {
-          const stateMeta = def?.states?.[state] ?? {}
-          const done = currentIdx >= i
-          const current = entity?.state === state
-          const displayLabel = stepLabel ?? stateMeta.label ?? state.replace(/_/g, ' ')
-          return (
-            <div key={state} className="flex items-center">
-              <div className="flex flex-col items-center w-20">
-                <div className={`w-4 h-4 rounded-full border-2 transition-colors ${done ? 'bg-[rgb(var(--brand))] border-[rgb(var(--brand))]' : 'bg-white border-slate-300'} ${current ? 'ring-4 ring-[rgb(var(--brand))]/20 scale-125' : ''}`} />
-                <span className={`mt-1.5 text-[10px] leading-tight text-center px-1 ${done ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                  {displayLabel}
-                </span>
-              </div>
-              {! (i === steps.length - 1) && (
-                <div className={`h-0.5 w-6 mb-5 ${currentIdx > i ? 'bg-[rgb(var(--brand))]' : 'bg-slate-200'}`} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function EntityCard({ entity, def, stepsProp, label }) {
-  const displayId = entity.id?.slice(-6) ?? entity.id
-  const stateMeta = def?.states?.[entity.state] ?? {}
-  const toneClass = {
-    slate: 'bg-slate-100 text-slate-600',
-    blue: 'bg-blue-50 text-blue-700',
-    amber: 'bg-amber-50 text-amber-700',
-    orange: 'bg-orange-50 text-orange-700',
-    green: 'bg-green-50 text-green-700',
-    red: 'bg-red-50 text-red-700',
-  }[stateMeta.tone] ?? 'bg-slate-100 text-slate-600'
-
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <p className="font-semibold text-slate-900">{def?.displayName ?? label} #{displayId}</p>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {entity.created_at ? new Date(entity.created_at).toLocaleString() : ''}
-          </p>
-        </div>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${toneClass}`}>
-          {stateMeta.label ?? entity.state}
-        </span>
-      </div>
-      <JourneyStepper entity={entity} def={def} stepsProp={stepsProp} />
-    </Card>
-  )
-}
+import EntityCard from './EntityCard.jsx'
 
 function PersonalJourney({ entityType, userId, userName, ownerField, label, stepsProp, description, cfg, def }) {
   const queryClient = useQueryClient()
