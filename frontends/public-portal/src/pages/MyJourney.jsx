@@ -61,7 +61,3 @@ export default function MyJourney() {
     </div>
   )
 }
-
-function unwrapEntities(d) {
-  return Array.isArray(d) ? d : d?.entities ?? d?.items ?? []
-}
