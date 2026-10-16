@@ -15,48 +15,104 @@ class RouteResolver {
     this.systemRoutes = [
       {
         prefix: '/api/v1/identity',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.IDENTITY_SERVICE_URL,
         serviceName: 'identity-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/workflow',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.WORKFLOW_SERVICE_URL,
         serviceName: 'workflow-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/transaction',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.TRANSACTION_SERVICE_URL,
         serviceName: 'transaction-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/journeys',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.JOURNEY_SERVICE_URL,
         serviceName: 'journey-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/iot',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.IOT_SERVICE_URL,
         serviceName: 'iot-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/news',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.NEWS_TICKER_SERVICE_URL,
         serviceName: 'news-ticker-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/weather',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.WEATHER_SERVICE_URL,
         serviceName: 'weather-service',
         requiresAuth: false,
       },
       {
         prefix: '/api/v1/demo-control',
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: config.DEMO_CONTROL_API_URL,
         serviceName: 'demo-control',
         requiresAuth: true,
@@ -82,24 +138,52 @@ class RouteResolver {
     const semanticMappings = [
       { 
         prefix: '/api/v1/citizens', 
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: this.config.IDENTITY_SERVICE_URL, 
         serviceName: 'identity-service', 
         rewritePrefix: '/api/v1/identity' 
       },
       { 
         prefix: '/api/v1/passengers', 
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: this.config.JOURNEY_SERVICE_URL, 
         serviceName: 'journey-service', 
         rewritePrefix: '/api/v1/journeys' 
       },
       { 
         prefix: '/api/v1/flights', 
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: this.config.OPS_ENTITY_SERVICE_URL, 
         serviceName: 'ops-entity-service', 
         rewritePrefix: '/api/v1/entities/flight' 
       },
       { 
         prefix: '/api/v1/service-requests', 
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
         target: this.config.CUSTOMER_ENTITY_SERVICE_URL, 
         serviceName: 'customer-entity-service', 
         rewritePrefix: '/api/v1/entities/service_request' 
@@ -112,15 +196,43 @@ class RouteResolver {
     // 3. Generic Entity Engine Fallbacks
     if (path.startsWith('/api/v1/entities/incident')) {
         return { prefix: '/api/v1/entities/incident', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
     }
     if (path.startsWith('/api/v1/entities/work_order')) {
         return { prefix: '/api/v1/entities/work_order', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
     }
     if (path.startsWith('/api/v1/entities/journey')) {
         return { prefix: '/api/v1/entities/journey', target: this.config.JOURNEY_SERVICE_URL, serviceName: 'journey-service', rewritePrefix: '/api/v1/journeys', requiresAuth: false };
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
     }
     if (path.startsWith('/api/v1/entities')) {
         return { prefix: '/api/v1/entities', target: this.config.CUSTOMER_ENTITY_SERVICE_URL, serviceName: 'customer-entity-service', requiresAuth: false };
+pi/v1/identity',/a 
+      {
+        prefix: '/api/v1/auth',
+        target: config.IDENTITY_SERVICE_URL,
+        serviceName: 'identity-service',
+        requiresAuth: false,
+      },
     }
 
     return null;
