@@ -5,6 +5,7 @@ import { getEntities, createEntity, unwrapEntities } from '../../api/entities.js
 import { displayName } from '../../lib/format.js'
 import Card from '../../ui/Card.jsx'
 import Button from '../../ui/Button.jsx'
+import { getEntityDef } from './entityConfig.js'
 
 // --- Sub-components ---
 
