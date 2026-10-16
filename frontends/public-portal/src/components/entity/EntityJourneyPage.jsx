@@ -142,7 +142,7 @@ function LiveBoard({ entityType, label, description, cfg, def, stepsProp, isAuth
       </div>
 
       {isLoading && <p className="text-slate-500 text-sm">Loading…</p>}
-      {isError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">Failed to load journeys.</p>}
+      {isError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py,3">Failed to load journeys.</p>}
 
       {!isLoading && !isError && entities.length === 0 && (
         <Card>
@@ -197,8 +197,4 @@ export default function EntityJourneyPage({ entityType, label, ownerField, steps
       isAuthenticated={isAuthenticated} 
     />
   )
-}
-
-function unwrapEntities(d) {
-  return Array.isArray(d) ? d : d?.entities ?? d?.items ?? []
 }
