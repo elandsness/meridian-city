@@ -1,51 +1,42 @@
-'use strict'
+"use strict"
 
 const { request: undiciRequest } = require('undici')
 
 async function authRoutes (fastify, opts) {
   const config = opts.config
 
-  // Login dispatcher:
-  //   1. Built-in operator login (demo / dynatrace) — handled locally, mints an
-  //      operator JWT. Used by both dashboards.
-  //   2. Otherwise, treat the username as a citizen email and verify the password
-  //      against citizen-service. On success, mint a citizen JWT carrying the
-  //      citizen id so the public portal can attach it to requests.
-  fastify.post('/api/v1/auth/login', async (request, reply) => {
-pi/v1/auth/login', async (request, reply) => {/i 
   fastify.get('/api/v1/auth/me', async (request, reply) => {
-    const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_SERVICE_URL || config.CITIZEN_SERVICE_URL
+    const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
     try {
-      const res = await undiciRequest(`/api/v1/auth/me`, {
+      const res = await undiciRequest(`${citizenAuthUrl}/api/v1/auth/me`, {
         method: 'GET',
-        headers: { 'Authorization': request.headers.authorization, 'content-type': 'application/json' },
-        headersTimeout: 5000, bodyTimeout: 5000,
+        headers: { 
+          'Authorization': request.headers.authorization,
+          'content-type': 'application/json' 
+        },
+        headersTimeout: 5000,
+        bodyTimeout: 5000,
       })
-      if (res.statusCode >= 200 && res.statusCode < 300) return reply.code(200).send(await res.body.json())
-      await res.body.text().catch(() => {}));
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return reply.code(200).send(await res.body.json())
+      }
+      await res.body.text().catch(() => {})
       return reply.code(res.statusCode).send({ error: 'Identity service error' })
     } catch (err) {
       request.log.error({ err: err.message }, 'auth /me upstream failed')
       return reply.code(502).send({ error: 'Authentication service unavailable' })
     }
   })
+
+  fastify.post('/api/v1/auth/login', async (request, reply) => {
     const { username, password } = request.body || {}
+    if (!username || !password) return reply.code(400).send({ error: 'username and password are required' })
 
-    if (!username || !password) {
-      return reply.code(400).send({ error: 'username and password are required' })
-    }
-
-    // 1. Operator login (unchanged).
     if (username === config.AUTH_USERNAME && password === config.AUTH_PASSWORD) {
       const token = fastify.jwt.sign({ sub: username, role: 'operator' }, { expiresIn: '8h' })
-      request.log.info({ username }, 'operator login')
       return reply.code(200).send({ token, user: { username, role: 'operator' } })
     }
 
-    // 2. Citizen login — verify credentials against identity-service (the
-    //    generic-services replacement for citizen-service). Falls back to
-    //    customer-entity-service, then citizen-service, for environments where
-    //    identity-service isn't deployed yet.
     const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
     try {
       const res = await undiciRequest(`${citizenAuthUrl}/api/v1/auth/login`, {
@@ -55,26 +46,14 @@ pi/v1/auth/login', async (request, reply) => {/i
         headersTimeout: 5000,
         bodyTimeout: 5000,
       })
-
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const identity = await res.body.json()
-        const token = fastify.jwt.sign(
-          { sub: identity.identity_id, role: 'citizen' },
-          { expiresIn: '8h' }
-        )
-        request.log.info({ identityId: identity.identity_id }, 'citizen login')
+        const token = fastify.jwt.sign({ sub: identity.identity_id, role: 'citizen' }, { expiresIn: '8h' })
         return reply.code(200).send({
           token,
-          user: {
-            id: identity.identity_id,
-            username: identity.email,
-            name: identity.name,
-            role: 'citizen',
-          },
+          user: { id: identity.identity_id, username: identity.email, name: identity.name, role: 'citizen' },
         })
       }
-
-      // Non-2xx (typically 401 invalid credentials). Drain the body and reject.
       await res.body.text().catch(() => {})
       return reply.code(401).send({ error: 'Invalid credentials' })
     } catch (err) {
@@ -83,13 +62,8 @@ pi/v1/auth/login', async (request, reply) => {/i
     }
   })
 
-  fastify.get('/api/v1/auth/verify', {
-    preHandler: [fastify.authenticateOps],
-  }, async (request, reply) => {
-    return reply.code(200).send({
-      valid: true,
-      sub: request.user.sub,
-    })
+  fastify.get('/api/v1/auth/verify', { preHandler: [fastify.authenticateOps] }, async (request, reply) => {
+    return reply.code(200).send({ valid: true, sub: request.user.sub })
   })
 }
 
