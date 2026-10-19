@@ -45,6 +45,12 @@ class RouteResolver {
         requiresAuth: false,
       },
       {
+        prefix: '/api/v1/chat',
+        target: config.AI_SERVICE_URL,
+        serviceName: 'ai-service',
+        requiresAuth: false,
+      },
+      {
         prefix: '/api/v1/news',
         target: config.NEWS_TICKER_SERVICE_URL,
         serviceName: 'news-ticker-service',
