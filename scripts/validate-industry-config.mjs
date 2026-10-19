@@ -350,17 +350,10 @@ function checkScreens(cfg) {
     ...(cfg.screens?.ops ?? []),
   ]
 
-  // entity-journey + ownerField in the public portal
-  for (const screen of cfg.screens?.public ?? []) {
-    if (typeof screen === 'object' && screen?.template === 'entity-journey' && screen?.ownerField) {
-      errors.push(
-        `screens.public[id="${screen.id}"]: entity-journey with ownerField is not supported for custom entities. ` +
-        `The portal has no mechanism to create custom entity instances on behalf of a logged-in user, ` +
-        `so every user sees an empty journey. ` +
-        `Replace with template: entity-list (remove ownerField — shows all entities as a live feed).`
-      )
-    }
-  }
+  // entity-journey + ownerField auto-creates a scoped instance on first visit
+  // (EntityJourneyPage's PersonalJourney create-on-demand flow) and entity-engine
+  // persists/filters on the owner_id column (EntityFactory, EntityEngineService) --
+  // this used to be unsupported but no longer is, so it's intentionally not flagged.
 
   // generator entities must appear in at least one screen or home module.
   // Exception: periodicHistoryBackfill is the billing system's generator — its
