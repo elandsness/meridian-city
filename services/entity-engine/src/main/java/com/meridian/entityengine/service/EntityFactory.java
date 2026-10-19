@@ -28,6 +28,9 @@ public class EntityFactory {
 
     public EntityRecord build(EntityDefinition def, String entityType, Map<String, Object> fieldOverrides) {
         EntityRecord record = EntityRecord.create(entityType, def.getIdPrefix(), def.getInitial());
+        if (fieldOverrides != null && fieldOverrides.get("owner_id") != null) {
+            record.setOwnerId(String.valueOf(fieldOverrides.get("owner_id")));
+        }
         def.getFields().forEach((fieldName, fieldDef) -> {
             Object override = fieldOverrides == null ? null : fieldOverrides.get(fieldName);
             if ("ref".equals(fieldDef.getType())) {

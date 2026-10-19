@@ -45,7 +45,7 @@ public class EntityEngineService {
         if (fieldFilters == null || fieldFilters.isEmpty()) return records;
         return records.stream()
                 .filter(r -> fieldFilters.entrySet().stream().allMatch(e -> {
-                    Object val = r.getField(e.getKey());
+                    Object val = "owner_id".equals(e.getKey()) ? r.getOwnerId() : r.getField(e.getKey());
                     return val != null && e.getValue().equals(String.valueOf(val));
                 }))
                 .toList();
