@@ -139,20 +139,20 @@ Meridian is a polyglot microservices application deliberately built across four 
 ### Notification Service
 - **Language**: Node.js 20 / Express
 - **Port**: 8087
-- **Role**: Kafka consumer on `requests.events`, `iot.anomalies`, and `notifications.outbound`. Stores in-app notifications in an in-memory store (no external dependency) served to the ops dashboard via SSE (Server-Sent Events).
+- **Role**: Kafka consumer on `requests.events`, `commerce.events`, `billing.events`, and `notifications.outbound`. Stores in-app notifications in an in-memory store (no external dependency) served to the ops dashboard via SSE (Server-Sent Events).
 - **Instrumentation**: OneAgent (auto)
 
 ### Demo Control API
 - **Language**: Node.js 20 / Fastify
 - **Port**: 3001
-- **Role**: Internal REST API for the demo control panel. Injects faults purely over HTTP — `POST /admin/fault` on each target service (in-memory flags) — resizes/anomalizes the IoT fleet via `iot-simulator`'s `/admin/*` endpoints, and controls the traffic bot via its `/api/v1/*` API. No Kubernetes API access or RBAC.
+- **Role**: Internal REST API for the demo control panel. Injects faults purely over HTTP — `POST /admin/fault` on each target service (in-memory flags) — manages the IoT device fleet (add/remove devices, set ongoing fault gates) via `iot-simulator`'s `/api/v1/iot/*` endpoints, and controls the traffic bot via its `/api/v1/*` API. No Kubernetes API access or RBAC.
 - **Instrumentation**: OneAgent (auto)
 
 ### IoT Simulator
-- **Language**: Go 1.22
+- **Language**: Go 1.26
 - **Port**: 8088 (admin/control API)
-- **Role**: Simulates a dynamic fleet of IoT devices. Each device runs as a goroutine emitting OTLP metrics + traces on a configurable interval. Devices emit to `iot-ingestion` (gRPC) and to the OTel Collector (direct path for the OTel showcase). Fleet size and anomaly states are configurable at runtime via the admin API.
-- **Instrumentation**: **OTel SDK** (Go). Resource attributes include `device.type`, `device.id`, `device.category`, `device.zone`.
+- **Role**: Generic, config-driven fake IoT device fleet. Device types, counts, metrics (with value ranges/patterns), logs, and one level of parent/child hierarchy all come from `industry.iot.deviceTypes` -- nothing is hardcoded to an industry. Each device runs as its own goroutine emitting OTLP metrics, logs, and trace spans directly to the shared otel-collector on a configurable tick (no separate ingestion hop, no Kafka pipeline). Dynatrace's own AI does anomaly detection; ongoing fault-gate problem injection is managed at runtime via the admin API.
+- **Instrumentation**: **OTel SDK** (Go). Resource attributes include `device.type`, `device.id`, `device.parent_id` (for hierarchy).
 
 ### Traffic Bot
 - **Language**: Node.js 20
@@ -183,19 +183,18 @@ meridian (database)
 ├── incidents
 │   ├── incidents         Active/resolved operational incidents
 │   └── work_orders       Field work orders
-├── iot
-│   ├── device_readings   IoT telemetry aggregates (1-min windows)
-│   └── anomalies         Detected anomaly events
 └── analytics
     └── kpi_snapshots     KPI snapshots (for the history chart)
 ```
+
+IoT device telemetry is no longer persisted to PostgreSQL -- iot-simulator keeps
+fleet state in memory only and emits OTLP metrics/logs directly; there is no
+ingestion/aggregation hop writing to a database.
 
 ### Kafka Topics
 
 | Topic | Partitions | Retention | Producer → Consumer |
 |---|---|---|---|
-| `iot.telemetry.raw` | 3 | 24h | iot-ingestion → telemetry-processor |
-| `iot.anomalies` | 1 | 24h | telemetry-processor → notification-service, city-operations |
 | `requests.events` | 2 | 7d | citizen-service, service-dispatch → notification-service (analytics-service reads from PostgreSQL, not Kafka) |
 | `notifications.outbound` | 1 | 1h | city-operations → notification-service |
 
@@ -217,11 +216,11 @@ Used where OneAgent does not have APM support (Go) and where deeper semantic met
 
 | Service | SDK | Reason |
 |---|---|---|
-| `iot-ingestion` | Go OTel SDK | No OneAgent Go APM |
-| `iot-simulator` | Go OTel SDK | IoT device simulation uses OTel semantic conventions |
+| `iot-simulator` | Go OTel SDK | No OneAgent Go APM; IoT device simulation uses OTel semantic conventions |
 | `ai-service` | Python OTel SDK | OTel GenAI semantic conventions for AI Observability |
+| `analytics-service` | Python OTel SDK | OneAgent `applicationMonitoring` doesn't produce PurePath traces for Python apps |
 
-OTel telemetry from all three services flows through the OTel Collector to Dynatrace.
+OTel telemetry from these services flows through the OTel Collector to Dynatrace.
 
 ### Business Events (log extraction)
 
@@ -253,12 +252,14 @@ Kubernetes API access — it has no k8s client and needs no RBAC):
    body shape varies — city-operations takes `{ "type": "db-slowdown", "enabled": true, "delayMs": 2000 }`;
    the Python and citizen services take `{ "<fault>_enabled": true, "<fault>_seconds": N }`.
    Each service holds an in-memory flag and artificially delays (e.g. citizen-service
-   delays the service-request DB write, analytics allocates memory, telemetry-processor
-   pauses its Kafka consumer, ai-service delays the LLM call).
+   delays the service-request DB write, analytics allocates memory, ai-service delays
+   the LLM call).
 
-2. **Fleet resize / anomalies**: Calls `iot-simulator`'s `/admin/fleet` (resize) and
-   `/admin/anomaly[/{id}]` (inject/clear) endpoints. The simulator starts/stops device
-   goroutines and toggles anomalous readings (which flow through to incidents).
+2. **IoT device fleet / fault gates**: Calls `iot-simulator`'s `/api/v1/iot/devices`
+   (add/remove) and `/api/v1/iot/fault-gates/{type}` (set/clear an ongoing,
+   probabilistic problem) endpoints. The simulator starts/stops device goroutines and
+   pushes a device type's metrics out of their normal range; Dynatrace's own AI does
+   the anomaly detection (there is no incident auto-creation from IoT anymore).
 
 3. **Traffic control**: Calls `traffic-bot`'s `/api/v1/{start,stop,burst}` endpoints.
 

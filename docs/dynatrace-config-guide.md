@@ -28,8 +28,7 @@ Expected services (after ~5 minutes of traffic):
 - `ai-service`
 - `analytics-service`
 - `notification-service`
-- `iot-ingestion`
-- `telemetry-processor`
+- `iot-simulator`
 
 If services are missing, check [setup-guide.md](setup-guide.md) troubleshooting section.
 
@@ -250,7 +249,7 @@ Create one guardian named **Meridian City Platform SLOs** with the following obj
 | **Name** | IoT Ingest Availability |
 | **Objective type** | Service-level objective |
 | **Metric** | `builtin:service.availability` |
-| **Entity selector** | `type(SERVICE),tag(app:iot-ingestion)` |
+| **Entity selector** | `type(SERVICE),tag(app:iot-simulator)` |
 | **Target** | 99% |
 | **Timeframe** | 7 days |
 

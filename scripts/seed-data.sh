@@ -341,12 +341,14 @@ WHERE sr.id LIKE 'req-0000%'
 success "Request lifecycle events seeded."
 
 # ---------------------------------------------------------------------------
-# NOTE: We intentionally do NOT seed sample incidents. The IoT anomaly → incident
-# pipeline (telemetry-processor → iot.anomalies → city-operations) creates real
-# incidents during baseline traffic, and the work-order lifecycle ages them out,
-# so the incident UIs (public-portal Home + map, ops Incidents page) populate
-# organically. Hardcoded seeds previously never aged (they had no work orders) and
-# so permanently dominated the active-incident views, masking the live flow.
+# NOTE: We intentionally do NOT seed sample incidents. The old IoT anomaly ->
+# incident Kafka bridge that used to populate these organically was removed
+# (IoT problems are now observed directly in Dynatrace, not routed into an
+# internal incident). Hardcoded seeds previously never aged (they had no work
+# orders) and so permanently dominated the active-incident views, masking the
+# live flow -- that problem no longer applies, but there's also currently no
+# automatic source of incidents, so the incident UIs will stay empty unless an
+# incident is created directly via a POST to ops-entity-service.
 
 fi  # end CITY_DEPLOY
 

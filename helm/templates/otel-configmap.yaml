@@ -1,4 +1,5 @@
 {{- if index .Values "opentelemetry-collector" "enabled" }}
+{{- $exporterName := ternary "dynatrace_otlp" "otlp_http/dynatrace" .Values.bindplane.enabled }}
 # OTel Collector configuration ConfigMap.
 # The opentelemetry-collector chart is configured to use this existing ConfigMap
 # via configMap.existingName in values.yaml.
@@ -17,8 +18,7 @@ data:
 
     receivers:
       # Receives OTLP from:
-      #  - iot-simulator (Go): IoT device telemetry
-      #  - iot-ingestion (Go): forwarded device spans
+      #  - iot-simulator (Go): IoT device telemetry (metrics/logs/traces)
       #  - ai-service (Python): GenAI spans with token metadata
       otlp:
         protocols:
@@ -60,6 +60,17 @@ data:
             action: upsert
 
     exporters:
+      {{- if .Values.bindplane.enabled }}
+      # Bindplane Collector's native Dynatrace destination. Only exists on a
+      # Bindplane collector build (see opentelemetry-collector.image.* and the
+      # `bindplane` values block above) -- NOT on vanilla
+      # otel/opentelemetry-collector-contrib.
+      dynatrace_otlp:
+        your_environment_id: "{{ .Values.bindplane.dynatrace.environmentId }}"
+        dynatrace_api_token: "{{ .Values.bindplane.dynatrace.apiToken }}"
+        deployment_type: saas
+        telemetry_types: [metrics, logs, traces]
+      {{- else }}
       # Export to Dynatrace via OTLP/HTTP
       otlp_http/dynatrace:
         endpoint: "{{ .Values.dynatrace.otlpEndpoint }}"
@@ -71,6 +82,7 @@ data:
           initial_interval: 5s
           max_interval: 30s
           max_elapsed_time: 300s
+      {{- end }}
 
       # Debug exporter (disabled in production — enable for troubleshooting)
       # debug:
@@ -82,15 +94,15 @@ data:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, resource, batch]
-          exporters: [otlp_http/dynatrace]
+          exporters: [{{ $exporterName }}]
         metrics:
           receivers: [otlp]
           processors: [memory_limiter, resource, batch]
-          exporters: [otlp_http/dynatrace]
+          exporters: [{{ $exporterName }}]
         logs:
           receivers: [otlp]
           processors: [memory_limiter, resource, batch]
-          exporters: [otlp_http/dynatrace]
+          exporters: [{{ $exporterName }}]
 
       telemetry:
         logs:

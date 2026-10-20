@@ -7,12 +7,12 @@
  * GET    /api/v1/scenarios/active        — currently active scenario (if any)
  * POST   /api/v1/scenarios/:id/start     — activate a scenario
  * DELETE /api/v1/scenarios/active        — reset active scenario + clear all faults
- * POST   /api/v1/scenarios/reset-all     — reset all scenarios + faults + IoT anomalies
+ * POST   /api/v1/scenarios/reset-all     — reset all scenarios + faults + IoT fault gates
  */
 
 const { getActiveScenario, clearActiveScenario } = require('../state')
 const { listScenarios, activateScenario, resetAll } = require('../scenarios')
-const { clearAllFleetAnomalies } = require('../fleetOps')
+const { clearAllFaultGates } = require('../iotOps')
 
 /**
  * @param {import('fastify').FastifyInstance} fastify
@@ -56,18 +56,17 @@ async function scenarioRoutes (fastify) {
     return reply.send({ reset: true, cleared: active.name })
   })
 
-  // POST /api/v1/scenarios/reset-all — nuclear reset: all faults + IoT anomalies
+  // POST /api/v1/scenarios/reset-all — nuclear reset: all faults + IoT fault gates
   fastify.post('/api/v1/scenarios/reset-all', async (_request, reply) => {
     const [faultResults] = await Promise.allSettled([resetAll()])
 
-    // Also clear IoT anomalies via the iot-simulator (per-device clears under
-    // /admin/anomaly/{id}); see fleetOps.clearAllFleetAnomalies.
-    const anomalyReset = await clearAllFleetAnomalies().catch(() => ({ ok: false, cleared: [] }))
+    // Also disable every active IoT fault gate; see iotOps.clearAllFaultGates.
+    const gateReset = await clearAllFaultGates().catch(() => ({ ok: false, cleared: [] }))
 
     return reply.send({
       reset: true,
       faults_reset: faultResults.status === 'fulfilled' ? faultResults.value : [],
-      anomalies_cleared: anomalyReset.cleared ?? [],
+      iot_fault_gates_cleared: gateReset.cleared ?? [],
     })
   })
 }

@@ -113,13 +113,58 @@ function checkEntities(entities) {
   return errors
 }
 
+// --- semantic checks for industry.iot (fake device fleet, services/iot-simulator) ---
+function checkIot(iot) {
+  const errors = []
+  if (!iot || typeof iot !== 'object') return errors
+
+  function checkMetrics(path, metrics) {
+    for (const [i, m] of (metrics || []).entries()) {
+      if (typeof m.min === 'number' && typeof m.max === 'number' && m.min >= m.max) {
+        errors.push(`${path}.metrics[${i}] ("${m.name}") has min (${m.min}) >= max (${m.max})`)
+      }
+      if (m.pattern === 'cyclic' && m.periodSeconds != null && m.periodSeconds <= 0) {
+        errors.push(`${path}.metrics[${i}] ("${m.name}") pattern is cyclic but periodSeconds is not positive`)
+      }
+    }
+  }
+
+  const topLevelTypes = new Set()
+  for (const [i, dt] of (iot.deviceTypes || []).entries()) {
+    const path = `iot.deviceTypes[${i}]`
+    if (dt.type) {
+      if (topLevelTypes.has(dt.type)) {
+        errors.push(`${path}.type "${dt.type}" is declared more than once in iot.deviceTypes`)
+      }
+      topLevelTypes.add(dt.type)
+    }
+    checkMetrics(path, dt.metrics)
+
+    const childTypes = new Set()
+    for (const [j, child] of (dt.children || []).entries()) {
+      const childPath = `${path}.children[${j}]`
+      if (child.type) {
+        if (childTypes.has(child.type)) {
+          errors.push(`${childPath}.type "${child.type}" is declared more than once under ${path}`)
+        }
+        if (child.type === dt.type) {
+          errors.push(`${childPath}.type "${child.type}" is the same as its parent type "${dt.type}" — a device can't be its own child type`)
+        }
+        childTypes.add(child.type)
+      }
+      checkMetrics(childPath, child.metrics)
+    }
+  }
+  return errors
+}
+
 const VALID_SERVICE_NAME_KEYS = new Set([
   'citizen-service', 'city-operations', 'service-dispatch',
   'api-gateway', 'notification-service', 'billing-service',
 ])
 
 const VALID_FLOW_IDS = new Set([
-  'service-request', 'account-creation', 'iot-incident',
+  'service-request', 'account-creation',
   'tax-payment', 'aircraft-turnaround', 'passenger-journey',
 ])
 
@@ -421,6 +466,7 @@ for (const path of files) {
   if (isPartialOverlay) {
     const semanticErrors = [
       ...checkEntities(cfg.entities),
+      ...checkIot(cfg.iot),
       ...checkJourneyService(parsed, cfg, isValuesOverlay),
       ...checkRuntimeOwnership(parsed, cfg),
     ]
@@ -439,6 +485,7 @@ for (const path of files) {
   // and some (like routing-inside-terminology) are the root cause of schema failures.
   const semanticErrors = [
     ...checkEntities(cfg.entities),
+    ...checkIot(cfg.iot),
     ...checkRouting(cfg),
     ...checkDynatrace(cfg),
     ...checkScreens(cfg),

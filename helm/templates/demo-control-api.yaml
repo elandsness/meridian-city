@@ -41,8 +41,6 @@ spec:
               value: "http://ai-service:8085"
             - name: ANALYTICS_SERVICE_URL
               value: "http://analytics-service:8084"
-            - name: TELEMETRY_PROCESSOR_URL
-              value: "http://telemetry-processor:8086"
             - name: IOT_SIMULATOR_URL
               value: "http://iot-simulator:8088"
             - name: TRAFFIC_BOT_URL

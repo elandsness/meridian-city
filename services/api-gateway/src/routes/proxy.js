@@ -40,8 +40,8 @@ class RouteResolver {
       },
       {
         prefix: '/api/v1/iot',
-        target: config.IOT_SERVICE_URL,
-        serviceName: 'iot-service',
+        target: config.IOT_SIMULATOR_URL,
+        serviceName: 'iot-simulator',
         requiresAuth: false,
       },
       {

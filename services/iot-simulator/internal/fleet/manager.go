@@ -1,240 +1,141 @@
+// Package fleet owns the in-memory device population: spawning/removing
+// devices (with parent/child hierarchy), and the per-device tick loop that
+// mutates metric values and emits them as OTel gauges (plus occasional log
+// lines), applying any active fault gate along the way.
 package fleet
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
+	otelmetric "go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
-	"github.com/meridian/iot-simulator/internal/device"
+	"github.com/meridian/iot-simulator/internal/config"
+	"github.com/meridian/iot-simulator/internal/faultgate"
+	"github.com/meridian/iot-simulator/internal/pattern"
 	"github.com/meridian/iot-simulator/internal/telemetry"
 )
 
-// DeviceWorker couples a Device with its mutable state and goroutine lifecycle.
-type DeviceWorker struct {
-	Device device.Device
-	State  *device.State
-	cancel context.CancelFunc
-}
-
-// Manager owns and coordinates all device goroutines.
+// Manager owns and coordinates every device goroutine.
 type Manager struct {
-	mu            sync.RWMutex
-	workers       map[string]*DeviceWorker
-	vehicleCount  int
-	buildingCount int
-	machineCount  int
-	emitInterval  int
-	instruments   *telemetry.Instruments
+	mu sync.RWMutex
+
+	topTypes      map[string]config.DeviceType
+	childTypes    map[string]map[string]config.ChildDeviceType // parentType -> childType -> def
+	defaultTickMs int
+
+	gates       *faultgate.Registry
+	instruments *telemetry.Instruments
+	logs        *telemetry.LogEmitter
+
+	seq        map[string]int
+	devices    map[string]*Device
+	childrenOf map[string][]string // parentID -> []childID
 }
 
-// FleetStatus is the JSON-serialisable snapshot of the entire fleet.
-type FleetStatus struct {
-	Vehicles  CategoryStatus `json:"vehicles"`
-	Buildings CategoryStatus `json:"buildings"`
-	Machines  CategoryStatus `json:"machines"`
+func NewManager(cfg *config.Config, gates *faultgate.Registry, instruments *telemetry.Instruments, logs *telemetry.LogEmitter) *Manager {
+	m := &Manager{
+		topTypes:      make(map[string]config.DeviceType),
+		childTypes:    make(map[string]map[string]config.ChildDeviceType),
+		defaultTickMs: cfg.EffectiveTickIntervalMs(0),
+		gates:         gates,
+		instruments:   instruments,
+		logs:          logs,
+		seq:           make(map[string]int),
+		devices:       make(map[string]*Device),
+		childrenOf:    make(map[string][]string),
+	}
+	for _, dt := range cfg.DeviceTypes {
+		m.topTypes[dt.Type] = dt
+		children := make(map[string]config.ChildDeviceType, len(dt.Children))
+		for _, c := range dt.Children {
+			children[c.Type] = c
+		}
+		m.childTypes[dt.Type] = children
+	}
+	return m
 }
 
-// CategoryStatus summarises one device category.
-type CategoryStatus struct {
-	Count     int               `json:"count"`
-	Anomalies map[string]string `json:"anomalies"` // deviceID → anomalyType
-}
-
-// NewManager creates an uninitialised Manager.
-func NewManager(emitIntervalSeconds int) *Manager {
-	return &Manager{
-		workers:      make(map[string]*DeviceWorker),
-		emitInterval: emitIntervalSeconds,
+// Initialize spawns the fleet's starting population from config.
+func (m *Manager) Initialize(ctx context.Context) {
+	for _, dt := range m.topTypes {
+		for i := 0; i < dt.Count; i++ {
+			m.spawnTop(ctx, dt)
+		}
 	}
 }
 
-// Initialize creates the initial device fleet and starts all goroutines.
-// Panics if instruments cannot be created (programming error / OTel misconfiguration).
-func (m *Manager) Initialize(ctx context.Context, vehicles, buildings, machines int) {
-	defaultMetrics := map[string]string{
-		"iot.vehicle.speed": "km/h", "iot.vehicle.engine_temp": "Cel", "iot.vehicle.fuel_level": "%", "iot.vehicle.gps_lat": "", "iot.vehicle.gps_lon": "",
-		"iot.building.hvac_temp": "Cel", "iot.building.hvac_setpoint": "Cel", "iot.building.energy_kwh": "kWh", "iot.building.occupancy": "{person}", "iot.building.co2_ppm": "ppm",
-		"iot.machine.vibration": "mm/s", "iot.machine.cycle_count": "", "iot.machine.temp": "Cel", "iot.machine.error_rate": "%", "iot.machine.throughput": "{unit}/min",
-	}
-	instr, err := telemetry.NewInstruments(defaultMetrics)
-	if err != nil {
-		panic(fmt.Sprintf("fleet: cannot create OTel instruments: %v", err))
-	}
-	m.instruments = instr
+func (m *Manager) spawnTop(ctx context.Context, dt config.DeviceType) *Device {
+	d := m.newDevice(dt.Type, "", dt.Metrics, dt.Logs, dt.TickIntervalMs)
+	m.register(d)
+	m.startTicking(ctx, d)
 
-	for i := 0; i < vehicles; i++ {
-		m.spawnDevice(ctx, device.NewVehicle(i))
+	for _, child := range dt.Children {
+		for i := 0; i < child.CountPerParent; i++ {
+			m.spawnChild(ctx, child, d.ID)
+		}
 	}
-	for i := 0; i < buildings; i++ {
-		m.spawnDevice(ctx, device.NewBuilding(i))
-	}
-	for i := 0; i < machines; i++ {
-		m.spawnDevice(ctx, device.NewMachine(i))
-	}
+	return d
+}
 
+func (m *Manager) spawnChild(ctx context.Context, ct config.ChildDeviceType, parentID string) *Device {
+	d := m.newDevice(ct.Type, parentID, ct.Metrics, ct.Logs, ct.TickIntervalMs)
+	m.register(d)
+	m.startTicking(ctx, d)
+	return d
+}
+
+func (m *Manager) newDevice(deviceType, parentID string, metrics []config.Metric, logCfg *config.LogConfig, tickOverrideMs int) *Device {
 	m.mu.Lock()
-	m.vehicleCount = vehicles
-	m.buildingCount = buildings
-	m.machineCount = machines
+	m.seq[deviceType]++
+	n := m.seq[deviceType]
 	m.mu.Unlock()
 
-	log.Printf("fleet: initialised %d vehicles, %d buildings, %d machines", vehicles, buildings, machines)
-}
-
-// spawnDevice creates a worker and starts its goroutine.
-func (m *Manager) spawnDevice(ctx context.Context, d device.Device) {
-	info := d.Info()
-	devCtx, cancel := context.WithCancel(ctx)
-	w := &DeviceWorker{
-		Device: d,
-		State:  &device.State{},
-		cancel: cancel,
+	tickMs := m.defaultTickMs
+	if tickOverrideMs > 0 {
+		tickMs = tickOverrideMs
 	}
 
-	m.mu.Lock()
-	m.workers[info.ID] = w
-	m.mu.Unlock()
-
-	go m.runDevice(devCtx, d, w.State)
+	d := &Device{
+		ID:             fmt.Sprintf("%s-%03d", deviceType, n),
+		Type:           deviceType,
+		ParentID:       parentID,
+		CreatedAt:      time.Now(),
+		metrics:        metrics,
+		logCfg:         logCfg,
+		tickIntervalMs: tickMs,
+		values:         make(map[string]float64, len(metrics)),
+	}
+	for _, metricDef := range metrics {
+		d.values[metricDef.Name] = pattern.Seed(metricDef.Pattern, metricDef.Min, metricDef.Max, metricDef.PeriodSeconds)
+	}
+	return d
 }
 
-// stopDevice cancels a device goroutine and removes it from the map.
-func (m *Manager) stopDevice(id string) {
+func (m *Manager) register(d *Device) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	w, ok := m.workers[id]
-	if !ok {
-		return
-	}
-	w.cancel()
-	delete(m.workers, id)
-}
-
-// ResizeFleet adjusts the number of running devices in each category.
-func (m *Manager) ResizeFleet(ctx context.Context, vehicles, buildings, machines int) {
-	m.mu.Lock()
-	curVehicles := m.vehicleCount
-	curBuildings := m.buildingCount
-	curMachines := m.machineCount
-	m.mu.Unlock()
-
-	resizeCategory(ctx, m, curVehicles, vehicles, "veh", func(i int) device.Device {
-		return device.NewVehicle(i)
-	})
-	resizeCategory(ctx, m, curBuildings, buildings, "bldg", func(i int) device.Device {
-		return device.NewBuilding(i)
-	})
-	resizeCategory(ctx, m, curMachines, machines, "mach", func(i int) device.Device {
-		return device.NewMachine(i)
-	})
-
-	m.mu.Lock()
-	m.vehicleCount = vehicles
-	m.buildingCount = buildings
-	m.machineCount = machines
-	m.mu.Unlock()
-
-	log.Printf("fleet: resized to %d vehicles, %d buildings, %d machines", vehicles, buildings, machines)
-}
-
-func resizeCategory(ctx context.Context, m *Manager, current, target int, prefix string, ctor func(int) device.Device) {
-	if target > current {
-		for i := current; i < target; i++ {
-			m.spawnDevice(ctx, ctor(i))
-		}
-	} else if target < current {
-		for i := current - 1; i >= target; i-- {
-			id := fmt.Sprintf("%s-%03d", prefix, i)
-			m.stopDevice(id)
-		}
+	m.devices[d.ID] = d
+	if d.ParentID != "" {
+		m.childrenOf[d.ParentID] = append(m.childrenOf[d.ParentID], d.ID)
 	}
 }
 
-// SetAnomaly injects a fault on the named device.
-func (m *Manager) SetAnomaly(deviceID string, anomalyType device.AnomalyType) error {
-	m.mu.RLock()
-	w, ok := m.workers[deviceID]
-	m.mu.RUnlock()
-	if !ok {
-		return fmt.Errorf("device %q not found", deviceID)
-	}
-	w.State.SetAnomaly(anomalyType)
-	log.Printf("fleet: anomaly %q set on %s", anomalyType, deviceID)
-	return nil
+func (m *Manager) startTicking(parentCtx context.Context, d *Device) {
+	ctx, cancel := context.WithCancel(parentCtx)
+	d.cancel = cancel
+	go m.runDevice(ctx, d)
 }
 
-// ClearAnomaly removes any active fault from the named device.
-func (m *Manager) ClearAnomaly(deviceID string) error {
-	m.mu.RLock()
-	w, ok := m.workers[deviceID]
-	m.mu.RUnlock()
-	if !ok {
-		return fmt.Errorf("device %q not found", deviceID)
-	}
-	w.State.SetAnomaly(device.AnomalyNone)
-	log.Printf("fleet: anomaly cleared on %s", deviceID)
-	return nil
-}
-
-// FleetStatus returns a point-in-time snapshot of the fleet.
-func (m *Manager) FleetStatus() FleetStatus {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	status := FleetStatus{
-		Vehicles:  CategoryStatus{Anomalies: make(map[string]string)},
-		Buildings: CategoryStatus{Anomalies: make(map[string]string)},
-		Machines:  CategoryStatus{Anomalies: make(map[string]string)},
-	}
-
-	for id, w := range m.workers {
-		info := w.Device.Info()
-		anomaly := string(w.State.GetAnomaly())
-		switch info.Category {
-		case device.Category("vehicle"):
-			status.Vehicles.Count++
-			if anomaly != "" {
-				status.Vehicles.Anomalies[id] = anomaly
-			}
-		case device.Category("building"):
-			status.Buildings.Count++
-			if anomaly != "" {
-				status.Buildings.Anomalies[id] = anomaly
-			}
-		case device.Category("machine"):
-			status.Machines.Count++
-			if anomaly != "" {
-				status.Machines.Anomalies[id] = anomaly
-			}
-		}
-	}
-
-	return status
-}
-
-// StopAll cancels every device goroutine.
-func (m *Manager) StopAll() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for id, w := range m.workers {
-		w.cancel()
-		delete(m.workers, id)
-	}
-	log.Println("fleet: all devices stopped")
-}
-
-// runDevice is the per-device goroutine. It emits metrics and a trace span on each tick.
-func (m *Manager) runDevice(ctx context.Context, d device.Device, state *device.State) {
-	info := d.Info()
-
-	// Stagger startup by up to 5 seconds to avoid a thundering-herd on the first tick.
+// runDevice is the per-device goroutine: staggers its first tick (to avoid a
+// thundering herd), then emits on its own ticker until cancelled.
+func (m *Manager) runDevice(ctx context.Context, d *Device) {
 	jitter := time.Duration(rand.Intn(5000)) * time.Millisecond
 	select {
 	case <-time.After(jitter):
@@ -242,7 +143,7 @@ func (m *Manager) runDevice(ctx context.Context, d device.Device, state *device.
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(m.emitInterval) * time.Second)
+	ticker := time.NewTicker(time.Duration(d.tickIntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 
 	tracer := otel.Tracer("iot-simulator")
@@ -252,30 +153,166 @@ func (m *Manager) runDevice(ctx context.Context, d device.Device, state *device.
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			anomaly := state.GetAnomaly()
-			readings := d.Readings(anomaly)
+			m.tick(ctx, tracer, d)
+		}
+	}
+}
 
-			spanCtx, span := tracer.Start(ctx, "device.telemetry.emit")
-			span.SetAttributes(
-				attribute.String("device.id", info.ID),
-				attribute.String("device.category", string(info.Category)),
-				attribute.String("device.zone", info.Zone),
-			)
+func (m *Manager) tick(ctx context.Context, tracer trace.Tracer, d *Device) {
+	spanCtx, span := tracer.Start(ctx, "device.telemetry.emit")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("device.id", d.ID),
+		attribute.String("device.type", d.Type),
+	)
+	if d.ParentID != "" {
+		span.SetAttributes(attribute.String("device.parent_id", d.ParentID))
+	}
 
-			attrs := metric.WithAttributes(
-				attribute.String("device.id", info.ID),
-				attribute.String("device.zone", info.Zone),
-				attribute.String("device.manufacturer", info.Manufacturer),
-				attribute.String("device.category", string(info.Category)),
-			)
+	elapsed := time.Since(d.CreatedAt).Seconds()
+	gate, hasGate := m.gates.Get(d.Type)
 
-			for metricName, value := range readings {
-				if g, ok := m.instruments.GaugeMap[metricName]; ok {
-					g.Record(spanCtx, value, attrs)
-				}
+	attrs := otelmetric.WithAttributes(
+		attribute.String("device.id", d.ID),
+		attribute.String("device.type", d.Type),
+	)
+
+	for _, metricDef := range d.metrics {
+		current := d.getValue(metricDef.Name)
+		next := pattern.Next(metricDef.Pattern, current, metricDef.Min, metricDef.Max, metricDef.PeriodSeconds, elapsed)
+		if hasGate && gate.Applies(metricDef.Name, rand.Float64()) {
+			next = gate.Apply(next)
+		}
+		d.setValue(metricDef.Name, next)
+
+		if g, ok := m.instruments.GaugeMap[metricDef.Name]; ok {
+			g.Record(spanCtx, next, attrs)
+		}
+	}
+
+	if d.logCfg != nil && len(d.logCfg.Messages) > 0 && rand.Float64() < d.logCfg.EmitProbabilityPerTick {
+		msg := d.logCfg.Messages[rand.Intn(len(d.logCfg.Messages))]
+		m.logs.Emit(spanCtx, msg.Level, msg.Template, d.ID, d.Type, d.ParentID)
+	}
+}
+
+// AddDevices spawns `count` new devices. If parentID is empty, deviceType
+// must be a configured top-level type, and each new instance also spawns its
+// configured children (per their countPerParent). If parentID is set,
+// deviceType must be a configured child type of that parent's device type,
+// and exactly that many children are added under the given parent.
+func (m *Manager) AddDevices(ctx context.Context, deviceType string, count int, parentID string) ([]Snapshot, error) {
+	if count <= 0 {
+		return nil, fmt.Errorf("count must be positive")
+	}
+
+	if parentID != "" {
+		m.mu.RLock()
+		parent, ok := m.devices[parentID]
+		m.mu.RUnlock()
+		if !ok {
+			return nil, fmt.Errorf("parent device %q not found", parentID)
+		}
+
+		m.mu.RLock()
+		ct, ok := m.childTypes[parent.Type][deviceType]
+		m.mu.RUnlock()
+		if !ok {
+			return nil, fmt.Errorf("%q is not a configured child type of %q", deviceType, parent.Type)
+		}
+
+		out := make([]Snapshot, 0, count)
+		for i := 0; i < count; i++ {
+			out = append(out, m.spawnChild(ctx, ct, parentID).Snapshot())
+		}
+		return out, nil
+	}
+
+	m.mu.RLock()
+	dt, ok := m.topTypes[deviceType]
+	m.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("%q is not a configured device type", deviceType)
+	}
+
+	out := make([]Snapshot, 0, count)
+	for i := 0; i < count; i++ {
+		d := m.spawnTop(ctx, dt)
+		out = append(out, d.Snapshot())
+		out = append(out, m.childSnapshots(d.ID)...)
+	}
+	return out, nil
+}
+
+func (m *Manager) childSnapshots(parentID string) []Snapshot {
+	m.mu.RLock()
+	ids := append([]string(nil), m.childrenOf[parentID]...)
+	m.mu.RUnlock()
+
+	out := make([]Snapshot, 0, len(ids))
+	for _, id := range ids {
+		m.mu.RLock()
+		d := m.devices[id]
+		m.mu.RUnlock()
+		if d != nil {
+			out = append(out, d.Snapshot())
+		}
+	}
+	return out
+}
+
+// RemoveDevice stops and removes a device, cascading to its children.
+func (m *Manager) RemoveDevice(id string) error {
+	m.mu.Lock()
+	d, ok := m.devices[id]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("device %q not found", id)
+	}
+	children := append([]string(nil), m.childrenOf[id]...)
+	delete(m.devices, id)
+	delete(m.childrenOf, id)
+	if d.ParentID != "" {
+		siblings := m.childrenOf[d.ParentID]
+		for i, sid := range siblings {
+			if sid == id {
+				m.childrenOf[d.ParentID] = append(siblings[:i], siblings[i+1:]...)
+				break
 			}
+		}
+	}
+	m.mu.Unlock()
 
-			span.End()
+	if d.cancel != nil {
+		d.cancel()
+	}
+	for _, cid := range children {
+		_ = m.RemoveDevice(cid) // best-effort cascade
+	}
+	return nil
+}
+
+// ListDevices returns a snapshot of every device, optionally filtered by type.
+func (m *Manager) ListDevices(typeFilter string) []Snapshot {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]Snapshot, 0, len(m.devices))
+	for _, d := range m.devices {
+		if typeFilter != "" && d.Type != typeFilter {
+			continue
+		}
+		out = append(out, d.Snapshot())
+	}
+	return out
+}
+
+// StopAll cancels every device goroutine.
+func (m *Manager) StopAll() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, d := range m.devices {
+		if d.cancel != nil {
+			d.cancel()
 		}
 	}
 }

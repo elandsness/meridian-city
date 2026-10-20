@@ -165,47 +165,67 @@ industry:
       stages: []
       # Position interpolation for map display
       positionInterpolation: "easeInOut"
-    iot:
-      enabled: true
-      # Device types and their configurations
-      deviceTypes:
-        - type: "vehicle"
-          count: 30
-          emitInterval: 15
-          anomalyProbability: 0.01
-        - type: "building"
-          count: 15
-          emitInterval: 15
-          anomalyProbability: 0.01
-        - type: "machine"
-          count: 10
-          emitInterval: 15
-          anomalyProbability: 0.01
-      # Anomaly detection thresholds per (device_type, metric)
-      anomalyThresholds:
-        vehicle:
-          engine_temp: { threshold: 110.0, consecutive: 1 }
-          speed: { threshold: 120.0, consecutive: 1 }
-        building:
-          hvac_temp: { threshold: 85.0, consecutive: 3 }
-          co2_ppm: { threshold: 1000.0, consecutive: 2 }
-        machine:
-          vibration: { threshold: 8.0, consecutive: 1 }
-          error_rate: { threshold: 5.0, consecutive: 1 }
-  dynatrace: {}
+  # Fake IoT device fleet (services/iot-simulator). Top-level, like `entities`
+  # below -- NOT nested under `services` above, since (unlike services.identity/
+  # workflow/transaction/journey, which nothing currently reads) this block is
+  # real, consumed config: rendered to JSON by iot-config-configmap.yaml and
+  # mounted into iot-simulator. Independent of `entities` -- devices emit OTLP
+  # metrics/logs directly; Dynatrace's own AI does anomaly detection. See
+  # docs/industry-config.schema.json's `iot`/`deviceType` definitions. `vehicle`
+  # demonstrates one level of hierarchy (tire_sensor children) and all three
+  # value patterns (steady/driftRandom/cyclic).
+  iot:
+    enabled: true
+    tickIntervalMs: 30000
+    deviceTypes:
+      - type: "vehicle"
+        displayName: "City Vehicle"
+        count: 30
+        tickIntervalMs: 15000
+        metrics:
+          - { name: "iot.vehicle.speed", unit: "km/h", min: 0, max: 120, pattern: "driftRandom" }
+          - { name: "iot.vehicle.engine_temp", unit: "Cel", min: 70, max: 105, pattern: "steady" }
+          - { name: "iot.vehicle.fuel_level", unit: "%", min: 5, max: 100, pattern: "driftRandom" }
+        logs:
+          emitProbabilityPerTick: 0.1
+          messages:
+            - { level: "info", template: "Vehicle {device_id} reported GPS checkpoint" }
+        children:
+          - type: "tire_sensor"
+            displayName: "Tire Sensor"
+            countPerParent: 4
+            metrics:
+              - { name: "iot.tire.pressure", unit: "psi", min: 28, max: 36, pattern: "steady" }
+              - { name: "iot.tire.temp", unit: "Cel", min: 20, max: 60, pattern: "driftRandom" }
+      - type: "building"
+        displayName: "Smart Building"
+        count: 15
+        metrics:
+          - { name: "iot.building.hvac_temp", unit: "Cel", min: 18, max: 28, pattern: "cyclic", periodSeconds: 3600 }
+          - { name: "iot.building.co2_ppm", unit: "ppm", min: 350, max: 1200, pattern: "driftRandom" }
+          - { name: "iot.building.energy_kwh", unit: "kWh", min: 5, max: 80, pattern: "cyclic", periodSeconds: 86400 }
+        logs:
+          emitProbabilityPerTick: 0.05
+          messages:
+            - { level: "info", template: "Building {device_id} HVAC cycle completed" }
+      - type: "machine"
+        displayName: "Public Works Machine"
+        count: 10
+        metrics:
+          - { name: "iot.machine.vibration", unit: "mm/s", min: 0.5, max: 10, pattern: "driftRandom" }
+          - { name: "iot.machine.cycle_count", unit: "{count}", min: 0, max: 5000, pattern: "driftRandom" }
+          - { name: "iot.machine.error_rate", unit: "%", min: 0, max: 8, pattern: "steady" }
   # Browser-visible analytics config: which Business Flow funnels to show and their labels.
   # NOT omitted from config.json (unlike `dynatrace` which is backend-only provisioner data).
   analytics:
     flows:
       - service-request
       - account-creation
-      - iot-incident
       - purchase
       - tax-payment
     flowLabels:
       service-request: "Service Request"
       account-creation: "Account Creation"
-      iot-incident: "IoT Incident"
       purchase: "Purchase"
       tax-payment: "Tax Payment"
   # Config-driven entity/lifecycle definitions for the generic entity engine.
@@ -594,25 +614,12 @@ industry:
         # open→resolved is driven by the linked work_order's 'transition'
         # effect (work_order.resolved cascades incident to resolved).
         # No timer here -- incident resolution is always work_order-triggered.
-      triggers:
-        # Kafka bridge (task #21): on iot.anomalies message, create an
-        # incident entity with the mapped fields below. fieldMapping uses
-        # the same {from, value, map, default} spec as callService body.
-        kafka:
-          - topic: iot.anomalies
-            fieldMapping:
-              asset_id: { from: device_id }
-              severity:
-                from: severity
-                map:
-                  warning: medium
-                  critical: critical
-                  high: high
-                  low: low
-                default: medium
-              source: { value: iot }
-              title: { from: anomaly_type }
-              description: { from: metric_name }
+        #
+        # NOTE: this entity type no longer has any automatic creation path --
+        # the IoT anomaly -> incident Kafka bridge that used to populate it
+        # was removed (IoT problems are now observed directly in Dynatrace,
+        # not routed back into an internal incident board). Incidents here
+        # now only come from a direct POST to ops-entity-service.
 
     # -----------------------------------------------------------------------
     # WORK ORDER — field operations lifecycle
@@ -1025,40 +1032,6 @@ journeyService:
     failuresEnabled: false
     failureStage: ""
     failureRate: 0.0
-  env: {}
-
-# ---------------------------------------------------------------------------
-# IoT Service (Go)
-# Consolidates iot-simulator + iot-ingestion + telemetry-processor: configurable
-# device fleet simulation, OTLP ingestion, and anomaly detection.
-# ---------------------------------------------------------------------------
-iotService:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: "iot-service"
-    tag: ""
-  service:
-    type: ClusterIP
-    port: 8086
-  resources:
-    requests:
-      cpu: "200m"
-      memory: "512Mi"
-      ephemeral-storage: "4Gi"
-    limits:
-      cpu: "1000m"
-      memory: "1Gi"
-      ephemeral-storage: "4Gi"
-  simulator:
-    enabled: true
-    fleet:
-      vehicles:
-        count: 30
-      buildings:
-        count: 15
-      machines:
-        count: 10
   env: {}
 
 # ---------------------------------------------------------------------------
@@ -1516,51 +1489,6 @@ aiService:
   env: {}
 
 # ---------------------------------------------------------------------------
-# IoT Ingestion (Go + OTel SDK)
-# Receives OTLP/gRPC telemetry from IoT simulators; publishes to Kafka.
-# ---------------------------------------------------------------------------
-iotIngestion:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: "iot-ingestion"
-    tag: ""
-  service:
-    type: ClusterIP
-    grpcPort: 4317
-    httpPort: 4318
-  resources:
-    requests:
-      cpu: "100m"
-      memory: "128Mi"
-    limits:
-      cpu: "500m"
-      memory: "512Mi"
-  env: {}
-
-# ---------------------------------------------------------------------------
-# Telemetry Processor (Python / FastAPI + OTel SDK)
-# Kafka consumer: processes IoT telemetry, detects anomalies, stores in PostgreSQL.
-# ---------------------------------------------------------------------------
-telemetryProcessor:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: "telemetry-processor"
-    tag: ""
-  resources:
-    requests:
-      cpu: "200m"
-      memory: "256Mi"
-    limits:
-      cpu: "1000m"
-      memory: "1Gi"
-  # Fault injection: allocate large in-memory buffers to simulate memory pressure
-  faultInjection:
-    memoryPressureEnabled: false
-  env: {}
-
-# ---------------------------------------------------------------------------
 # Notification Service (Node.js / Express)
 # Kafka consumer; delivers in-app notifications for incidents and work orders.
 # ---------------------------------------------------------------------------
@@ -1609,31 +1537,20 @@ demoControlApi:
 
 # ---------------------------------------------------------------------------
 # IoT Simulator (Go + OTel SDK)
-# Simulates a dynamic fleet of IoT devices emitting OTLP telemetry.
-# Fleet size and anomalies are configurable at runtime via demo-control-api.
+# Generic, config-driven fake IoT device fleet: device types/counts/metrics/
+# hierarchy come entirely from industry.iot (see docs/industry-config.schema.json).
+# Emits OTLP metrics/logs straight to the shared otel-collector -- no separate
+# ingestion hop. Fleet size and fault gates are managed at runtime via
+# demo-control-api's /api/v1/demo-control/iot/* routes.
 # ---------------------------------------------------------------------------
 iotSimulator:
   enabled: true
   image:
     repository: "iot-simulator"
     tag: ""
-  fleet:
-    vehicles:
-      count: 30
-      # Interval between telemetry emissions per device
-      emitIntervalSeconds: 15
-      # Baseline probability that any given device emits an anomalous reading
-      anomalyProbability: 0.01
-    buildings:
-      count: 15
-      emitIntervalSeconds: 15
-      anomalyProbability: 0.01
-    machines:
-      count: 10
-      emitIntervalSeconds: 15
-      anomalyProbability: 0.01
-  # Target for OTLP telemetry (the iot-ingestion service)
-  otlpEndpoint: "http://iot-ingestion:4317"
+  service:
+    type: ClusterIP
+    port: 8088
   resources:
     requests:
       cpu: "200m"
@@ -1960,6 +1877,34 @@ opentelemetry-collector:
       cpu: "500m"
       memory: "2Gi"
       ephemeral-storage: "4Gi"
+
+# ---------------------------------------------------------------------------
+# Infrastructure: BindPlane collector routing (OPTIONAL, default OFF, untested)
+# Dynatrace agreed to acquire BindPlane (April 2026) -- an OpenTelemetry
+# pipeline control plane. Its Collector distro is drop-in compatible with the
+# vanilla OTel collector (same receiver/processor/exporter model) and ships a
+# native `dynatrace_otlp` destination, optionally centrally managed by a
+# BindPlane OP server over OpAMP.
+#
+# When bindplane.enabled is true, helm/templates/otel-configmap.yaml swaps the
+# `otlp_http/dynatrace` exporter below for `dynatrace_otlp`. That exporter type
+# only exists in the Bindplane Collector image, not otel/opentelemetry-collector-
+# contrib -- so also point `opentelemetry-collector.image.repository`/`.tag`
+# above at a Bindplane collector build, and (if you want central fleet
+# management via a real BindPlane OP server rather than running this collector
+# standalone) set `opentelemetry-collector.extraEnvVars` to OPAMP_ENDPOINT /
+# OPAMP_SECRET_KEY. All of that -- plus the real environmentId/apiToken below --
+# goes in values-custom.yaml (see values-custom.yaml.example), never here.
+#
+# NOT tested end-to-end: this sandbox has no route to an external BindPlane
+# server. Validate from a cluster with real internet access (e.g. the GKE
+# instance) once you have real BindPlane credentials.
+# ---------------------------------------------------------------------------
+bindplane:
+  enabled: false
+  dynatrace:
+    environmentId: ""
+    apiToken: ""
 
 # ---------------------------------------------------------------------------
 # Infrastructure: Meridian log collector (DaemonSet) — DEFAULT ON for GKE Autopilot

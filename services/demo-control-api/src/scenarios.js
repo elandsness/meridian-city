@@ -191,8 +191,8 @@ const SCENARIOS = {
   },
 
   'incident-escalations': {
-    name: 'IoT Incident Escalations',
-    description: 'Escalates a share of acknowledged work orders instead of resolving them, so the [Meridian] IoT Incident Resolution flow shows a workorder.escalated error branch + drop-off at the resolution step. Driven by the IoT anomaly pipeline.',
+    name: 'Work Order Escalations',
+    description: 'Escalates a share of acknowledged work orders instead of resolving them, so any incident -> work_order flow shows a workorder.escalated error branch + drop-off at the resolution step.',
     clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [RATE_PARAM],
     async activate (opts = {}) {

@@ -4,7 +4,6 @@
  * KafkaJS consumer for notification-service.
  *
  * Topics consumed:
- *   iot.anomalies    — IoT device anomaly events from telemetry-processor
  *   requests.events  — Service request lifecycle events from entity-engine
  *
  * Each message is transformed into a notification and pushed to the in-memory
@@ -24,7 +23,7 @@ const GROUP_ID = 'notification-service'
 // When set, only these comma-separated topics are subscribed. Lets industry
 // configs (e.g. airport, which has no store/billing) suppress irrelevant inbox
 // messages without touching the notification service code.
-const ALL_TOPICS = ['iot.anomalies', 'requests.events', 'commerce.events', 'billing.events']
+const ALL_TOPICS = ['requests.events', 'commerce.events', 'billing.events']
 const ENABLED_TOPICS = process.env.ENABLED_TOPICS
   ? process.env.ENABLED_TOPICS.split(',').map((t) => t.trim()).filter(Boolean)
   : ALL_TOPICS
@@ -42,23 +41,6 @@ const kafka = new Kafka({
 const consumer = kafka.consumer({ groupId: GROUP_ID })
 
 let _started = false
-
-/**
- * Map an iot.anomalies Kafka message to a notification object.
- */
-function mapAnomaly (payload) {
-  const severity = payload.severity || 'warning'
-  const deviceId = payload.device_id || payload.deviceId || 'unknown'
-  const anomalyType = payload.anomaly_type || payload.anomalyType || 'anomaly'
-  return {
-    type: 'iot_anomaly',
-    severity,
-    title: `IoT Anomaly: ${deviceId}`,
-    message: `${anomalyType} detected on device ${deviceId}` +
-      (payload.metric_name ? ` (${payload.metric_name}: ${payload.value})` : ''),
-    metadata: payload,
-  }
-}
 
 /**
  * Map a requests.events Kafka message to a notification object.
@@ -177,9 +159,7 @@ async function start () {
         }
 
         try {
-          if (topic === 'iot.anomalies') {
-            push(mapAnomaly(payload))
-          } else if (topic === 'requests.events') {
+          if (topic === 'requests.events') {
             push(mapRequestEvent(payload))
             await mapRequestToInbox(payload)
           } else if (topic === 'commerce.events') {
