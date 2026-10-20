@@ -12,8 +12,10 @@ import java.util.Map;
 
 /**
  * Publishes entity-lifecycle events to the Kafka topics that downstream
- * consumers (notification-service) already listen on. Payload shapes match
- * those topics' existing contracts so notification-service needs no changes.
+ * consumers (notification-service) listen on. The payload's "owner_id" key
+ * is a fixed wire-contract name across every industry; notification-service
+ * reads it generically and never sees the source entity's own field name
+ * (see {@link #ownerField}).
  *
  * Only emits for entity type + state combinations that have a downstream
  * consumer — everything else is a no-op.
@@ -55,7 +57,7 @@ public class EntityKafkaPublisher {
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("event_type", eventType);
-        payload.put("citizen_id", record.getField("citizen_id"));
+        payload.put("owner_id", record.getField(ownerField("bill")));
         payload.put("period", record.getField("period"));
         payload.put("amount_cents", record.getField("amount_cents"));
         payload.put("bill_id", record.getId());
@@ -69,9 +71,31 @@ public class EntityKafkaPublisher {
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("event_type", "service_request." + state);
-        payload.put("citizen_id", record.getField("citizen_id"));
+        payload.put("owner_id", record.getField(ownerField("service_request")));
         payload.put("status", state);
         payload.put("request_id", record.getId());
         kafkaTemplate.send("requests.events", record.getId(), payload);
+    }
+
+    /**
+     * notification-service's consumers always key on an "owner_id" payload field,
+     * but the source entity's own field for that id varies per industry (e.g.
+     * "citizen_id" for city, "passenger_id" for airport) — reuses
+     * generator.ownerField (the existing owner-entity-linking concept) to resolve
+     * it. No industry-specific default: an entity type that omits ownerField gets
+     * a null id (notification-service already drops those) with a loud warning,
+     * rather than silently guessing a field name that happens to be right for one
+     * industry and wrong for others.
+     */
+    private String ownerField(String entityType) {
+        var def = configLoader.getAllDefinitions().get(entityType);
+        var gen = def != null ? def.getGenerator() : null;
+        String field = gen != null ? gen.getOwnerField() : null;
+        if (field == null) {
+            log.warn("entityType={} has no generator.ownerField configured — published events "
+                    + "for it will carry a null owner id and be dropped by notification-service",
+                    entityType);
+        }
+        return field;
     }
 }

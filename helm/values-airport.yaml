@@ -423,5 +423,5 @@ industry:
           to: "resolved"
           timer: { minSeconds: 300, maxSeconds: 7200 }
           signal: { eventType: "request.resolved", correlationId: "service_request.id" }
-      generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000 }
+      generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000, ownerField: "passenger_id" }
 
