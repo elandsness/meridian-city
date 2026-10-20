@@ -9,7 +9,7 @@ import Card from '../../ui/Card.jsx'
 // Generic `entity-map` full-page screen template. Replaces the old bespoke
 // AirfieldMap.jsx-style pages: same shared EntityMap component any entity type
 // can use, decorated via this screen's config (background/viewBox/labelField).
-export default function EntityMapPage({ entityType, viewBox, background, labelField }) {
+export default function EntityMapPage({ entityType, viewBox, background, labelField, title, label }) {
   const config = useConfig()
   const def = getEntityDef(config, entityType)
 
@@ -20,9 +20,10 @@ export default function EntityMapPage({ entityType, viewBox, background, labelFi
   })
   const entities = unwrapEntities(data)
   const sprites = toSprites(entities, def, labelField)
+  const heading = title ?? label ?? def?.displayNamePlural ?? entityType
 
   return (
-    <Card title={def?.displayNamePlural ?? entityType} action={<span className="text-xs text-slate-400">{sprites.length} active</span>}>
+    <Card title={heading} action={<span className="text-xs text-slate-400">{sprites.length} active</span>}>
       <EntityMap
         viewBox={viewBox}
         background={background}

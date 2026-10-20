@@ -90,6 +90,7 @@ industry:
       - id: cityband
         template: ticker
         height: slim
+        position: full
         label: "🏙️ CITY NEWS"
         items:
           - "City Hall announces $2M parks renovation starting Spring 2026"

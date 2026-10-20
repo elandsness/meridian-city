@@ -113,6 +113,7 @@ industry:
       - id: "airportband"
         template: "ticker"
         height: "slim"
+        position: "full"
         label: "✈️ TERMINAL BUZZ"
         items:
           - "Flight Attendant's Pretzel-Distribution Technique Draws Standing Ovation From Row 14"
@@ -123,10 +124,14 @@ industry:
           - "Gate Agent Remembers Frequent Flyer's Name, Seat Preference, And Dog's Birthday"
           - "Jet Bridge Apologizes For Slight Incline, Passengers Graciously Accept"
           - "Lost Luggage Reunited With Owner, Airport Staff Throw Tiny Welcome-Back Parade"
+      - id: "airport-hero"
+        template: "welcome-hero"
+        position: "full"
       - "flight-status"
       - id: "airfield-home"
         template: "entity-map"
         entityType: "flight_departure"
+        label: "Flight Map"
         viewBox: "0 0 900 520"
         labelField: "flight_number"
         background:

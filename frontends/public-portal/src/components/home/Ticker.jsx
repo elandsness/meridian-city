@@ -68,21 +68,30 @@ function defaultLabel(preset) {
 
 // ─── Rendering ───────────────────────────────────────────────────────────────
 
-const MARQUEE_KEYFRAMES = `@keyframes ticker-marquee{from{transform:translateX(100%)}to{transform:translateX(-200%)}}`
+// Seamless loop: the animated row holds TWO back-to-back copies of the content
+// and travels exactly -50% of its own (doubled) width, i.e. exactly one copy's
+// width -- so the second copy is already in the first copy's old position the
+// instant it exits, with no gap. (An earlier version translated a single copy
+// from 100% to -200% of ITS OWN width, which is mostly empty screen: for text
+// much wider than its container, the bulk of that travel is fully off-screen in
+// both directions, so it looked like the ticker finished and stopped instead of
+// looping.)
+const MARQUEE_KEYFRAMES = `@keyframes ticker-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`
 
 // The marquee always travels the same 300%-of-its-own-width distance, so a fixed
 // duration makes longer item lists (more industries, more items, longer headlines)
 // scroll proportionally faster. Scale duration to content length instead, calibrated
 // against city's original 5-item ticker (~353 chars over 35s) so reading speed stays
-// comfortable regardless of how much text a given industry config supplies.
-const MARQUEE_CHARS_PER_SECOND = 10
-const MARQUEE_MIN_DURATION_S = 20
+// comfortable regardless of how much text a given industry config supplies. Halved
+// again (5 chars/sec, was 10) per request -- the original calibration still read fast.
+const MARQUEE_CHARS_PER_SECOND = 5
+const MARQUEE_MIN_DURATION_S = 40
 
 export default function Ticker({ items, height = 'slim', title = 'Updates', label, preset }) {
   const resolved = resolveItems(items, preset)
   const prefixLabel = label ?? defaultLabel(preset)
   const [current, setCurrent] = useState(0)
-  const marqueeText = resolved.join('   ·   ')
+  const marqueeText = resolved.join('     -     ')
   const marqueeDurationS = Math.max(MARQUEE_MIN_DURATION_S, Math.round(marqueeText.length / MARQUEE_CHARS_PER_SECOND))
 
   useEffect(() => {
@@ -108,12 +117,13 @@ export default function Ticker({ items, height = 'slim', title = 'Updates', labe
           {prefixLabel}
         </span>
         <div className="overflow-hidden flex-1 h-full flex items-center">
-          <span
-            className="whitespace-nowrap text-sm text-slate-700"
-            style={{ animation: `ticker-marquee ${marqueeDurationS}s linear infinite`, display: 'inline-block' }}
+          <div
+            className="flex whitespace-nowrap text-sm text-slate-700"
+            style={{ animation: `ticker-marquee ${marqueeDurationS}s linear infinite` }}
           >
-            {marqueeText}
-          </span>
+            <span className="pr-10">{marqueeText}</span>
+            <span className="pr-10" aria-hidden="true">{marqueeText}</span>
+          </div>
         </div>
       </div>
     )
