@@ -79,11 +79,20 @@ public class EntityKafkaPublisher {
      * notification-service's consumers always key on a "citizen_id" payload field,
      * but the source entity's own field for that id varies per industry (e.g.
      * "passenger_id" for airport) — reuses generator.ownerField (the existing
-     * owner-entity-linking concept) rather than hardcoding the city field name.
+     * owner-entity-linking concept) to resolve it. No industry-specific default:
+     * an entity type that omits ownerField gets a null id (notification-service
+     * already drops those) with a loud warning, rather than silently guessing a
+     * field name that happens to be right for one industry and wrong for others.
      */
     private String ownerField(String entityType) {
         var def = configLoader.getAllDefinitions().get(entityType);
         var gen = def != null ? def.getGenerator() : null;
-        return gen != null && gen.getOwnerField() != null ? gen.getOwnerField() : "citizen_id";
+        String field = gen != null ? gen.getOwnerField() : null;
+        if (field == null) {
+            log.warn("entityType={} has no generator.ownerField configured — published events "
+                    + "for it will carry a null owner id and be dropped by notification-service",
+                    entityType);
+        }
+        return field;
     }
 }
