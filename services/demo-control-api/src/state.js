@@ -6,8 +6,12 @@
  * Tracks:
  *   - Active fault injections per service
  *   - Active scenario (name + start time + auto-reset timer)
- *   - Fleet size per device category
  *   - Traffic bot status
+ *
+ * IoT fleet/fault-gate state is NOT cached here -- the new iot-simulator API
+ * (device CRUD + fault gates) is queried live via iotOps.js/routes/iot.js,
+ * since device types/counts are entirely config-driven and not a fixed shape
+ * worth mirroring locally.
  */
 
 // ---------------------------------------------------------------------------
@@ -21,7 +25,6 @@ const _faults = {
                             request_reject_enabled: false, request_reject_rate: 0,
                             account_fail_enabled: false, account_fail_rate: 0 },
   'analytics-service':    { memory_pressure_enabled: false },
-  'telemetry-processor':  { memory_pressure_enabled: false },
   // Business-exception toggles (default off) — see scenarios.js *-failures scenarios.
   'city-operations':      { workorder_escalation_enabled: false, workorder_escalation_rate: 0 },
   'commerce-service':     { checkout_failures_enabled: false, checkout_failures_rate: 0 },
@@ -92,38 +95,6 @@ function clearActiveScenario () {
 }
 
 // ---------------------------------------------------------------------------
-// Fleet state
-// ---------------------------------------------------------------------------
-
-const _fleet = {
-  vehicles:  { count: 30, anomaly_device_id: null },
-  buildings: { count: 15, anomaly_device_id: null },
-  machines:  { count: 10, anomaly_device_id: null },
-}
-
-function getFleet () {
-  return { ..._fleet }
-}
-
-function setFleetCount (category, count) {
-  if (_fleet[category]) {
-    _fleet[category].count = count
-  }
-}
-
-function setFleetAnomaly (category, deviceId) {
-  if (_fleet[category]) {
-    _fleet[category].anomaly_device_id = deviceId
-  }
-}
-
-function clearFleetAnomalies () {
-  for (const cat of Object.keys(_fleet)) {
-    _fleet[cat].anomaly_device_id = null
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Traffic bot state
 // ---------------------------------------------------------------------------
 
@@ -144,6 +115,5 @@ function setTrafficState (patch) {
 module.exports = {
   getFaults, setFault, hasActiveFaults,
   getActiveScenario, setActiveScenario, clearActiveScenario,
-  getFleet, setFleetCount, setFleetAnomaly, clearFleetAnomalies,
   getTrafficState, setTrafficState,
 }

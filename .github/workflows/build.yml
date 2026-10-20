@@ -186,7 +186,6 @@ jobs:
         service:
           - analytics-service
           - ai-service
-          - telemetry-processor
     steps:
       - uses: actions/checkout@v4
 
@@ -255,19 +254,18 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - iot-ingestion
           - iot-simulator
           - movement-service
-          - iot-service
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Go 1.26
         uses: actions/setup-go@v5
         with:
-          # iot-service's go.mod requires go >= 1.26 (go.opentelemetry.io/collector/pdata
-          # v1.66.0). A newer toolchain still builds the other services' `go 1.22` modules
-          # fine (forward-compatible), so this is a safe shared bump for the whole matrix.
+          # iot-simulator's go.mod requires go >= 1.26 (go.opentelemetry.io/otel
+          # v1.47.0's Logs SDK). A newer toolchain still builds the other services'
+          # modules fine (forward-compatible), so this is a safe shared bump for
+          # the whole matrix.
           go-version: "1.26"
           # Use go.mod (always present) for cache key.
           # go.sum is generated below if not yet committed.

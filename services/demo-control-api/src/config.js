@@ -12,7 +12,6 @@ module.exports = {
   CITIZEN_SERVICE_URL:      process.env.CITIZEN_SERVICE_URL      || 'http://localhost:8081',
   CITY_OPERATIONS_URL:      process.env.CITY_OPERATIONS_URL      || 'http://localhost:8083',
   AI_SERVICE_URL:           process.env.AI_SERVICE_URL           || 'http://localhost:8085',
-  TELEMETRY_PROCESSOR_URL:  process.env.TELEMETRY_PROCESSOR_URL  || 'http://localhost:8086',
   IOT_SIMULATOR_URL:        process.env.IOT_SIMULATOR_URL        || 'http://localhost:8088',
   TRAFFIC_BOT_URL:          process.env.TRAFFIC_BOT_URL          || 'http://localhost:8089',
   ANALYTICS_SERVICE_URL:    process.env.ANALYTICS_SERVICE_URL    || 'http://analytics-service:8084',

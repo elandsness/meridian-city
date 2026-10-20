@@ -144,6 +144,22 @@
         "$ref": "#/definitions/entityType"
       }
     },
+    "iot": {
+      "type": "object",
+      "description": "Fake IoT device fleet simulation, consumed by services/iot-simulator. Independent of `entities` -- devices emit OTLP metrics/logs directly, they are not entity-engine records.",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "tickIntervalMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "description": "Default cadence at which every device mutates/emits its metrics, unless overridden per deviceType."
+        },
+        "deviceTypes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/deviceType" }
+        }
+      }
+    },
     "data": {
       "type": "object",
       "properties": {
@@ -296,6 +312,83 @@
         },
         "correlationId": {
           "type": "string"
+        }
+      }
+    },
+    "deviceType": {
+      "type": "object",
+      "required": ["type", "displayName", "count", "metrics"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "displayName": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "tickIntervalMs": { "type": "integer", "minimum": 1000 },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/deviceMetric" }
+        },
+        "logs": { "$ref": "#/definitions/deviceLogConfig" },
+        "children": {
+          "type": "array",
+          "description": "One level of child device types (e.g. a train's doors). Children cannot have their own children.",
+          "items": { "$ref": "#/definitions/childDeviceType" }
+        }
+      }
+    },
+    "childDeviceType": {
+      "type": "object",
+      "required": ["type", "displayName", "countPerParent", "metrics"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "displayName": { "type": "string" },
+        "countPerParent": { "type": "integer", "minimum": 0 },
+        "tickIntervalMs": { "type": "integer", "minimum": 1000 },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/deviceMetric" }
+        },
+        "logs": { "$ref": "#/definitions/deviceLogConfig" }
+      }
+    },
+    "deviceMetric": {
+      "type": "object",
+      "required": ["name", "min", "max", "pattern"],
+      "properties": {
+        "name": { "type": "string" },
+        "unit": { "type": "string" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "pattern": {
+          "type": "string",
+          "enum": ["steady", "driftRandom", "cyclic"],
+          "description": "steady = small noise around a baseline; driftRandom = random walk clamped to [min,max]; cyclic = sine wave oscillating between min and max."
+        },
+        "periodSeconds": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Oscillation period for pattern=cyclic. Ignored otherwise."
+        }
+      }
+    },
+    "deviceLogConfig": {
+      "type": "object",
+      "properties": {
+        "emitProbabilityPerTick": { "type": "number", "minimum": 0, "maximum": 1 },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["level", "template"],
+            "properties": {
+              "level": { "type": "string", "enum": ["debug", "info", "warn", "error"] },
+              "template": {
+                "type": "string",
+                "description": "May reference {device_id}, {device_type}, and {parent_id}."
+              }
+            }
+          }
         }
       }
     }

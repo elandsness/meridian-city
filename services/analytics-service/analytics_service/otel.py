@@ -5,7 +5,7 @@ Why this exists: the cluster's DynaKube runs OneAgent in *applicationMonitoring*
 mode (CSI code module, no host agent). That mode auto-instruments Java and Node
 services into PurePaths, but does NOT produce traces for these Python/FastAPI apps
 — so analytics-service was reporting no spans and no service entity at all. The fix
-is the same pattern ai-service and iot-ingestion already use: the service
+is the same pattern ai-service and iot-simulator already use: the service
 instruments itself with OpenTelemetry and exports OTLP to the in-cluster collector,
 which forwards to Dynatrace.
 

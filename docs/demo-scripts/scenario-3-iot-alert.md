@@ -1,16 +1,16 @@
 # Demo Scenario 3: IoT Telemetry Stream + Alert
 
-**Duration**: ~6 minutes  
-**Dynatrace features**: OpenTelemetry metrics ingestion, distributed traces, Davis AI correlation  
-**Narrative**: "A smart building's HVAC is overheating. Dynatrace sees it in real time from the IoT device."
+**Duration**: ~5 minutes
+**Dynatrace features**: OpenTelemetry metrics/logs ingestion, Davis AI anomaly detection
+**Narrative**: "A city vehicle's brake system is degrading. Dynatrace sees it in real time from the IoT device, with no custom detection code on our side."
 
 ---
 
 ## Setup
 
-- Ops Dashboard open: http://localhost:8081 — **IoT** tab visible
-- Dynatrace open on **Metrics** (search `iot.building.hvac_temp`)
+- Dynatrace open on **Metrics** (search `iot.vehicle.engine_temp`)
 - Second Dynatrace tab on **Problems**
+- (Optional) a terminal or API client ready to call demo-control-api
 
 ---
 
@@ -18,69 +18,67 @@
 
 ### 1. Show the live IoT feed (1 min)
 
-In the Ops Dashboard → IoT Feed:
-> "This is our smart city's IoT telemetry feed. We have 30 connected vehicles reporting GPS and engine data, 15 smart buildings reporting HVAC, energy, and occupancy, and 10 industrial machines on the maintenance network."
+In Dynatrace → Metrics, show `iot.vehicle.engine_temp`:
+> "This is Meridian's fake IoT device fleet — iot-simulator. By default City
+> runs 30 connected vehicles reporting speed/engine temp/fuel level, 15 smart
+> buildings reporting HVAC/CO2/energy, and 10 industrial machines reporting
+> vibration/error rate — each a separate goroutine ticking on its own
+> schedule, with real parent/child hierarchy where it makes sense (every
+> vehicle in this build also reports 4 tire sensors). None of this is
+> hardcoded to City, either — any industry config can declare its own device
+> types, metrics, ranges, and hierarchy."
 
-Point out the live updates coming in. Highlight that all buildings show green / normal.
+Point out the normal, steady readings arriving straight through the
+OpenTelemetry Collector — no intermediate ingestion service, no Kafka hop.
 
-In Dynatrace → Metrics, show `iot.building.hvac_temp`:
-> "And here's that same data in Dynatrace — HVAC temperatures for all 15 buildings, ingested via OpenTelemetry. These are real-time metrics from the IoT devices, arriving through our OpenTelemetry Collector."
+### 2. Trigger an ongoing problem (30 sec)
 
-### 2. Trigger the anomaly (30 sec)
+Call demo-control-api to enable a fault gate on the vehicle fleet:
 
-In Demo Control Panel → **Anomaly Injection**:
-1. Category = **Building**
-2. Device ID = **`bldg-007`** (valid building ids are `bldg-000`–`bldg-014`)
-3. Anomaly Type = **HVAC Failure**
-4. Click **Inject Anomaly**
+```bash
+curl -X PUT http://<gateway>/api/v1/demo-control/iot/fault-gates/vehicle \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled": true, "rate": 1.0, "metric": "iot.vehicle.engine_temp", "magnitude": {"type": "percent", "value": 35}}'
+```
 
-> "I've just told the IoT simulator to start emitting out-of-range HVAC readings
-> from building `bldg-007`. This simulates a failing cooling system — a
-> compressor fault or a refrigerant leak."
+> "I've just told the simulator to push every vehicle's engine temperature 35%
+> above its normal reading, every tick, until I turn it back off. This is a
+> fault *gate* — not a one-shot blip — so it keeps producing an anomalous
+> signal for as long as it's enabled, the way a real degrading sensor would."
 
-### 3. Watch the data arrive (~3 min)
+### 3. Watch the data arrive (~2 min)
 
-In Dynatrace Metrics: `iot.building.hvac_temp` for device `bldg-007` spikes to
-~95°C, above the normal range.
+In Dynatrace Metrics: `iot.vehicle.engine_temp` climbs well outside its normal
+band for every vehicle device.
 
-> Timing: the HVAC detector requires **3 consecutive 1-minute windows** over
-> threshold before it raises an incident, so the metric spikes immediately but
-> the incident (next step) appears after ~3 minutes. (Vehicle and machine
-> anomalies fire in ~1 minute.)
+> "Watch the metric in Dynatrace. There's no custom threshold code on our
+> side deciding this is abnormal — these are just real metrics, with
+> device-level resource attributes (`device.id`, `device.type`,
+> `device.parent_id` for hierarchy), flowing straight to Dynatrace. Davis AI
+> does the anomaly detection."
 
-> "Watch the metric in Dynatrace. The anomalous readings are arriving through our OTel Collector — these have device-level resource attributes, so Dynatrace knows which specific building and sensor is reporting the problem."
+### 4. Davis AI anomaly detection (1-2 min)
 
-### 4. Show the incident creation (1 min)
+If Davis AI has raised a problem:
+> "Here's Davis AI picking up the anomaly directly from the OTel metric
+> stream — no custom pipeline, no bespoke incident-creation code. This is
+> exactly what we want to show: Dynatrace handling real metric ingestion and
+> anomaly detection for IoT-style device data out of the box."
 
-In the Ops Dashboard → Incidents tab: a new incident referencing `bldg-007`
-appears (the title is auto-generated from the anomaly, e.g. "IoT anomaly detected:
-hvac_overtemp on bldg-007", with severity set by the detector).
+### 5. Resolve and reset (30 sec)
 
-In Dynatrace Distributed Traces: find the ingest trace from `iot-ingestion`:
-> "Here's the ingest trace — the device emitted a reading, our Go ingestion
-> service received it and published to Kafka. The telemetry processor (Python)
-> then aggregates readings into 1-minute windows and, on threshold breach,
-> publishes to `iot.anomalies`, which city-operations (Java) consumes to create
-> the incident. So it's an OTel ingest path feeding a Kafka-driven, asynchronous
-> detection-and-incident step — Go, Kafka, Python, and Java end to end."
+```bash
+curl -X DELETE http://<gateway>/api/v1/demo-control/iot/fault-gates/vehicle
+```
 
-### 5. Davis AI correlation (1 min)
-
-If Davis AI has raised a problem (may take 2-3 min):
-> "And here's where it gets really powerful. Davis AI has correlated this OTel metric anomaly with the downstream impact on city-operations. It's not treating these as separate events — it's presenting them as a single problem with a clear cause: the IoT sensor data."
-
-### 6. Resolve and reset (30 sec)
-
-In Demo Control Panel → Anomaly Injection: **Clear All Anomalies**
-
-> "The IoT device returns to normal readings, the alert clears, and the incident is automatically updated."
+> "The fleet returns to normal readings and the problem closes on its own."
 
 ---
 
 ## Key talking points
 
 - OpenTelemetry is a first-class citizen in Dynatrace — not an afterthought
-- OTel semantic conventions (device attributes like `device.id`, `device.category`) are preserved and queryable
-- The full chain from IoT device → Kafka → service → incident is traced end-to-end
-- Davis AI correlates OTel metrics with APM data — unified observability
-- Real IoT scenarios: building management, fleet monitoring, industrial automation
+- OTel semantic conventions (device attributes, parent/child hierarchy) are preserved and queryable
+- Device types, metrics, ranges, and hierarchy are entirely config-driven — a new industry (trains, robots, transit, mining equipment, building sensors) needs zero new code
+- Fault gates demonstrate *ongoing* problem injection, not just one-shot blips
+- Davis AI detects the anomaly directly from real telemetry — Dynatrace does the detection work, not custom application code

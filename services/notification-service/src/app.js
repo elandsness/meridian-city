@@ -11,7 +11,6 @@
  *   - GET  /api/v1/notifications/stream   (SSE real-time push)
  *
  * Kafka consumer (kafkajs) subscribes to:
- *   - iot.anomalies
  *   - requests.events
  *
  * Startup is non-fatal if Kafka is unreachable — HTTP endpoints work

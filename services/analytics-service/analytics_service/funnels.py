@@ -67,12 +67,6 @@ async def get_funnel(funnel_name: str) -> List[dict]:
     stages = funnel_def["stages"]
     
     pool = await get_pool()
-    
-    # Special case: IoT Incident funnel involves multiple different entities (anomalies, incidents, work_orders)
-    if funnel_name == "iot-incident": 
-        return await _query_iot_incident_funnel(pool, entity_type, stages)
-    
-    # Generic case: All other funnels follow the standard entity event log pattern.
     return await _query_entity_event_funnel(pool, entity_type, stages)
 
 async def _query_entity_event_funnel(pool, entity_type: str, stages: list[str]) -> list[dict]:
@@ -87,27 +81,3 @@ async def _query_entity_event_funnel(pool, entity_type: str, stages: list[str]) 
             result.append({"stage": stage, "count": int(count)})
     return result
 
-async def _query_iot_incident_funnel(pool, incident_type: str, stages: list[str]) -> list[dict]:
-    async with pool.acquire() as conn:
-        anomalies = await safe_fetchval(conn, 
-            "SELECT COUNT(*) FROM iot.anomalies WHERE detected_at >= NOW() - ($1 || ' hours')::INTERVAL", 
-            WINDOW_HOURS)
-        incidents = await safe_fetchval(conn, 
-            "SELECT COUNT(*) FROM entities.entity_event WHERE entity_type = $1 "
-            "AND event_type = $2 AND occurred_at >= NOW() - ($3 || ' hours')::INTERVAL", 
-            incident_type, f"{incident_type}.detecting", WINDOW_HOURS)
-        
-        wo_counts = []
-        wo_event_types = ["work_order.created", "work_order.assigned", "work_order.acknowledged", "work_order.resolved"]
-        
-        for event_type in wo_event_types:
-            count = await safe_fetchval(conn, 
-                "SELECT COUNT(DISTINCT ee.entity_id) FROM entities.entity_event ee "
-                "JOIN entities.entity e ON e.id = ee.entity_id "
-                "WHERE ee.entity_type = 'work_order' AND ee.event_type = $1 "
-                "AND e.links->>'incident_id' IS NOT NULL AND ee.occurred_at >= NOW() - ($2 || ' hours')::INTERVAL", 
-                event_type, WINDOW_HOURS)
-            wo_counts.append(count)
-        
-        counts = [anomalies, incidents] + wo_counts
-        return [{"stage": stage, "count": int(count)} for stage, count in zip(stages, counts)]

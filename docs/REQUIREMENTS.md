@@ -68,9 +68,12 @@ is routed to the operations team and tracked through its lifecycle with a status
 - Source: `POST /api/v1/service-requests`, `GET /api/v1/service-requests?citizen_id=`.
 
 ### CP-4 — IoT device map with statuses
-Citizens see a city map of monitored IoT devices, each rendered with its current
-status (healthy / warning / alert) and tied to any open incident.
-- Source: `GET /api/v1/devices` (new aggregation endpoint in telemetry-processor).
+Citizens see a city map of monitored IoT devices, each rendered with its
+current metric readings. No longer tied to an incident — IoT problems are
+observed directly in Dynatrace (Davis AI), not routed into an internal
+incident. Backend (device CRUD, ongoing fault-gate problem injection) exists; the UI
+itself is not yet built (pending the planned ops-dashboard rewrite).
+- Source: `GET /api/v1/iot/devices`, `GET /api/v1/iot/device-types` (iot-simulator, proxied via demo-control-api/the gateway).
 
 ### CP-5 — Tax & billing (simulated)
 Citizens see all outstanding bills and a paid-bill history that resembles a

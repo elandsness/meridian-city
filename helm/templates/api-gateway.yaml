@@ -60,8 +60,8 @@ spec:
               value: "http://transaction-service:8090"
             - name: JOURNEY_SERVICE_URL
               value: "http://journey-service:8093"
-            - name: IOT_SERVICE_URL
-              value: "http://iot-service:8086"
+            - name: IOT_SIMULATOR_URL
+              value: "http://iot-simulator:8088"
             - name: NEWS_TICKER_SERVICE_URL
               value: "http://news-ticker-service:8095"
             - name: WEATHER_SERVICE_URL
@@ -76,8 +76,6 @@ spec:
               value: "http://commerce-service:8090"
             - name: BILLING_SERVICE_URL
               value: "http://transaction-service:8093"
-            - name: TELEMETRY_PROCESSOR_URL
-              value: "http://telemetry-processor:8086"
             - name: DEMO_CONTROL_API_URL
               value: "http://demo-control-api:3001"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}

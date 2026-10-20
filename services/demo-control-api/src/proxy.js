@@ -36,6 +36,29 @@ async function post (url, body = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
 }
 
 /**
+ * PUT JSON to a URL.
+ * @param {string} url
+ * @param {object} body
+ * @param {number} [timeoutMs]
+ */
+async function put (url, body = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  try {
+    const { statusCode, body: responseBody } = await request(url, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      bodyTimeout: timeoutMs,
+      headersTimeout: timeoutMs,
+    })
+    let data = {}
+    try { data = await responseBody.json() } catch { await responseBody.text() }
+    return { ok: statusCode >= 200 && statusCode < 300, statusCode, data }
+  } catch (err) {
+    return { ok: false, statusCode: 0, data: {}, error: err.message }
+  }
+}
+
+/**
  * GET a URL.
  * @param {string} url
  * @param {number} [timeoutMs]
@@ -74,4 +97,4 @@ async function del (url, timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
-module.exports = { post, get, del }
+module.exports = { post, put, get, del }

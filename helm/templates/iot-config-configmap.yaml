@@ -1,0 +1,18 @@
+{{/*
+IoT-config ConfigMap. Mounts the full `.Values.industry.iot` block as a JSON
+file for iot-simulator to read at startup -- device types, metrics/ranges,
+hierarchy, and tick interval. Same delivery pattern as entity-config-configmap.yaml
+for the entity engine. Namespace-scoped, so the name stays plain (multi-tenancy
+isolates by namespace).
+*/}}
+{{- if .Values.iotSimulator.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iot-config
+  namespace: {{ include "meridian.namespace" . }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+data:
+  iot-config.json: {{ .Values.industry.iot | default dict | toJson | quote }}
+{{- end }}

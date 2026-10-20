@@ -76,6 +76,41 @@ dynatrace:
     platformToken: ""
 
 # ---------------------------------------------------------------------------
+# BindPlane collector routing (OPTIONAL, default OFF, UNTESTED from this
+# sandbox -- it has no route to an external BindPlane server. Validate from a
+# cluster with real internet access once you have real BindPlane credentials.)
+#
+# Dynatrace agreed to acquire BindPlane (April 2026), an OpenTelemetry pipeline
+# control plane. Its Collector distro is drop-in compatible with the vanilla
+# OTel collector and ships a native `dynatrace_otlp` destination. To actually
+# route through it:
+#   1. Set bindplane.enabled: true below and fill in your Dynatrace
+#      environment ID + API token (same scopes as dynatrace.apiToken above).
+#      This swaps helm/templates/otel-configmap.yaml's exporter from
+#      otlp_http/dynatrace to dynatrace_otlp.
+#   2. Point the collector at a Bindplane collector image instead of the
+#      vanilla one (the dynatrace_otlp exporter type doesn't exist on
+#      otel/opentelemetry-collector-contrib):
+#        opentelemetry-collector:
+#          image:
+#            repository: "<your-bindplane-collector-image>"
+#            tag: "<version>"
+#   3. OPTIONAL -- central fleet management via a real BindPlane OP server
+#      (self-hosted or SaaS) instead of running this collector standalone:
+#        opentelemetry-collector:
+#          extraEnvVars:
+#            - name: OPAMP_ENDPOINT
+#              value: "wss://<your-bindplane-server>/v1/opamp"
+#            - name: OPAMP_SECRET_KEY
+#              value: "<your-opamp-secret-key>"
+# ---------------------------------------------------------------------------
+bindplane:
+  enabled: false
+  dynatrace:
+    environmentId: ""
+    apiToken: ""
+
+# ---------------------------------------------------------------------------
 # RUM (Real User Monitoring) — front-end user sessions for the two SPAs.
 # The agentless RUM JS is injected at runtime via nginx sub_filter (no rebuild).
 # The application id / agent URL is shipped to every browser and is NOT a secret.

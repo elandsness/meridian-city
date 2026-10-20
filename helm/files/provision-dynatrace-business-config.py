@@ -299,17 +299,16 @@ FLOW_SPECS = [
     # "<entity_type>.<state>", using the REAL state ids from industry.entities
     # (incident: detecting/open/resolved -- there is no "created" state; work_order:
     # created/assigned/acknowledged/resolved/escalated, entity type has an
-    # underscore so events are "work_order.*" not "workorder.*"). This spec
-    # previously used pre-entity-engine event names ("incident.created",
-    # "workorder.*") that nothing has emitted since city-operations/citizen-service
-    # were replaced by ops-entity-service/customer-entity-service -- the flow was
-    # silently stuck after its first step (iot.anomaly_detected, which
-    # telemetry-processor does still emit directly) for every industry using it.
-    {"key": "iot-incident", "name": "IoT Incident Lifecycle", 
-     "kpiLabel": "Incidents Opened", "kpi": "incident.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "incident.open",
-     "steps": [("Anomaly detected", "iot.anomaly_detected"), ("Incident opened", "incident.open")]},
-{"key": "iot-work-order", "name": "IoT Work Order Lifecycle", 
+    # underscore so events are "work_order.*" not "workorder.*").
+    #
+    # The old "iot-incident" flow key (Anomaly detected -> Incident opened) was
+    # removed along with the IoT -> incident Kafka bridge: IoT problems are now
+    # observed directly in Dynatrace rather than routed into an internal incident.
+    # This "iot-work-order" flow is left as-is (it was already dormant -- not in
+    # DEFAULT_FLOW_KEYS -- since nothing creates incidents by default); it still
+    # works unchanged if incidents are ever created another way (e.g. a direct
+    # POST to ops-entity-service).
+{"key": "iot-work-order", "name": "IoT Work Order Lifecycle",
      "kpiLabel": "Resolved Work Orders", "kpi": "work_order.id", "kpiCalculation": "lastEvent",
      "kpiEventName": "work_order.resolved",
      "steps": [("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
@@ -346,7 +345,7 @@ FLOW_SPECS = [
 # City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)
 # pass DT_FLOWS to select a different subset; provision()'s stale-flow cleanup removes any
 # of this instance's flows that drop out of the active set on an in-place upgrade.
-DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "identity-registration", "iot-incident", "purchase", "tax-payment"]
+DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "identity-registration", "purchase", "tax-payment"]
 
 
 def _topo_walk(initial, states, transitions):

@@ -3,8 +3,8 @@
 /**
  * Postgres access for the per-owner messages inbox (works for any industry's
  * "owner" concept -- citizen, passenger, etc; see EntityKafkaPublisher's
- * generator.ownerField). Owns the `messages` schema, created at startup
- * (runtime DDL, mirroring telemetry-processor/db.py). Non-fatal: if the DB is
+ * generator.ownerField). Owns the `messages` schema, created at startup via
+ * runtime DDL. Non-fatal: if the DB is
  * unreachable the service still serves notifications; inbox calls no-op until
  * init() succeeds.
  */

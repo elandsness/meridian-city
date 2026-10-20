@@ -10,7 +10,7 @@
  *   GET  /health                         — liveness
  *   GET  /api/v1/status                  — full system state snapshot
  *   GET/POST /api/v1/fault/*             — fault injection per service
- *   GET/POST/DELETE /api/v1/fleet/*      — IoT fleet management
+ *   GET/POST/DELETE /api/v1/iot/*        — IoT device fleet management
  *   GET/POST /api/v1/traffic/*           — traffic bot control
  *   GET/POST/DELETE /api/v1/scenarios/*  — demo scenario orchestration
  */
@@ -22,7 +22,7 @@ const config = require('./config')
 
 const healthRoutes    = require('./routes/health')
 const faultRoutes     = require('./routes/fault')
-const fleetRoutes     = require('./routes/fleet')
+const iotRoutes       = require('./routes/iot')
 const trafficRoutes   = require('./routes/traffic')
 const scenarioRoutes  = require('./routes/scenarios')
 const transitRoutes   = require('./routes/transit')
@@ -46,7 +46,7 @@ async function build () {
   // Routes
   await app.register(healthRoutes)
   await app.register(faultRoutes)
-  await app.register(fleetRoutes)
+  await app.register(iotRoutes)
   await app.register(trafficRoutes)
   await app.register(scenarioRoutes)
   await app.register(transitRoutes)

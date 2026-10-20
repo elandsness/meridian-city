@@ -101,8 +101,6 @@ meridian-city/
 │   ├── city-operations/    Java (Spring Boot)
 │   ├── analytics-service/  Python (FastAPI)
 │   ├── ai-service/         Python (FastAPI)
-│   ├── iot-ingestion/      Go
-│   ├── telemetry-processor/ Python (FastAPI)
 │   ├── notification-service/ Node.js (Express)
 │   ├── iot-simulator/      Go
 │   ├── traffic-bot/        Node.js

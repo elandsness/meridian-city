@@ -244,15 +244,14 @@ After 2-3 minutes of traffic from the traffic bot, you should see:
 - `ai-service`
 - `analytics-service`
 - `notification-service`
-- `iot-ingestion`
-- `telemetry-processor`
+- `iot-simulator`
 
 ### OTel metrics from IoT
 
 In Dynatrace: **Observe and Explore → Metrics**
-Search for: `iot.device.`
+Search for: `iot.`
 
-You should see metrics like `iot.device.vehicle.engine_temp`, `iot.device.building.hvac_temp`, etc.
+You should see metrics like `iot.vehicle.engine_temp`, `iot.building.hvac_temp`, etc. (the exact set depends on the active industry config's `industry.iot.deviceTypes`).
 
 ### AI Observability
 
@@ -425,13 +424,6 @@ e.g. `installerDownload`, `activeGateTokenManagement.create`, `entities.read`,
 ### PostgreSQL not ready
 
 Java services (Spring Boot) will crash-loop until PostgreSQL is healthy. This is expected during first install — they will recover automatically once PostgreSQL is up (usually within 2-3 minutes).
-
-### Kafka consumer lag
-
-`telemetry-processor` needs Kafka to be fully started. On first install with large IoT fleets, there may be lag. Monitor:
-```bash
-kubectl logs -l app=telemetry-processor -n meridian --tail=50 -f
-```
 
 ### LLM API errors
 

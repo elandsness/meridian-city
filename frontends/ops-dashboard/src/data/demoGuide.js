@@ -26,11 +26,11 @@ export const DEMO_GUIDE = [
   {
     id: 3,
     title: 'IoT alert',
-    shows: 'IoT telemetry → anomaly → incident, with OTel metrics.',
+    shows: 'IoT device telemetry (OTel metrics/logs) with Davis AI detecting the anomaly directly — no custom detection code.',
     steps: [
-      'Inject a fleet anomaly below (e.g. building hvac_overtemp).',
-      'After ~3 one-minute windows, telemetry-processor flags it and ops-entity-service opens an incident.',
-      'Show the incident in Incidents and the OTel metric in Dynatrace.',
+      'Enable an ongoing fault gate on a device type below (e.g. vehicle engine_temp +35%).',
+      'Watch the metric spike in Dynatrace and Davis AI raise a problem from the raw telemetry.',
+      'Disable the fault gate to recover.',
     ],
   },
   {
