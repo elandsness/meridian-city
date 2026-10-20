@@ -1,9 +1,9 @@
 import client from './client.js'
 
-export function getMessages(citizenId, { unreadOnly } = {}) {
+export function getMessages(ownerId, { unreadOnly } = {}) {
   return client
     .get('/api/v1/messages', {
-      params: { citizen_id: citizenId, unread_only: unreadOnly ? 'true' : undefined },
+      params: { owner_id: ownerId, unread_only: unreadOnly ? 'true' : undefined },
     })
     .then((r) => r.data)
 }
@@ -12,8 +12,8 @@ export function markMessageRead(id) {
   return client.post(`/api/v1/messages/${id}/read`).then((r) => r.data)
 }
 
-export function markAllRead(citizenId) {
+export function markAllRead(ownerId) {
   return client
-    .post('/api/v1/messages/read-all', null, { params: { citizen_id: citizenId } })
+    .post('/api/v1/messages/read-all', null, { params: { owner_id: ownerId } })
     .then((r) => r.data)
 }

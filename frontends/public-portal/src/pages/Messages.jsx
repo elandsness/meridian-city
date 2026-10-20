@@ -28,20 +28,20 @@ function unwrap(d) {
 
 export default function Messages() {
   const { user } = useAuth()
-  const citizenId = user?.id
+  const ownerId = user?.id
   const qc = useQueryClient()
   const cfg = useConfig()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['messages', citizenId],
-    queryFn: () => getMessages(citizenId),
-    enabled: !!citizenId,
+    queryKey: ['messages', ownerId],
+    queryFn: () => getMessages(ownerId),
+    enabled: !!ownerId,
     refetchInterval: 15000,
   })
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['messages', citizenId] })
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['messages', ownerId] })
   const readMut = useMutation({ mutationFn: markMessageRead, onSuccess: invalidate })
-  const readAllMut = useMutation({ mutationFn: () => markAllRead(citizenId), onSuccess: invalidate })
+  const readAllMut = useMutation({ mutationFn: () => markAllRead(ownerId), onSuccess: invalidate })
 
   const messages = unwrap(data)
   const unread = data?.unread ?? messages.filter((m) => !m.read).length

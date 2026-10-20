@@ -1,10 +1,12 @@
 'use strict'
 
 /**
- * Postgres access for the per-citizen messages inbox. Owns the `messages` schema,
- * created at startup (runtime DDL, mirroring telemetry-processor/db.py). Non-fatal:
- * if the DB is unreachable the service still serves notifications; inbox calls no-op
- * until init() succeeds.
+ * Postgres access for the per-owner messages inbox (works for any industry's
+ * "owner" concept -- citizen, passenger, etc; see EntityKafkaPublisher's
+ * generator.ownerField). Owns the `messages` schema, created at startup
+ * (runtime DDL, mirroring telemetry-processor/db.py). Non-fatal: if the DB is
+ * unreachable the service still serves notifications; inbox calls no-op until
+ * init() succeeds.
  */
 
 const { Pool } = require('pg')
@@ -35,7 +37,7 @@ async function init () {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS messages.messages (
       id UUID PRIMARY KEY,
-      citizen_id VARCHAR(50) NOT NULL,
+      owner_id VARCHAR(50) NOT NULL,
       type VARCHAR(40),
       title TEXT,
       body TEXT,
@@ -44,8 +46,25 @@ async function init () {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
+  // Migrate any table created before the citizen_id -> owner_id rename (the column was
+  // city-specific; this inbox serves every industry's own "owner" concept).
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'messages' AND table_name = 'messages' AND column_name = 'citizen_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'messages' AND table_name = 'messages' AND column_name = 'owner_id'
+      ) THEN
+        ALTER TABLE messages.messages RENAME COLUMN citizen_id TO owner_id;
+      END IF;
+    END $$;
+  `)
+  await pool.query('ALTER INDEX IF EXISTS idx_messages_citizen RENAME TO idx_messages_owner')
   await pool.query(
-    'CREATE INDEX IF NOT EXISTS idx_messages_citizen ON messages.messages (citizen_id, created_at DESC)'
+    'CREATE INDEX IF NOT EXISTS idx_messages_owner ON messages.messages (owner_id, created_at DESC)'
   )
   _ready = true
   console.log(JSON.stringify({ level: 'info', msg: 'messages schema ready' }))

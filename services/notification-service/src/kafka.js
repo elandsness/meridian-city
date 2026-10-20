@@ -5,7 +5,7 @@
  *
  * Topics consumed:
  *   iot.anomalies    — IoT device anomaly events from telemetry-processor
- *   requests.events  — Service request lifecycle events from citizen-service / service-dispatch
+ *   requests.events  — Service request lifecycle events from entity-engine
  *
  * Each message is transformed into a notification and pushed to the in-memory
  * ring buffer (notifications.js), which broadcasts to SSE clients.
@@ -75,17 +75,17 @@ function mapRequestEvent (payload) {
   }
 }
 
-// ---- Per-citizen inbox mappers (DB-backed) --------------------------------
+// ---- Per-owner inbox mappers (DB-backed) --------------------------------
 
 async function mapCommerceToInbox (payload) {
   const eventType = payload.eventType || payload.event_type
-  const citizenId = payload.citizenId || payload.citizen_id
+  const ownerId = payload.ownerId || payload.owner_id
   const orderId = payload.orderId || payload.order_id
-  if (!citizenId) return
+  if (!ownerId) return
   // Key milestones only: order placed + delivered.
   if (eventType === 'checkout.completed') {
     await insert({
-      citizenId,
+      ownerId,
       type: 'order_placed',
       title: 'Order placed',
       body: `Your order ${orderId} has been placed. We'll let you know when it ships.`,
@@ -93,10 +93,10 @@ async function mapCommerceToInbox (payload) {
     })
   } else if (eventType === 'order.delivered') {
     await insert({
-      citizenId,
+      ownerId,
       type: 'order_delivered',
       title: 'Your package has arrived',
-      body: `Order ${orderId} has been delivered. Enjoy your Meridian City merchandise!`,
+      body: `Order ${orderId} has been delivered. Enjoy!`,
       metadata: payload,
     })
   }
@@ -104,13 +104,13 @@ async function mapCommerceToInbox (payload) {
 
 async function mapBillingToInbox (payload) {
   const eventType = payload.eventType || payload.event_type
-  const citizenId = payload.citizenId || payload.citizen_id
+  const ownerId = payload.ownerId || payload.owner_id
   const period = payload.period || ''
   const billNoun = (payload.display_name || 'Tax Bill').toLowerCase()
-  if (!citizenId) return
+  if (!ownerId) return
   if (eventType === 'tax.bill_issued') {
     await insert({
-      citizenId,
+      ownerId,
       type: 'tax_due',
       title: `${period} ${billNoun} issued`,
       body: `A new ${period} ${billNoun} is now due. View it under Pay bills.`,
@@ -118,7 +118,7 @@ async function mapBillingToInbox (payload) {
     })
   } else if (eventType === 'tax.payment_completed') {
     await insert({
-      citizenId,
+      ownerId,
       type: 'tax_paid',
       title: 'Payment received',
       body: `Thank you — your ${period} ${billNoun} is paid.`,
@@ -129,14 +129,14 @@ async function mapBillingToInbox (payload) {
 
 async function mapRequestToInbox (payload) {
   const eventType = payload.eventType || payload.event_type || ''
-  const citizenId = payload.citizenId || payload.citizen_id
+  const ownerId = payload.ownerId || payload.owner_id
   const status = (payload.status || payload.new_status || '').toLowerCase()
   const requestId = payload.requestId || payload.request_id || ''
-  if (!citizenId) return
+  if (!ownerId) return
   // Key milestones only: request received (submitted) + resolved.
   if (status === 'submitted' || eventType.endsWith('.submitted')) {
     await insert({
-      citizenId,
+      ownerId,
       type: 'request_received',
       title: 'Service request received',
       body: `We've received your request ${requestId} and will get it assigned.`,
@@ -144,7 +144,7 @@ async function mapRequestToInbox (payload) {
     })
   } else if (status === 'resolved' || eventType.endsWith('.resolved')) {
     await insert({
-      citizenId,
+      ownerId,
       type: 'request_resolved',
       title: 'Service request resolved',
       body: `Your request ${requestId} has been resolved.`,
