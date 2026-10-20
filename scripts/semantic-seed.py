@@ -188,5 +188,71 @@ def main():
 
     print("[SUCCESS] Semantic reflection seeding complete.")
 
+    seed_ticker_headlines(namespace, industry_id, terminology, llm)
+
+
+def generate_ticker_headlines(industry_id: str, terminology: Dict, label: str, llm: 'LLMClient', count: int = 8) -> List[str]:
+    prompt = (
+        f"Act as a headline writer for a scrolling news ticker on a {industry_id} "
+        f"demo app's home page, labeled '{label}'. "
+        f"Generate {count} short, light, funny/cute headlines in the style of "
+        f"Onion-style fake local news -- plausible-sounding but silly and warm, never dark "
+        f"or mean-spirited. They must read as specific to this industry's own world "
+        f"(not generic small-talk), using this terminology where it helps: "
+        f"{json.dumps(terminology)}. "
+        f"Return ONLY a JSON array of {count} strings. No markdown, no preamble."
+    )
+    text = llm.generate(prompt)
+    if "```json" in text: text = text.split("```json")[1].split("```")[0]
+    elif "```" in text: text = text.split("```")[1].split("```")[0]
+    items = json.loads(text)
+    if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
+        raise ValueError("LLM did not return a JSON array of strings")
+    return items
+
+
+def seed_ticker_headlines(namespace: str, industry_id: str, terminology: Dict, llm: 'LLMClient'):
+    """Regenerates any `template: ticker` home module's items with fresh,
+    industry-flavored headlines via the LLM, then patches the live industry-config
+    ConfigMap and restarts the frontends to pick it up (config.json is mounted with
+    subPath, which does NOT auto-sync on a ConfigMap change)."""
+    cm_res = run_cmd(
+        ["kubectl", "get", "configmap", "industry-config", "-n", namespace, "-o", "jsonpath={.data.config\\.json}"],
+        check=False,
+    )
+    if cm_res.returncode != 0 or not cm_res.stdout.strip():
+        print("[WARN] Could not read live industry-config ConfigMap -- skipping ticker generation.")
+        return
+
+    live_config = json.loads(cm_res.stdout)
+    home_sections = [live_config.get("home", {}).get("public", [])]
+    updated = False
+
+    for section in home_sections:
+        for module in section:
+            if not isinstance(module, dict) or module.get("template") != "ticker":
+                continue
+            label = module.get("label", "NEWS")
+            print(f"[SEED] Generating ticker headlines for module '{module.get('id', 'ticker')}'...")
+            try:
+                module["items"] = generate_ticker_headlines(industry_id, terminology, label, llm)
+                updated = True
+            except Exception as e:
+                print(f"[WARN] Ticker headline generation failed, leaving existing items: {e}")
+
+    if not updated:
+        return
+
+    patch = {"data": {"config.json": json.dumps(live_config)}}
+    with open("/tmp/industry-config-patch.json", "w") as f:
+        json.dump(patch, f)
+    run_cmd(["kubectl", "patch", "configmap", "industry-config", "-n", namespace,
+              "--type", "merge", "--patch-file", "/tmp/industry-config-patch.json"])
+
+    run_cmd(["kubectl", "rollout", "restart", "deployment/public-portal", "-n", namespace], check=False)
+
+    print("[SUCCESS] Ticker headlines regenerated and live.")
+
+
 if __name__ == "__main__":
     main()
