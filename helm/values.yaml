@@ -377,6 +377,13 @@ industry:
         - from: in_progress
           to: abandoned
           timer: { minSeconds: 300, maxSeconds: 7200 }
+      # No generation strategy -- requests are only ever user-submitted. This block
+      # exists solely to declare ownerField: EntityKafkaPublisher reuses it to find
+      # which field holds the owning citizen's id for the "citizen_id" Kafka payload
+      # key notification-service expects (that field's name varies per industry,
+      # e.g. "passenger_id" for airport).
+      generator:
+        ownerField: citizen_id
 
     # -----------------------------------------------------------------------
     # BILL (tax bill) — quarterly billing lifecycle

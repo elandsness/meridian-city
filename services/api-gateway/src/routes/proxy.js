@@ -69,6 +69,12 @@ class RouteResolver {
         requiresAuth: true,
         rewritePrefix: '/api/v1',
       },
+      {
+        prefix: '/api/v1/messages',
+        target: config.NOTIFICATION_SERVICE_URL,
+        serviceName: 'notification-service',
+        requiresAuth: false,
+      },
     ]
   }
 

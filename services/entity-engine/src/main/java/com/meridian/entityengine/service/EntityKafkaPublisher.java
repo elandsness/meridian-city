@@ -55,7 +55,7 @@ public class EntityKafkaPublisher {
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("event_type", eventType);
-        payload.put("citizen_id", record.getField("citizen_id"));
+        payload.put("citizen_id", record.getField(ownerField("bill")));
         payload.put("period", record.getField("period"));
         payload.put("amount_cents", record.getField("amount_cents"));
         payload.put("bill_id", record.getId());
@@ -69,9 +69,21 @@ public class EntityKafkaPublisher {
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("event_type", "service_request." + state);
-        payload.put("citizen_id", record.getField("citizen_id"));
+        payload.put("citizen_id", record.getField(ownerField("service_request")));
         payload.put("status", state);
         payload.put("request_id", record.getId());
         kafkaTemplate.send("requests.events", record.getId(), payload);
+    }
+
+    /**
+     * notification-service's consumers always key on a "citizen_id" payload field,
+     * but the source entity's own field for that id varies per industry (e.g.
+     * "passenger_id" for airport) — reuses generator.ownerField (the existing
+     * owner-entity-linking concept) rather than hardcoding the city field name.
+     */
+    private String ownerField(String entityType) {
+        var def = configLoader.getAllDefinitions().get(entityType);
+        var gen = def != null ? def.getGenerator() : null;
+        return gen != null && gen.getOwnerField() != null ? gen.getOwnerField() : "citizen_id";
     }
 }
