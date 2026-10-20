@@ -70,10 +70,20 @@ function defaultLabel(preset) {
 
 const MARQUEE_KEYFRAMES = `@keyframes ticker-marquee{from{transform:translateX(100%)}to{transform:translateX(-200%)}}`
 
+// The marquee always travels the same 300%-of-its-own-width distance, so a fixed
+// duration makes longer item lists (more industries, more items, longer headlines)
+// scroll proportionally faster. Scale duration to content length instead, calibrated
+// against city's original 5-item ticker (~353 chars over 35s) so reading speed stays
+// comfortable regardless of how much text a given industry config supplies.
+const MARQUEE_CHARS_PER_SECOND = 10
+const MARQUEE_MIN_DURATION_S = 20
+
 export default function Ticker({ items, height = 'slim', title = 'Updates', label, preset }) {
   const resolved = resolveItems(items, preset)
   const prefixLabel = label ?? defaultLabel(preset)
   const [current, setCurrent] = useState(0)
+  const marqueeText = resolved.join('   ·   ')
+  const marqueeDurationS = Math.max(MARQUEE_MIN_DURATION_S, Math.round(marqueeText.length / MARQUEE_CHARS_PER_SECOND))
 
   useEffect(() => {
     if (height !== 'half' || resolved.length < 2) return
@@ -100,9 +110,9 @@ export default function Ticker({ items, height = 'slim', title = 'Updates', labe
         <div className="overflow-hidden flex-1 h-full flex items-center">
           <span
             className="whitespace-nowrap text-sm text-slate-700"
-            style={{ animation: 'ticker-marquee 35s linear infinite', display: 'inline-block' }}
+            style={{ animation: `ticker-marquee ${marqueeDurationS}s linear infinite`, display: 'inline-block' }}
           >
-            {resolved.join('   ·   ')}
+            {marqueeText}
           </span>
         </div>
       </div>

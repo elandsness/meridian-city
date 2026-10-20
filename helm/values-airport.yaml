@@ -110,6 +110,19 @@ industry:
 
   home:
     public:
+      - id: "airportband"
+        template: "ticker"
+        height: "slim"
+        label: "✈️ TERMINAL BUZZ"
+        items:
+          - "Flight Attendant's Pretzel-Distribution Technique Draws Standing Ovation From Row 14"
+          - "Local Toddler Successfully Negotiates Window Seat, Airline Reportedly Considering Them For Union Rep"
+          - "Baggage Carousel 4 Completes Entire Shift Without A Single Mystery Suitcase, Coworkers Stunned"
+          - "Pilot Lands So Smoothly Napping Passenger Sleeps Through Entire Taxi To Gate"
+          - "Security Line Moves So Fast Passengers Begin Asking If They Missed A Step"
+          - "Gate Agent Remembers Frequent Flyer's Name, Seat Preference, And Dog's Birthday"
+          - "Jet Bridge Apologizes For Slight Incline, Passengers Graciously Accept"
+          - "Lost Luggage Reunited With Owner, Airport Staff Throw Tiny Welcome-Back Parade"
       - "flight-status"
       - id: "airfield-home"
         template: "entity-map"
