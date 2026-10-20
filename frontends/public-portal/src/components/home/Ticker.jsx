@@ -91,7 +91,11 @@ export default function Ticker({ items, height = 'slim', title = 'Updates', labe
   const resolved = resolveItems(items, preset)
   const prefixLabel = label ?? defaultLabel(preset)
   const [current, setCurrent] = useState(0)
-  const marqueeText = resolved.join('               -               ')
+  // Regular spaces collapse to one under normal HTML whitespace rules (even with
+  // whitespace-nowrap, which only stops line-wrapping, not collapsing) -- use the
+  // actual em-space character (what &emsp; renders to in HTML) so the gap survives.
+  const EM_SPACE = ' '
+  const marqueeText = resolved.join(`${EM_SPACE.repeat(4)}-${EM_SPACE.repeat(4)}`)
   const marqueeDurationS = Math.max(MARQUEE_MIN_DURATION_S, Math.round(marqueeText.length / MARQUEE_CHARS_PER_SECOND))
 
   useEffect(() => {
