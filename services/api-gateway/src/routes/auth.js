@@ -6,9 +6,9 @@ async function authRoutes (fastify, opts) {
   const config = opts.config
 
   fastify.get('/api/v1/auth/me', async (request, reply) => {
-    const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
+    const identityServiceUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
     try {
-      const res = await undiciRequest(`${citizenAuthUrl}/api/v1/auth/me`, {
+      const res = await undiciRequest(`${identityServiceUrl}/api/v1/auth/me`, {
         method: 'GET',
         headers: { 
           'Authorization': request.headers.authorization,
@@ -37,9 +37,9 @@ async function authRoutes (fastify, opts) {
       return reply.code(200).send({ token, user: { username, role: 'operator' } })
     }
 
-    const citizenAuthUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
+    const identityServiceUrl = config.IDENTITY_SERVICE_URL || config.CUSTOMER_ENTITY_SERVICE_URL || config.CITIZEN_SERVICE_URL
     try {
-      const res = await undiciRequest(`${citizenAuthUrl}/api/v1/auth/login`, {
+      const res = await undiciRequest(`${identityServiceUrl}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: username, password }),
@@ -48,16 +48,16 @@ async function authRoutes (fastify, opts) {
       })
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const identity = await res.body.json()
-        const token = fastify.jwt.sign({ sub: identity.identity_id, role: 'citizen' }, { expiresIn: '8h' })
+        const token = fastify.jwt.sign({ sub: identity.identity_id, role: 'customer' }, { expiresIn: '8h' })
         return reply.code(200).send({
           token,
-          user: { id: identity.identity_id, username: identity.email, name: identity.name, role: 'citizen' },
+          user: { id: identity.identity_id, username: identity.email, name: identity.name, role: 'customer' },
         })
       }
       await res.body.text().catch(() => {})
       return reply.code(401).send({ error: 'Invalid credentials' })
     } catch (err) {
-      request.log.error({ err: err.message }, 'citizen login upstream failed')
+      request.log.error({ err: err.message }, 'identity login upstream failed')
       return reply.code(502).send({ error: 'Authentication service unavailable' })
     }
   })
