@@ -5,6 +5,7 @@ import argparse
 import json
 import subprocess
 import random
+import time
 import yaml
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
@@ -29,7 +30,8 @@ def load_ai_config(custom_values_path: str):
         return {
             "provider": os.environ.get("LLM_PROVIDER", "openai"),
             "apiKey": os.environ.get("LLM_API_KEY"),
-            "model": os.environ.get("LLM_MODEL", "gpt-4o")
+            "model": os.environ.get("LLM_MODEL", "gpt-4o"),
+            "endpoint": os.environ.get("LLM_ENDPOINT"),
         }
     with open(custom_values_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -39,22 +41,49 @@ def load_ai_config(custom_values_path: str):
     return {
         "provider": provider,
         "apiKey": provider_cfg.get('apiKey'),
-        "model": provider_cfg.get('model', 'gpt-4o')
+        "model": provider_cfg.get('model', 'gpt-4o'),
+        # Only meaningful for provider=local (Ollama) -- matches helm/values.yaml's
+        # llm.local.endpoint default. Resolved to a localhost port-forward URL by
+        # ensure_llm_reachable() before any LLMClient call is made.
+        "endpoint": provider_cfg.get('endpoint', 'http://ollama:11434') if provider == 'local' else None,
     }
+
+def ensure_llm_reachable(namespace: str, ai_config: Dict[str, Any]):
+    """For provider=local, Ollama is a cluster-internal Service (unlike OpenAI/
+    Anthropic's public endpoints) -- this script runs on the deploy host, outside
+    the cluster, so it can't resolve `ollama` or reach it directly. Port-forwards
+    it to localhost and rewrites ai_config['endpoint'] in place. No-op for other
+    providers. Returns the port-forward Popen handle to terminate when done, or
+    None if nothing was started.
+    """
+    if ai_config.get('provider') != 'local':
+        return None
+    local_port = 19434
+    print(f"[SEED] provider=local -- port-forwarding ollama service to localhost:{local_port}...")
+    proc = subprocess.Popen(
+        ["kubectl", "port-forward", "svc/ollama", f"{local_port}:11434", "-n", namespace],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    time.sleep(3)  # give the port-forward a moment to establish before first use
+    ai_config['endpoint'] = f"http://localhost:{local_port}"
+    return proc
 
 class LLMClient:
     def __init__(self, config: Dict[str, Any]):
         self.provider = config['provider']
-        self.apiKey = config['apiKey']
+        self.apiKey = config.get('apiKey')
         self.model = config['model']
+        self.endpoint = config.get('endpoint')
 
     def generate(self, prompt: str) -> str:
-        if not self.apiKey:
+        if not self.apiKey and self.provider != "local":
             raise ValueError("LLM API Key is missing.")
         if self.provider == "openai":
             return self._call_openai(prompt)
         elif self.provider == "anthropic":
             return self._call_anthropic(prompt)
+        elif self.provider == "local":
+            return self._call_local(prompt)
         return "[]"
 
     def _call_openai(self, prompt: str) -> str:
@@ -79,6 +108,22 @@ class LLMClient:
         resp = requests.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         return resp.json()['content'][0]['text']
+
+    def _call_local(self, prompt: str) -> str:
+        # Ollama's OpenAI-compatible endpoint (same one ai-service's LocalProvider
+        # uses) -- same request/response shape as _call_openai, dummy auth.
+        import requests
+        url = f"{self.endpoint}/v1/chat/completions"
+        headers = {"Authorization": "Bearer ollama", "Content-Type": "application/json"}
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "system", "content": "You are a data generation engine. Return ONLY valid JSON arrays. No markdown. No preamble."},
+                         {"role": "user", "content": prompt}],
+            "temperature": 0.7
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        return resp.json()['choices'][0]['message']['content']
 
 def main():
     parser = argparse.ArgumentParser()
@@ -131,64 +176,69 @@ def main():
         entities_to_seed[etype]['initial'] = defn.get('initial', 'initial')
 
     ai_config = load_ai_config(custom_values_path)
+    llm_port_forward = ensure_llm_reachable(namespace, ai_config)
     llm = LLMClient(ai_config)
 
-    def generate_generic_data(etype: str, schema: Dict, count: int = 20) -> List[Dict]:
-        print(f"[SEED] Reflecting {etype}... Generating {count} records...")
-        field_descriptions = [f"- {k}: {v}" for k, v in schema.items()]
-        fields_str = "\n".join(field_descriptions)
-        prompt = (
-            f"Act as a high-fidelity data generator for a {industry_id} simulation. "
-            f"Generate {count} realistic records for the entity type '{etype}'. "
-            f"Each record MUST be a JSON object. "
-            f"Required fields to populate:\n{fields_str}\n"
-            f"Also include 'id' matching the pattern 'sem-{etype}-...'. "
-            f"Industry Terminology: {json.dumps(terminology)}. "
-            f"Return ONLY a JSON array of objects. No markdown."
-        )
-        try:
-            text = llm.generate(prompt)
-            if "```json" in text: text = text.split("```json")[1].split("```")[0]
-            elif "```" in text: text = text.split("```")[1].split("```")[0]
-            return json.loads(text)
-        except Exception as e:
-            print(f"[WARN] Reflection failed for {etype}: {e}. Creating skeletal records.")
-            return [{"id": f"sem-{etype}-{i}", "fallback": True} for i in range(count)]
-
-    all_sql = []
-    for etype, meta in entities_to_seed.items():
-        data = generate_generic_data(etype, meta.get('fields', {}))
-        for record in data:
-            rec_id = record.get('id', f"sem-{etype}-{random.randint(1000,9999)}")
-            rec_data = record if 'data' not in record else record['data']
-            entered_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-            transition_at = (datetime.now(timezone.utc) + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
-            initial_state = meta.get('initial', 'initial')
-            json_str = json.dumps(rec_data).replace("'", "''")
-            sql = (
-                f"INSERT INTO entities.entity (id, entity_type, state, data, links, created_at, updated_at, state_entered_at, next_transition_at) "
-                f"VALUES ('{rec_id}', '{etype}', '{initial_state}', "
-                f"'{json_str}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), '{entered_at}', '{transition_at}') "
-                f"ON CONFLICT (id) DO UPDATE SET state_entered_at='{entered_at}', next_transition_at='{transition_at}', data='{json_str}'::jsonb;"
+    try:
+        def generate_generic_data(etype: str, schema: Dict, count: int = 20) -> List[Dict]:
+            print(f"[SEED] Reflecting {etype}... Generating {count} records...")
+            field_descriptions = [f"- {k}: {v}" for k, v in schema.items()]
+            fields_str = "\n".join(field_descriptions)
+            prompt = (
+                f"Act as a high-fidelity data generator for a {industry_id} simulation. "
+                f"Generate {count} realistic records for the entity type '{etype}'. "
+                f"Each record MUST be a JSON object. "
+                f"Required fields to populate:\n{fields_str}\n"
+                f"Also include 'id' matching the pattern 'sem-{etype}-...'. "
+                f"Industry Terminology: {json.dumps(terminology)}. "
+                f"Return ONLY a JSON array of objects. No markdown."
             )
-            all_sql.append(sql)
+            try:
+                text = llm.generate(prompt)
+                if "```json" in text: text = text.split("```json")[1].split("```")[0]
+                elif "```" in text: text = text.split("```")[1].split("```")[0]
+                return json.loads(text)
+            except Exception as e:
+                print(f"[WARN] Reflection failed for {etype}: {e}. Creating skeletal records.")
+                return [{"id": f"sem-{etype}-{i}", "fallback": True} for i in range(count)]
 
-    print(f"[SEED] Injecting {len(all_sql)} generic records...")
-    batch_size = 50
-    for i in range(0, len(all_sql), batch_size):
-        batch = all_sql[i:i+batch_size]
-        full_sql = "BEGIN;\n" + "\n".join(batch) + "\nCOMMIT;"
-        process = subprocess.Popen(
-            ["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        stdout, stderr = process.communicate(input=full_sql)
-        if process.returncode != 0 or "ERROR" in stdout or "ERROR" in stderr:
-            print(f"[ERROR] Batch {i//batch_size + 1} failed: {stderr} {stdout}")
+        all_sql = []
+        for etype, meta in entities_to_seed.items():
+            data = generate_generic_data(etype, meta.get('fields', {}))
+            for record in data:
+                rec_id = record.get('id', f"sem-{etype}-{random.randint(1000,9999)}")
+                rec_data = record if 'data' not in record else record['data']
+                entered_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                transition_at = (datetime.now(timezone.utc) + timedelta(seconds=random.randint(30, 600))).strftime('%Y-%m-%d %H:%M:%S')
+                initial_state = meta.get('initial', 'initial')
+                json_str = json.dumps(rec_data).replace("'", "''")
+                sql = (
+                    f"INSERT INTO entities.entity (id, entity_type, state, data, links, created_at, updated_at, state_entered_at, next_transition_at) "
+                    f"VALUES ('{rec_id}', '{etype}', '{initial_state}', "
+                    f"'{json_str}'::jsonb, '{{}}'::jsonb, NOW(), NOW(), '{entered_at}', '{transition_at}') "
+                    f"ON CONFLICT (id) DO UPDATE SET state_entered_at='{entered_at}', next_transition_at='{transition_at}', data='{json_str}'::jsonb;"
+                )
+                all_sql.append(sql)
 
-    print("[SUCCESS] Semantic reflection seeding complete.")
+        print(f"[SEED] Injecting {len(all_sql)} generic records...")
+        batch_size = 50
+        for i in range(0, len(all_sql), batch_size):
+            batch = all_sql[i:i+batch_size]
+            full_sql = "BEGIN;\n" + "\n".join(batch) + "\nCOMMIT;"
+            process = subprocess.Popen(
+                ["kubectl", "exec", "-n", namespace, db_pod, "--", "psql", "-U", "postgres", "-d", "meridian"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            stdout, stderr = process.communicate(input=full_sql)
+            if process.returncode != 0 or "ERROR" in stdout or "ERROR" in stderr:
+                print(f"[ERROR] Batch {i//batch_size + 1} failed: {stderr} {stdout}")
 
-    seed_ticker_headlines(namespace, industry_id, terminology, llm)
+        print("[SUCCESS] Semantic reflection seeding complete.")
+
+        seed_ticker_headlines(namespace, industry_id, terminology, llm)
+    finally:
+        if llm_port_forward:
+            llm_port_forward.terminate()
 
 
 def generate_ticker_headlines(industry_id: str, terminology: Dict, label: str, llm: 'LLMClient', count: int = 8) -> List[str]:
