@@ -101,7 +101,12 @@ entities:
 Continue with the standard Meridian sections:
 - **terminology**: Map generic nouns to industry nouns (e.g. `customer` $ightarrow$ `Patient`).
 - **screens**: Compose the UI using the module catalog.
-- **home**: Define the layout of the public and ops dashboards.
+- **home**: Define the layout of the public and ops dashboards. Lead the public home
+  with a `template: ticker` module carrying 6-8 GENERATED, light/funny,
+  industry-flavored headlines — a cheap, high-charm touch for almost any demo.
+  Generate the tone and content yourself from the industry's own flavor (an
+  airport's headlines read differently than a hospital's or a bank's); don't
+  reuse another industry's items verbatim.
 - **data**: Provide realistic seeds for zones and request templates.
 - **routing**: Map request categories to departments (MUST include `other: "General Support"`).
 - **dynatrace**: Map fixed platform service keys to industry labels and list the flows to enable.

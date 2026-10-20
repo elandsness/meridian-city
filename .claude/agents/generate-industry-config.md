@@ -162,6 +162,32 @@ Defining `work_order` as a custom entity drops the incident-cascade chain. Any I
 incident will never auto-resolve, leaving permanent warning dots on every device map.
 Use domain-specific names: `field_order`, `crew_job`, `repair_task`, `maintenance_ticket`.
 
+### Rule P7 — Lead the public home with a generated flavor ticker
+
+Add a `template: ticker` module as the FIRST entry in `screens.home.public` (or
+`home.public`, matching whichever section the rest of the config uses), carrying
+6-8 headlines you generate yourself for this specific industry — light, funny,
+cute, plausible-sounding local buzz (not real news, not corporate announcements).
+City's own example (`helm/values.yaml`'s `cityband` module) uses a more serious
+civic-announcement tone; lean funnier/cuter unless the SE asks for something more
+buttoned-up. Match the industry's own flavor — an airport's headlines should not
+read like a hospital's or a bank's.
+
+```yaml
+- id: "<short-industry-id>band"       # e.g. "airportband", "bankband"
+  template: "ticker"
+  height: "slim"
+  label: "<emoji> <SHORT ALL-CAPS LABEL>"   # e.g. "✈️ TERMINAL BUZZ"
+  items:
+    - "<generated headline 1>"
+    - "<generated headline 2>"
+    # ... 6-8 total
+```
+
+`Ticker.jsx` is fully generic (no industry assumptions in the component) and
+auto-paces its scroll speed to the combined item text length, so any number/length
+of items reads at a comfortable, consistent speed — don't worry about tuning speed.
+
 ### Rule P6 — Fleet/moving-map entities use the reserved `journey` type, not a custom entity
 
 If the industry has a fleet of things gliding between named locations (trucks between hubs,
@@ -253,6 +279,12 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] All state `tone` values are from: `slate`, `blue`, `amber`, `orange`, `green`, `red`.
 - [ ] Every state referenced in `transitions` and `steps` exists in `states`.
 - [ ] All states reachable from `initial` via at least one transition (or marked `externallyTriggered: true`).
+
+### Checklist D' — Flavor ticker (Rule P7)
+
+- [ ] A `template: ticker` module is the first entry in the public `home.public` list.
+- [ ] It has 6-8 generated, industry-flavored, light/funny headlines — not copied
+      from another industry's config, not generic placeholder text.
 
 ### Checklist D — Platform supplements (Rules P1–P4 above)
 
