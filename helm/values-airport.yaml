@@ -28,6 +28,7 @@ industry:
       accentInk: "#062B36"
     logo: "/meridian-airport-logo.svg"
     favicon: "/meridian-airport-logo.svg"
+    heroImage: "/airport_hero_bg.png"
 
   terminology:
     customer: "Passenger"
@@ -110,6 +111,9 @@ industry:
 
   home:
     public:
+      - id: "airport-hero"
+        template: "welcome-hero"
+        position: "full"
       - id: "airportband"
         template: "ticker"
         height: "slim"
@@ -124,9 +128,6 @@ industry:
           - "Gate Agent Remembers Frequent Flyer's Name, Seat Preference, And Dog's Birthday"
           - "Jet Bridge Apologizes For Slight Incline, Passengers Graciously Accept"
           - "Lost Luggage Reunited With Owner, Airport Staff Throw Tiny Welcome-Back Parade"
-      - id: "airport-hero"
-        template: "welcome-hero"
-        position: "full"
       - "flight-status"
       - id: "airfield-home"
         template: "entity-map"
