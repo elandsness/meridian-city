@@ -45,7 +45,7 @@ industry:
     public:
       - "home"
       - { id: "my-journey", label: "My Journey", template: "entity-journey", entityType: "passenger", ownerField: "owner_id" }
-      - { id: "account-status", label: "Account Status", template: "entity-journey", entityType: "passenger_account" }
+      - "my-account"
       - id: "service-requests"
         label: "Help & requests"
         template: "entity-grid-list"
