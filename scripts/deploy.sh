@@ -166,8 +166,15 @@ add_repos() {
 # CNPG/Strimzi/OTel operator Deployments. Used to pull fresh :latest images on
 # upgrade and to (re)trigger OneAgent injection.
 restart_app_workloads() {
+  # A deployment that something else (e.g. semantic-seed.py's ticker-regeneration
+  # step, or a manual restart) already restarted in the last second makes kubectl
+  # fail just that one patch ("restart has already been triggered within the past
+  # second") while still restarting every other match -- that's not a real
+  # failure (the deployment WAS just restarted, by definition), so it must not
+  # abort the rest of this script under set -e.
   kubectl rollout restart deployment -n "$NAMESPACE" \
-    -l 'app.kubernetes.io/part-of=meridian-city-platform'
+    -l 'app.kubernetes.io/part-of=meridian-city-platform' \
+    || warn "One or more deployments were already restarted moments ago by something else — continuing."
   sleep 10  # let the rollout begin so we wait on the new pods, not the old ready ones
   kubectl wait pods \
     --for=condition=ready \
