@@ -91,7 +91,7 @@ export default function Ticker({ items, height = 'slim', title = 'Updates', labe
   const resolved = resolveItems(items, preset)
   const prefixLabel = label ?? defaultLabel(preset)
   const [current, setCurrent] = useState(0)
-  const marqueeText = resolved.join('   ·   ')
+  const marqueeText = resolved.join('     -     ')
   const marqueeDurationS = Math.max(MARQUEE_MIN_DURATION_S, Math.round(marqueeText.length / MARQUEE_CHARS_PER_SECOND))
 
   useEffect(() => {
