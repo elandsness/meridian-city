@@ -95,7 +95,7 @@ export default function Ticker({ items, height = 'slim', title = 'Updates', labe
   // whitespace-nowrap, which only stops line-wrapping, not collapsing) -- use the
   // actual em-space character (what &emsp; renders to in HTML) so the gap survives.
   const EM_SPACE = ' '
-  const marqueeText = resolved.join(`${EM_SPACE.repeat(4)}-${EM_SPACE.repeat(4)}`)
+  const marqueeText = resolved.join(`${EM_SPACE.repeat(4)}•${EM_SPACE.repeat(4)}`)
   const marqueeDurationS = Math.max(MARQUEE_MIN_DURATION_S, Math.round(marqueeText.length / MARQUEE_CHARS_PER_SECOND))
 
   useEffect(() => {
