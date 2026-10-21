@@ -893,6 +893,33 @@ function DemoGuideCard() {
 }
 
 // ---------------------------------------------------------------------------
+// External trigger API — lets an external demo-automation system call the same
+// scenario endpoints this panel uses, authenticated with a per-instance API key
+// instead of an operator login. See api-gateway's x-demo-api-key header.
+// ---------------------------------------------------------------------------
+function ExternalTriggerCard() {
+  return (
+    <SectionCard title="External Trigger API" defaultOpen={false}>
+      <p className="text-xs text-gray-400">
+        Any scenario below can also be triggered by an external system — useful for wiring
+        this demo up to something that fires events automatically. Call the gateway with an{' '}
+        <code className="text-gray-300 font-mono">x-demo-api-key</code> header instead of
+        logging in as the operator. The key for this instance is in its Helm secret — printed
+        by <code className="text-gray-300 font-mono">deploy.sh</code> when{' '}
+        <code className="text-gray-300 font-mono">auth.demoApiKey</code> is set, or readable via{' '}
+        <code className="text-gray-300 font-mono">kubectl get secret &lt;release&gt;-secrets</code>.
+      </p>
+      <div className="mt-3 space-y-1.5 font-mono text-xs text-gray-400">
+        <p>POST /api/v1/demo-control/scenarios/:id/start</p>
+        <p>DELETE /api/v1/demo-control/scenarios/active</p>
+        <p>POST /api/v1/demo-control/scenarios/reset-all</p>
+        <p>GET /api/v1/demo-control/scenarios — list available scenario ids</p>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main DemoControl page
 // ---------------------------------------------------------------------------
 export default function DemoControl() {
@@ -936,6 +963,7 @@ export default function DemoControl() {
       <ScenarioControlCard activeScenario={demoStatus?.active_scenario} />
       <FleetCard />
       <TrafficCard />
+      <ExternalTriggerCard />
     </div>
   );
 }

@@ -28,26 +28,10 @@ export const DEFAULT_CONFIG = {
     logo: '', // empty = use the built-in inline BrandMark; set a path/URL to override
     favicon: '/meridian-logo.svg',
   },
-  terminology: {
-    customer: 'Citizen',
-    customerPlural: 'Citizens',
-    request: 'Service request',
-    requestPlural: 'Service requests',
-    incident: 'Incident',
-    incidentPlural: 'Incidents',
-    workOrder: 'Work order',
-    asset: 'Asset',
-    assetPlural: 'Assets',
-  },
-  screens: {
-    public: ['home', 'service-requests', 'store', 'billing', 'messages'],
-    ops: ['overview', 'iot', 'incidents', 'requests', 'analytics', 'demo-control'],
-    disabled: [],
-  },
-  home: {
-    public: ['city-home', 'transit-map', 'quick-actions'],
-    ops: ['ops-overview'],
-  },
+  // IoT category labels/prefixes (iotCategory1/2/3, iotIdPrefix1/2/3) are read by
+  // Demo Control's fleet panel; omitted here since it already falls back sensibly
+  // (Vehicles/Buildings/Machines) when unset.
+  terminology: {},
   entities: {},
 }
 

@@ -3,12 +3,15 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
 import { useConfig } from '../config/ConfigContext';
-import { getActiveScreens } from '../config/screens.jsx';
+
+const NAV = [
+  { path: '/command-center', label: 'Command Center', icon: '🛰️' },
+  { path: '/demo-control', label: 'Demo Control', icon: '⚙️' },
+];
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const cfg = useConfig();
-  const screens = getActiveScreens(cfg);
 
   return (
     <div className="flex h-full min-h-screen">
@@ -25,9 +28,9 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          {screens.map((s) => (
+          {NAV.map((s) => (
             <NavLink
-              key={s.id}
+              key={s.path}
               to={s.path}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors border-l-2 ${
