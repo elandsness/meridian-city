@@ -39,9 +39,8 @@ cover — gaps discovered from production deployments:
 | Rule | What it enforces |
 |------|-----------------|
 | **P1 — ownedTypes overrides** | Every custom entity type with a `generator` must appear in `customerEntityService.ownedTypes` or `opsEntityService.ownedTypes` (outside the `industry:` block). Without this the entity engine never creates or transitions those entities — screens appear empty. |
-| **P2 — IoT terminology** | When `iot` is in `screens.ops`, all six keys must be present in `terminology`: `iotCategory1/2/3` and `iotIdPrefix1/2/3`. Without them the IoT page and demo-control fleet panel fall back to the Meridian City defaults ("Vehicles / Buildings / Machines"). |
+| **P2 — IoT terminology** | If the industry has a device/asset fleet, all six keys should be present in `terminology`: `iotCategory1/2/3` and `iotIdPrefix1/2/3`. Without them Demo Control's fleet panel falls back to the Meridian City defaults ("Vehicles / Buildings / Machines"). (ops-dashboard has no IoT screen of its own — this only affects Demo Control's labels.) |
 | **P3 — iotZonePositions** | When a `status-map` screen uses `clusterBy: zone`, `terminology.iotZonePositions` must map each zone id to an `{x, y}` cluster center in the map's viewBox. Without it no dots render. |
-| **P4 — incidents paired with iot** | Whenever `iot` appears in `screens.ops`, `incidents` must also appear. The IoT page links to `/incidents` for anomaly-related incidents; if the screen is absent those links redirect to overview. |
 
 The skill also maintains a quick-reference table of the 14 most common LLM generation
 mistakes (fabricated `serviceNames` keys, invalid `flows` ids, `routing:` nested inside

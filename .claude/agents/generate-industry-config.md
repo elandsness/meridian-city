@@ -98,10 +98,12 @@ opsEntityService:
 Without this override the entity engine never generates or transitions the custom entity —
 the screen renders empty forever, and billing also breaks if the base types are omitted.
 
-### Rule P2 — IoT terminology is required when the `iot` screen is active
+### Rule P2 — IoT terminology is required when the industry has a device/asset fleet
 
-If `iot` appears in `screens.ops`, you must add all six IoT terminology keys. Without them,
-the IoT page and demo-control fleet panel fall back to the city defaults
+ops-dashboard has no screen composition (it's a fixed Command Center + Demo Control app),
+so this isn't gated by any `screens` entry. If the industry has a device/asset fleet at all
+(an `iot:` block, or a status-map screen in `screens.public`), add all six IoT terminology
+keys. Without them, Demo Control's fleet panel falls back to the city defaults
 ("Vehicles / Buildings / Machines / veh / bldg / mach") regardless of industry:
 
 ```yaml
@@ -126,7 +128,7 @@ Map to something that makes sense for the industry. Examples by vertical:
 
 ### Rule P3 — `iotZonePositions` is required when using `status-map` with `clusterBy: zone`
 
-If the ops dashboard has a `status-map` screen with `clusterBy: zone`, the component reads
+If `screens.public` has a `status-map` screen with `clusterBy: zone`, the component reads
 `terminology.iotZonePositions` to know where to cluster each device zone on the map.
 Without it the map renders with zero sprites (no dots, "No data available").
 
@@ -142,19 +144,6 @@ terminology:
 
 The `data.zones` list determines which zones exist. Every zone that should show on the map
 needs an entry here. Zones with no position entry are silently skipped.
-
-### Rule P4 — Always add `incidents` to ops when `iot` is present
-
-The IoT page generates links to `/incidents` for any device-linked incident. If `incidents`
-is not in `screens.ops`, those links 404 and redirect to the overview. Always pair `iot` with
-`incidents` in the ops screen list, using an industry-appropriate label:
-
-```yaml
-screens:
-  ops:
-    - { id: incidents, label: "Grid Faults" }   # or "Clinical Incidents", "Equipment Alerts", etc.
-    - { id: iot, label: "Asset Fleet" }
-```
 
 ### Rule P5 — `work_order` is reserved — never redefine it
 
@@ -286,15 +275,14 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] It has 6-8 generated, industry-flavored, light/funny headlines — not copied
       from another industry's config, not generic placeholder text.
 
-### Checklist D — Platform supplements (Rules P1–P4 above)
+### Checklist D — Platform supplements (Rules P1–P3 above)
 
 - [ ] `customerEntityService.ownedTypes` override added outside `industry:` block, including
       base types plus every custom customer-facing entity that has a generator.
 - [ ] `opsEntityService.ownedTypes` override added outside `industry:` block, including
       base types plus every custom ops-facing entity that has a generator.
-- [ ] If `iot` in `screens.ops`: `iotCategory1/2/3` and `iotIdPrefix1/2/3` in `terminology`.
+- [ ] If the industry has a device/asset fleet: `iotCategory1/2/3` and `iotIdPrefix1/2/3` in `terminology`.
 - [ ] If `status-map` with `clusterBy: zone`: `iotZonePositions` in `terminology`.
-- [ ] If `iot` in `screens.ops`: `incidents` also in `screens.ops`.
 
 ### Checklist E' — Fleet / `journey` entities (Rule P6)
 
@@ -375,9 +363,8 @@ and Claude itself when generating industry configs. Read this list before writin
 | Transition with only `when: { probability }`, no `timer` | Add `timer:` — `when` is a filter, not a trigger |
 | Unquoted `y:` in waypoints | Always write `"y": 280` |
 | Custom entity not in `ownedTypes` | Add `customerEntityService` / `opsEntityService` override outside `industry:` |
-| `iot` screen without matching `incidents` screen | Add `{ id: incidents, label: "..." }` to `screens.ops` |
 | `status-map clusterBy: zone` with no `iotZonePositions` | Add `iotZonePositions` to terminology with zone → {x,y} centers |
-| Missing `iotCategory1/2/3` + `iotIdPrefix1/2/3` | Add all six keys to terminology when `iot` screen is active |
+| Missing `iotCategory1/2/3` + `iotIdPrefix1/2/3` | Add all six keys to terminology when the industry has a device/asset fleet |
 | `billing` screen without `billingTitle/Subtitle/billNoun` | Always include all three when billing is active |
 | Fabricated image URLs | Unsplash URLs or omit — never invent GitHub raw paths |
 | `analytics:` block with invented flow ids | `analytics.flows` is browser-visible but same valid-id constraint applies |

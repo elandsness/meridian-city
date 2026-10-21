@@ -72,7 +72,7 @@ industry:
 
 ### 3. Screens
 
-Define which screens appear in each app (portal + ops dashboard). Pick from the catalog, relabel, and hide what doesn't apply.
+Define which screens appear in the passenger/citizen portal. Pick from the catalog, relabel, and hide what doesn't apply. (ops-dashboard is a fixed Command Center + Demo Control app — it doesn't read a `screens.ops` list; see "Ops Dashboard" below.)
 
 ```yaml
 industry:
@@ -82,15 +82,6 @@ industry:
       - { id: my-journey, label: "My Journey" }
       - { id: service-requests, label: "Help & requests" }
       - messages
-    ops:                              # operations dashboard
-      - overview
-      - { id: flight-board, label: "Flight Board" }
-      - { id: airfield, label: "Airfield" }
-      - { id: requests, label: "Maintenance queue" }
-      - { id: iot, label: "Ground equipment" }
-      - { id: incidents, label: "Operational incidents" }
-      - { id: analytics, label: "On-time performance" }
-      - demo-control
 ```
 
 **Portal screens catalog:**
@@ -104,22 +95,17 @@ industry:
 | `messages` | Notifications inbox | generic |
 | `my-journey` | Personal step-by-step journey tracker | aviation / transport only |
 
-**Ops screens catalog:**
+### Ops Dashboard
 
-| id | What it is | Use for |
-|----|-----------|---------|
-| `overview` | Ops landing (contents from `home.ops` modules) | always |
-| `requests` | Request / work queue | generic — relabel |
-| `incidents` | Operational incidents | generic — relabel |
-| `iot` | Connected device / asset fleet | if the industry has sensors/equipment |
-| `analytics` | Business analytics / KPIs | generic |
-| `demo-control` | Demo control panel | **always keep** |
-| `flight-board` | Live flight board | aviation only |
-| `airfield` | Live airfield map with moving aircraft | aviation only |
+ops-dashboard is **not** config-composable — it's a fixed two-screen app
+(Command Center + Demo Control) for every industry. Command Center discovers
+whatever business flows/entity types the loaded industry config defines (via
+entity-engine's `GET /api/v1/entity-types` and journey-service) and renders
+them generically, so there's nothing to pick/relabel/hide per industry here.
 
 ### 4. Home Page Modules
 
-Compose the home page from a library of generic components. Modules are rendered by the `PageComposer` from the `COMPONENT_REGISTRY`.
+Compose the portal home page from a library of generic components. Modules are rendered by the `PageComposer` from the `COMPONENT_REGISTRY`. (ops-dashboard has no home-module composition — see "Ops Dashboard" above.)
 
 ```yaml
 industry:
@@ -129,9 +115,6 @@ industry:
       - { id: news-ticker, label: "Flight Updates", headlines: ["Flight 123 On Time", "Flight 456 Delayed 30 min"] }
       - { id: transit-map, label: "Shuttle Map" }
       - { id: weather, label: "Airport Weather", location: "Meridian Airport", units: "fahrenheit" }
-    ops:
-      - { id: ops-overview, label: "Overview" }
-      - { id: flight-summary, label: "Flight Summary" }
 ```
 
 #### Configurable Components
@@ -162,7 +145,7 @@ The `COMPONENT_REGISTRY` maps component IDs to React components. This is the con
 | `entity-journey` | `EntityJourneyPage` | Generic entity journey tracker |
 | `status-map` | `StatusMapPage` | Generic status map (for IoT/asset fleet) |
 
-Registry location: `frontends/public-portal/src/config/componentRegistry.jsx` (and `frontends/ops-dashboard/src/config/componentRegistry.jsx`).
+Registry location: `frontends/public-portal/src/config/componentRegistry.jsx`.
 
 #### Page Composer
 
@@ -328,7 +311,7 @@ The following require code changes:
    - Change `industry.theme.colors` (hex)
    - Change `industry.terminology`
    - Change `industry.screens` (pick from catalog, relabel, hide what doesn't apply)
-   - Change `industry.home.public` / `industry.home.ops` (compose from component library)
+   - Change `industry.home.public` (compose from component library)
    - Change `industry.data` (zones, requestTemplates, chatQuestions)
    - Change `industry.routing` (must match requestTemplates categories)
    - Change `industry.dynatrace` (serviceNames, flowLabels, flows)
@@ -514,13 +497,11 @@ These are acceptable limitations for a demo platform. If you need dynamic reskin
   - `helm/values-powerutility.yaml` (Meridian Power)
   - `helm/values-oilandgas.yaml` (Meridian Oil)
 - **Component Registry (public portal):** `frontends/public-portal/src/config/componentRegistry.jsx`
-- **Component Registry (ops dashboard):** `frontends/ops-dashboard/src/config/componentRegistry.jsx`
 - **Page Composer (public portal):** `frontends/public-portal/src/components/PageComposer.jsx`
-- **Page Composer (ops dashboard):** `frontends/ops-dashboard/src/components/PageComposer.jsx`
 - **Configurable Components:**
   - `frontends/public-portal/src/components/WeatherWidget.jsx`
   - `frontends/public-portal/src/components/NewsTicker.jsx`
   - `frontends/public-portal/src/components/TransitPanel.jsx`
   - `frontends/public-portal/src/components/ChatWidget.jsx`
-  - (Same components in `frontends/ops-dashboard/src/components/`)
-- **Entity Components:** `frontends/public-portal/src/components/entity/` (and `frontends/ops-dashboard/src/components/entity/`)
+- **Entity Components:** `frontends/public-portal/src/components/entity/`
+- **Ops Dashboard (not config-composable):** `frontends/ops-dashboard/src/pages/CommandCenter.jsx`, `frontends/ops-dashboard/src/pages/DemoControl.jsx`
