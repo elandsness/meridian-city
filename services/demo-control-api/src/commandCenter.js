@@ -21,25 +21,29 @@ const config = require('./config')
 const proxy = require('./proxy')
 const { getActiveScenario, getFaults } = require('./state')
 
-/** One flow per configured entity type, with a volume + state-bucket breakdown. */
+/** One flow per configured entity type, with a volume + state-bucket breakdown.
+ * entity-engine's REST API is snake_case (spring.jackson.property-naming-strategy:
+ * SNAKE_CASE, per docs/API_CONVENTIONS.md) -- EntityTypeSummary's fields are
+ * entity_type/display_name/display_name_plural/states[].is_error. */
 async function entityFlows () {
   const typesResult = await proxy.get(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/entity-types`)
   if (!typesResult.ok) return []
   const types = Array.isArray(typesResult.data) ? typesResult.data : []
 
   const perType = await Promise.all(types.map(async (type) => {
-    const listResult = await proxy.get(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/entities/${encodeURIComponent(type.entityType)}`)
+    const entityType = type.entity_type
+    const listResult = await proxy.get(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/entities/${encodeURIComponent(entityType)}`)
     const records = listResult.ok && Array.isArray(listResult.data) ? listResult.data : []
     const byState = {}
     let errorCount = 0
     for (const record of records) {
       const state = record.state || 'unknown'
       byState[state] = (byState[state] || 0) + 1
-      if (type.states?.[state]?.isError) errorCount += 1
+      if (type.states?.[state]?.is_error) errorCount += 1
     }
     return {
-      entityType: type.entityType,
-      label: type.displayNamePlural || type.displayName || type.entityType,
+      entityType,
+      label: type.display_name_plural || type.display_name || entityType,
       total: records.length,
       byState,
       errorCount,

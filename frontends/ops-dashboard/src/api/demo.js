@@ -25,33 +25,16 @@ export async function resetAll() {
   return res.data;
 }
 
-export async function getFaultStatus() {
-  const res = await client.get('/api/v1/demo-control/fault/status');
-  return res.data;
-}
-
-export async function injectFault(service, body) {
-  const res = await client.post(`/api/v1/demo-control/fault/${service}`, body);
-  return res.data;
-}
-
 export async function getFleetStatus() {
   const res = await client.get('/api/v1/demo-control/fleet/status');
   return res.data;
 }
 
-export async function resizeFleet(body) {
-  const res = await client.post('/api/v1/demo-control/fleet/resize', body);
-  return res.data;
-}
-
-export async function injectAnomaly(body) {
-  const res = await client.post('/api/v1/demo-control/fleet/anomaly', body);
-  return res.data;
-}
-
-export async function clearAnomalies() {
-  const res = await client.delete('/api/v1/demo-control/fleet/anomaly');
+// Set one device type's population to an exact count (generic across whatever
+// device types the industry config declares -- not a fixed vehicle/building/
+// machine set).
+export async function resizeFleetType(type, count) {
+  const res = await client.post('/api/v1/demo-control/fleet/resize', { type, count });
   return res.data;
 }
 
