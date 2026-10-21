@@ -134,6 +134,7 @@ industry:
       displayName: "Passenger"
       displayNamePlural: "Passengers"
       idPrefix: "pax"
+      domain: "customer"
       fields:
         has_bag: { type: "boolean" }
         name: { type: "string" }
@@ -179,6 +180,7 @@ industry:
       displayName: "Luggage"
       displayNamePlural: "Luggage"
       idPrefix: "bag"
+      domain: "ops"
       fields:
         passenger_id: { type: "ref", entity: "passenger" }
         weight: { type: "number" }
@@ -212,6 +214,7 @@ industry:
       displayName: "Aircraft"
       displayNamePlural: "Aircraft"
       idPrefix: "ac"
+      domain: "ops"
       fields:
         tail_number: { type: "string" }
         type: { type: "string" }
@@ -255,6 +258,7 @@ industry:
       displayName: "Departure"
       displayNamePlural: "Departures"
       idPrefix: "fltd"
+      domain: "ops"
       fields:
         flight_number: { type: "string" }
         destination: { type: "string" }
@@ -306,6 +310,7 @@ industry:
       displayName: "Arrival"
       displayNamePlural: "Arrivals"
       idPrefix: "flta"
+      domain: "ops"
       fields:
         flight_number: { type: "string" }
         origin: { type: "string" }
@@ -357,6 +362,7 @@ industry:
       displayName: "Service Request"
       displayNamePlural: "Service Requests"
       idPrefix: "req"
+      domain: "customer"
       fields:
         passenger_id: { type: "string" }
         category: { type: "string" }
