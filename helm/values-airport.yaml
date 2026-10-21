@@ -260,7 +260,7 @@ industry:
       idPrefix: "fltd"
       domain: "ops"
       fields:
-        flight_number: { type: "string", required: true }
+        flight_number: { type: "string", required: true, unique: true }
         destination: { type: "string", required: true }
         gate: { type: "string" }
       initial: "at_gate"
@@ -302,7 +302,7 @@ industry:
         maxActive: 20
         intervalMs: 20000
         fields:
-          flight_number: [{ values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }]
+          flight_number: [{ values: ["SK102", "SK441", "SK273", "LH902", "LH118", "AF112", "AF308", "BA203", "BA415", "DL449", "DL687", "AA881", "AA213", "EK201", "EK556", "QF901", "CX884", "SQ321", "NH203", "JL415", "UA842", "VS103", "TK729", "QR447"] }]
           destination: [{ values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }]
           gate: [{ values: ["A1", "A2", "B5", "B12", "C3", "D8"] }]
 
@@ -312,7 +312,7 @@ industry:
       idPrefix: "flta"
       domain: "ops"
       fields:
-        flight_number: { type: "string", required: true }
+        flight_number: { type: "string", required: true, unique: true }
         origin: { type: "string", required: true }
         gate: { type: "string" }
       initial: "approach"
@@ -354,7 +354,7 @@ industry:
         maxActive: 20
         intervalMs: 25000
         fields:
-          flight_number: [{ values: ["SK102", "SK441", "LH902", "AF112", "BA203", "DL449", "AA881", "EK201"] }]
+          flight_number: [{ values: ["SK102", "SK441", "SK273", "LH902", "LH118", "AF112", "AF308", "BA203", "BA415", "DL449", "DL687", "AA881", "AA213", "EK201", "EK556", "QF901", "CX884", "SQ321", "NH203", "JL415", "UA842", "VS103", "TK729", "QR447"] }]
           origin: [{ values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }]
           gate: [{ values: ["A1", "A2", "B5", "B12", "C3", "D8"] }]
 
