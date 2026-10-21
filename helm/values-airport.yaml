@@ -260,8 +260,8 @@ industry:
       idPrefix: "fltd"
       domain: "ops"
       fields:
-        flight_number: { type: "string" }
-        destination: { type: "string" }
+        flight_number: { type: "string", required: true }
+        destination: { type: "string", required: true }
         gate: { type: "string" }
       initial: "at_gate"
       states:
@@ -312,8 +312,8 @@ industry:
       idPrefix: "flta"
       domain: "ops"
       fields:
-        flight_number: { type: "string" }
-        origin: { type: "string" }
+        flight_number: { type: "string", required: true }
+        origin: { type: "string", required: true }
         gate: { type: "string" }
       initial: "approach"
       states:

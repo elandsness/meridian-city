@@ -40,8 +40,8 @@ public class EntityEngineService {
     public List<EntityRecord> list(String entityType, String stateFilter, Map<String, String> fieldFilters) {
         configLoader.require(entityType);
         List<EntityRecord> records = stateFilter == null
-                ? repository.findByEntityType(entityType)
-                : repository.findByEntityTypeAndState(entityType, stateFilter);
+                ? repository.findByEntityTypeOrderByCreatedAtAsc(entityType)
+                : repository.findByEntityTypeAndStateOrderByCreatedAtAsc(entityType, stateFilter);
         if (fieldFilters == null || fieldFilters.isEmpty()) return records;
         return records.stream()
                 .filter(r -> fieldFilters.entrySet().stream().allMatch(e -> {
