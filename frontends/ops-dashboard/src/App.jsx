@@ -1,11 +1,10 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
-import { useConfig } from './config/ConfigContext';
-import { getActiveScreens } from './config/screens.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
-import EntityDetailPage from './components/entity/EntityDetailPage.jsx';
+import CommandCenter from './pages/CommandCenter.jsx';
+import DemoControl from './pages/DemoControl.jsx';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -15,31 +14,13 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-// Build the <Route> list for the active ops screens (+ sub-routes) from the
-// registry. Auth is enforced by the wrapping Layout route, not per-screen.
-function screenRoutes(screens) {
-  const routes = [];
-  for (const s of screens) {
-    const Comp = s.component;
-    routes.push(<Route key={s.id} path={s.path} element={<Comp />} />);
-    for (const sub of s.subRoutes) {
-      const SubComp = sub.component;
-      const subPath = `${s.path.replace(/\/$/, '')}/${sub.path}`;
-      routes.push(<Route key={`${s.id}:${sub.path}`} path={subPath} element={<SubComp />} />);
-    }
-  }
-  return routes;
-}
-
+// Fixed two-screen app: Command Center (platform health) + Demo Control. No
+// industry-config-driven screen composition -- that's public-portal's job.
 function AppRoutes() {
-  const config = useConfig();
-  const screens = getActiveScreens(config);
-  const firstPath = screens[0]?.path ?? '/overview';
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
 
-      {/* Protected layout routes */}
       <Route
         element={
           <ProtectedRoute>
@@ -47,15 +28,12 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to={firstPath} replace />} />
-        {screenRoutes(screens)}
-        {/* One generic route every entity-list template's rows link to, regardless
-            of entity type -- no per-industry detail-screen config needed. */}
-        <Route path="/entities/:entityType/:id" element={<EntityDetailPage />} />
+        <Route index element={<Navigate to="/command-center" replace />} />
+        <Route path="/command-center" element={<CommandCenter />} />
+        <Route path="/demo-control" element={<DemoControl />} />
       </Route>
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to={firstPath} replace />} />
+      <Route path="*" element={<Navigate to="/command-center" replace />} />
     </Routes>
   );
 }
