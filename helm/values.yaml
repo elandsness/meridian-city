@@ -243,6 +243,7 @@ industry:
       displayName: "Citizen"
       displayNamePlural: "Citizens"
       idPrefix: "cit"
+      domain: "customer"
       fields:
         first_name: { type: string }
         last_name: { type: string }
@@ -309,6 +310,7 @@ industry:
       displayName: "Service Request"
       displayNamePlural: "Service Requests"
       idPrefix: "req"
+      domain: "customer"
       fields:
         citizen_id: { type: string }
         category: { type: string }
@@ -419,6 +421,7 @@ industry:
       displayName: "Tax Bill"
       displayNamePlural: "Tax Bills"
       idPrefix: "bill"
+      domain: "customer"
       fields:
         citizen_id: { type: string }
         period: { type: string }
@@ -485,6 +488,7 @@ industry:
       displayName: "Order"
       displayNamePlural: "Orders"
       idPrefix: "cart"
+      domain: "customer"
       fields:
         citizen_id: { type: string }
         total_cents: { type: number, default: 0 }
@@ -555,6 +559,7 @@ industry:
       displayName: "Incident"
       displayNamePlural: "Incidents"
       idPrefix: "inc"
+      domain: "ops"
       fields:
         asset_id: { type: string }
         source:
@@ -632,6 +637,7 @@ industry:
       displayName: "Work Order"
       displayNamePlural: "Work Orders"
       idPrefix: "wo"
+      domain: "ops"
       fields:
         incident_id: { type: ref, entity: incident }
         request_id: { type: string }
@@ -1306,9 +1312,10 @@ passengerService:
 # Generic config-driven entity/lifecycle engine, driven entirely by
 # industry.entities (see above). One deployment for now, owning every entity
 # type in the mounted config; Stage 6/7 retrofits City/Airport by deploying
-# this same image twice (customer-entity-service, ops-entity-service) with a
-# non-empty ownedTypes each — see docs/regression-baseline-2026-07-23.md and
-# the project_generic_entity_engine memory for the full plan.
+# this same image twice (customer-entity-service, ops-entity-service), each
+# given a `serviceRole` matched against a `domain` on every entity in
+# industry.entities — see docs/regression-baseline-2026-07-23.md and the
+# project_generic_entity_engine memory for the full plan.
 # ---------------------------------------------------------------------------
 # Stage 6: replaced by customerEntityService + opsEntityService below.
 # Kept here as disabled so any existing tooling that references entityEngine.*
@@ -1322,7 +1329,10 @@ entityEngine:
   service:
     type: ClusterIP
     port: 8094
-  serviceRole: "generic"
+  # Blank -- this disabled legacy stub is meant to be the sole deployment if ever
+  # re-enabled, so it should own every entity type (no domain filtering), matching
+  # its original single-deployment design intent.
+  serviceRole: ""
   resources:
     requests:
       cpu: "150m"

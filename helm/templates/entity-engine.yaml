@@ -64,8 +64,8 @@ spec:
               value: "none"
             - name: ENTITY_CONFIG_PATH
               value: "file:/etc/meridian/entity-config.json"
-            - name: ENTITY_TYPES
-              value: {{ .Values.customerEntityService.ownedTypes | quote }}
+            - name: SERVICE_ROLE
+              value: {{ .Values.customerEntityService.serviceRole | quote }}
             - name: KAFKA_GROUP_ID
               value: "customer-entity-service-group"
             # application.yml binds spring.kafka.bootstrap-servers from SPRING_KAFKA_BOOTSTRAP_SERVERS,
@@ -182,8 +182,8 @@ spec:
               value: "none"
             - name: ENTITY_CONFIG_PATH
               value: "file:/etc/meridian/entity-config.json"
-            - name: ENTITY_TYPES
-              value: {{ .Values.opsEntityService.ownedTypes | quote }}
+            - name: SERVICE_ROLE
+              value: {{ .Values.opsEntityService.serviceRole | quote }}
             - name: KAFKA_GROUP_ID
               value: "ops-entity-service-group"
             # Kafka bridge: listen to iot.anomalies and create incident entities.
@@ -297,8 +297,8 @@ spec:
               value: "none"
             - name: ENTITY_CONFIG_PATH
               value: "file:/etc/meridian/entity-config.json"
-            - name: ENTITY_TYPES
-              value: {{ .Values.entityEngine.ownedTypes | quote }}
+            - name: SERVICE_ROLE
+              value: {{ .Values.entityEngine.serviceRole | quote }}
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
             {{- with .Values.entityEngine.env }}
             {{- include "meridian.extraEnv" . | nindent 12 }}

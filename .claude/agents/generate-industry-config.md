@@ -67,36 +67,47 @@ Read Step 3 of `docs/authoring-kit/AUTHORING_PROMPT.md` for the full DSL.
 
 **Additional platform rules not in the authoring prompt:**
 
-### Rule P1 — ownedTypes overrides are mandatory for custom entities
+### Rule P1 — every entity needs a `domain` so the owning deployment picks it up
 
-The `industry:` block tells the frontend what exists. The entity engine only creates
-and manages entities whose types are listed in `customerEntityService.ownedTypes` or
-`opsEntityService.ownedTypes`. These are Helm values **outside** the `industry:` block.
+The entity engine runs as two deployments against the same entity-config:
+`customerEntityService` (Helm value `serviceRole: "customer"`) and `opsEntityService`
+(`serviceRole: "ops"`). Each only generates/transitions the entities whose `domain`
+(inside `industry.entities.<type>`) case-insensitively matches its own `serviceRole`.
+An entity with no `domain` is never picked up by either deployment — it still renders
+in a screen if you add one, but it never gets created or advanced, so the screen stays
+empty forever.
 
-For every custom entity type you define with a `generator`, you must add a top-level
-override at the bottom of the YAML (after the `industry:` block closes):
+For **every** entity type you define — base types and custom ones — set `domain` right
+after `idPrefix`:
 
 ```yaml
-# Entity engine ownership — outside industry: block
-customerEntityService:
-  ownedTypes: "citizen,service_request,bill,cart,<your_customer_entity>"
-
-opsEntityService:
-  ownedTypes: "incident,work_order,<your_ops_entity>"
+industry:
+  entities:
+    <your_customer_entity>:
+      displayName: "..."
+      idPrefix: "..."
+      domain: "customer"   # owned by customerEntityService
+      ...
+    <your_ops_entity>:
+      displayName: "..."
+      idPrefix: "..."
+      domain: "ops"        # owned by opsEntityService
+      ...
 ```
 
-**Which service owns which entity:**
-- `customerEntityService` — customer-facing entities (things a customer tracks/sees):
+**Which domain owns which entity:**
+- `domain: "customer"` — customer-facing entities (things a customer tracks/sees):
   concession orders, loan applications, patient admissions, outage events, meter readings
-- `opsEntityService` — ops-facing entities (things the operations team manages):
+- `domain: "ops"` — ops-facing entities (things the operations team manages):
   field repairs, gate assignments, crew jobs, maintenance tickets
 
-**Always include the base types** in each list — never replace them, only extend:
-- customerEntityService base: `citizen,service_request,bill,cart`
-- opsEntityService base: `incident,work_order`
+**The base types already need this too** — don't skip them just because they're
+inherited from the city example:
+- `domain: "customer"`: `citizen`, `service_request`, `bill`, `cart`
+- `domain: "ops"`: `incident`, `work_order`
 
-Without this override the entity engine never generates or transitions the custom entity —
-the screen renders empty forever, and billing also breaks if the base types are omitted.
+Omitting `domain` on any entity type — base or custom — silently drops it from both
+deployments' scheduler/generator.
 
 ### Rule P2 — IoT terminology is required when the industry has a device/asset fleet
 
@@ -211,8 +222,8 @@ The essentials:
         - { origin: "Hub A", destination: "Hub B", originX: 180, originY: 200, destX: 210, destY: 290 }
   ```
 
-- `journey` does **not** go in `customerEntityService`/`opsEntityService` `ownedTypes` (Rule P1
-  doesn't apply — it's served by its own microservice, not the generic entity engine).
+- `entities.journey` does **not** need a `domain` (Rule P1 doesn't apply — it's served by
+  its own microservice, not the generic entity engine).
 - No `journeyService.lifecycle.transitions` key exists — status progression is fixed in
   journey-service's own defaults, not exposed via Helm.
 - Route lines are not auto-drawn. To make routes visible, add `line` shapes to the screen's
@@ -277,10 +288,10 @@ the authoring prompt but consistently fail the validator or break the live demo:
 
 ### Checklist D — Platform supplements (Rules P1–P3 above)
 
-- [ ] `customerEntityService.ownedTypes` override added outside `industry:` block, including
-      base types plus every custom customer-facing entity that has a generator.
-- [ ] `opsEntityService.ownedTypes` override added outside `industry:` block, including
-      base types plus every custom ops-facing entity that has a generator.
+- [ ] Every entity in `industry.entities` has a `domain` of `"customer"` or `"ops"` —
+      including the base types (`citizen`/`service_request`/`bill`/`cart` → customer,
+      `incident`/`work_order` → ops) if you kept them.
+- [ ] `entities.journey` (if present) has no `domain` — not owned by the entity engine.
 - [ ] If the industry has a device/asset fleet: `iotCategory1/2/3` and `iotIdPrefix1/2/3` in `terminology`.
 - [ ] If `status-map` with `clusterBy: zone`: `iotZonePositions` in `terminology`.
 
@@ -292,7 +303,7 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] A top-level `journeyService` block exists (outside `industry:`) with `enabled: true`
       plus a `generator` with `entityTypes`, `initialStatuses`, and a non-empty `routes` list.
       journey-service is OFF by default — omitting `enabled: true` means the pod never runs.
-- [ ] `journey` is NOT added to `customerEntityService`/`opsEntityService` `ownedTypes`.
+- [ ] `entities.journey` has no `domain` set.
 - [ ] If routes should be visible, matching `line` shapes are added to `background.shapes`.
 
 ### Checklist E — Images
@@ -362,7 +373,7 @@ and Claude itself when generating industry configs. Read this list before writin
 | Entity with generator but no screen | Add `entity-list` screen, or remove the generator |
 | Transition with only `when: { probability }`, no `timer` | Add `timer:` — `when` is a filter, not a trigger |
 | Unquoted `y:` in waypoints | Always write `"y": 280` |
-| Custom entity not in `ownedTypes` | Add `customerEntityService` / `opsEntityService` override outside `industry:` |
+| Entity missing `domain` | Add `domain: "customer"` or `domain: "ops"` right after `idPrefix` — including base types |
 | `status-map clusterBy: zone` with no `iotZonePositions` | Add `iotZonePositions` to terminology with zone → {x,y} centers |
 | Missing `iotCategory1/2/3` + `iotIdPrefix1/2/3` | Add all six keys to terminology when the industry has a device/asset fleet |
 | `billing` screen without `billingTitle/Subtitle/billNoun` | Always include all three when billing is active |
@@ -374,4 +385,4 @@ and Claude itself when generating industry configs. Read this list before writin
 | `computed.position` added to `entities.journey` | Ignored — position comes from `journeyService.generator.routes`, not waypoints |
 | Fleet map defined with no top-level `journeyService.generator.routes` | Map renders empty (or shows flights/passengers) — the block is required, outside `industry:` |
 | Fleet map defined without `journeyService.enabled: true` | journey-service is OFF by default in the base chart — the pod never even runs |
-| `journey` added to `customerEntityService`/`opsEntityService` `ownedTypes` | Wrong — journey-service is a separate microservice, not the generic entity engine |
+| `domain` set on `entities.journey` | Wrong — journey-service is a separate microservice, not the generic entity engine |

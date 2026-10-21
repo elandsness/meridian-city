@@ -33,12 +33,12 @@ loop, and writes the final file to `helm/values-<industry>.yaml`.
 
 ### What the skill adds beyond the authoring prompt
 
-The skill wraps `AUTHORING_PROMPT.md` with four platform rules that the prompt doesn't
+The skill wraps `AUTHORING_PROMPT.md` with three platform rules that the prompt doesn't
 cover — gaps discovered from production deployments:
 
 | Rule | What it enforces |
 |------|-----------------|
-| **P1 — ownedTypes overrides** | Every custom entity type with a `generator` must appear in `customerEntityService.ownedTypes` or `opsEntityService.ownedTypes` (outside the `industry:` block). Without this the entity engine never creates or transitions those entities — screens appear empty. |
+| **P1 — entity `domain`** | Every entity in `industry.entities` — base types included — needs a `domain: "customer"` or `domain: "ops"`, matched against the `customerEntityService`/`opsEntityService` deployment that should generate/transition it. Without it, neither deployment picks the entity up — it never gets created or advanced, so any screen for it stays empty forever. |
 | **P2 — IoT terminology** | If the industry has a device/asset fleet, all six keys should be present in `terminology`: `iotCategory1/2/3` and `iotIdPrefix1/2/3`. Without them Demo Control's fleet panel falls back to the Meridian City defaults ("Vehicles / Buildings / Machines"). (ops-dashboard has no IoT screen of its own — this only affects Demo Control's labels.) |
 | **P3 — iotZonePositions** | When a `status-map` screen uses `clusterBy: zone`, `terminology.iotZonePositions` must map each zone id to an `{x, y}` cluster center in the map's viewBox. Without it no dots render. |
 
@@ -86,18 +86,20 @@ Gemini, or another assistant.
    (`values-custom.yaml` holds your cluster/tenant secrets; the industry file only
    overrides the `industry:` block. Both are passed together -- Helm merges them.)
 
-> **Manual pitfall:** the authoring prompt does not cover Rules P1–P4 above. If your
-> generated config produces empty entity screens, an unthemed IoT page, or a blank
-> status-map, see the rule table in Option A and add the missing pieces by hand.
+> **Manual pitfall:** the authoring prompt does not cover Rules P1–P3 above. If your
+> generated config produces empty entity screens, city-default fleet labels in Demo
+> Control, or a blank status-map, see the rule table in Option A and add the missing
+> pieces by hand.
 
 ---
 
 ## What the kit can and can't do
 
-- **Can:** rebrand, relabel every screen/nav item, choose which screens + home/ops modules
-  appear, define custom domain entities with typed fields and lifecycle state machines,
-  generate industry-realistic demo data + dispatch routing, and rename the Dynatrace
-  service map + business flows.
+- **Can:** rebrand, relabel every portal screen/nav item, choose which screens + home
+  modules appear (public portal only — ops-dashboard is a fixed Command Center + Demo
+  Control app), define custom domain entities with typed fields and lifecycle state
+  machines, generate industry-realistic demo data + dispatch routing, and rename the
+  Dynatrace service map + business flows.
 - **Can't:** invent brand-new screen components or modules — those require code. The kit
   **composes and re-skins Meridian's existing module library**. The prompt's catalog lists
   everything available; generic templates (`entity-list`, `entity-map`, `status-map`, etc.)
