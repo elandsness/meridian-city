@@ -51,8 +51,14 @@ export default function FlightStatus() {
     queryFn: () => getFlightArrivals(),
     refetchInterval: 10000,
   })
-  const departures = unwrap(departureData).filter((f) => f.status !== 'departed' && f.status !== 'cancelled').slice(0, 6)
-  const arrivals = unwrap(arrivalData).filter((f) => f.status !== 'arrived' && f.status !== 'diverted').slice(0, 6)
+  const departures = unwrap(departureData)
+    .filter((f) => f.status !== 'departed' && f.status !== 'cancelled')
+    .filter((f) => f.flight_number && f.destination)
+    .slice(0, 6)
+  const arrivals = unwrap(arrivalData)
+    .filter((f) => f.status !== 'arrived' && f.status !== 'diverted')
+    .filter((f) => f.flight_number && f.origin)
+    .slice(0, 6)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
