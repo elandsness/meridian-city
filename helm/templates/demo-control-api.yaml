@@ -35,8 +35,6 @@ spec:
             # URLs for services that support fault injection
             - name: CITIZEN_SERVICE_URL
               value: "http://citizen-service:8081"
-            - name: CITY_OPERATIONS_URL
-              value: "http://city-operations:8083"
             - name: AI_SERVICE_URL
               value: "http://ai-service:8085"
             - name: ANALYTICS_SERVICE_URL
@@ -45,14 +43,8 @@ spec:
               value: "http://iot-simulator:8088"
             - name: TRAFFIC_BOT_URL
               value: "http://traffic-bot:8089"
-            - name: COMMERCE_SERVICE_URL
-              value: "http://commerce-service:8090"
-            - name: BILLING_SERVICE_URL
-              value: "http://transaction-service:8093"
-            - name: FLIGHT_OPS_URL
-              value: "http://flight-ops:8092"
-            - name: PASSENGER_SERVICE_URL
-              value: "http://passenger-service:8093"
+            - name: JOURNEY_SERVICE_URL
+              value: "http://journey-service:8093"
             - name: CUSTOMER_ENTITY_SERVICE_URL
               value: "http://customer-entity-service:8094"
             - name: OPS_ENTITY_SERVICE_URL

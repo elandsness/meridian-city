@@ -4,14 +4,17 @@
  * In-memory state tracking for demo-control-api.
  *
  * Tracks:
- *   - Active fault injections per service
+ *   - Active fault injections for the infra-level scenarios (db-slowdown,
+ *     llm-latency, memory-pressure) that each own a plain service-specific
+ *     /admin/fault endpoint
  *   - Active scenario (name + start time + auto-reset timer)
  *   - Traffic bot status
  *
- * IoT fleet/fault-gate state is NOT cached here -- the new iot-simulator API
- * (device CRUD + fault gates) is queried live via iotOps.js/routes/iot.js,
- * since device types/counts are entirely config-driven and not a fixed shape
- * worth mirroring locally.
+ * The business-process exception scenarios (request-failures, flight-cancellations,
+ * etc.) are NOT cached here -- they're named fault gates on entity-engine/
+ * journey-service, queried live via their GET /api/v1/admin/fault-gates (see
+ * routes/commandCenter.js), which is the more honest source of truth than a local
+ * mirror. IoT fleet/fault-gate state is likewise queried live via iotOps.js/routes/iot.js.
  */
 
 // ---------------------------------------------------------------------------
@@ -21,14 +24,8 @@
 /** @type {Record<string, object>} */
 const _faults = {
   'ai-service':           { llm_latency_enabled: false, llm_latency_seconds: 0 },
-  'citizen-service':      { db_slowdown_enabled: false, db_slowdown_seconds: 0,
-                            request_reject_enabled: false, request_reject_rate: 0,
-                            account_fail_enabled: false, account_fail_rate: 0 },
+  'citizen-service':      { db_slowdown_enabled: false, db_slowdown_seconds: 0 },
   'analytics-service':    { memory_pressure_enabled: false },
-  // Business-exception toggles (default off) — see scenarios.js *-failures scenarios.
-  'city-operations':      { workorder_escalation_enabled: false, workorder_escalation_rate: 0 },
-  'commerce-service':     { checkout_failures_enabled: false, checkout_failures_rate: 0 },
-  'billing-service':      { payment_fail_enabled: false, payment_fail_rate: 0 },
 }
 
 function getFaults () {

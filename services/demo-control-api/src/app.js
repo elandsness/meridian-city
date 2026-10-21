@@ -9,7 +9,7 @@
  * Route groups:
  *   GET  /health                         — liveness
  *   GET  /api/v1/status                  — full system state snapshot
- *   GET/POST /api/v1/fault/*             — fault injection per service
+ *   GET  /api/v1/command-center          — cross-service health aggregator
  *   GET/POST/DELETE /api/v1/iot/*        — IoT device fleet management
  *   GET/POST /api/v1/traffic/*           — traffic bot control
  *   GET/POST/DELETE /api/v1/scenarios/*  — demo scenario orchestration
@@ -20,12 +20,12 @@ const cors = require('@fastify/cors')
 const sensible = require('@fastify/sensible')
 const config = require('./config')
 
-const healthRoutes    = require('./routes/health')
-const faultRoutes     = require('./routes/fault')
-const iotRoutes       = require('./routes/iot')
-const trafficRoutes   = require('./routes/traffic')
-const scenarioRoutes  = require('./routes/scenarios')
-const transitRoutes   = require('./routes/transit')
+const healthRoutes        = require('./routes/health')
+const commandCenterRoutes = require('./routes/commandCenter')
+const iotRoutes            = require('./routes/iot')
+const trafficRoutes        = require('./routes/traffic')
+const scenarioRoutes       = require('./routes/scenarios')
+const transitRoutes        = require('./routes/transit')
 const { startTransitSimulation } = require('./transit')
 
 async function build () {
@@ -45,7 +45,7 @@ async function build () {
 
   // Routes
   await app.register(healthRoutes)
-  await app.register(faultRoutes)
+  await app.register(commandCenterRoutes)
   await app.register(iotRoutes)
   await app.register(trafficRoutes)
   await app.register(scenarioRoutes)

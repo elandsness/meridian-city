@@ -36,6 +36,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "meridian.appSecret" . }}
                   key: auth-password
+            - name: DEMO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meridian.appSecret" . }}
+                  key: demo-api-key
             - name: CITIZEN_SERVICE_URL
               value: "http://citizen-service:8081"
             - name: SERVICE_DISPATCH_URL

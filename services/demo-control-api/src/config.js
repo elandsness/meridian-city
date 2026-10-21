@@ -10,15 +10,11 @@ module.exports = {
 
   // Downstream service URLs
   CITIZEN_SERVICE_URL:      process.env.CITIZEN_SERVICE_URL      || 'http://localhost:8081',
-  CITY_OPERATIONS_URL:      process.env.CITY_OPERATIONS_URL      || 'http://localhost:8083',
   AI_SERVICE_URL:           process.env.AI_SERVICE_URL           || 'http://localhost:8085',
   IOT_SIMULATOR_URL:        process.env.IOT_SIMULATOR_URL        || 'http://localhost:8088',
   TRAFFIC_BOT_URL:          process.env.TRAFFIC_BOT_URL          || 'http://localhost:8089',
   ANALYTICS_SERVICE_URL:    process.env.ANALYTICS_SERVICE_URL    || 'http://analytics-service:8084',
-  COMMERCE_SERVICE_URL:     process.env.COMMERCE_SERVICE_URL     || 'http://localhost:8090',
-  BILLING_SERVICE_URL:      process.env.BILLING_SERVICE_URL      || 'http://localhost:8091',
-  FLIGHT_OPS_URL:           process.env.FLIGHT_OPS_URL           || 'http://localhost:8092',
-  PASSENGER_SERVICE_URL:    process.env.PASSENGER_SERVICE_URL    || 'http://localhost:8093',
+  JOURNEY_SERVICE_URL:      process.env.JOURNEY_SERVICE_URL      || 'http://localhost:8093',
   CUSTOMER_ENTITY_SERVICE_URL: process.env.CUSTOMER_ENTITY_SERVICE_URL || 'http://localhost:8094',
   OPS_ENTITY_SERVICE_URL:      process.env.OPS_ENTITY_SERVICE_URL      || 'http://localhost:8094',
 }

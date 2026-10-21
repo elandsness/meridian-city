@@ -631,6 +631,16 @@ port_forward() {
     info "Port-forwards restart automatically when pods are replaced."
   fi
 
+  # Surface the external-trigger API key (auth.demoApiKey), if this instance has one
+  # set, so an SE can hand it to whatever external demo system they're wiring up —
+  # see api-gateway's x-demo-api-key header (services/api-gateway/src/routes/proxy.js).
+  local demo_api_key
+  demo_api_key=$(kubectl get secret "${RELEASE_NAME}-secrets" -n "$NAMESPACE" \
+    -o jsonpath='{.data.demo-api-key}' 2>/dev/null | base64 -d 2>/dev/null)
+  if [[ -n "$demo_api_key" ]]; then
+    info "  Demo API key    → ${demo_api_key}  (send as header: x-demo-api-key)"
+  fi
+
   # Build the set of port-forwards to run: the ClusterIP API services always,
   # plus any frontend that lacks an external LoadBalancer IP.
   local -a targets=()

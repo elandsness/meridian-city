@@ -90,11 +90,6 @@ generator:
     flight: initiated
     passenger: initiated
 
-# Fault injection flags — set by demo-control-api at runtime.
-fault:
-  failures-enabled: ${FAULT_FAILURES_ENABLED:false}
-  failure-rate: ${FAULT_FAILURES_RATE:0.0}
-
 meridian:
   observability:
     entity-types:

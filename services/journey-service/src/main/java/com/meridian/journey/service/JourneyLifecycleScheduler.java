@@ -1,6 +1,5 @@
 package com.meridian.journey.service;
 
-import com.meridian.journey.config.FaultState;
 import com.meridian.journey.config.JourneyLifecycleProperties;
 import com.meridian.journey.domain.Journey;
 import com.meridian.journey.domain.JourneyStage;
@@ -16,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -24,8 +24,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * realistically spaced. The next status depends on the journey's entity type and current
  * status, driven by the configured transition map.
  *
- * <p>When fault injection is on, a share of journeys are cancelled/offloaded at a
- * configured stage (e.g., boarding for flights, security for passengers).
+ * <p>When a fault gate is on for a journey's (entity type, current status) pair, a share
+ * of journeys there fail into that gate's configured status instead of advancing normally
+ * (e.g. flight.boarding -> cancelled, passenger.security_cleared -> offloaded). See
+ * {@link FaultGateRegistry}.
  */
 @Component
 @RequiredArgsConstructor
@@ -37,7 +39,7 @@ public class JourneyLifecycleScheduler {
     private final BusinessEventLogger businessEventLogger;
     private final JourneyEventPublisher journeyEventPublisher;
     private final JourneyLifecycleProperties props;
-    private final FaultState faultState;
+    private final FaultGateRegistry faultGateRegistry;
 
     @Scheduled(fixedDelay = 10_000)
     @Transactional
@@ -58,9 +60,11 @@ public class JourneyLifecycleScheduler {
     }
 
     private void advance(Journey j, OffsetDateTime now) {
-        // Check for fault injection (cancellation/offload)
-        if (shouldFail(j)) {
-            j.setStatus("cancelled");
+        // Check for fault injection -- a gate named "{entityType}.{currentStatus}.*" fires
+        // the journey into that gate's failure status instead of advancing normally.
+        String failureStatus = rollFailureStatus(j);
+        if (failureStatus != null) {
+            j.setStatus(failureStatus);
             j.setUpdatedAt(now);
             j.setNextTransitionAt(null);
             journeyRepository.save(j);
@@ -91,11 +95,23 @@ public class JourneyLifecycleScheduler {
         journeyEventPublisher.publishJourneyEvent("journey.stage_changed", j);
     }
 
-    /** Gated demo failure: cancel/offload a share of journeys at a configured stage. */
-    private boolean shouldFail(Journey j) {
-        return faultState.isFailuresEnabled()
-                && faultState.getFailureStage() != null
-                && faultState.getFailureStage().equals(j.getStatus())
-                && ThreadLocalRandom.current().nextDouble() < faultState.getFailureRate();
+    /**
+     * Looks for an enabled fault gate named "{entityType}.{currentStatus}.{failureStatus}"
+     * for this journey and rolls its rate. Returns the failure status to apply, or null if
+     * no gate matches or the roll misses -- named per (entity type, status) so independent
+     * demo scenarios (flight-cancellations, passenger-offloads, ...) each get their own
+     * on/off switch instead of sharing one gate.
+     */
+    private String rollFailureStatus(Journey j) {
+        String prefix = j.getEntityType() + "." + j.getStatus() + ".";
+        for (Map.Entry<String, FaultGateRegistry.FaultGateState> gate : faultGateRegistry.snapshot().entrySet()) {
+            String name = gate.getKey();
+            FaultGateRegistry.FaultGateState state = gate.getValue();
+            if (state.enabled() && name.length() > prefix.length() && name.startsWith(prefix)
+                    && ThreadLocalRandom.current().nextDouble() < state.rate()) {
+                return name.substring(prefix.length());
+            }
+        }
+        return null;
     }
 }

@@ -21,7 +21,11 @@ The journey-service is a generic domain-pattern service that handles all journey
 - `GET /api/v1/journeys/{id}` - Get journey by ID
 
 ### Admin (internal, not exposed via gateway)
-- `POST /admin/fault` - Configure fault injection (failures_enabled, failure_stage, failure_rate)
+- `GET /api/v1/admin/fault-gates` - List configured named fault gates (`{enabled, rate}` each)
+- `POST /api/v1/admin/fault-gates/{name}` - Configure a named fault gate, e.g.
+  `flight.boarding.cancelled` or `passenger.security_cleared.offloaded`
+  (`"{entityType}.{triggerStatus}.{failureStatus}"`). Same shape as
+  entity-engine's identical endpoint — see `JourneyLifecycleScheduler`.
 
 ## Configuration
 
@@ -47,8 +51,8 @@ The journey-service is configured via environment variables:
 
 ### Fault Injection
 
-- `FAULT_FAILURES_ENABLED` - Enable journey failures (default: false)
-- `FAULT_FAILURES_RATE` - Failure rate 0.0-1.0 (default: 0.0)
+Configured at runtime via the named fault-gates admin endpoint above, not
+environment variables — see `POST /api/v1/admin/fault-gates/{name}`.
 
 ## Database Schema
 
