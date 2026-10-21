@@ -14,8 +14,10 @@ is not "done" until its instrumentation is done (see [INSTRUMENTATION.md](INSTRU
 
 The app has two front doors:
 - **public-portal** — the citizen-facing experience (a real city would ship this).
-- **ops-dashboard** — the operator + demo-driver surface (incident/request handling,
-  IoT fleet, and the demo control room).
+- **ops-dashboard** — the operator + demo-driver surface: a Command Center
+  (platform health — business-flow activity, traffic, active failure
+  scenarios) and the Demo Control room. Fixed two-screen app, not
+  config-composable per industry (see `docs/RESKINNING_MODEL.md`).
 
 ## Locked decisions
 
@@ -72,7 +74,7 @@ Citizens see a city map of monitored IoT devices, each rendered with its
 current metric readings. No longer tied to an incident — IoT problems are
 observed directly in Dynatrace (Davis AI), not routed into an internal
 incident. Backend (device CRUD, ongoing fault-gate problem injection) exists; the UI
-itself is not yet built (pending the planned ops-dashboard rewrite).
+itself is not yet built.
 - Source: `GET /api/v1/iot/devices`, `GET /api/v1/iot/device-types` (iot-simulator, proxied via demo-control-api/the gateway).
 
 ### CP-5 — Tax & billing (simulated)

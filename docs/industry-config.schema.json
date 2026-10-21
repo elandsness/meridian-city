@@ -115,11 +115,9 @@
     },
     "screens": {
       "type": "object",
+      "description": "Public-portal screen composition. ops-dashboard is a fixed Command Center + Demo Control app and no longer reads a `screens.ops` list.",
       "properties": {
         "public": {
-          "$ref": "#/definitions/screenList"
-        },
-        "ops": {
           "$ref": "#/definitions/screenList"
         },
         "disabled": {
@@ -129,11 +127,9 @@
     },
     "home": {
       "type": "object",
+      "description": "Public-portal home-page module composition. ops-dashboard is a fixed Command Center + Demo Control app and no longer reads a `home.ops` list.",
       "properties": {
         "public": {
-          "$ref": "#/definitions/screenList"
-        },
-        "ops": {
           "$ref": "#/definitions/screenList"
         }
       }

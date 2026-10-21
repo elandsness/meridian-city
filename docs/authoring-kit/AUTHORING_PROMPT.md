@@ -100,9 +100,11 @@ entities:
 ## Step 4 — The Rest of the Config
 Continue with the standard Meridian sections:
 - **terminology**: Map generic nouns to industry nouns (e.g. `customer` $ightarrow$ `Patient`).
-- **screens**: Compose the UI using the module catalog.
-- **home**: Define the layout of the public and ops dashboards. Lead the public home
-  with a `template: ticker` module carrying 6-8 GENERATED, light/funny,
+- **screens**: Compose the public portal's UI using the module catalog (`screens.public`).
+  ops-dashboard is a fixed Command Center + Demo Control app — there's no `screens.ops`/
+  `home.ops` to compose.
+- **home**: Define the public portal's home layout. Lead it with a `template: ticker`
+  module carrying 6-8 GENERATED, light/funny,
   industry-flavored headlines — a cheap, high-charm touch for almost any demo.
   Generate the tone and content yourself from the industry's own flavor (an
   airport's headlines read differently than a hospital's or a bank's); don't

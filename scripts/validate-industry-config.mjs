@@ -366,7 +366,7 @@ function collectScreenEntityTypes(screens) {
 
 function collectHomeEntityTypes(home) {
   const types = new Set()
-  const allModules = [...(home?.public ?? []), ...(home?.ops ?? [])]
+  const allModules = home?.public ?? []
   for (const mod of allModules) {
     if (typeof mod === 'object') {
       if (mod?.entityType) types.add(mod.entityType)
@@ -387,20 +387,22 @@ function checkRuntimeOwnership(parsed, cfg) {
 }
 
 function checkScreens(cfg) {
-  const errors = []
-  const warnings = []
-
-  const allScreens = [
-    ...(cfg.screens?.public ?? []),
-    ...(cfg.screens?.ops ?? []),
-  ]
+  // ops-dashboard is a fixed Command Center + Demo Control app -- it has no screen/
+  // home-module composition, so `screens.ops`/`home.ops` are never read by anything
+  // and are deliberately excluded here (see docs/RESKINNING_MODEL.md).
+  const allScreens = cfg.screens?.public ?? []
 
   // entity-journey + ownerField auto-creates a scoped instance on first visit
   // (EntityJourneyPage's PersonalJourney create-on-demand flow) and entity-engine
   // persists/filters on the owner_id column (EntityFactory, EntityEngineService) --
   // this used to be unsupported but no longer is, so it's intentionally not flagged.
 
-  // generator entities must appear in at least one screen or home module.
+  // A generator entity with no `screens.public`/`home.public` surface is still
+  // visible to operators -- the ops Command Center shows every configured entity
+  // type generically (GET /api/v1/entity-types + per-type counts), regardless of
+  // screen config. So this is a non-blocking heads-up for citizen-facing visibility
+  // only, not a hard error: an ops-only entity (no public surface at all, e.g. an
+  // aircraft-turnaround or fleet-tracking type) is expected and fine.
   // Exception: periodicHistoryBackfill is the billing system's generator — its
   // entities are surfaced through the built-in `billing` screen, not a custom screen.
   const screenTypes = collectScreenEntityTypes(allScreens)
@@ -416,15 +418,15 @@ function checkScreens(cfg) {
     if (!def.generator) continue
     if (def.generator.strategy === 'periodicHistoryBackfill' && billingScreenActive) continue
     if (!surfacedTypes.has(entityId)) {
-      errors.push(
-        `entities.${entityId} has a generator but does not appear in any screen or home module — ` +
-        `the engine creates entities that are invisible to users. ` +
-        `Add a screen (entity-list, entity-map, entity-journey) or remove the generator.`
+      console.log(
+        `… entities.${entityId} has a generator but no screens.public/home.public entry — ` +
+        `it's still visible to operators via the Command Center, but citizens won't see it ` +
+        `unless that's intentional.`
       )
     }
   }
 
-  return [...errors, ...warnings]
+  return []
 }
 
 let failures = 0

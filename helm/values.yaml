@@ -81,10 +81,12 @@ industry:
     requestCategories: [infrastructure, utilities, safety, environment, transport, other]
   screens:
     public: ["home", "service-requests", "store", "billing", "messages"]
-    ops: ["overview", "iot", "incidents", "requests", "analytics", "demo-control"]
     disabled: []
-  # Home-page module composition per SPA (module ids from frontends/*/src/config/homeModules.jsx).
-  # Absent falls back to the city bundle; an industry overlay supplies its own.
+  # Home-page module composition for the public portal (module ids from
+  # frontends/public-portal/src/config/homeModules.jsx). Absent falls back to the
+  # city bundle; an industry overlay supplies its own. ops-dashboard is a fixed
+  # Command Center + Demo Control app and no longer reads a `home.ops`/`screens.ops`
+  # list -- see docs/RESKINNING_MODEL.md.
   home:
     public:
       - id: cityband
@@ -101,7 +103,6 @@ industry:
       - city-home
       - transit-map
       - quick-actions
-    ops: ["ops-overview"]
   # Backend-only demo-data pools + dispatch routing. NOT rendered into the browser
   # config.json (see industry-configmap.yaml). Empty = services use their built-in
   # City defaults; an industry overlay (e.g. values-airport.yaml) supplies its own.
