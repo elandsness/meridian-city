@@ -34,6 +34,10 @@ public class EntityDefinition {
     public static class FieldDef {
         private String type; // string | number | boolean | date | enum | ref
         private boolean required;
+        // When generated (no client override), avoid a value already held by another
+        // still-active instance of this entity type -- e.g. two flights shouldn't
+        // simultaneously share a flight_number. Only applies to generator "values" lists.
+        private boolean unique;
         @JsonProperty("default")
         private Object defaultValue;
         private List<String> values; // enum type only

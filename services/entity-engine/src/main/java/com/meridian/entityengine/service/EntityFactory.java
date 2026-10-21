@@ -12,6 +12,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -27,6 +28,11 @@ public class EntityFactory {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public EntityRecord build(EntityDefinition def, String entityType, Map<String, Object> fieldOverrides) {
+        return build(def, entityType, fieldOverrides, Map.of());
+    }
+
+    public EntityRecord build(EntityDefinition def, String entityType, Map<String, Object> fieldOverrides,
+                               Map<String, Set<Object>> usedValuesByField) {
         EntityRecord record = EntityRecord.create(entityType, def.getIdPrefix(), def.getInitial());
         if (fieldOverrides != null && fieldOverrides.get("owner_id") != null) {
             record.setOwnerId(String.valueOf(fieldOverrides.get("owner_id")));
@@ -37,7 +43,9 @@ public class EntityFactory {
                 if (override != null) record.setLink(fieldName, String.valueOf(override));
                 return;
             }
-            Object value = override != null ? override : generateFieldValue(fieldName, fieldDef, def);
+            Object value = override != null
+                    ? override
+                    : generateFieldValue(fieldName, fieldDef, def, usedValuesByField.get(fieldName));
             boolean isPassword = "password".equals(fieldDef.getType());
             record.setField(fieldName, isPassword && value != null ? passwordEncoder.encode(String.valueOf(value)) : value);
         });
@@ -117,7 +125,8 @@ public class EntityFactory {
         }
     }
 
-    private Object generateFieldValue(String fieldName, EntityDefinition.FieldDef fieldDef, EntityDefinition def) {
+    private Object generateFieldValue(String fieldName, EntityDefinition.FieldDef fieldDef, EntityDefinition def,
+                                       Set<Object> usedValues) {
         if (fieldDef.getDefaultValue() != null) return fieldDef.getDefaultValue();
         Object rawHint = def.getGenerator() == null ? null : def.getGenerator().getFields().get(fieldName);
         if (rawHint == null) return null;
@@ -129,7 +138,7 @@ public class EntityFactory {
             if (picked instanceof Map<?, ?> map) {
                 Object vals = map.get("values");
                 if (vals instanceof List<?> values && !values.isEmpty()) {
-                    return String.valueOf(values.get(ThreadLocalRandom.current().nextInt(values.size())));
+                    return pickValue(values, fieldDef.isUnique() ? usedValues : null);
                 }
             }
             return String.valueOf(picked);
@@ -165,6 +174,16 @@ public class EntityFactory {
             }
         }
         return null;
+    }
+
+    /** Picks a random value, preferring one not in `excluded` if that still leaves a choice. */
+    private String pickValue(List<?> values, Set<Object> excluded) {
+        List<?> candidates = values;
+        if (excluded != null && !excluded.isEmpty()) {
+            List<?> remaining = values.stream().filter(v -> !excluded.contains(String.valueOf(v))).toList();
+            if (!remaining.isEmpty()) candidates = remaining;
+        }
+        return String.valueOf(candidates.get(ThreadLocalRandom.current().nextInt(candidates.size())));
     }
 
     private static final String[] FIRST_NAMES = {

@@ -12,11 +12,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 /**
  * The generic entity engine's core: create, read, and drive entities of any
@@ -73,12 +75,34 @@ public class EntityEngineService {
     @Transactional
     public EntityRecord create(String entityType, Map<String, Object> fieldOverrides) {
         EntityDefinition def = configLoader.require(entityType);
-        EntityRecord record = entityFactory.build(def, entityType, fieldOverrides);
+        EntityRecord record = entityFactory.build(def, entityType, fieldOverrides, usedValuesForUniqueFields(entityType, def));
         applyLinkOnCreate(record, def);
         entityFactory.scheduleNext(record, def);
         repository.save(record);
         entityFactory.recordCreation(record, def);
         return record;
+    }
+
+    /**
+     * For fields marked `unique`, the set of values already taken by other
+     * still-active instances of this entity type, so the generator doesn't hand
+     * out e.g. the same flight_number to two flights in the air at once.
+     */
+    private Map<String, Set<Object>> usedValuesForUniqueFields(String entityType, EntityDefinition def) {
+        List<String> uniqueFields = def.getFields().entrySet().stream()
+                .filter(e -> e.getValue().isUnique())
+                .map(Map.Entry::getKey)
+                .toList();
+        if (uniqueFields.isEmpty()) return Map.of();
+        List<EntityRecord> active = repository.findByEntityTypeAndStateNotIn(entityType, terminalStates(def));
+        Map<String, Set<Object>> usedValues = new HashMap<>();
+        for (String field : uniqueFields) {
+            usedValues.put(field, active.stream()
+                    .map(r -> r.getField(field))
+                    .filter(v -> v != null)
+                    .collect(Collectors.toSet()));
+        }
+        return usedValues;
     }
 
     /**
