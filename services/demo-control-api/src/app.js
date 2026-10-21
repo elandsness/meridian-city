@@ -10,7 +10,8 @@
  *   GET  /health                         — liveness
  *   GET  /api/v1/status                  — full system state snapshot
  *   GET  /api/v1/command-center          — cross-service health aggregator
- *   GET/POST/DELETE /api/v1/iot/*        — IoT device fleet management
+ *   GET/POST/DELETE /api/v1/iot/*        — IoT device/fault-gate CRUD (raw iot-simulator passthrough)
+ *   GET/POST /api/v1/fleet/*             — generic fleet status/resize (Demo Control's Fleet panel)
  *   GET/POST /api/v1/traffic/*           — traffic bot control
  *   GET/POST/DELETE /api/v1/scenarios/*  — demo scenario orchestration
  */
@@ -23,6 +24,7 @@ const config = require('./config')
 const healthRoutes        = require('./routes/health')
 const commandCenterRoutes = require('./routes/commandCenter')
 const iotRoutes            = require('./routes/iot')
+const fleetRoutes          = require('./routes/fleet')
 const trafficRoutes        = require('./routes/traffic')
 const scenarioRoutes       = require('./routes/scenarios')
 const transitRoutes        = require('./routes/transit')
@@ -47,6 +49,7 @@ async function build () {
   await app.register(healthRoutes)
   await app.register(commandCenterRoutes)
   await app.register(iotRoutes)
+  await app.register(fleetRoutes)
   await app.register(trafficRoutes)
   await app.register(scenarioRoutes)
   await app.register(transitRoutes)

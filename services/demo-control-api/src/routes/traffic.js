@@ -35,7 +35,7 @@ async function trafficRoutes (fastify) {
   // POST /api/v1/traffic/start
   fastify.post('/api/v1/traffic/start', async (_request, reply) => {
     const result = await proxy.post(`${config.TRAFFIC_BOT_URL}/api/v1/start`, {})
-    setTrafficState({ running: true })
+    if (result.ok) setTrafficState({ running: true })
     return reply.status(result.ok ? 200 : 502).send({ ok: result.ok, result: result.data, error: result.error })
   })
 
@@ -52,7 +52,7 @@ async function trafficRoutes (fastify) {
     const result = await proxy.post(`${config.TRAFFIC_BOT_URL}/api/v1/burst`, { duration_minutes })
 
     const burst_until = new Date(Date.now() + duration_minutes * 60_000).toISOString()
-    setTrafficState({ running: true, burst_active: true, burst_until })
+    if (result.ok) setTrafficState({ running: true, burst_active: true, burst_until })
 
     return reply.status(result.ok ? 200 : 502).send({
       ok: result.ok,

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useConfig } from '../config/ConfigContext.jsx';
 import {
   getDemoStatus,
   getScenarios,
@@ -8,9 +7,7 @@ import {
   resetActiveScenario,
   resetAll,
   getFleetStatus,
-  resizeFleet,
-  injectAnomaly,
-  clearAnomalies,
+  resizeFleetType,
   getTrafficStatus,
   startTraffic,
   stopTraffic,
@@ -19,24 +16,8 @@ import {
   purgeMessages,
 } from '../api/demo.js';
 import { getIncidents } from '../api/incidents.js';
-import { getDevices } from '../api/devices.js';
+import { getFaultGates, setFaultGate, clearFaultGate } from '../api/devices.js';
 import { DEMO_GUIDE } from '../data/demoGuide.js';
-
-// Simulator-supported anomaly types per device category (matches the iot-simulator
-// device.AnomalyType vocabulary), so the injected type maps 1:1 with no fallback.
-const ANOMALY_TYPES = {
-  vehicle: [
-    { value: 'engine_overtemp', label: 'Engine overtemp' },
-    { value: 'high_speed', label: 'High speed' },
-  ],
-  building: [
-    { value: 'hvac_overtemp', label: 'HVAC overtemp' },
-  ],
-  machine: [
-    { value: 'high_vibration', label: 'High vibration' },
-    { value: 'high_error_rate', label: 'High error rate' },
-  ],
-};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -390,246 +371,201 @@ function ScenarioControlCard({ activeScenario }) {
 }
 
 // ---------------------------------------------------------------------------
-// Section 4: Fleet Management
+// Section 4: Fleet Management — fully generic over whatever device types the
+// industry config declares (industry.iot.deviceTypes), not a fixed vehicle/
+// building/machine set. Resize is per-type (iot-simulator only exposes
+// additive add + single remove, so the backend computes the delta). Fault
+// injection targets a whole device type's fault gate (iot-simulator's
+// ongoing, probabilistic {enabled, rate, magnitude} model) rather than a
+// one-shot single-device anomaly, which no longer has a backend endpoint.
 // ---------------------------------------------------------------------------
+function DeviceTypeRow({ deviceType, gate, onResize, onSetGate, onClearGate, resizing, gateLoading }) {
+  const [count, setCount] = useState(deviceType.currentCount);
+  const [rate, setRate] = useState(gate?.enabled ? Math.round(gate.rate * 100) : 30);
+  const [magnitude, setMagnitude] = useState(gate?.magnitude?.value ?? 50);
+
+  useEffect(() => {
+    setCount(deviceType.currentCount);
+  }, [deviceType.currentCount]);
+
+  const enabled = Boolean(gate?.enabled);
+
+  return (
+    <div className="rounded-lg bg-gray-800 border border-gray-700 p-4 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-sm font-semibold text-white">
+          {deviceType.displayName}
+          {enabled && (
+            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              Fault active
+            </span>
+          )}
+        </p>
+        <span className="text-xs text-gray-500">{deviceType.currentCount} active</span>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">Count</label>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              max={500}
+              value={count}
+              onChange={(e) => setCount(Math.max(0, Number(e.target.value)))}
+              className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm text-center focus:outline-none focus:border-cyan-500"
+            />
+            <button
+              onClick={() => onResize(deviceType.type, count)}
+              disabled={resizing}
+              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+            >
+              {resizing ? '…' : 'Apply'}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 w-10">Rate</label>
+          <input
+            type="range"
+            min={5}
+            max={100}
+            step={5}
+            value={rate}
+            disabled={enabled}
+            onChange={(e) => setRate(Number(e.target.value))}
+            className="w-28 accent-rose-400 disabled:opacity-50"
+          />
+          <span className="text-xs text-gray-400 tabular-nums w-10">{rate}%</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 w-16">Deviation</label>
+          <input
+            type="range"
+            min={-100}
+            max={200}
+            step={10}
+            value={magnitude}
+            disabled={enabled}
+            onChange={(e) => setMagnitude(Number(e.target.value))}
+            className="w-28 accent-rose-400 disabled:opacity-50"
+          />
+          <span className="text-xs text-gray-400 tabular-nums w-10">{magnitude > 0 ? '+' : ''}{magnitude}%</span>
+        </div>
+
+        {enabled ? (
+          <button
+            onClick={() => onClearGate(deviceType.type)}
+            disabled={gateLoading}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+          >
+            {gateLoading ? '…' : '■ Stop Fault'}
+          </button>
+        ) : (
+          <button
+            onClick={() => onSetGate(deviceType.type, {
+              enabled: true,
+              rate: rate / 100,
+              magnitude: { type: 'percent', value: magnitude },
+            })}
+            disabled={gateLoading}
+            className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+          >
+            {gateLoading ? '…' : '▶ Inject Fault'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FleetCard() {
   const qc = useQueryClient();
-  const config = useConfig();
-  const term = config?.terminology ?? {};
-  const cat1 = term.iotCategory1 ?? 'Vehicles';
-  const cat2 = term.iotCategory2 ?? 'Buildings';
-  const cat3 = term.iotCategory3 ?? 'Machines';
-  const categoryLabel = { vehicle: cat1, building: cat2, machine: cat3 };
-  const pfx1 = term.iotIdPrefix1 ?? 'veh';
-  const pfx2 = term.iotIdPrefix2 ?? 'bldg';
-  const pfx3 = term.iotIdPrefix3 ?? 'mach';
-
-  function displayDeviceId(deviceId) {
-    if (!deviceId) return deviceId;
-    if (deviceId.startsWith('veh-')) return pfx1 + deviceId.slice(3);
-    if (deviceId.startsWith('bldg-')) return pfx2 + deviceId.slice(4);
-    if (deviceId.startsWith('mach-')) return pfx3 + deviceId.slice(4);
-    return deviceId;
-  }
   const { data: fleetStatus, isLoading } = useQuery({
     queryKey: ['fleet-status'],
     queryFn: getFleetStatus,
     refetchInterval: 10_000,
   });
-  const { data: devicesData } = useQuery({
-    queryKey: ['devices'],
-    queryFn: getDevices,
-    refetchInterval: 15_000,
+  const { data: faultGatesData } = useQuery({
+    queryKey: ['iot-fault-gates'],
+    queryFn: getFaultGates,
+    refetchInterval: 10_000,
   });
-  const devices = Array.isArray(devicesData?.items)
-    ? devicesData.items
-    : Array.isArray(devicesData)
-    ? devicesData
-    : [];
 
-  const [vehicles, setVehicles] = useState(30);
-  const [buildings, setBuildings] = useState(15);
-  const [machines, setMachines] = useState(10);
-  const [resizeResult, setResizeResult] = useState(null);
-  const [resizeLoading, setResizeLoading] = useState(false);
+  const deviceTypes = Array.isArray(fleetStatus?.deviceTypes) ? fleetStatus.deviceTypes : [];
+  const gates = faultGatesData?.gates ?? {};
 
-  const [anomalyDeviceId, setAnomalyDeviceId] = useState('');
-  const [anomalyType, setAnomalyType] = useState('');
-  const [anomalyResult, setAnomalyResult] = useState(null);
-  const [anomalyLoading, setAnomalyLoading] = useState(false);
-  const [clearResult, setClearResult] = useState(null);
-  const [clearLoading, setClearLoading] = useState(false);
+  const [resizingType, setResizingType] = useState(null);
+  const [gateLoadingType, setGateLoadingType] = useState(null);
+  const [results, setResults] = useState({});
 
-  const selectedDevice = devices.find((d) => d.device_id === anomalyDeviceId) || null;
-  const typeOptions = ANOMALY_TYPES[selectedDevice?.category] || [];
-
-  function handleDeviceChange(id) {
-    setAnomalyDeviceId(id);
-    const dev = devices.find((d) => d.device_id === id);
-    const opts = ANOMALY_TYPES[dev?.category] || [];
-    setAnomalyType(opts.length ? opts[0].value : '');
-  }
-
-  useEffect(() => {
-    if (fleetStatus) {
-      setVehicles(fleetStatus.vehicles ?? 30);
-      setBuildings(fleetStatus.buildings ?? 15);
-      setMachines(fleetStatus.machines ?? 10);
-    }
-  }, [fleetStatus]);
-
-  async function handleResize() {
-    setResizeLoading(true);
-    setResizeResult(null);
+  async function handleResize(type, count) {
+    setResizingType(type);
+    setResults((r) => ({ ...r, [type]: null }));
     try {
-      await resizeFleet({ vehicles, buildings, machines });
-      setResizeResult({ ok: true });
+      await resizeFleetType(type, count);
+      setResults((r) => ({ ...r, [type]: { ok: true } }));
       qc.invalidateQueries({ queryKey: ['fleet-status'] });
     } catch (err) {
-      setResizeResult({ ok: false, error: err.response?.data?.message ?? err.message });
+      setResults((r) => ({ ...r, [type]: { ok: false, error: err.response?.data?.message ?? err.message } }));
     } finally {
-      setResizeLoading(false);
+      setResizingType(null);
     }
   }
 
-  async function handleInjectAnomaly() {
-    if (!selectedDevice || !anomalyType) return;
-    setAnomalyLoading(true);
-    setAnomalyResult(null);
+  async function handleSetGate(type, body) {
+    setGateLoadingType(type);
     try {
-      await injectAnomaly({
-        category: selectedDevice.category,
-        device_id: selectedDevice.device_id,
-        anomaly_type: anomalyType,
-      });
-      setAnomalyResult({ ok: true });
+      await setFaultGate(type, body);
+      qc.invalidateQueries({ queryKey: ['iot-fault-gates'] });
     } catch (err) {
-      setAnomalyResult({ ok: false, error: err.response?.data?.message ?? err.message });
+      setResults((r) => ({ ...r, [type]: { ok: false, error: err.response?.data?.message ?? err.message } }));
     } finally {
-      setAnomalyLoading(false);
+      setGateLoadingType(null);
     }
   }
 
-  async function handleClearAnomalies() {
-    setClearLoading(true);
-    setClearResult(null);
+  async function handleClearGate(type) {
+    setGateLoadingType(type);
     try {
-      await clearAnomalies();
-      setClearResult({ ok: true });
+      await clearFaultGate(type);
+      qc.invalidateQueries({ queryKey: ['iot-fault-gates'] });
     } catch (err) {
-      setClearResult({ ok: false, error: err.response?.data?.message ?? err.message });
+      setResults((r) => ({ ...r, [type]: { ok: false, error: err.response?.data?.message ?? err.message } }));
     } finally {
-      setClearLoading(false);
+      setGateLoadingType(null);
     }
-  }
-
-  function NumberInput({ label, value, setValue, min, max }) {
-    return (
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500">{label}</label>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setValue((v) => Math.max(min, v - 1))}
-            className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm transition-colors"
-          >
-            −
-          </button>
-          <input
-            type="number"
-            value={value}
-            min={min}
-            max={max}
-            onChange={(e) => setValue(Math.min(max, Math.max(min, Number(e.target.value))))}
-            className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm text-center focus:outline-none focus:border-cyan-500"
-          />
-          <button
-            onClick={() => setValue((v) => Math.min(max, v + 1))}
-            className="w-7 h-7 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm transition-colors"
-          >
-            +
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
     <SectionCard title="IoT Fleet Management">
-      {/* Current counts */}
-      {isLoading ? (
-        <p className="text-gray-500 text-sm">Loading fleet status…</p>
-      ) : (
-        <div className="flex gap-4 text-xs text-gray-400">
-          <span>Current: <span className="text-blue-400">{fleetStatus?.vehicles ?? '?'} {cat1}</span></span>
-          <span><span className="text-green-400">{fleetStatus?.buildings ?? '?'} {cat2}</span></span>
-          <span><span className="text-orange-400">{fleetStatus?.machines ?? '?'} {cat3}</span></span>
-        </div>
+      <p className="text-xs text-gray-500 -mt-1">
+        Resize any device type's population, or inject an ongoing probabilistic fault into a
+        type's metrics (pushes values outside their normal range so Dynatrace anomaly
+        detection has something real to react to).
+      </p>
+      {isLoading && <p className="text-gray-500 text-sm">Loading fleet status…</p>}
+      {!isLoading && deviceTypes.length === 0 && (
+        <p className="text-gray-500 text-sm">No device types configured for this industry.</p>
       )}
-
-      {/* Resize controls */}
-      <div className="flex flex-wrap items-end gap-4">
-        <NumberInput label={`${cat1} (1–100)`} value={vehicles} setValue={setVehicles} min={1} max={100} />
-        <NumberInput label={`${cat2} (1–50)`} value={buildings} setValue={setBuildings} min={1} max={50} />
-        <NumberInput label={`${cat3} (1–30)`} value={machines} setValue={setMachines} min={1} max={30} />
-        <button
-          onClick={handleResize}
-          disabled={resizeLoading}
-          className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
-        >
-          {resizeLoading ? '…' : 'Apply'}
-        </button>
-        <StatusMsg result={resizeResult} />
-      </div>
-
-      <hr className="border-gray-800" />
-
-      {/* Anomaly injection */}
-      <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Anomaly Injection
-        </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Device</label>
-            <select
-              value={anomalyDeviceId}
-              onChange={(e) => handleDeviceChange(e.target.value)}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm w-44 focus:outline-none focus:border-cyan-500"
-            >
-              <option value="">Select a device…</option>
-              {['vehicle', 'building', 'machine'].map((cat) => {
-                const inCat = devices.filter((d) => d.category === cat);
-                if (inCat.length === 0) return null;
-                return (
-                  <optgroup key={cat} label={categoryLabel[cat] ?? cat}>
-                    {inCat.map((d) => (
-                      <option key={d.device_id} value={d.device_id}>
-                        {displayDeviceId(d.device_id)}
-                        {d.status && d.status !== 'ok' ? ` — ${d.status}` : ''}
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </select>
+      <div className="space-y-3">
+        {deviceTypes.map((dt) => (
+          <div key={dt.type}>
+            <DeviceTypeRow
+              deviceType={dt}
+              gate={gates[dt.type]}
+              onResize={handleResize}
+              onSetGate={handleSetGate}
+              onClearGate={handleClearGate}
+              resizing={resizingType === dt.type}
+              gateLoading={gateLoadingType === dt.type}
+            />
+            <div className="mt-1"><StatusMsg result={results[dt.type]} /></div>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Anomaly Type</label>
-            <select
-              value={anomalyType}
-              onChange={(e) => setAnomalyType(e.target.value)}
-              disabled={!selectedDevice}
-              className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-cyan-500 disabled:opacity-50"
-            >
-              {typeOptions.length === 0 ? (
-                <option value="">Select a device first</option>
-              ) : (
-                typeOptions.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))
-              )}
-            </select>
-          </div>
-          <button
-            onClick={handleInjectAnomaly}
-            disabled={anomalyLoading || !selectedDevice || !anomalyType}
-            className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
-          >
-            {anomalyLoading ? '…' : 'Inject Anomaly'}
-          </button>
-          <StatusMsg result={anomalyResult} />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleClearAnomalies}
-          disabled={clearLoading}
-          className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
-        >
-          {clearLoading ? '…' : '🗑 Clear All Anomalies'}
-        </button>
-        <StatusMsg result={clearResult} />
+        ))}
       </div>
     </SectionCard>
   );
