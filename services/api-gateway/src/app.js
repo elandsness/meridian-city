@@ -13,6 +13,10 @@ const config = {
   JWT_SECRET: process.env.JWT_SECRET || 'meridian-demo-secret-change-me',
   AUTH_USERNAME: process.env.AUTH_USERNAME || 'demo',
   AUTH_PASSWORD: process.env.AUTH_PASSWORD || 'dynatrace',
+  // Lets an external demo-automation system call /api/v1/demo-control/* (scenario
+  // start/stop, traffic, fleet) with a stable header instead of the 8h operator JWT.
+  // Empty/unset disables the header entirely -- see routes/proxy.js's preHandler.
+  DEMO_API_KEY: process.env.DEMO_API_KEY || '',
   CITIZEN_SERVICE_URL: process.env.CITIZEN_SERVICE_URL || 'http://localhost:8081',
   SERVICE_DISPATCH_URL: process.env.SERVICE_DISPATCH_URL || 'http://localhost:8082',
   CITY_OPERATIONS_URL: process.env.CITY_OPERATIONS_URL || 'http://localhost:8083',

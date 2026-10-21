@@ -827,6 +827,12 @@ llm:
 auth:
   username: "demo"
   password: "dynatrace"
+  # Lets an external demo-automation system call the ops panel's scenario/trigger
+  # APIs (POST /api/v1/demo-control/scenarios/:id/start, etc. via api-gateway) with
+  # a stable `x-demo-api-key` header instead of logging in as the operator. Empty
+  # disables the header entirely (JWT-only, today's behavior). Set per-instance,
+  # e.g. `--set auth.demoApiKey=<generated-value>`, when wiring up external triggers.
+  demoApiKey: ""
 
 # ---------------------------------------------------------------------------
 # API Gateway (Node.js / Fastify)

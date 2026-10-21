@@ -67,6 +67,9 @@ class RouteResolver {
         target: config.DEMO_CONTROL_API_URL,
         serviceName: 'demo-control',
         requiresAuth: true,
+        // External demo-automation systems may send a stable x-demo-api-key header
+        // instead of logging in as the operator -- see the preHandler below.
+        allowApiKey: true,
         rewritePrefix: '/api/v1',
       },
       {
@@ -151,9 +154,12 @@ async function proxyRoutes (fastify, opts) {
     preHandler: async (request, reply) => {
       const path = request.url.split('?')[0]
       const route = resolver.resolve(path)
-      if (route && route.requiresAuth) {
-        return fastify.authenticateOps(request, reply)
+      if (!route || !route.requiresAuth) return
+
+      if (route.allowApiKey && config.DEMO_API_KEY && request.headers['x-demo-api-key'] === config.DEMO_API_KEY) {
+        return
       }
+      return fastify.authenticateOps(request, reply)
     },
     handler: async (request, reply) => {
       const rawUrl = request.url

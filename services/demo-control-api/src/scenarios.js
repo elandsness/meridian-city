@@ -19,13 +19,19 @@
  *   cascade-failure  — db-slowdown + llm-latency simultaneously (default manual)
  *
  * Business-process exceptions (gated error branches that make the Dynatrace Business
- * Flows show process failures + conversion drop-off; default off, default manual clear):
+ * Flows show process failures + conversion drop-off; default off, default manual clear).
+ * All target a named fault gate ({enabled, rate}) via a GET/POST
+ * /api/v1/admin/fault-gates/{name} endpoint — entity-engine's for entity-config-driven
+ * types, journey-service's identical endpoint for its own journey-shaped types (see
+ * journey-service's FaultGateRegistry/JourneyLifecycleScheduler):
  *   request-failures      — customer-entity-service: fault-gate service-request-rejected
  *   account-failures      — customer-entity-service: fault-gates account-verification-failed + account-activation-failed
  *   incident-escalations  — ops-entity-service: fault-gate work-order-escalated
  *   checkout-declines     — customer-entity-service: fault-gates checkout-payment-declined + order-delivery-failed
  *   tax-payment-failures  — customer-entity-service: fault-gate tax-payment-failed
- *   business-exceptions   — all five of the above at once (umbrella)
+ *   flight-cancellations  — journey-service: fault-gate flight.boarding.cancelled
+ *   passenger-offloads    — journey-service: fault-gate passenger.security_cleared.offloaded
+ *   business-exceptions   — all of the above at once (umbrella)
  */
 
 const config = require('./config')
@@ -149,18 +155,14 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
         enabled: true, rate,
       })
-      state.setFault('customer-entity-service', { 'service-request-rejected': { enabled: true, rate } })
-      return r
     },
     async reset () {
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
         enabled: false, rate: 0,
       })
-      state.setFault('customer-entity-service', { 'service-request-rejected': { enabled: false, rate: 0 } })
-      return r
     },
   },
 
@@ -172,21 +174,11 @@ const SCENARIOS = {
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
       await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-verification-failed`, { enabled: true, rate })
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: true, rate })
-      state.setFault('customer-entity-service', {
-        'account-verification-failed': { enabled: true, rate },
-        'account-activation-failed': { enabled: true, rate },
-      })
-      return r
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: true, rate })
     },
     async reset () {
       await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-verification-failed`, { enabled: false, rate: 0 })
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: false, rate: 0 })
-      state.setFault('customer-entity-service', {
-        'account-verification-failed': { enabled: false, rate: 0 },
-        'account-activation-failed': { enabled: false, rate: 0 },
-      })
-      return r
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: false, rate: 0 })
     },
   },
 
@@ -197,18 +189,14 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
+      return proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
         enabled: true, rate,
       })
-      state.setFault('ops-entity-service', { 'work-order-escalated': { enabled: true, rate } })
-      return r
     },
     async reset () {
-      const r = await proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
+      return proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
         enabled: false, rate: 0,
       })
-      state.setFault('ops-entity-service', { 'work-order-escalated': { enabled: false, rate: 0 } })
-      return r
     },
   },
 
@@ -220,21 +208,11 @@ const SCENARIOS = {
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
       await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/checkout-payment-declined`, { enabled: true, rate })
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: true, rate })
-      state.setFault('customer-entity-service', {
-        'checkout-payment-declined': { enabled: true, rate },
-        'order-delivery-failed': { enabled: true, rate },
-      })
-      return r
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: true, rate })
     },
     async reset () {
       await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/checkout-payment-declined`, { enabled: false, rate: 0 })
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: false, rate: 0 })
-      state.setFault('customer-entity-service', {
-        'checkout-payment-declined': { enabled: false, rate: 0 },
-        'order-delivery-failed': { enabled: false, rate: 0 },
-      })
-      return r
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: false, rate: 0 })
     },
   },
 
@@ -245,62 +223,50 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
         enabled: true, rate,
       })
-      state.setFault('customer-entity-service', { 'tax-payment-failed': { enabled: true, rate } })
-      return r
     },
     async reset () {
-      const r = await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
+      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
         enabled: false, rate: 0,
       })
-      state.setFault('customer-entity-service', { 'tax-payment-failed': { enabled: false, rate: 0 } })
-      return r
     },
   },
 
   'flight-cancellations': {
     name: 'Flight Cancellations',
-    description: 'Cancels a share of departing flights at boarding, so the Aircraft Turnaround flow shows a flight.cancelled error branch + drop-off at the Boarding step. Needs flight traffic (flight-ops).',
+    description: 'Cancels a share of departing flights at boarding, so the Aircraft Turnaround flow shows a flight.cancelled error branch + drop-off at the Boarding step. Needs flight traffic (journey-service).',
     clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.FLIGHT_OPS_URL}/admin/fault`, {
-        failures_enabled: true, failure_rate: rate,
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/flight.boarding.cancelled`, {
+        enabled: true, rate,
       })
-      state.setFault('flight-ops', { failures_enabled: true, failure_rate: rate })
-      return r
     },
     async reset () {
-      const r = await proxy.post(`${config.FLIGHT_OPS_URL}/admin/fault`, {
-        failures_enabled: false, failure_rate: 0,
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/flight.boarding.cancelled`, {
+        enabled: false, rate: 0,
       })
-      state.setFault('flight-ops', { failures_enabled: false, failure_rate: 0 })
-      return r
     },
   },
 
   'passenger-offloads': {
     name: 'Passenger Offloads',
-    description: 'Offloads a share of passengers at security, so the Passenger Journey flow shows a passenger.offloaded error branch + drop-off at the Security step. Needs passenger traffic (passenger-service).',
+    description: 'Offloads a share of passengers at security, so the Passenger Journey flow shows a passenger.offloaded error branch + drop-off at the Security step. Needs passenger traffic (journey-service).',
     clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      const r = await proxy.post(`${config.PASSENGER_SERVICE_URL}/admin/fault`, {
-        failures_enabled: true, failure_rate: rate,
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/passenger.security_cleared.offloaded`, {
+        enabled: true, rate,
       })
-      state.setFault('passenger-service', { failures_enabled: true, failure_rate: rate })
-      return r
     },
     async reset () {
-      const r = await proxy.post(`${config.PASSENGER_SERVICE_URL}/admin/fault`, {
-        failures_enabled: false, failure_rate: 0,
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/passenger.security_cleared.offloaded`, {
+        enabled: false, rate: 0,
       })
-      state.setFault('passenger-service', { failures_enabled: false, failure_rate: 0 })
-      return r
     },
   },
 
