@@ -1,7 +1,7 @@
 'use strict'
 
 const industryConfig = process.env.INDUSTRY_CONFIG ? JSON.parse(process.env.INDUSTRY_CONFIG) : {};
-const flows = industryConfig.analytics?.flows || [];
+const flows = industryConfig.dynatrace?.flows || [];
 
 module.exports = {
   PORT: parseInt(process.env.PORT || '8089', 10),

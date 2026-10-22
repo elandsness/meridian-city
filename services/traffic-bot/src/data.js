@@ -124,8 +124,22 @@ function generateServiceRequest(citizenId) {
   }
 }
 
-function randomChatQuestion() {
-  return randomItem(CHAT_QUESTIONS)
+function generateEntityBody(entityDef) {
+  const body = {}
+  const fields = entityDef.fields || {}
+  
+  for (const [name, def] of Object.entries(fields)) {
+    if (def.type === 'string') {
+      body[name] = `Gen-${Math.random().toString(36).substring(7)}`
+    } else if (def.type === 'number') {
+      body[name] = Math.floor(Math.random() * 100)
+    } else if (def.type === 'boolean') {
+      body[name] = Math.random() > 0.5
+    } else if (def.type === 'enum') {
+      body[name] = randomItem(def.values || ['default'])
+    }
+  }
+  return body
 }
 
-module.exports = { generateCitizen, generateServiceRequest, randomChatQuestion, ZONES, getPath, INDUSTRY_ID }
+module.exports = { generateCitizen, generateServiceRequest, randomChatQuestion, ZONES, getPath, INDUSTRY_ID, generateEntityBody }
