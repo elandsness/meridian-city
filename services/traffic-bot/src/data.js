@@ -8,16 +8,8 @@ try {
 }
 
 const INDUSTRY_ID = INDUSTRY_CONFIG.id || 'generic'
-
-const PATH_MAP = {
-  buildings: '/api/v1/city/buildings', 
-  assets: '/api/v1/assets',
-  incidents: '/api/v1/incidents',
-}
-
-const getPath = (key) => {
-  return PATH_MAP[key] || '/api/v1/unknown'
-}
+const PATH_MAP = { buildings: '/api/v1/city/buildings', assets: '/api/v1/assets', incidents: '/api/v1/incidents' }
+const getPath = (key) => PATH_MAP[key] || '/api/v1/unknown'
 
 let OVERRIDE = {}
 try {
@@ -27,30 +19,15 @@ try {
   OVERRIDE = {}
 }
 
-const pick = (key, fallback) =>
-  Array.isArray(OVERRIDE[key]) && OVERRIDE[key].length ? OVERRIDE[key] : fallback
-
-const FIRST_NAMES = pick('firstNames', [
-  'Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry',
-  'Iris', 'Jack', 'Karen', 'Leo', 'Maya', 'Noah', 'Olivia', 'Paul',
-  'Quinn', 'Rachel', 'Sam', 'Tara', 'Uma', 'Victor', 'Wendy', 'Xander',
-  'Yasmin', 'Zoe', 'Aaron', 'Brianna', 'Carlos', 'Diana',
-])
-
-const LAST_NAMES = pick('lastNames', [
-  'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller',
-  'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez',
-  'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin',
-  'Lee', 'Perez', 'Thompson', 'White', 'Harris',
-])
-
+const pick = (key, fallback) => Array.isArray(OVERRIDE[key]) && OVERRIDE[key].length ? OVERRIDE[key] : fallback
+const FIRST_NAMES = pick('firstNames', ['Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry','Iris', 'Jack', 'Karen', 'Leo', 'Maya', 'Noah', 'Olivia', 'Paul','Quinn', 'Rachel', 'Sam', 'Tara', 'Uma', 'Victor', 'Wendy', 'Xander','Yasmin', 'Zoe', 'Aaron', 'Brianna', 'Carlos', 'Diana'])
+const LAST_NAMES = pick('lastNames', ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller','Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez','Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin','Lee', 'Perez', 'Thompson', 'White', 'Harris'])
 const EMAIL_DOMAINS = pick('emailDomains', ['gmail.com', 'yahoo.com', 'outlook.com', 'meridianmail.com', 'generic-mail.org'])
 const ZONES = pick('zones', ['zone-north', 'zone-south', 'zone-east', 'zone-west', 'zone-central'])
-
 const REQUEST_TEMPLATES = pick('requestTemplates', [
   { category: 'infrastructure', title: 'Pothole on Main St',        description: 'Large pothole near the intersection of Main St and Oak Ave causing vehicle damage.' },
   { category: 'infrastructure', title: 'Broken sidewalk',           description: 'Cracked and raised sidewalk panel creating a trip hazard on Elm Street.' },
-  { category: 'infrastructure', title: 'Graffiti on bridge',        description: 'Graffiti has appeared on the underpass wall near Central Station.' },
+  { category: 'infrastructure', title: 'Graffiti on bridge',        description: 'Graffiti has appeared on the underpass wall in the city.' },
   { category: 'infrastructure', title: 'Damaged guardrail',         description: 'Guardrail on River Road bridge is bent and needs urgent repair.' },
   { category: 'environment',    title: 'Illegal dumping',           description: 'Debris and waste illegally dumped in the vacant lot on Maple Drive.' },
   { category: 'environment',    title: 'Fallen tree blocking path', description: 'Large fallen tree is blocking the bike path in Riverside Park.' },
@@ -64,82 +41,36 @@ const REQUEST_TEMPLATES = pick('requestTemplates', [
   { category: 'utilities',      title: 'Street drain blocked',      description: 'Drain on the corner of Ash Road is blocked causing flooding during rain.' },
   { category: 'transport',      title: 'Malfunctioning traffic light', description: 'Traffic lights at Oak St and Pine Ave are cycling incorrectly, causing congestion.' },
   { category: 'transport',      title: 'Missing road sign',         description: 'Stop sign at Birch Rd and Highway 9 has been knocked down.' },
-  { category: 'transport',      title: 'Bike lane obstruction',     description: 'Construction debris is blocking the bike lane on 2nd Avenue.' },
+  { category: 'transport',      title: 'Bike lane and obstruction',     description: 'Construction debris is blocking the bike lane on 2nd Avenue.' },
 ])
-
 const PRIORITIES = ['low', 'normal', 'normal', 'normal', 'high', 'urgent']
+const CHAT_QUESTIONS = pick('chatQuestions', ['Where do I report a broken streetlight?','How do I submit a service request for a pothole?','What are the current active incidents in the system?','How long does it take to resolve a service request?','Is there a water outage in the north zone?','How do I check the status of my service request?','What categories of service requests can I submit?','Are there any road closures today?','How do I contact the operator services and utilities department?','What should I do if I see a downed power line?','Is the recycling center open this weekend?','How do I report illegal dumping in my neighborhood?','Can I track my service request online?','Who do I contact about a noisy neighbor?','Is the park on Oak Avenue open during winter?','How do I apply for a street permit?','What happens after I submit a service request?','Can I attach photos to a service request?','Is there a water main break on Elm Street?','How do I report graffiti?'])
 
-const CHAT_QUESTIONS = pick('chatQuestions', [
-  'Where do I report a broken streetlight?',
-  'How do I submit a service request for a pothole?',
-  'What are the current active incidents in the system?',
-  'How long does it take to resolve a service request?',
-  'Is there a water outage in the north zone?',
-  'How do I check the status of my service request?',
-  'What categories of service requests can I submit?',
-  'Are there any road closures today?',
-  'How do I contact the operator services and utilities department?',
-  'What should I do if I see a downed power line?',
-  'Is the recycling center open this weekend?',
-  'How do I report illegal dumping in my neighborhood?',
-  'Can I track my service request online?',
-  'Who do I contact about a noisy neighbor?',
-  'Is the park on Oak Avenue open during winter?',
-  'How do I apply for a street permit?',
-  'What happens after I submit a service request?',
-  'Can I attach photos to a service request?',
-  'Is there a water main break on Elm Street?',
-  'How do I report graffiti?',
-])
-
-function randomItem(arr) {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min
-}
-
+function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)] }
+function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min }
 function generateCitizen() {
   const firstName = randomItem(FIRST_NAMES)
   const lastName  = randomItem(LAST_NAMES)
   const num       = randomInt(10, 999)
-  return {
-    first_name: firstName,
-    last_name:  lastName,
-    email:      `${firstName.toLowerCase()}.${lastName.toLowerCase()}${num}@${randomItem(EMAIL_DOMAINS)}`,
-    zone_id:    randomItem(ZONES),
-  }
+  return { first_name: firstName, last_name:  lastName, email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${num}@${randomItem(EMAIL_DOMAINS)}`, zone_id: randomItem(ZONES) }
 }
-
 function generateServiceRequest(citizenId) {
   const template = randomItem(REQUEST_TEMPLATES)
-  return {
-    citizen_id:  citizenId,
-    category:    template.category,
-    title:       template.title,
-    description: template.description,
-    zone_id:     randomItem(ZONES),
-    priority:    randomItem(PRIORITIES),
-  }
+  return { citizen_id:  citizenId, category:    template.category, title:       template.title, description: template.description, zone_id:     randomItem(ZONES), priority:    randomItem(PRIORITIES) }
 }
-
-function generateEntityBody(entityDef) {
-  const body = {}
-  const fields = entityDef.fields || {}
-  
-  for (const [name, def] of Object.entries(fields)) {
-    if (def.type === 'string') {
-      body[name] = `Gen-${Math.random().toString(36).substring(7)}`
-    } else if (def.type === 'number') {
-      body[name] = Math.floor(Math.random() * 100)
-    } else if (def.type === 'boolean') {
-      body[name] = Math.random() > 0.5
-    } else if (def.type === 'enum') {
-      body[name] = randomItem(def.values || ['default'])
-    }
+function randomChatQuestion() { return randomItem(CHAT_QUESTIONS) }
+function generateEntityBody(entityType, definition) {
+  const fields = definition.fields || {};
+  const body = {};
+  for (const [fieldName, fieldDef] of Object.entries(fields)) {
+    const type = fieldDef.type;
+    if (type === 'string') body[fieldName] = `Random ${fieldName} ${randomInt(100, 999)}`;
+    else if (type === 'number') body[fieldName] = randomInt(10, 1000);
+    else if (type === 'boolean') body[fieldName] = Math.random() > 0.5;
+    else if (type === 'enum') body[fieldName] = randomItem(fieldDef.values || ['default']);
+    else if (type === 'password') body[fieldName] = 'p@ssword123';
   }
-  return body
+  return body;
 }
 
 module.exports = { generateCitizen, generateServiceRequest, randomChatQuestion, ZONES, getPath, INDUSTRY_ID, generateEntityBody }

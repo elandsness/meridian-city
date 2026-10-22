@@ -2,6 +2,7 @@
 
 const axios = require('axios')
 const config = require('./config')
+const data = require('./data')
 
 const client = axios.create({
   baseURL: config.TARGET_URL,
@@ -9,30 +10,28 @@ const client = axios.create({
   validateStatus: (s) => s < 500,
 })
 
-/**
- * Executes a journey defined as a sequence of steps.
- * 
- * Step Shape: { method, path, body, query }
- */
-async function runGenericJourney(definition) {
-  const context = {}
+async function runGenericJourney(def) {
+  const { entityType, config: entityDef } = def
   
-  for (const stepDef of definition.steps) {
-    const step = typeof stepDef === 'function' ? stepDef(context) : stepDef
-    const path = typeof step.path === 'function' ? step.path(context) : step.path
-    const body = typeof step.body === 'function' ? step.body(context) : step.body
-    const query = typeof step.query === 'function' ? step.query(context) : step.query
+  const body = data.generateEntityBody(entityType, entityDef)
+  const spawnRes = await client.post(`/api/v1/entities/${entityType}`, body)
+  if (!spawnRes.data || !spawnRes.data.id) {
+    throw new Error(`Failed to spawn entity ${entityType}: ${JSON.stringify(spawnRes.data)}`)
+  }
+  const id = spawnRes.data.id
+  let currentState = entityDef.initial
 
-    const response = await client({
-      method: step.method || 'get',
-      url: path,
-      data: body,
-      params: query
-    })
+  while (true) {
+    const stateDef = entityDef.states?.[currentState]
+    if (!stateDef) break
+    if (stateDef.terminal) break
 
-    if (response.data) {
-      Object.assign(context, response.data)
-    }
+    const transition = (entityDef.transitions || []).find(t => t.from === currentState)
+    if (!transition) break
+
+    const nextState = transition.to
+    await client.post(`/api/v1/entities/${entityType}/${id}/actions/${nextState}`)
+    currentState = nextState
   }
 }
 
