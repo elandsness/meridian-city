@@ -274,78 +274,12 @@ def routing_entry(pipeline_object_id):
 # event carries a correlation id already surfaced by DQL_SCRIPT (request.id / citizen.id /
 # work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
 # auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
-FLOW_SPECS = [
-    {"key": "service-request", "name": "Service Request Lifecycle", 
-     "kpiLabel": "Resolved requests", "kpi": "service_request.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "service_request.resolved",
-     "steps": [("Submitted", "service_request.submitted"),
-               ("Validated", "service_request.validated", ["service_request.rejected"]),
-               ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
-               ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
-    {"key": "account-creation", "name": "Account Creation", 
-         "kpiLabel": "Activations", "kpi": "account.id", "kpiCalculation": "lastEvent",
-         "kpiEventName": "account.activated",
-         "steps": [("Registration started", "account.registration_started"),
-                   ("Details submitted", "account.details_submitted"),
-                   ("Verification sent", "account.verification_sent"),
-                   ("Verified", "account.verified", ["account.verification_failed"]),
-                   ("Activated", "account.activated", ["account.activation_failed"])]},
-    {"key": "identity-registration", "name": "Identity Registration", 
-     "kpiLabel": "Registered identities", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "citizen.registered",
-     "steps": [("Identity created", "citizen.registered")]},
-    # Event names below must match what EntityEventLogger.transitioned() actually
-    # emits for the generic entity engine's "incident"/"work_order" entity types:
-    # "<entity_type>.<state>", using the REAL state ids from industry.entities
-    # (incident: detecting/open/resolved -- there is no "created" state; work_order:
-    # created/assigned/acknowledged/resolved/escalated, entity type has an
-    # underscore so events are "work_order.*" not "workorder.*").
-    #
-    # The old "iot-incident" flow key (Anomaly detected -> Incident opened) was
-    # removed along with the IoT -> incident Kafka bridge: IoT problems are now
-    # observed directly in Dynatrace rather than routed into an internal incident.
-    # This "iot-work-order" flow is left as-is (it was already dormant -- not in
-    # DEFAULT_FLOW_KEYS -- since nothing creates incidents by default); it still
-    # works unchanged if incidents are ever created another way (e.g. a direct
-    # POST to ops-entity-service).
-{"key": "iot-work-order", "name": "IoT Work Order Lifecycle",
-     "kpiLabel": "Resolved Work Orders", "kpi": "work_order.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "work_order.resolved",
-     "steps": [("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
-               ("Work order acknowledged", "work_order.acknowledged"),
-               ("Work order resolved", "work_order.resolved", ["work_order.escalated"])]},
-    {"key": "purchase", "name": "City Store Purchase", 
-     "kpiLabel": "Revenue", "kpi": "order.total_cents", "kpiCalculation": "sum",
-     "kpiEventName": "checkout.completed",
-     "steps": [("Item added", "cart.item_added"),
-               ("Checkout completed", "checkout.completed", ["checkout.payment_declined"]),
-               ("Order packed", "order.packed"), ("Order shipped", "order.shipped"),
-               ("Order delivered", "order.delivered", ["order.delivery_failed"])]},
-    {"key": "tax-payment", "name": "Tax Payment", 
-     "kpiLabel": "Tax collected", "kpi": "bill.amount_cents", "kpiCalculation": "sum",
-     "kpiEventName": "tax.payment_completed",
-     "steps": [("Bill issued", "tax.bill_issued"),
-               ("Payment completed", "tax.payment_completed", ["tax.payment_failed"])]},
-    # Airport's "aircraft-turnaround"/"passenger-journey" flows used to live here,
-    # hand-written against event names ("flight.at_gate", "flight.servicing", ...)
-    # from a pre-entity-engine "flight-service" that no longer exists. Since
-    # flight_departure/flight_arrival/passenger are now real industry.entities
-    # (states: at_gate/boarding/taxiing/takeoff/departed and
-    # checked_in/security_cleared/gate_ready/boarded), derive_flow_specs_from_entity_config()
-    # below builds correct flows for them automatically -- entity type IS the flow
-    # key ("flight_departure", "passenger"), event names are "<entity_type>.<state>"
-    # (matching EntityEventLogger's real output), and a "servicing"/"bag_checked"/
-    # "bag_loaded" step can't silently go missing because it's generated from the
-    # same states/transitions the entities actually run, not copied by hand.
-    # values-airport.yaml's dynatrace.flows/analytics.flows select "flight_departure"
-    # and "passenger" (flowLabels renames them to "Aircraft Turnaround"/"Passenger
-    # Journey" for display) instead of these dead keys.
-]
+FLOW_SPECS = []
 
 # City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)
 # pass DT_FLOWS to select a different subset; provision()'s stale-flow cleanup removes any
 # of this instance's flows that drop out of the active set on an in-place upgrade.
-DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "identity-registration", "purchase", "tax-payment"]
+DEFAULT_FLOW_KEYS = []
 
 
 def _topo_walk(initial, states, transitions):
