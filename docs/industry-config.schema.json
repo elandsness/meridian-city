@@ -136,8 +136,12 @@
     },
     "entities": {
       "type": "object",
+      "description": "A value of null deletes that key from the merged map -- the standard Helm idiom for an industry overlay to remove a base entity type it doesn't use (e.g. a non-city industry nulling out citizen/bill/cart/incident/work_order).",
       "additionalProperties": {
-        "$ref": "#/definitions/entityType"
+        "anyOf": [
+          { "$ref": "#/definitions/entityType" },
+          { "type": "null" }
+        ]
       }
     },
     "iot": {

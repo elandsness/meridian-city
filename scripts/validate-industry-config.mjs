@@ -58,9 +58,14 @@ function checkYamlBooleanKeys(rawText) {
 function checkEntities(entities) {
   const errors = []
   if (!entities || typeof entities !== 'object') return errors
-  const entityIds = new Set(Object.keys(entities))
+  // A `null` entity value is the standard Helm idiom for "delete this key from
+  // the merged map" (e.g. an industry overlay removing a city-only entity it
+  // doesn't want) -- not an entity to validate. Checked here, not just filtered
+  // out of entityIds below, so every entities.* iteration skips it uniformly.
+  const entityIds = new Set(Object.keys(entities).filter((id) => entities[id] !== null))
 
   for (const [entityId, def] of Object.entries(entities)) {
+    if (def === null) continue
     const states = def.states ? Object.keys(def.states) : []
     const stateSet = new Set(states)
 
@@ -415,7 +420,7 @@ function checkScreens(cfg) {
   const billingScreenActive = publicScreenIds.has('billing')
 
   for (const [entityId, def] of Object.entries(cfg.entities ?? {})) {
-    if (!def.generator) continue
+    if (!def?.generator) continue
     if (def.generator.strategy === 'periodicHistoryBackfill' && billingScreenActive) continue
     if (!surfacedTypes.has(entityId)) {
       console.log(
