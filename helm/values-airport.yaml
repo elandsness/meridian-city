@@ -130,6 +130,22 @@ industry:
       - { id: "flight_arrival", correlationID: "flight_arrival.id" }
 
   entities:
+    # Helm deep-merges `industry.entities` across -f files with the chart's own
+    # values.yaml (the chart's default is the CITY industry, not an empty base) --
+    # an overlay that only adds its own keys still inherits every city entity it
+    # never asked for. Null out every city-only entity this industry doesn't use
+    # (a key set to null is deleted from the merged map, not just emptied) so
+    # entity-engine never generates/tracks city data (citizen signups, tax bills,
+    # store orders, city incidents/work orders) on a non-city deployment, and the
+    # Command Center only ever shows flows relevant to this industry.
+    # `service_request` is NOT nulled -- airport defines and wants its own version
+    # below, which already fully replaces (not merges with) the city one.
+    citizen: null
+    bill: null
+    cart: null
+    incident: null
+    work_order: null
+
     passenger:
       displayName: "Passenger"
       displayNamePlural: "Passengers"

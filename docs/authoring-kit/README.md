@@ -33,14 +33,15 @@ loop, and writes the final file to `helm/values-<industry>.yaml`.
 
 ### What the skill adds beyond the authoring prompt
 
-The skill wraps `AUTHORING_PROMPT.md` with three platform rules that the prompt doesn't
+The skill wraps `AUTHORING_PROMPT.md` with four platform rules that the prompt doesn't
 cover — gaps discovered from production deployments:
 
 | Rule | What it enforces |
 |------|-----------------|
-| **P1 — entity `domain`** | Every entity in `industry.entities` — base types included — needs a `domain: "customer"` or `domain: "ops"`, matched against the `customerEntityService`/`opsEntityService` deployment that should generate/transition it. Without it, neither deployment picks the entity up — it never gets created or advanced, so any screen for it stays empty forever. |
+| **P1 — entity `domain`** | Every entity in `industry.entities` you keep active needs a `domain: "customer"` or `domain: "ops"`, matched against the `customerEntityService`/`opsEntityService` deployment that should generate/transition it. Without it, neither deployment picks the entity up — it never gets created or advanced, so any screen for it stays empty forever. |
 | **P2 — IoT terminology** | If the industry has a device/asset fleet, all six keys should be present in `terminology`: `iotCategory1/2/3` and `iotIdPrefix1/2/3`. Without them Demo Control's fleet panel falls back to the Meridian City defaults ("Vehicles / Buildings / Machines"). (ops-dashboard has no IoT screen of its own — this only affects Demo Control's labels.) |
 | **P3 — iotZonePositions** | When a `status-map` screen uses `clusterBy: zone`, `terminology.iotZonePositions` must map each zone id to an `{x, y}` cluster center in the map's viewBox. Without it no dots render. |
+| **P8 — null out unused base entities** | The chart's `values.yaml` (city) is always the base layer under your overlay — it isn't replaced, it's merged with. `null` out every one of `citizen`/`bill`/`cart`/`incident`/`work_order` your industry doesn't reuse, or entity-engine keeps generating/tracking real city data (citizen signups, tax bills, store orders) underneath your industry, and the Command Center shows those irrelevant flows too. |
 
 The skill also maintains a quick-reference table of the 14 most common LLM generation
 mistakes (fabricated `serviceNames` keys, invalid `flows` ids, `routing:` nested inside
@@ -86,10 +87,10 @@ Gemini, or another assistant.
    (`values-custom.yaml` holds your cluster/tenant secrets; the industry file only
    overrides the `industry:` block. Both are passed together -- Helm merges them.)
 
-> **Manual pitfall:** the authoring prompt does not cover Rules P1–P3 above. If your
-> generated config produces empty entity screens, city-default fleet labels in Demo
-> Control, or a blank status-map, see the rule table in Option A and add the missing
-> pieces by hand.
+> **Manual pitfall:** the authoring prompt does not cover Rules P1–P3 or P8 above. If
+> your generated config produces empty entity screens, city-default fleet labels in
+> Demo Control, a blank status-map, or shows city flows (citizen/tax/store) you never
+> asked for, see the rule table in Option A and add the missing pieces by hand.
 
 ---
 

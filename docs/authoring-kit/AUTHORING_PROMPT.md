@@ -48,6 +48,40 @@ To ensure Dynatrace Business Flows work, every transition MUST map to a specific
 2. **Event Names:** Use a `type.state` pattern (e.g., `passenger.boarded`).
 3. **No Invention:** Do not invent arbitrary logs. The goal is to produce a signal stream that matches the "Gold Standard" for a business process.
 
+### ⚠️ THE BASE CONFIG YOU ARE OVERLAYING (MANDATORY READING)
+
+Your output YAML is NOT deployed alone. The platform always deploys its own
+built-in "city" config underneath yours (standard Helm chart behavior: the
+chart's default values are the base layer, your file is an overlay merged on
+top — not a replacement). That base config already defines six entity types:
+`citizen`, `service_request`, `bill`, `cart` (customer-facing) and `incident`,
+`work_order` (ops-facing).
+
+**If you don't explicitly remove the ones you're not using, they stay active
+underneath your industry** — the backend will keep generating and tracking
+real citizen signups, tax bills, and store orders for an industry that has
+nothing to do with any of that, and every dashboard will show those
+irrelevant flows mixed in with yours. This is not cosmetic — it is a real,
+previously-shipped bug.
+
+**Fix:** at the very top of your `entities:` block, explicitly delete every
+one of those six you are not reusing by setting it to YAML `null` (the
+standard idiom for removing a key from a merged map):
+
+```yaml
+entities:
+  citizen: null
+  bill: null
+  cart: null
+  incident: null
+  work_order: null
+  # (leave service_request out of this list if you intend to redefine it below —
+  #  a full redefinition replaces it; only entities you want GONE need null)
+```
+
+Only skip nulling an entity if your industry is genuinely reusing it as-is or
+redefining it with your own fields/states below.
+
 ### Entity type DSL
 ```yaml
 entities:
@@ -55,6 +89,7 @@ entities:
     displayName: "<Singular name>"
     displayNamePlural: "<Plural>"
     idPrefix: "<short prefix>"     # 2-6 lowercase letters (e.g. clm)
+    domain: customer|ops           # MANDATORY -- see below, no default
     fields:
       <field_name>:                # snake_case (e.g. claim_number)
         type: string|number|boolean|date|enum|ref
@@ -92,8 +127,17 @@ entities:
 1. **THE NORWAY PROBLEM:** Always quote `"y"` in waypoints (e.g., `"y": 280`). Unquoted `y` is read as boolean `true` and crashes the app.
 2. **ID HYGIENE:** `idPrefix` must be `[a-z][a-z0-9]*` (no hyphens).
 3. **AUTO-ADVANCE:** Every transition that is not `userTriggerable` MUST have a `timer` block, or the entity will stay stuck forever.
-4. **RESERVED NAMES:** `work_order` and `journey` are reserved. Do not redefine them.
+4. **RESERVED NAMES:** `work_order` and `journey` are reserved. Do not redefine them (you may still `null` out `work_order` if unused).
 5. **CORRELATION:** Ensure the `correlationId` in the signal block exactly matches a field name defined in the `fields` block.
+6. **`domain` IS MANDATORY, NOT OPTIONAL:** the backend runs as two separate
+   deployments, one that only processes entities with `domain: customer`, one
+   that only processes `domain: ops`. An entity with no `domain` is never
+   picked up by either one — it will never be created or advanced, no matter
+   how correctly everything else is written, and any screen for it will stay
+   empty forever. There is no default; you must set it on every single entity
+   you define. Customer-facing (something a customer/passenger/patient tracks
+   or sees) → `customer`. Ops-facing (something the operations team manages)
+   → `ops`.
 
 ---
 
@@ -122,6 +166,9 @@ Before outputting, verify:
 3. **Timer Check:** Do all auto-transitions have timers?
 4. **Y-Quoting:** Are all `"y"` keys quoted?
 5. **Routing Sync:** Does every key in `routing` exist in `terminology.requestCategories`?
+6. **Domain Completeness:** Does every entity you defined have a `domain: customer` or `domain: ops`?
+7. **Base Entity Cleanup:** Is every one of `citizen`/`bill`/`cart`/`incident`/`work_order`
+   that your industry does NOT reuse set to `null` at the top of `entities:`?
 
 ---
 

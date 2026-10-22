@@ -101,13 +101,58 @@ industry:
 - `domain: "ops"` — ops-facing entities (things the operations team manages):
   field repairs, gate assignments, crew jobs, maintenance tickets
 
-**The base types already need this too** — don't skip them just because they're
-inherited from the city example:
-- `domain: "customer"`: `citizen`, `service_request`, `bill`, `cart`
-- `domain: "ops"`: `incident`, `work_order`
+**The base city types already have `domain` set** (`citizen`/`service_request`/
+`bill`/`cart` → customer, `incident`/`work_order` → ops) in the chart's own
+`values.yaml` — you only need to set `domain` on types *you* define. But per
+Rule P8 below, you almost always want to `null` out the base types you don't
+reuse rather than leave them active with their city `domain`.
 
-Omitting `domain` on any entity type — base or custom — silently drops it from both
-deployments' scheduler/generator.
+Omitting `domain` on any entity type you DO keep (base or custom) silently
+drops it from both deployments' scheduler/generator.
+
+### Rule P8 — null out every base city entity your industry doesn't use
+
+The chart's own `values.yaml` is always the base layer underneath your overlay
+(standard Helm behavior) — it already defines `citizen`, `service_request`,
+`bill`, `cart`, `incident`, `work_order`. Your `values-<industry>.yaml` adding
+its own entities does **not** replace that base map, it merges with it. Leave
+even one of those keys un-nulled and your industry silently runs the city's
+entity model alongside your own: entity-engine generates/tracks real citizen
+signups, tax bills, and store orders for an industry that has nothing to do
+with any of that, and the ops Command Center shows those irrelevant flows too.
+
+For every base entity your industry isn't reusing, set it to `null` (the
+standard Helm idiom for "delete this key from the merged map") at the top of
+your `entities:` block:
+
+```yaml
+industry:
+  entities:
+    citizen: null
+    bill: null
+    cart: null
+    incident: null
+    work_order: null
+    # ... then your industry's own entities below
+```
+
+If you DO want one of the base entities (e.g. a retail industry keeping
+`cart`), just don't null it — leave it as-is or redefine it with your own
+fields/states, same as `service_request` in the airport example (a full
+redefinition replaces that key's contents entirely; it doesn't need nulling
+first).
+
+**Verify, don't assume**: the local validator (Step 5) reads your overlay file
+in isolation, so it can't catch a city entity you forgot to null — it never
+sees the merge. Confirm with the real Helm-rendered output instead:
+
+```bash
+helm template meridian helm/ -f helm/values-<industry>.yaml \
+  --show-only templates/entity-config-configmap.yaml \
+  | python3 -c "import sys,yaml,json; print(sorted(json.loads(yaml.safe_load(sys.stdin)['data']['entity-config.json']).keys()))"
+```
+
+Every key printed should be one your industry actually uses.
 
 ### Rule P2 — IoT terminology is required when the industry has a device/asset fleet
 
@@ -286,12 +331,15 @@ the authoring prompt but consistently fail the validator or break the live demo:
 - [ ] It has 6-8 generated, industry-flavored, light/funny headlines — not copied
       from another industry's config, not generic placeholder text.
 
-### Checklist D — Platform supplements (Rules P1–P3 above)
+### Checklist D — Platform supplements (Rules P1–P3, P8 above)
 
 - [ ] Every entity in `industry.entities` has a `domain` of `"customer"` or `"ops"` —
-      including the base types (`citizen`/`service_request`/`bill`/`cart` → customer,
-      `incident`/`work_order` → ops) if you kept them.
+      including any base types (`citizen`/`service_request`/`bill`/`cart` → customer,
+      `incident`/`work_order` → ops) you kept.
 - [ ] `entities.journey` (if present) has no `domain` — not owned by the entity engine.
+- [ ] Every base city entity (`citizen`/`bill`/`cart`/`incident`/`work_order`) your
+      industry does NOT reuse is set to `null` in `entities:`. Confirmed with the
+      `helm template` command in Rule P8, not just by eyeballing the overlay file.
 - [ ] If the industry has a device/asset fleet: `iotCategory1/2/3` and `iotIdPrefix1/2/3` in `terminology`.
 - [ ] If `status-map` with `clusterBy: zone`: `iotZonePositions` in `terminology`.
 
@@ -374,6 +422,7 @@ and Claude itself when generating industry configs. Read this list before writin
 | Transition with only `when: { probability }`, no `timer` | Add `timer:` — `when` is a filter, not a trigger |
 | Unquoted `y:` in waypoints | Always write `"y": 280` |
 | Entity missing `domain` | Add `domain: "customer"` or `domain: "ops"` right after `idPrefix` — including base types |
+| City's `citizen`/`bill`/`cart`/`incident`/`work_order` left active in a non-city industry | `null` out every one you don't reuse — the chart's base `values.yaml` merges in underneath your overlay, it doesn't get replaced |
 | `status-map clusterBy: zone` with no `iotZonePositions` | Add `iotZonePositions` to terminology with zone → {x,y} centers |
 | Missing `iotCategory1/2/3` + `iotIdPrefix1/2/3` | Add all six keys to terminology when the industry has a device/asset fleet |
 | `billing` screen without `billingTitle/Subtitle/billNoun` | Always include all three when billing is active |
