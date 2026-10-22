@@ -274,4 +274,453 @@ def routing_entry(pipeline_object_id):
 # event carries a correlation id already surfaced by DQL_SCRIPT (request.id / citizen.id /
 # work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
 # auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
-FLOW_SPECS = []
+FLOW_SPECS = []),
+               ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
+               ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
+    {"key": "account-creation", "name": "Account Creation", 
+         "kpiLabel": "Activations", "kpi": "account.id", "kpiCalculation": "lastEvent",
+         "kpiEventName": "account.activated",
+         "steps": [("Registration started", "account.registration_started"),
+                   ("Details submitted", "account.details_submitted"),
+                   ("Verification sent", "account.verification_sent"),
+                   ("Verified", "account.verified", ["account.verification_failed"]),
+                   ("Activated", "account.activated", ["account.activation_failed"])]},
+    {"key": "identity-registration", "name": "Identity Registration", 
+     "kpiLabel": "Registered identities", "kpi": "citizen.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "citizen.registered",
+     "steps": [("Identity created", "citizen.registered")]},
+    # Event names below must match what EntityEventLogger.transitioned() actually
+    # emits for the generic entity engine's "incident"/"work_order" entity types:
+    # "<entity_type>.<state>", using the REAL state ids from industry.entities
+    # (incident: detecting/open/resolved -- there is no "created" state; work_order:
+    # created/assigned/acknowledged/resolved/escalated, entity type has an
+    # underscore so events are "work_order.*" not "workorder.*").
+    #
+    # The old "iot-incident" flow key (Anomaly detected -> Incident opened) was
+    # removed along with the IoT -> incident Kafka bridge: IoT problems are now
+    # observed directly in Dynatrace rather than routed into an internal incident.
+    # This "iot-work-order" flow is left as-is (it was already dormant -- not in
+    # DEFAULT_FLOW_KEYS -- since nothing creates incidents by default); it still
+    # works unchanged if incidents are ever created another way (e.g. a direct
+    # POST to ops-entity-service).
+{"key": "iot-work-order", "name": "IoT Work Order Lifecycle",
+     "kpiLabel": "Resolved Work Orders", "kpi": "work_order.id", "kpiCalculation": "lastEvent",
+     "kpiEventName": "work_order.resolved",
+     "steps": [("Work order created", "work_order.created"), ("Work order assigned", "work_order.assigned"),
+               ("Work order acknowledged", "work_order.acknowledged"),
+               ("Work order resolved", "work_order.resolved", ["work_order.escalated"])]},
+    {"key": "purchase", "name": "City Store Purchase", 
+     "kpiLabel": "Revenue", "kpi": "order.total_cents", "kpiCalculation": "sum",
+     "kpiEventName": "checkout.completed",
+     "steps": [("Item added", "cart.item_added"),
+               ("Checkout completed", "checkout.completed", ["checkout.payment_declined"]),
+               ("Order packed", "order.packed"), ("Order shipped", "order.shipped"),
+               ("Order delivered", "order.delivered", ["order.delivery_failed"])]},
+    {"key": "tax-payment", "name": "Tax Payment", 
+     "kpiLabel": "Tax collected", "kpi": "bill.amount_cents", "kpiCalculation": "sum",
+     "kpiEventName": "tax.payment_completed",
+     "steps": [("Bill issued", "tax.bill_issued"),
+               ("Payment completed", "tax.payment_completed", ["tax.payment_failed"])]},
+    # Airport's "aircraft-turnaround"/"passenger-journey" flows used to live here,
+    # hand-written against event names ("flight.at_gate", "flight.servicing", ...)
+    # from a pre-entity-engine "flight-service" that no longer exists. Since
+    # flight_departure/flight_arrival/passenger are now real industry.entities
+    # (states: at_gate/boarding/taxiing/takeoff/departed and
+    # checked_in/security_cleared/gate_ready/boarded), derive_flow_specs_from_entity_config()
+    # below builds correct flows for them automatically -- entity type IS the flow
+    # key ("flight_departure", "passenger"), event names are "<entity_type>.<state>"
+    # (matching EntityEventLogger's real output), and a "servicing"/"bag_checked"/
+    # "bag_loaded" step can't silently go missing because it's generated from the
+    # same states/transitions the entities actually run, not copied by hand.
+    # values-airport.yaml's dynatrace.flows/analytics.flows select "flight_departure"
+    # and "passenger" (flowLabels renames them to "Aircraft Turnaround"/"Passenger
+    # Journey" for display) instead of these dead keys.
+]
+
+# City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)
+# pass DT_FLOWS to select a different subset; provision()'s stale-flow cleanup removes any
+# of this instance's flows that drop out of the active set on an in-place upgrade.
+DEFAULT_FLOW_KEYS = []
+
+
+def _topo_walk(initial, states, transitions):
+    """Reachable non-error states from `initial`, in first-visited order (BFS
+    over declared transitions) -- the flow's step order. Error states are
+    walked (so unreachable-from-error branches still get visited) but excluded
+    from the returned step list; they're attached to their predecessor step
+    instead (see _error_events_from).
+
+    States marked externallyTriggered:true are appended after the BFS result:
+    they are reachable but via a cross-entity effect (e.g. a work_order cascade
+    driving its parent incident to "resolved"), so no transition declares them
+    as a target within this entity type's own graph."""
+    adjacency = {}
+    for t in transitions:
+        adjacency.setdefault(t.get("from"), []).append(t.get("to"))
+    visited, seen, queue = [], set(), [initial]
+    while queue:
+        current = queue.pop(0)
+        if current in seen or current not in states:
+            continue
+        seen.add(current)
+        if not states[current].get("isError"):
+            visited.append(current)
+        queue.extend(adjacency.get(current, []))
+    # Append externallyTriggered states in declaration order (they're terminal
+    # success/kpi steps that close the flow but have no incoming local transition).
+    for state_id, state_def in states.items():
+        if state_def.get("externallyTriggered") and state_id not in seen and not state_def.get("isError"):
+            visited.append(state_id)
+    return visited
+
+
+def _error_events_from(state_id, entity_type, states, transitions):
+    return ["%s.%s" % (entity_type, t["to"]) for t in transitions
+            if t.get("from") == state_id and states.get(t["to"], {}).get("isError")]
+
+
+def derive_flow_specs_from_entity_config():
+    """One Business Flow spec per entity type in DT_ENTITY_CONFIG, structurally
+    identical in shape to a hand-written FLOW_SPECS entry -- states/transitions/
+    isKpi/isError fully describe a flow's steps/correlation/KPI, so nothing here
+    is entity-type-specific. Skips any entity type with no `states`/`initial`
+    (nothing to build a flow from)."""
+    specs = []
+    for entity_type, definition in sorted(ENTITY_CONFIG.items()):
+        states = definition.get("states") or {}
+        transitions = definition.get("transitions") or []
+        initial = definition.get("initial")
+        if not states or not initial or initial not in states:
+            continue
+        ordered = _topo_walk(initial, states, transitions)
+        if not ordered:
+            continue
+
+        # Use the LAST isKpi state (the terminal success step) as the flow
+        # endpoint, not the first. The first isKpi state may be an intermediate
+        # waypoint (e.g. service_request.in_progress, bill.outstanding, cart.placed)
+        # whereas the flow's KPI metric should track completion.
+        kpi_candidates = [s for s in ordered if states[s].get("isKpi")]
+        kpi_state = kpi_candidates[-1] if kpi_candidates else ordered[-1]
+
+        # Non-terminal states are always waypoints (sequential steps on the path to
+        # completion). Terminal non-kpi states (abandoned, verified_only, ...) are
+        # silent dropout points -- visible as drop-off in the funnel but not listed
+        # as a step in their own right. The kpi_state is always included regardless.
+        #
+        # The old "has_outgoing" proxy is insufficient for externallyTriggered states
+        # (e.g. incident.open has no outgoing transition in its own config but IS a
+        # real intermediate waypoint resolved by a cross-entity effect).
+        steps = []
+        for state_id in ordered:
+            is_non_terminal = not states[state_id].get("terminal")
+            if not is_non_terminal and state_id != kpi_state:
+                continue
+            label = states[state_id].get("label", state_id)
+            event_type = "%s.%s" % (entity_type, state_id)
+            errors = _error_events_from(state_id, entity_type, states, transitions)
+            steps.append((label, event_type, errors) if errors else (label, event_type))
+
+        if not steps:
+            continue
+
+        display_name = definition.get("displayName", entity_type)
+
+        # If the kpi_state declares a kpiField, aggregate it as a sum KPI
+        # (e.g. bill.amount_cents, cart.total_cents). Otherwise count completions.
+        kpi_field = states[kpi_state].get("kpiField")
+        if kpi_field:
+            kpi = "%s.%s" % (entity_type, kpi_field)
+            kpi_calc = "sum"
+            kpi_label = "%s total" % display_name
+        else:
+            kpi = "%s.id" % entity_type
+            kpi_calc = "lastEvent"
+            kpi_label = "%s completed" % display_name
+
+        specs.append({
+            "key": entity_type,
+            "name": display_name,
+            "correlationID": "%s.id" % entity_type,
+            "kpiLabel": kpi_label,
+            "kpi": kpi,
+            "kpiCalculation": kpi_calc,
+            "kpiEventName": "%s.%s" % (entity_type, kpi_state),
+            "steps": steps,
+        })
+    return specs
+
+
+# DT_FLOWS (FLOW_KEYS_OR_SPECS) supports two formats:
+#   1. Array of flow keys (backward compatible): ["service-request", "account-creation"]
+#   2. Array of full flow definitions: [{key, name, correlationID, ...steps, ...}]
+# Format 2 lets a new industry define fully custom flows (steps/correlation/KPI)
+# with zero code changes, alongside the legacy hand-written flows and every
+# flow auto-derived from DT_ENTITY_CONFIG below.
+def _flow_keys_from_env():
+    if not FLOW_KEYS_OR_SPECS:
+        return None
+    first = FLOW_KEYS_OR_SPECS[0]
+    if isinstance(first, dict) and "id" in first:
+        return [s["id"] for s in FLOW_KEYS_OR_SPECS]
+    return FLOW_KEYS_OR_SPECS
+
+
+def _custom_flow_specs_from_env():
+    if FLOW_KEYS_OR_SPECS and isinstance(FLOW_KEYS_OR_SPECS[0], dict) and "key" in FLOW_KEYS_OR_SPECS[0]:
+        return FLOW_KEYS_OR_SPECS
+    return []
+
+
+_ACTIVE_KEYS = _flow_keys_from_env()
+
+# Legacy hand-written flows (subset selected the existing way), every derived
+# entity-type flow, and any fully custom flow specs passed via DT_FLOWS --
+# unioned. A derived flow is active when DT_FLOWS is unset (a synthetic/new
+# industry has no legacy default list to fall back to) or when its entity-type
+# key is explicitly listed in DT_FLOWS (so a mixed deployment -- some legacy
+# flows, some entity-config-derived ones, some fully custom -- can select
+# precisely).
+DERIVED_FLOW_SPECS = derive_flow_specs_from_entity_config()
+_LEGACY_ACTIVE = []
+for s in FLOW_SPECS:
+    if s["key"] in (_ACTIVE_KEYS or DEFAULT_FLOW_KEYS):
+        spec = s.copy()
+        if isinstance(FLOW_KEYS_OR_SPECS, list):
+            override = next((o for o in FLOW_KEYS_OR_SPECS if isinstance(o, dict) and o.get("id") == s["key"]), None)
+            if override and "correlationID" in override:
+                spec["correlationID"] = override["correlationID"]
+        _LEGACY_ACTIVE.append(spec)
+
+_DERIVED_ACTIVE = []
+for s in DERIVED_FLOW_SPECS:
+    if not _ACTIVE_KEYS or s["key"] in _ACTIVE_KEYS:
+        spec = s.copy()
+        if isinstance(FLOW_KEYS_OR_SPECS, list):
+            override = next((o for o in FLOW_KEYS_OR_SPECS if isinstance(o, dict) and o.get("id") == s["key"]), None)
+            if override and "correlationID" in override:
+                spec["correlationID"] = override["correlationID"]
+        _DERIVED_ACTIVE.append(spec)
+
+_CUSTOM_ACTIVE = _custom_flow_specs_from_env()
+ACTIVE_FLOW_SPECS = _LEGACY_ACTIVE + _DERIVED_ACTIVE + _CUSTOM_ACTIVE
+
+
+def _event(event_type, is_error=False):
+    return {"id": "provider:%s-event:%s" % (PROVIDER, event_type), "name": event_type,
+            "provider": PROVIDER, "isError": is_error, "isDisabled": False}
+
+
+def flow_value(spec):
+    steps, ids = [], []
+    for i, step_spec in enumerate(spec["steps"]):
+        name, event_type = step_spec[0], step_spec[1]
+        error_types = step_spec[2] if len(step_spec) > 2 else []
+        sid = str(uuid.uuid5(_NS, _SEED_PREFIX + spec["key"] + "/" + name))
+        ids.append(sid)
+        events = [_event(event_type)] + [_event(et, is_error=True) for et in error_types]
+        step = {"name": name, "id": sid, "events": events}
+        if i == 0:
+            step["isRoot"] = True
+        steps.append(step)
+    connections = [{"id": "%s__%s" % (a, b), "source": a, "target": b}
+                   for a, b in zip(ids, ids[1:])]
+    return {
+        "name": FLOW_TITLE_PREFIX + FLOW_LABELS.get(spec["key"], spec["name"]), "version": 1, "steps": steps, "connections": connections,
+        "correlationID": spec["correlationID"], "analysisType": "conversion",
+        "analysisCustomLabel": "Conversions", "isSmartscapeTopologyEnabled": False,
+        "isDefaultQueryLimitIgnored": False, "kpiLabel": spec["kpiLabel"],
+        "kpi": spec["kpi"], "kpiCalculation": spec["kpiCalculation"],
+        "kpiEvent": {"name": spec["kpiEventName"], "provider": PROVIDER},
+    }
+
+
+# --------------------------------------------------------------------------- #
+# 3. Service naming rules (Path A) — rename the service map per industry, each rule
+#    scoped to THIS instance's namespace + deployment so other tenants' services on
+#    the shared environment are never affected. Applies to OneAgent-detected services;
+#    OTel services are renamed via OTEL_SERVICE_NAME instead. Resilient: any failure
+#    warns and continues (the schema payload is tenant-verified at deploy) so it can
+#    never abort the pipeline/routing/flows provisioned above.
+# --------------------------------------------------------------------------- #
+def _naming_rule_value(deployment, display_name):
+    return {
+        "enabled": True,
+        "nameFormat": display_name,
+        "rules": [{
+            "conditions": [
+                {"attribute": "k8s.namespace.name",
+                 "comparisonInfo": {"type": "EQUALS", "value": NAMESPACE}},
+                {"attribute": "k8s.deployment.name",
+                 "comparisonInfo": {"type": "EQUALS", "value": deployment}},
+            ],
+        }],
+    }
+
+
+def _rule_targets(value, deployment=None):
+    """True if the object has a rule scoped to our namespace (and deployment, if given)."""
+    for rule in value.get("rules", []):
+        conds = rule.get("conditions", [])
+        ns_ok = any(c.get("attribute") == "k8s.namespace.name"
+                    and c.get("comparisonInfo", {}).get("value") == NAMESPACE for c in conds)
+        if not ns_ok:
+            continue
+        if deployment is None:
+            return True
+        if any(c.get("attribute") == "k8s.deployment.name"
+               and c.get("comparisonInfo", {}).get("value") == deployment for c in conds):
+            return True
+    return False
+
+
+def _list_naming():
+    status, body = api("GET",
+                       "/objects?schemaIds=%s&fields=objectId,value&pageSize=500" % NAMING_SCHEMA)
+    if status != 200:
+        raise RuntimeError("list %s -> %s %s" % (NAMING_SCHEMA, status, body))
+    return body.get("items", [])
+
+
+def provision_service_names():
+    if not SERVICE_NAMES:
+        return
+    print("- Service naming rules (%d, namespace-scoped)" % len(SERVICE_NAMES))
+    try:
+        existing = _list_naming()
+    except Exception as e:
+        print("  WARN: cannot list naming rules (%s) — skipping" % e)
+        return
+    for deployment, display_name in SERVICE_NAMES.items():
+        try:
+            match = next((o for o in existing if _rule_targets(o["value"], deployment)), None)
+            value = _naming_rule_value(deployment, display_name)
+            if match:
+                st, bd = api("PUT", "/objects/" + match["objectId"], {"value": value})
+                act, oid = "updated", match["objectId"]
+            else:
+                st, bd = api("POST", "/objects",
+                             [{"schemaId": NAMING_SCHEMA, "scope": "environment", "value": value}])
+                act = "created"
+                oid = bd[0]["objectId"] if isinstance(bd, list) and bd and "objectId" in bd[0] else None
+            if st in (200, 201):
+                print("  %s: %s -> %r" % (act, deployment, display_name))
+            else:
+                print("  WARN: naming rule for %s failed: %s %s" % (deployment, st, bd))
+        except Exception as e:
+            print("  WARN: naming rule for %s errored: %s" % (deployment, e))
+
+
+def deprovision_service_names():
+    print("- Service naming rules (remove this namespace's)")
+    try:
+        objs = _list_naming()
+    except Exception as e:
+        print("  WARN: cannot list naming rules (%s) — skipping" % e)
+        return
+    for o in objs:
+        if _rule_targets(o["value"]):
+            try:
+                api("DELETE", "/objects/" + o["objectId"])
+                print("  deleted naming rule -> %s" % o["objectId"])
+            except Exception as e:
+                print("  WARN: delete naming rule %s failed: %s" % (o["objectId"], e))
+
+
+# --------------------------------------------------------------------------- #
+def provision():
+    print("Provisioning Meridian business observability "
+          "(instance=%s, provider=%s, namespace=%s)" % (HASH or "(legacy)", PROVIDER, NAMESPACE))
+
+    print("- OpenPipeline extraction pipeline")
+    pipe_oid = upsert(PIPELINE_SCHEMA, pipeline_value(),
+                      lambda v: v.get("customId") == PIPE_CUSTOM_ID)
+
+    print("- Logs routing entry (merge into shared object)")
+    routing = list_objects(ROUTING_SCHEMA)
+    if not routing:
+        sys.exit("FATAL: no %s object found" % ROUTING_SCHEMA)
+    robj = routing[0]
+    rvalue = robj["value"]
+    # Key this instance's entry by its (per-instance) pipeline name so concurrent
+    # instances each own exactly one entry.
+    entries = [e for e in rvalue.get("routingEntries", []) if e.get("description") != PIPE_NAME]
+    entries.append(routing_entry(pipe_oid))
+    rvalue["routingEntries"] = entries
+    status, body = api("PUT", "/objects/" + robj["objectId"], {"value": rvalue})
+    if status != 200:
+        sys.exit("FATAL: routing PUT failed: %s %s" % (status, body))
+    print("  merged routing entry -> %s (%d total)" % (robj["objectId"], len(entries)))
+
+    print("- Business Flows")
+    wanted_names = set()
+    for spec in ACTIVE_FLOW_SPECS:
+        value = flow_value(spec)
+        wanted_names.add(value["name"])
+        upsert(FLOW_SCHEMA, value, lambda v, name=value["name"]: v.get("name") == name)
+    # Clean up this instance's stale flows whose label changed (e.g. City -> Airport
+    # on an in-place upgrade) so relabeling never leaves duplicates behind.
+    for o in list_objects(FLOW_SCHEMA):
+        nm = o["value"].get("name", "")
+        if nm.startswith(FLOW_TITLE_PREFIX) and nm not in wanted_names:
+            delete_object(FLOW_SCHEMA, o["objectId"])
+
+    provision_service_names()
+
+    print("Done.")
+
+
+def deprovision():
+    """Remove ONLY this instance's objects; leave other instances' intact."""
+    print("Deprovisioning Meridian business observability "
+          "(instance=%s, provider=%s, namespace=%s)" % (HASH or "(legacy)", PROVIDER, NAMESPACE))
+
+    # 1. Drop this instance's routing entry from the shared routing object first
+    #    (so it stops referencing the pipeline we are about to delete). Never delete
+    #    the shared routing object itself — other instances have entries in it.
+    print("- Logs routing entry (remove from shared object)")
+    routing = list_objects(ROUTING_SCHEMA)
+    if routing:
+        robj = routing[0]
+        rvalue = robj["value"]
+        before = rvalue.get("routingEntries", [])
+        entries = [e for e in before if e.get("description") != PIPE_NAME]
+        if len(entries) != len(before):
+            rvalue["routingEntries"] = entries
+            status, body = api("PUT", "/objects/" + robj["objectId"], {"value": rvalue})
+            if status != 200:
+                sys.exit("FATAL: routing PUT failed: %s %s" % (status, body))
+            print("  removed routing entry -> %s (%d remain)" % (robj["objectId"], len(entries)))
+        else:
+            print("  no routing entry for this instance (already removed)")
+
+    # 2. Delete this instance's OpenPipeline pipeline (matched by per-instance customId).
+    print("- OpenPipeline extraction pipeline")
+    for o in list_objects(PIPELINE_SCHEMA):
+        if o["value"].get("customId") == PIPE_CUSTOM_ID:
+            delete_object(PIPELINE_SCHEMA, o["objectId"])
+
+    # 3. Delete this instance's five Business Flows (matched by per-instance title).
+    print("- Business Flows")
+    # Match any flow carrying this instance's prefix, so all our flows are removed
+    # regardless of per-industry label changes across upgrades.
+    for o in list_objects(FLOW_SCHEMA):
+        if o["value"].get("name", "").startswith(FLOW_TITLE_PREFIX):
+            delete_object(FLOW_SCHEMA, o["objectId"])
+
+    deprovision_service_names()
+
+    print("Done.")
+
+
+def main():
+    if ACTION == "delete":
+        deprovision()
+    elif ACTION == "provision":
+        provision()
+    else:
+        sys.exit("FATAL: unknown DT_ACTION=%r (expected provision|delete)" % ACTION)
+
+
+if __name__ == "__main__":
+    main()
