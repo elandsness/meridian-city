@@ -274,7 +274,7 @@ def routing_entry(pipeline_object_id):
 # event carries a correlation id already surfaced by DQL_SCRIPT (request.id / citizen.id /
 # work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
 # auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
-FLOW_SPECS = []),
+FLOW_SPECS = []
                ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
                ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
     {"key": "account-creation", "name": "Account Creation", 
