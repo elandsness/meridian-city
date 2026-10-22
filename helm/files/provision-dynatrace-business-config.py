@@ -274,12 +274,7 @@ def routing_entry(pipeline_object_id):
 # event carries a correlation id already surfaced by DQL_SCRIPT (request.id / citizen.id /
 # work_order.id / incident.id / cart.id / order.id / bill.id / flight.id / passenger.id) and
 # auto-extracts as a bizevent via the includeAll + isNotNull(meridian.event_type) extraction.
-FLOW_SPECS = [
-    {"key": "service-request", "name": "Service Request Lifecycle", 
-     "kpiLabel": "Resolved requests", "kpi": "service_request.id", "kpiCalculation": "lastEvent",
-     "kpiEventName": "service_request.resolved",
-     "steps": [("Submitted", "service_request.submitted"),
-               ("Validated", "service_request.validated", ["service_request.rejected"]),
+FLOW_SPECS = []
                ("Dispatched", "service_request.dispatched"), ("Assigned", "service_request.assigned"),
                ("In progress", "service_request.in_progress"), ("Resolved", "service_request.resolved")]},
     {"key": "account-creation", "name": "Account Creation", 
@@ -345,7 +340,7 @@ FLOW_SPECS = [
 # City default flow set (used when DT_FLOWS is unset). Industry overlays (e.g. airport)
 # pass DT_FLOWS to select a different subset; provision()'s stale-flow cleanup removes any
 # of this instance's flows that drop out of the active set on an in-place upgrade.
-DEFAULT_FLOW_KEYS = ["service-request", "account-creation", "identity-registration", "purchase", "tax-payment"]
+DEFAULT_FLOW_KEYS = []
 
 
 def _topo_walk(initial, states, transitions):
