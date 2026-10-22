@@ -128,22 +128,22 @@ opsDashboard:
     enabled: false
     snippet: ""
 
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------  
 # LLM / AI configuration (for the citizen chatbot and ai-service)
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------  
 llm:
   # Provider selection: openai | anthropic | local
   provider: "openai"
 
   openai:
     # REQUIRED if provider=openai
-    apiKey: ""
+    apiKey: ***
     model: "gpt-4o"
     baseUrl: "https://api.openai.com/v1"
 
   anthropic:
     # REQUIRED if provider=anthropic
-    apiKey: ""
+    apiKey: ***
     model: "claude-sonnet-4-6"
 
   local:
@@ -153,6 +153,13 @@ llm:
     # Ollama tuning (image/resources/persistence) lives in values.yaml.
     endpoint: "http://ollama:11434"
     model: "llama3"
+
+# --------------------------------------------------------------------------- 
+# Sample data generation control (to avoid unnecessary LLM cost)
+# Options are: always, never, if_needed
+# if_needed means only generate data when no existing records are found
+# ---------------------------------------------------------------------------  
+generateSampleData: "if_needed"
 
 # ---------------------------------------------------------------------------
 # Docker Hub credentials (OPTIONAL)

@@ -405,4 +405,20 @@ industry:
           timer: { minSeconds: 300, maxSeconds: 7200 }
           signal: { eventType: "request.resolved", correlationId: "service_request.id" }
       generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000, ownerField: "passenger_id" }
-
+trafficBot:
+  enabled: true
+  image:
+    repository: "traffic-bot"
+    tag: ""
+  config:
+    # Average HTTP requests per minute sent to the API gateway. Kept low so only a
+    # handful of flows are in-flight at once; server-side schedulers complete them.
+    requestsPerMinute: 0
+    scenarios:
+      citizenRequests: false
+      accountCreation: false
+      browsing: false
+      storePurchase: false
+      payTax: false
+      injectAnomaly: false  # auto-inject/clear IoT anomalies so incidents flow without an operator
+      chatbot: false   # low-weight (lowest journey weight) steady chat traffic so the llm-latency scenario has a `meridian.chat` baseline to deviate from; set false to avoid real LLM API cost

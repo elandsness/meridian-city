@@ -143,6 +143,20 @@ def main():
     if not db_pod:
         print("[ERROR] DB pod not found."); sys.exit(1)
 
+    # Check generateSampleData setting
+    generate_sample_data = "if_needed"  # default
+    try:
+        with open(custom_values_path, 'r') as f:
+            custom_config = yaml.safe_load(f)
+            generate_sample_data = custom_config.get('generateSampleData', 'if_needed')
+    except Exception as e:
+        print(f"[WARN] Could not read generateSampleData from config: {e}")
+    
+    # Skip if set to "never"
+    if generate_sample_data == "never":
+        print("[SEED] Skipping semantic data generation (generateSampleData = never)")
+        sys.exit(0)
+        
     try:
         with open('industry_config.json', 'r') as f:
             industry_cfg = json.load(f)
@@ -150,6 +164,22 @@ def main():
             movement_cfg = json.load(f)
     except FileNotFoundError:
         print("[ERROR] Config files missing."); sys.exit(1)
+
+    # Quick check for existing data to skip generation if needed
+    if generate_sample_data == "if_needed":
+        check_sql = """
+        SELECT EXISTS (
+            SELECT 1 FROM entities.entity LIMIT 1
+        ) as has_data;
+        """
+        check_res = run_cmd([
+            "kubectl", "exec", "-n", namespace, db_pod, "--", 
+            "psql", "-U", "postgres", "-d", "meridian", "-tAq", "-c", check_sql
+        ], check=False)
+        
+        if check_res.returncode == 0 and "t" in check_res.stdout.strip():
+            print("[SEED] Existing data found - skipping semantic data generation")
+            sys.exit(0)
 
     industry_meta = industry_cfg.get('industry', {})
     industry_id = industry_meta.get('id', 'generic')
