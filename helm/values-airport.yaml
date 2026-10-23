@@ -123,11 +123,11 @@ industry:
       "flight_departure": "Departure Flow"
       "flight_arrival": "Arrival Flow"
     flows:
-      - { id: "passenger-journey", correlationID: "passenger.id" }
-      - { id: "aircraft-turnaround", correlationID: "aircraft.id" }
-      - { id: "luggage", correlationID: "luggage.id" }
-      - { id: "flight_departure", correlationID: "flight_departure.id" }
-      - { id: "flight_arrival", correlationID: "flight_arrival.id" }
+      - "passenger"
+      - "luggage"
+      - "aircraft"
+      - "flight_departure"
+      - "flight_arrival"
 
   entities:
     # Helm deep-merges `industry.entities` across -f files with the chart's own
