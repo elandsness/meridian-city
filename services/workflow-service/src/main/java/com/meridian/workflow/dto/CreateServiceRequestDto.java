@@ -1,7 +1,9 @@
 package com.meridian.workflow.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public record CreateServiceRequestDto(
-        String citizenId,
+        @JsonProperty("citizen_id") String identityId,
         String category,
         String priority,
         String title,

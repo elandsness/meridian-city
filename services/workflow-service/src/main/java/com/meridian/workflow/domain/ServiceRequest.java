@@ -23,7 +23,7 @@ public class ServiceRequest {
     private String id;
 
     @Column(name = "citizen_id", nullable = false, length = 50)
-    private String citizenId;
+    private String identityId;
 
     @Column(name = "category", nullable = false, length = 50)
     private String category;
@@ -78,10 +78,10 @@ public class ServiceRequest {
         updatedAt = OffsetDateTime.now();
     }
 
-    public static ServiceRequest create(String citizenId, String category, String priority, String title, String description, String zoneId) {
+    public static ServiceRequest create(String identityId, String category, String priority, String title, String description, String zoneId) {
         ServiceRequest request = new ServiceRequest();
         request.setId("req-" + generateSuffix());
-        request.setCitizenId(citizenId);
+        request.setIdentityId(identityId);
         request.setCategory(category);
         request.setPriority(priority != null ? priority : "normal");
         request.setTitle(title);

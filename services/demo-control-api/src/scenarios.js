@@ -37,6 +37,7 @@
 const config = require('./config')
 const proxy = require('./proxy')
 const state = require('./state')
+const scenarioConfig = require('./scenario-config.json')
 
 const CLEAR_MIN = 1
 const CLEAR_MAX = 30
@@ -241,12 +242,12 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/flight.boarding.cancelled`, {
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/${scenarioConfig.scenarios['flight-cancellations'].faultGate}`, {
         enabled: true, rate,
       })
     },
     async reset () {
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/flight.boarding.cancelled`, {
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/${scenarioConfig.scenarios['flight-cancellations'].faultGate}`, {
         enabled: false, rate: 0,
       })
     },
@@ -259,12 +260,12 @@ const SCENARIOS = {
     params: [RATE_PARAM],
     async activate (opts = {}) {
       const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/passenger.security_cleared.offloaded`, {
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/${scenarioConfig.scenarios['passenger-offloads'].faultGate}`, {
         enabled: true, rate,
       })
     },
     async reset () {
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/passenger.security_cleared.offloaded`, {
+      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/${scenarioConfig.scenarios['passenger-offloads'].faultGate}`, {
         enabled: false, rate: 0,
       })
     },

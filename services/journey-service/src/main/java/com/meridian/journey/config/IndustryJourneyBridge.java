@@ -50,10 +50,29 @@ public class IndustryJourneyBridge {
                 }
             }
 
-            List<Map<String, Object>> states = (List<Map<String, Object>>) entityCfg.get("states");
-            if (states != null) {
-                allStates.addAll(states);
+        Map<String, Object> states = (Map<String, Object>) entityCfg.get("states");
+        if (states != null) {
+            // Use sequence if available for ordering, otherwise use map keys
+            List<String> sequence = (List<String>) entityCfg.get("sequence");
+            if (sequence != null) {
+                for (String stateId : sequence) {
+                    Map<String, Object> s = (Map<String, Object>) states.get(stateId);
+                    if (s != null) {
+                        allStates.add(s);
+                        // Store the ID in the state map itself so the progress loop can find it
+                        s.put("__id", stateId);
+                    }
+                }
+            } else {
+                for (Map.Entry<String, Object> stateEntry : states.entrySet()) {
+                    Map<String, Object> s = (Map<String, Object>) stateEntry.getValue();
+                    if (s != null) {
+                        s.put("__id", stateEntry.getKey());
+                        allStates.add(s);
+                    }
+                }
             }
+        }
         }
         props.setTransitions(transMap);
 
@@ -62,7 +81,7 @@ public class IndustryJourneyBridge {
             int total = allStates.size();
             for (int i = 0; i < total; i++) {
                 Map<String, Object> s = allStates.get(i);
-                String name = (String) s.get("id") != null ? (String) s.get("id") : (String) s.get("name");
+                String name = (String) s.get("__id") != null ? (String) s.get("__id") : (String) s.get("id") != null ? (String) s.get("id") : (String) s.get("name");
                 if (name != null) {
                     progMap.put(name, (double) i / (total - 1));
                 }

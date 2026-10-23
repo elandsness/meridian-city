@@ -71,7 +71,7 @@ public class WorkOrder {
         }
     }
 
-    public static WorkOrder createFromRequest(String requestId, String citizenId, String title, String department, String priority, String zoneId) {
+    public static WorkOrder createFromRequest(String requestId, String title, String department, String priority, String zoneId) {
         WorkOrder workOrder = new WorkOrder();
         workOrder.setId("wo-" + generateSuffix());
         workOrder.setRequestId(requestId);

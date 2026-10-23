@@ -29,7 +29,7 @@ public class WorkflowService {
         requireField(request.category(), "category");
 
         ServiceRequest serviceRequest = ServiceRequest.create(
-                request.citizenId(),
+                request.identityId(),
                 request.category(),
                 request.priority(),
                 request.title(),
@@ -39,7 +39,7 @@ public class WorkflowService {
 
         serviceRequest = serviceRequestRepository.save(serviceRequest);
 
-        log.info("Service request created: requestId={} citizenId={}", serviceRequest.getId(), serviceRequest.getCitizenId());
+        log.info("Service request created: requestId={} identityId={}", serviceRequest.getId(), serviceRequest.getIdentityId());
 
         return ServiceRequestResponse.from(serviceRequest);
     }

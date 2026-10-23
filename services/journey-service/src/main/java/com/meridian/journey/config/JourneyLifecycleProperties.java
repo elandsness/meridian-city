@@ -21,6 +21,7 @@ public class JourneyLifecycleProperties {
     // Maps status -> progress (0.0 to 1.0)
     private Map<String, Double> progressMap = new HashMap<>();
     private List<String> activeStatuses = new ArrayList<>();
+    private String passengerEntityType = "passenger";
 
     public int nextDelaySeconds() {
         return minSeconds + ThreadLocalRandom.current().nextInt(Math.max(1, maxSeconds - minSeconds + 1));

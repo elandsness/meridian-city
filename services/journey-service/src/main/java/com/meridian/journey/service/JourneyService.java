@@ -64,7 +64,7 @@ public class JourneyService {
 
     @Transactional(readOnly = true)
     public JourneyResponse getForUser(String userId) {
-        Journey journey = journeyRepository.findByEntityTypeAndUserId("passenger", userId)
+        Journey journey = journeyRepository.findByEntityTypeAndUserId(lifecycleProperties.getPassengerEntityType(), userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "personal journey not found for user: " + userId));
         return toResponse(journey);
     }

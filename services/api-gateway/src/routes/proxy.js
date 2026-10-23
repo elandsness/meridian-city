@@ -2,6 +2,7 @@
 
 const { request: undiciRequest } = require('undici')
 const { v4: uuidv4 } = require('uuid')
+const semanticRoutes = require('./semantic-routes.json')
 
 class RouteResolver {
   constructor(config) {
@@ -85,48 +86,15 @@ class RouteResolver {
     const systemMatch = this.systemRoutes.find(r => path.startsWith(r.prefix));
     if (systemMatch) return systemMatch;
 
-    const semanticMappings = [
-      { 
-        prefix: '/api/v1/citizens', 
-        target: this.config.IDENTITY_SERVICE_URL, 
-        serviceName: 'identity-service', 
-        rewritePrefix: '/api/v1/identity' 
-      },
-      { 
-        prefix: '/api/v1/passengers', 
-        target: this.config.JOURNEY_SERVICE_URL, 
-        serviceName: 'journey-service', 
-        rewritePrefix: '/api/v1/journeys' 
-      },
-      { 
-        prefix: '/api/v1/flights', 
-        target: this.config.OPS_ENTITY_SERVICE_URL, 
-        serviceName: 'ops-entity-service', 
-        rewritePrefix: '/api/v1/entities/flight' 
-      },
-      { 
-        prefix: '/api/v1/service-requests', 
-        target: this.config.CUSTOMER_ENTITY_SERVICE_URL, 
-        serviceName: 'customer-entity-service', 
-        rewritePrefix: '/api/v1/entities/service_request' 
-      },
-    ];
+    const semanticMappings = semanticRoutes.map(r => ({
+      ...r,
+      target: this.config[r.targetKey]
+    })).filter(r => r.target);
 
     const semanticMatch = semanticMappings.find(r => path.startsWith(r.prefix));
     if (semanticMatch) return { ...semanticMatch, requiresAuth: false };
 
-    if (path.startsWith('/api/v1/entities/incident')) {
-        return { prefix: '/api/v1/entities/incident', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
-    }
-    if (path.startsWith('/api/v1/entities/work_order')) {
-        return { prefix: '/api/v1/entities/work_order', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
-    }
-    if (path.startsWith('/api/v1/entities/journey')) {
-        return { prefix: '/api/v1/entities/journey', target: this.config.JOURNEY_SERVICE_URL, serviceName: 'journey-service', rewritePrefix: '/api/v1/journeys', requiresAuth: false };
-    }
-    if (path.startsWith('/api/v1/entities')) {
-        return { prefix: '/api/v1/entities', target: this.config.CUSTOMER_ENTITY_SERVICE_URL, serviceName: 'customer-entity-service', requiresAuth: false };
-    }
+
 
     return null;
   }

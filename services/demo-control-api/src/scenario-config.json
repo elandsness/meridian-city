@@ -1,0 +1,14 @@
+{
+  "scenarios": {
+    "flight-cancellations": {
+      "faultGate": "flight.boarding.cancelled",
+      "label": "Flight Cancellations",
+      "description": "Cancels a share of departing flights at boarding, so the Aircraft Turnaround flow shows a flight.cancelled error branch + drop-off at the Boarding step."
+    },
+    "passenger-offloads": {
+      "faultGate": "passenger.security_cleared.offloaded",
+      "label": "Passenger Offloads",
+      "description": "Offloads a share of passengers at security, so the Passenger Journey flow shows a passenger.offloaded error branch + drop-off at the Security step."
+    }
+  }
+}
