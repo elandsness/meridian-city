@@ -19,7 +19,7 @@ public interface EntityRecordRepository extends JpaRepository<EntityRecord, Stri
     // whatever order Postgres happens to return for an unordered scan.
     List<EntityRecord> findByEntityTypeOrderByCreatedAtAsc(String entityType);
 
-    List<EntityRecord> findByEntityTypeAndState(String entityType, String state);
+    List<EntityRecord> findByEntityTypeAndState(String entityType, String state, Pageable pageable);
 
     List<EntityRecord> findByEntityTypeAndStateOrderByCreatedAtAsc(String entityType, String state);
 

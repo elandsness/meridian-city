@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The Semantic Bridge: translate generic entity transitions into domain-specific 
@@ -35,16 +37,25 @@ public class EntityEventLogger {
         List<Object> args = new ArrayList<>();
         
         args.add(StructuredArguments.keyValue("event.type", eventType));
-        args.add(StructuredArguments.keyValue(record.getEntityType() + ".id", record.getId()));
+        String entityIdKey = record.getEntityType() + ".id";
+        args.add(StructuredArguments.keyValue(entityIdKey, record.getId()));
+
+        Set<String> addedKeys = new HashSet<>();
+        addedKeys.add(entityIdKey);
 
         // If a semantic signal alias exists, add it as a supplementary attribute for legacy/pretty reporting.
         if (transition != null && transition.getSignal() != null) {
             EntityDefinition.SignalDef signal = transition.getSignal();
             args.add(StructuredArguments.keyValue("event.signal", signal.getEventType()));
             
-            String corrIdField = signal.getCorrelationId();
-            if (corrIdField != null) {
-                args.add(StructuredArguments.keyValue(corrIdField, record.getField(corrIdField)));
+            String corrIdKey = signal.getCorrelationId();
+            if (corrIdKey != null && !addedKeys.contains(corrIdKey)) {
+                String fieldName = corrIdKey.startsWith(record.getEntityType() + ".") 
+                    ? corrIdKey.substring(record.getEntityType().length() + 1) 
+                    : corrIdKey;
+                Object corrValue = "id".equals(fieldName) ? record.getId() : record.getField(fieldName);
+                args.add(StructuredArguments.keyValue(corrIdKey, corrValue));
+                addedKeys.add(corrIdKey);
             }
         }
 
@@ -55,9 +66,10 @@ public class EntityEventLogger {
 
         if (def != null) {
             def.getFields().forEach((fieldName, fieldDef) -> {
-                if ("password".equals(fieldDef.getType())) return;
+                String fieldKey = record.getEntityType() + "." + fieldName;
+                if ("password".equals(fieldDef.getType()) || "id".equals(fieldName) || addedKeys.contains(fieldKey)) return;
                 Object value = "ref".equals(fieldDef.getType()) ? record.getLink(fieldName) : record.getField(fieldName);
-                args.add(StructuredArguments.keyValue(record.getEntityType() + "." + fieldName, value));
+                args.add(StructuredArguments.keyValue(fieldKey, value));
             });
         }
 

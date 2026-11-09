@@ -26,10 +26,18 @@ public class EntityController {
                                       @RequestParam Map<String, String> allParams) {
         // Strip known non-field params before passing the rest as field filters.
         Map<String, String> fieldFilters = new java.util.HashMap<>(allParams);
+        
+        int page = 0;
+        int limit = 100;
+        try {
+            if (fieldFilters.containsKey("page")) page = Integer.parseInt(fieldFilters.remove("page"));
+            if (fieldFilters.containsKey("limit")) limit = Integer.parseInt(fieldFilters.remove("limit"));
+        } catch (NumberFormatException e) {
+            // fallback to defaults
+        }
+        
         fieldFilters.remove("state");
-        fieldFilters.remove("page");
-        fieldFilters.remove("limit");
-        return service.list(entityType, state, fieldFilters.isEmpty() ? null : fieldFilters)
+        return service.list(entityType, state, fieldFilters.isEmpty() ? null : fieldFilters, page, limit)
                 .stream().map(EntityResponse::new).toList();
     }
 

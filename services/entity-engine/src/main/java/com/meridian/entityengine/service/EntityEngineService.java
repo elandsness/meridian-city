@@ -1,5 +1,7 @@
 package com.meridian.entityengine.service;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import com.meridian.entityengine.config.EntityConfigLoader;
 import com.meridian.entityengine.config.EntityDefinition;
 import com.meridian.entityengine.domain.EntityEventRecord;
@@ -39,11 +41,12 @@ public class EntityEngineService {
     private final EntityKafkaPublisher kafkaPublisher;
     private final EntityFactory entityFactory;
 
-    public List<EntityRecord> list(String entityType, String stateFilter, Map<String, String> fieldFilters) {
+    public List<EntityRecord> list(String entityType, String stateFilter, Map<String, String> fieldFilters, int page, int size) {
         configLoader.require(entityType);
+        var pageRequest = PageRequest.of(page, size, Sort.by("createdAt").ascending());
         List<EntityRecord> records = stateFilter == null
-                ? repository.findByEntityTypeOrderByCreatedAtAsc(entityType)
-                : repository.findByEntityTypeAndStateOrderByCreatedAtAsc(entityType, stateFilter);
+                ? repository.findByEntityType(entityType, pageRequest)
+                : repository.findByEntityTypeAndState(entityType, stateFilter, pageRequest);
         if (fieldFilters == null || fieldFilters.isEmpty()) return records;
         return records.stream()
                 .filter(r -> fieldFilters.entrySet().stream().allMatch(e -> {
