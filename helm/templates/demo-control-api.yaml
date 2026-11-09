@@ -27,11 +27,16 @@ spec:
           ports:
             - name: http
               containerPort: 3001
+          volumeMounts:
+            - name: industry-config
+              mountPath: /etc/meridian/industry-config
           env:
             - name: OTEL_SERVICE_NAME
               value: "demo-control-api"
             - name: K8S_NAMESPACE
               value: {{ include "meridian.namespace" . | quote }}
+            - name: INDUSTRY_CONFIG_PATH
+              value: "/etc/meridian/industry-config/industry-config.json"
             # URLs for services that support fault injection
             - name: CITIZEN_SERVICE_URL
               value: "http://citizen-service:8081"
@@ -64,6 +69,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.demoControlApi.resources | nindent 12 }}
+      volumes:
+        - name: industry-config
+          configMap:
+            name: industry-config
 ---
 # ServiceAccount with permissions to patch ConfigMaps and Deployments
 # (needed for fault injection that modifies runtime config)
