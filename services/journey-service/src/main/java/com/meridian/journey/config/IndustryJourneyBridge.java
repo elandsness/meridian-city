@@ -32,6 +32,10 @@ public class IndustryJourneyBridge {
         }
 
         log.info("Aligning journey lifecycle with industry config...");
+        if (!entities.isEmpty()) {
+            String firstEntityType = entities.keySet().iterator().next();
+            props.setPrimaryJourneyEntityType(firstEntityType);
+        }
         
         Map<String, String> transMap = new HashMap<>();
         List<Map<String, Object>> allStates = new ArrayList<>();
