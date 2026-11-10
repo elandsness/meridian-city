@@ -29,6 +29,9 @@ spec:
         - name: industry-config
           configMap:
             name: industry-config
+        - name: branding
+          configMap:
+            name: {{ include "meridian.fullname" . }}-branding
       containers:
         - name: ops-dashboard
           image: {{ include "meridian.image" (dict "repository" .Values.opsDashboard.image.repository "tag" .Values.opsDashboard.image.tag "context" $) }}
@@ -43,6 +46,9 @@ spec:
             - name: industry-config
               mountPath: /usr/share/nginx/html/config.json
               subPath: config.json
+            - name: branding
+              mountPath: /usr/share/nginx/html/logo.svg
+              subPath: logo.svg
           livenessProbe:
             httpGet:
               path: /
