@@ -4,45 +4,28 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-/**
- * Journey configuration — defines the stages, transitions, and rules for a journey type.
- * Configurable per industry (airport, hospital, bank, etc.).
- */
 @Entity
 @Table(schema = "journey", name = "journey_configs")
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class JourneyConfig {
 
     @Id
     private String id;
 
-    /** Entity type this config applies to (e.g., "flight", "passenger"). */
     @Column(name = "entity_type")
     private String entityType;
 
-    /** Display name for this journey type. */
     private String name;
 
-    /** JSON array of stages: [{"name": "at_gate", "order": 1, "progress": 0.1}, ...] */
     @Column(columnDefinition = "jsonb")
     private String stages;
 
-    /** Transition rules: {"at_gate": "servicing", "servicing": "boarding", ...} */
     @Column(columnDefinition = "jsonb")
     private String transitions;
 
-    /** Fault injection rules: {"boarding": {"failure_rate": 0.1}} */
     @Column(columnDefinition = "jsonb")
     private String faultRules;
 
@@ -55,18 +38,44 @@ public class JourneyConfig {
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
-    /** Factory — generates id like "jcfg-a1b2c". */
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getEntityType() { return entityType; }
+    public void setEntityType(String entityType) { this.entityType = entityType; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getStages() { return stages; }
+    public void setStages(String stages) { this.stages = stages; }
+
+    public String getTransitions() { return transitions; }
+    public void setTransitions(String transitions) { this.transitions = transitions; }
+
+    public String getFaultRules() { return faultRules; }
+    public void setFaultRules(String faultRules) { this.faultRules = faultRules; }
+
+    public boolean isUserLinked() { return isUserLinked; }
+    public void setUserLinked(boolean userLinked) { this.isUserLinked = userLinked; }
+
+    public String getOwnerField() { return ownerField; }
+    public void setOwnerField(String ownerField) { this.ownerField = ownerField; }
+
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
     public static JourneyConfig create(String entityType, String name, String stages,
                                        String transitions, String faultRules) {
+        JourneyConfig cfg = new JourneyConfig();
         String shortId = UUID.randomUUID().toString().replace("-", "").substring(0, 5);
-        return JourneyConfig.builder()
-                .id("jcfg-" + shortId)
-                .entityType(entityType)
-                .name(name)
-                .stages(stages)
-                .transitions(transitions)
-                .faultRules(faultRules)
-                .createdAt(OffsetDateTime.now())
-                .build();
+        cfg.setId("jcfg-" + shortId);
+        cfg.setEntityType(entityType);
+        cfg.setName(name);
+        cfg.setStages(stages);
+        cfg.setTransitions(transitions);
+        cfg.setFaultRules(faultRules);
+        cfg.setCreatedAt(OffsetDateTime.now());
+        return cfg;
     }
 }

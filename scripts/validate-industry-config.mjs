@@ -60,7 +60,7 @@ function checkIot(iot) {
   return errors
 }
 
-const VALID_SERVICE_NAME_KEYS = new Set(['citizen-service', 'city-operations', 'service-dispatch', 'api-gateway', 'notification-service', 'billing-service'])
+const VALID_SERVICE_NAME_KEYS = new Set(['customer-entity-service', 'ops-entity-service', 'identity-service', 'journey-service', 'movement-service', 'routing-service', 'workflow-service', 'api-gateway', 'notification-service', 'billing-service'])
 const VALID_FLOW_IDS = new Set(['service-request', 'account-creation', 'tax-payment', 'aircraft-turnaround', 'passenger-journey'])
 
 function checkRouting(cfg) {

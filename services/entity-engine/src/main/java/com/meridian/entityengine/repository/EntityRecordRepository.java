@@ -8,6 +8,8 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface EntityRecordRepository extends JpaRepository<EntityRecord, String> {
 
@@ -23,6 +25,9 @@ public interface EntityRecordRepository extends JpaRepository<EntityRecord, Stri
 
     List<EntityRecord> findByEntityTypeAndStateOrderByCreatedAtAsc(String entityType, String state);
 
+    @Query(value = "SELECT * FROM entity_records WHERE entity_type = :entityType AND state NOT IN :states ORDER BY random() LIMIT 1", nativeQuery = true)
+    Optional<EntityRecord> findRandomByEntityTypeAndStateNotIn(@Param("entityType") String entityType, @Param("states") Collection<String> states);
+
     Optional<EntityRecord> findByIdAndEntityType(String id, String entityType);
 
     List<EntityRecord> findByEntityTypeInAndNextTransitionAtLessThanEqual(
@@ -30,5 +35,6 @@ public interface EntityRecordRepository extends JpaRepository<EntityRecord, Stri
 
     long countByEntityTypeAndStateNotIn(String entityType, Collection<String> states);
 
+    List<EntityRecord> findByEntityTypeAndStateNotIn(String entityType, Collection<String> states, Pageable pageable);
     List<EntityRecord> findByEntityTypeAndStateNotIn(String entityType, Collection<String> states);
 }
