@@ -54,7 +54,7 @@ export default function EntityListPage({ entityType, fields, filters }) {
             <thead>
               <tr className="text-left text-slate-400 border-b border-slate-100">
                 {columns.map((c) => (
-                  <th key={c} className="py-2 pr-4 font-medium">{c.replace(/_/g, ' ')}</th>
+                  <th key={c} className="py-2 pr-4 font-medium">{def?.fields?.[c]?.label ?? c.replace(/_/g, ' ')}</th>
                 ))}
                 <th className="py-2 pr-4 font-medium">state</th>
               </tr>

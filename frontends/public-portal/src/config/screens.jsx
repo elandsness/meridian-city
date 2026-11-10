@@ -12,7 +12,7 @@ import Billing from '../pages/Billing.jsx'
 import Messages from '../pages/Messages.jsx'
 import MyAccount from '../pages/MyAccount.jsx'
 import EntityListPage from '../components/entity/EntityListPage.jsx'
-import MyJourney from '../pages/MyJourney.jsx'
+
 import EntityDetailPage from '../components/entity/EntityDetailPage.jsx'
 import EntityMapPage from '../components/entity/EntityMapPage.jsx'
 import EntityAnalyticsPage from '../components/entity/EntityAnalyticsPage.jsx'
@@ -37,7 +37,7 @@ const TEMPLATES = {
 // (detail/new) that mount whenever the parent screen is active.
 export const SCREENS = {
   home: { path: '/', label: 'Home', component: Home, protected: false },
-  'my-journey': { path: '/my-journey', label: 'My Journey', icon: '<0xF0><0x9F><0xA7><0xB3>', component: MyJourney, protected: true },
+
   'my-account': { path: '/my-account', label: 'My Account', component: MyAccount, protected: true },
   'service-requests': {
     path: '/service-requests',

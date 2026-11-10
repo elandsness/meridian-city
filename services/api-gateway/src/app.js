@@ -1,5 +1,6 @@
 'use strict'
 
+const fs = require('fs')
 const fastify = require('fastify')
 const cors = require('@fastify/cors')
 const sensible = require('@fastify/sensible')
@@ -8,14 +9,22 @@ const healthRoutes = require('./routes/health')
 const authRoutes = require('./routes/auth')
 const proxyRoutes = require('./routes/proxy')
 
+// Load Industry Config for Semantic Routing
+let industryConfig = {}
+const configPath = process.env.INDUSTRY_CONFIG_PATH
+if (configPath && fs.existsSync(configPath)) {
+  try {
+    industryConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+  } catch (e) {
+    console.error(`Failed to parse industry config at ${configPath}: ${e.message}`)
+  }
+}
+
 const config = {
   PORT: process.env.PORT || 3000,
   JWT_SECRET: process.env.JWT_SECRET || 'meridian-demo-secret-change-me',
   AUTH_USERNAME: process.env.AUTH_USERNAME || 'demo',
   AUTH_PASSWORD: process.env.AUTH_PASSWORD || 'dynatrace',
-  // Lets an external demo-automation system call /api/v1/demo-control/* (scenario
-  // start/stop, traffic, fleet) with a stable header instead of the 8h operator JWT.
-  // Empty/unset disables the header entirely -- see routes/proxy.js's preHandler.
   DEMO_API_KEY: process.env.DEMO_API_KEY || '',
   CITIZEN_SERVICE_URL: process.env.CITIZEN_SERVICE_URL || 'http://localhost:8081',
   SERVICE_DISPATCH_URL: process.env.SERVICE_DISPATCH_URL || 'http://localhost:8082',
@@ -28,7 +37,6 @@ const config = {
   COMMERCE_SERVICE_URL: process.env.COMMERCE_SERVICE_URL || 'http://localhost:8090',
   BILLING_SERVICE_URL: process.env.BILLING_SERVICE_URL || 'http://localhost:8091',
   DEMO_CONTROL_API_URL: process.env.DEMO_CONTROL_API_URL || 'http://localhost:3001',
-  // Generic services (new architecture)
   IDENTITY_SERVICE_URL: process.env.IDENTITY_SERVICE_URL || 'http://localhost:8081',
   WORKFLOW_SERVICE_URL: process.env.WORKFLOW_SERVICE_URL || 'http://localhost:8083',
   TRANSACTION_SERVICE_URL: process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8090',
@@ -39,6 +47,7 @@ const config = {
   ENTITY_ENGINE_URL: process.env.ENTITY_ENGINE_URL || 'http://localhost:8094',
   CUSTOMER_ENTITY_SERVICE_URL: process.env.CUSTOMER_ENTITY_SERVICE_URL || 'http://localhost:8094',
   OPS_ENTITY_SERVICE_URL: process.env.OPS_ENTITY_SERVICE_URL || 'http://localhost:8094',
+  industryConfig: industryConfig
 }
 
 async function build () {
@@ -48,22 +57,10 @@ async function build () {
     },
   })
 
-  // Transparent-proxy body handling. Fastify only parses application/json (and
-  // text/plain) out of the box and replies 415 to any other content type *before*
-  // the request reaches the proxy handler. That silently broke bodyless action
-  // POSTs — most visibly POST /api/v1/billing/bills/:id/pay — because axios labels
-  // a no-body POST `application/x-www-form-urlencoded`, which Fastify rejected with
-  // 415. Since 415 < 500 the callers (traffic-bot, public-portal "Pay now") never
-  // threw, so the Tax Payment funnel just stalled: bills issued, never paid, no
-  // tax.payment_completed. A reverse proxy must forward these, not reject them, so
-  // buffer any non-JSON body raw and let the proxy pass it through verbatim (it
-  // already forwards string/Buffer bodies as-is). application/json still uses the
-  // built-in parser, so JSON re-serialization in proxy.js is unaffected.
   app.addContentTypeParser('*', { parseAs: 'buffer' }, (req, body, done) => {
     done(null, body)
   })
 
-  // Plugins
   await app.register(cors, {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -74,12 +71,10 @@ async function build () {
 
   await app.register(authPlugin, { config })
 
-  // Routes
   await app.register(healthRoutes, { config })
   await app.register(authRoutes, { config })
   await app.register(proxyRoutes, { config })
 
-  // Log each incoming request with method and url
   app.addHook('onRequest', async (request) => {
     request.log.info({ method: request.method, url: request.url }, 'incoming request')
   })

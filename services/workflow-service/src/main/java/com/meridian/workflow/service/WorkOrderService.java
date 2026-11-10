@@ -34,7 +34,6 @@ public class WorkOrderService {
     public WorkOrderResponse createWorkOrder(CreateWorkOrderDto request) {
         WorkOrder workOrder = WorkOrder.createFromRequest(
                 request.requestId(),
-                request.citizenId(),
                 request.title(),
                 request.department(),
                 request.priority(),

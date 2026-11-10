@@ -67,8 +67,6 @@ class RouteResolver {
         target: config.DEMO_CONTROL_API_URL,
         serviceName: 'demo-control',
         requiresAuth: true,
-        // External demo-automation systems may send a stable x-demo-api-key header
-        // instead of logging in as the operator -- see the preHandler below.
         allowApiKey: true,
         rewritePrefix: '/api/v1',
       },
@@ -79,56 +77,56 @@ class RouteResolver {
         requiresAuth: false,
       },
     ]
+
+    this.domainMap = {
+      'customer': 'CUSTOMER_ENTITY_SERVICE_URL',
+      'ops': 'OPS_ENTITY_SERVICE_URL',
+      'journey': 'JOURNEY_SERVICE_URL',
+      'identity': 'IDENTITY_SERVICE_URL'
+    }
   }
 
   resolve(path) {
     const systemMatch = this.systemRoutes.find(r => path.startsWith(r.prefix));
     if (systemMatch) return systemMatch;
 
-    const semanticMappings = [
-      { 
-        prefix: '/api/v1/citizens', 
-        target: this.config.IDENTITY_SERVICE_URL, 
-        serviceName: 'identity-service', 
-        rewritePrefix: '/api/v1/identity' 
-      },
-      { 
-        prefix: '/api/v1/passengers', 
-        target: this.config.JOURNEY_SERVICE_URL, 
-        serviceName: 'journey-service', 
-        rewritePrefix: '/api/v1/journeys' 
-      },
-      { 
-        prefix: '/api/v1/flights', 
-        target: this.config.OPS_ENTITY_SERVICE_URL, 
-        serviceName: 'ops-entity-service', 
-        rewritePrefix: '/api/v1/entities/flight' 
-      },
-      { 
-        prefix: '/api/v1/service-requests', 
-        target: this.config.CUSTOMER_ENTITY_SERVICE_URL, 
-        serviceName: 'customer-entity-service', 
-        rewritePrefix: '/api/v1/entities/service_request' 
-      },
-    ];
+    let entityType = null;
+    let isDirectPath = false;
 
-    const semanticMatch = semanticMappings.find(r => path.startsWith(r.prefix));
-    if (semanticMatch) return { ...semanticMatch, requiresAuth: false };
+    if (path.startsWith('/api/v1/entities/')) {
+      entityType = path.replace('/api/v1/entities/', '').split('/')[0];
+    } else if (path.startsWith('/api/v1/')) {
+      const parts = path.replace('/api/v1/', '').split('/');
+      if (parts.length > 0 && parts[0]) {
+        entityType = parts[0];
+        isDirectPath = true;
+      }
+    }
 
-    if (path.startsWith('/api/v1/entities/incident')) {
-        return { prefix: '/api/v1/entities/incident', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
-    }
-    if (path.startsWith('/api/v1/entities/work_order')) {
-        return { prefix: '/api/v1/entities/work_order', target: this.config.OPS_ENTITY_SERVICE_URL, serviceName: 'ops-entity-service', requiresAuth: false };
-    }
-    if (path.startsWith('/api/v1/entities/journey')) {
-        return { prefix: '/api/v1/entities/journey', target: this.config.JOURNEY_SERVICE_URL, serviceName: 'journey-service', rewritePrefix: '/api/v1/journeys', requiresAuth: false };
-    }
-    if (path.startsWith('/api/v1/entities')) {
-        return { prefix: '/api/v1/entities', target: this.config.CUSTOMER_ENTITY_SERVICE_URL, serviceName: 'customer-entity-service', requiresAuth: false };
+    if (entityType && this.config.industryConfig?.entities?.[entityType]) {
+      const entityDef = this.config.industryConfig.entities[entityType];
+      const domain = entityDef.domain;
+      const targetKey = this.domainMap[domain];
+      const target = this.config[targetKey];
+
+      if (target) {
+        return {
+          prefix: isDirectPath ? `/api/v1/${entityType}` : `/api/v1/entities/${entityType}`,
+          target: target,
+          serviceName: domain + '-service',
+          requiresAuth: false,
+          rewritePrefix: this.getRewritePrefix(domain, entityType)
+        };
+      }
     }
 
     return null;
+  }
+
+  getRewritePrefix(domain, type) {
+    if (domain === 'journey') return '/api/v1/journeys';
+    if (domain === 'identity') return '/api/v1/identity';
+    return undefined; 
   }
 }
 

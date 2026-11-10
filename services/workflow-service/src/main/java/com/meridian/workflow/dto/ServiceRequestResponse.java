@@ -1,12 +1,13 @@
 package com.meridian.workflow.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.meridian.workflow.domain.ServiceRequest;
 
 import java.time.OffsetDateTime;
 
 public record ServiceRequestResponse(
         String id,
-        String citizenId,
+        @JsonProperty("citizen_id") String identityId,
         String category,
         String priority,
         String status,

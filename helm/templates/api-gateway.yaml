@@ -26,6 +26,9 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+          volumeMounts:
+            - name: industry-config
+              mountPath: /etc/meridian/industry-config
           env:
             - name: OTEL_SERVICE_NAME
               value: "api-gateway"
@@ -83,6 +86,8 @@ spec:
               value: "http://transaction-service:8093"
             - name: DEMO_CONTROL_API_URL
               value: "http://demo-control-api:3001"
+            - name: INDUSTRY_CONFIG_PATH
+              value: "/etc/meridian/industry-config/industry-config.json"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:
@@ -98,6 +103,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.apiGateway.resources | nindent 12 }}
+      volumes:
+        - name: industry-config
+          configMap:
+            name: industry-config
 ---
 apiVersion: v1
 kind: Service
@@ -124,6 +133,7 @@ metadata:
   namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-gateway
   annotations:
     {{- toYaml .Values.apiGateway.ingress.annotations | nindent 4 }}
 spec:
@@ -131,7 +141,7 @@ spec:
   ingressClassName: {{ .Values.apiGateway.ingress.className }}
   {{- end }}
   rules:
-    - host: {{ .Values.apiGateway.ingress.host }}
+    - host: {{ .Values.apiGateway.s-gateway.ingress.host }}
       http:
         paths:
           - path: /

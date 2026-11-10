@@ -1,61 +1,37 @@
-'use strict'
+"use strict"
 
-/**
- * Scenario definitions for demo-control-api.
- *
- * Each scenario describes a named demo story that orchestrates one or more fault
- * injections. Scenarios expose:
- *   - `params`: tunable fault knobs the UI renders as sliders and passes back on
- *      start. activate(opts) reads opts[param.name] (falling back to the default).
- *   - `clear`: how the scenario ends — a default mode ('auto' | 'manual') and,
- *      when auto, a default duration in minutes (plus the allowed min/max). The
- *      operator can override both on start via clear_mode / clear_minutes;
- *      activation schedules the auto-reset timer from that choice.
- *
- * Demo scenarios:
- *   db-slowdown      — citizen-service DB latency, tunable (default auto-clear 5m)
- *   llm-latency      — ai-service LLM latency, tunable (default manual)
- *   memory-pressure  — analytics-service leak: tunable cap + ramp (default manual)
- *   cascade-failure  — db-slowdown + llm-latency simultaneously (default manual)
- *
- * Business-process exceptions (gated error branches that make the Dynatrace Business
- * Flows show process failures + conversion drop-off; default off, default manual clear).
- * All target a named fault gate ({enabled, rate}) via a GET/POST
- * /api/v1/admin/fault-gates/{name} endpoint — entity-engine's for entity-config-driven
- * types, journey-service's identical endpoint for its own journey-shaped types (see
- * journey-service's FaultGateRegistry/JourneyLifecycleScheduler):
- *   request-failures      — customer-entity-service: fault-gate service-request-rejected
- *   account-failures      — customer-entity-service: fault-gates account-verification-failed + account-activation-failed
- *   incident-escalations  — ops-entity-service: fault-gate work-order-escalated
- *   checkout-declines     — customer-entity-service: fault-gates checkout-payment-declined + order-delivery-failed
- *   tax-payment-failures  — customer-entity-service: fault-gate tax-payment-failed
- *   flight-cancellations  — journey-service: fault-gate flight.boarding.cancelled
- *   passenger-offloads    — journey-service: fault-gate passenger.security_cleared.offloaded
- *   business-exceptions   — all of the above at once (umbrella)
- */
-
+const fs = require('fs')
 const config = require('./config')
 const proxy = require('./proxy')
 const state = require('./state')
 
+// Load Industry Config for Dynamic Scenarios
+let industryConfig = {}
+const configPath = process.env.INDUSTRY_CONFIG_PATH
+if (configPath && fs.existsSync(configPath)) {
+  try {
+    industryConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+  } catch (e) {
+    console.error(`Failed to parse industry config at ${configPath}: ${e.message}`)
+  }
+}
+
 const CLEAR_MIN = 1
 const CLEAR_MAX = 30
 
-/** Convert a percent param (5–100) to a 0..1 fraction, falling back to a default percent. */
 const pctToFrac = (v, def) => (Number(v) > 0 ? Number(v) : def) / 100
-
-/** Shared shape for the per-flow failure-rate slider. */
 const RATE_PARAM = { name: 'rate', label: 'Failure rate', min: 5, max: 100, step: 5, default: 30, unit: '%' }
 
-/** @type {Record<string, ScenarioDef>} */
+/**
+ * The SCENARIOS object is now built dynamically.
+ * It contains core platform faults and industry-specific business faults.
+ */
 const SCENARIOS = {
   'db-slowdown': {
     name: 'Database Slowdown',
-    description: 'Injects DB query latency into citizen-service, so submit-request PurePaths show a clear slow span.',
+    description: 'Injects DB query latency into the identity service, visible as slow spans.',
     clear: { mode: 'auto', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [
-      { name: 'seconds', label: 'DB latency', min: 1, max: 10, step: 1, default: 2, unit: 's' },
-    ],
+    params: [{ name: 'seconds', label: 'DB latency', min: 1, max: 10, step: 1, default: 2, unit: 's' }],
     async activate (opts = {}) {
       const seconds = Number(opts.seconds) > 0 ? Number(opts.seconds) : 2
       const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
@@ -72,14 +48,11 @@ const SCENARIOS = {
       return r
     },
   },
-
   'llm-latency': {
     name: 'LLM Latency Spike',
-    description: 'Injects latency before every ai-service LLM call, visible as long meridian.chat spans in AI observability. Needs chat traffic (enable the Chat-traffic toggle, or chat in the portal).',
+    description: 'Injects latency before every AI service LLM call.',
     clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [
-      { name: 'seconds', label: 'LLM latency', min: 1, max: 30, step: 1, default: 10, unit: 's' },
-    ],
+    params: [{ name: 'seconds', label: 'LLM latency', min: 1, max: 30, step: 1, default: 10, unit: 's' }],
     async activate (opts = {}) {
       const seconds = Number(opts.seconds) > 0 ? Number(opts.seconds) : 10
       const r = await proxy.post(`${config.AI_SERVICE_URL}/admin/fault`, {
@@ -96,10 +69,9 @@ const SCENARIOS = {
       return r
     },
   },
-
   'memory-pressure': {
     name: 'Memory Pressure',
-    description: 'Leaks analytics-service heap up to a cap over a ramp time. With the cap above the 512 MiB container limit it overshoots and triggers an OOMKill partway up the ramp; below the limit it plateaus (stress without a kill).',
+    description: 'Leaks analytics-service heap up to a cap over a ramp time.',
     clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [
       { name: 'cap_mb', label: 'Cap', min: 128, max: 1024, step: 64, default: 512, unit: 'MB' },
@@ -124,10 +96,9 @@ const SCENARIOS = {
       return r
     },
   },
-
   'cascade-failure': {
     name: 'Cascade Failure',
-    description: 'Triggers Database Slowdown + LLM Latency Spike simultaneously for a multi-signal incident.',
+    description: 'Triggers Database Slowdown + LLM Latency Spike simultaneously.',
     clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
     params: [],
     async activate (opts = {}) {
@@ -141,182 +112,56 @@ const SCENARIOS = {
       return { ok: true, data: { message: 'cascade-failure reset' } }
     },
   },
+}
 
-  // --------------------------------------------------------------------------- //
-  // Business-process exceptions — gated error branches for the Business Flows.
-  // Off by default; an SE turns one on for a demo so Dynatrace surfaces the
-  // process failure / conversion drop-off without polluting the happy-path funnels.
-  // --------------------------------------------------------------------------- //
+// Dynamically inject Business Process Faults from Industry Config
+if (industryConfig.businessFaults && Array.isArray(industryConfig.businessFaults)) {
+  industryConfig.businessFaults.forEach((f, index) => {
+    const id = `biz-fault-${index}`
+    SCENARIOS[id] = {
+      name: f.label || 'Business Process Failure',
+      description: f.description || 'Injects a business-process failure into the flow.',
+      clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+      params: [RATE_PARAM],
+      async activate (opts = {}) {
+        const rate = pctToFrac(opts.rate, 30)
+        return proxy.post(`${f.targetServiceUrl}/api/v1/admin/fault-gates/${f.faultGateName}`, {
+          enabled: true, rate,
+        })
+      },
+      async reset () {
+        return proxy.post(`${f.targetServiceUrl}/api/v1/admin/fault-gates/${f.faultGateName}`, {
+          enabled: false, rate: 0,
+        })
+      },
+    }
+  })
+}
 
-  'request-failures': {
-    name: 'Service Request Rejections',
-    description: 'Rejects a share of new service requests at validation, so the [Meridian] Service Request Lifecycle flow shows a service_request.rejected error branch + drop-off at the Validated step. Needs request traffic (Citizen-request journey).',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
-        enabled: true, rate,
-      })
-    },
-    async reset () {
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/service-request-rejected`, {
-        enabled: false, rate: 0,
-      })
-    },
+// The umbrella scenario for all business exceptions
+SCENARIOS['business-exceptions'] = {
+  name: 'Business Failures',
+  description: 'Inject business-process failures across every active business flow defined in the industry config.',
+  clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
+  params: [RATE_PARAM],
+  async activate (opts = {}) {
+    const businessFaultKeys = Object.keys(SCENARIOS).filter(k => k.startsWith('biz-fault-'))
+    const activations = businessFaultKeys.map(k => SCENARIOS[k].activate(opts))
+    await Promise.all(activations)
+    return { ok: true, data: { message: 'business-exceptions activated' } }
   },
-
-  'account-failures': {
-    name: 'Account Verification/Activation Failures',
-    description: 'Fails verification/activation for a share of new accounts, so the [Meridian] Account Creation flow shows account.verification_failed / account.activation_failed error branches + drop-off at the Verified/Activated steps. Deferred steps land over the lifecycle bands, so failures appear minutes after signup.',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-verification-failed`, { enabled: true, rate })
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: true, rate })
-    },
-    async reset () {
-      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-verification-failed`, { enabled: false, rate: 0 })
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/account-activation-failed`, { enabled: false, rate: 0 })
-    },
-  },
-
-  'incident-escalations': {
-    name: 'Work Order Escalations',
-    description: 'Escalates a share of acknowledged work orders instead of resolving them, so any incident -> work_order flow shows a workorder.escalated error branch + drop-off at the resolution step.',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
-        enabled: true, rate,
-      })
-    },
-    async reset () {
-      return proxy.post(`${config.OPS_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/work-order-escalated`, {
-        enabled: false, rate: 0,
-      })
-    },
-  },
-
-  'checkout-declines': {
-    name: 'Store Checkout Declines',
-    description: 'Declines a share of checkouts and fails the same share of deliveries, so the [Meridian] City Store Purchase flow shows checkout.payment_declined + order.delivery_failed error branches + drop-off at the Checkout and Delivered steps. Needs store traffic (Store-purchase journey).',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/checkout-payment-declined`, { enabled: true, rate })
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: true, rate })
-    },
-    async reset () {
-      await proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/checkout-payment-declined`, { enabled: false, rate: 0 })
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/order-delivery-failed`, { enabled: false, rate: 0 })
-    },
-  },
-
-  'tax-payment-failures': {
-    name: 'Tax Payment Failures',
-    description: 'Fails a share of tax-bill payments at the gateway (bill stays outstanding), so the [Meridian] Tax Payment flow shows a tax.payment_failed error branch + drop-off at the Payment step. Needs tax traffic (Pay-tax journey).',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
-        enabled: true, rate,
-      })
-    },
-    async reset () {
-      return proxy.post(`${config.CUSTOMER_ENTITY_SERVICE_URL}/api/v1/admin/fault-gates/tax-payment-failed`, {
-        enabled: false, rate: 0,
-      })
-    },
-  },
-
-  'flight-cancellations': {
-    name: 'Flight Cancellations',
-    description: 'Cancels a share of departing flights at boarding, so the Aircraft Turnaround flow shows a flight.cancelled error branch + drop-off at the Boarding step. Needs flight traffic (journey-service).',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/flight.boarding.cancelled`, {
-        enabled: true, rate,
-      })
-    },
-    async reset () {
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/flight.boarding.cancelled`, {
-        enabled: false, rate: 0,
-      })
-    },
-  },
-
-  'passenger-offloads': {
-    name: 'Passenger Offloads',
-    description: 'Offloads a share of passengers at security, so the Passenger Journey flow shows a passenger.offloaded error branch + drop-off at the Security step. Needs passenger traffic (journey-service).',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      const rate = pctToFrac(opts.rate, 30)
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/passenger.security_cleared.offloaded`, {
-        enabled: true, rate,
-      })
-    },
-    async reset () {
-      return proxy.post(`${config.JOURNEY_SERVICE_URL}/api/v1/admin/fault-gates/passenger.security_cleared.offloaded`, {
-        enabled: false, rate: 0,
-      })
-    },
-  },
-
-  'business-exceptions': {
-    name: 'Business Failures',
-    description: 'Inject business-process failures across every active business flow at one shared rate — Dynatrace surfaces the failure branch + conversion drop-off wherever traffic is flowing. One toggle + one rate for all flows (replaces the old per-flow failure scenarios).',
-    clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [RATE_PARAM],
-    async activate (opts = {}) {
-      await SCENARIOS['request-failures'].activate(opts)
-      await SCENARIOS['account-failures'].activate(opts)
-      await SCENARIOS['incident-escalations'].activate(opts)
-      await SCENARIOS['checkout-declines'].activate(opts)
-      await SCENARIOS['tax-payment-failures'].activate(opts)
-      await SCENARIOS['flight-cancellations'].activate(opts)
-      await SCENARIOS['passenger-offloads'].activate(opts)
-      return { ok: true, data: { message: 'business-exceptions activated' } }
-    },
-    async reset () {
-      await SCENARIOS['request-failures'].reset()
-      await SCENARIOS['account-failures'].reset()
-      await SCENARIOS['incident-escalations'].reset()
-      await SCENARIOS['checkout-declines'].reset()
-      await SCENARIOS['tax-payment-failures'].reset()
-      await SCENARIOS['flight-cancellations'].reset()
-      await SCENARIOS['passenger-offloads'].reset()
-      return { ok: true, data: { message: 'business-exceptions reset' } }
-    },
+  async reset () {
+    const businessFaultKeys = Object.keys(SCENARIOS).filter(k => k.startsWith('biz-fault-'))
+    const resets = businessFaultKeys.map(k => SCENARIOS[k].reset())
+    await Promise.all(resets)
+    return { ok: true, data: { message: 'business-exceptions reset' } }
   },
 }
 
-// The per-flow failure scenarios are folded into the single 'business-exceptions'
-// control (one toggle + rate for all flows). They stay defined as internal building
-// blocks the umbrella calls, but are hidden from the catalog so operators use the one
-// unified control instead of toggling failures a flow at a time. Making a new
-// industry's flow failable means wiring its service into 'business-exceptions', not
-// adding (and re-skinning) another per-flow scenario.
 const HIDDEN_SCENARIOS = new Set([
-  'request-failures',
-  'account-failures',
-  'incident-escalations',
-  'checkout-declines',
-  'tax-payment-failures',
-  'flight-cancellations',
-  'passenger-offloads',
+  ...Object.keys(SCENARIOS).filter(k => k.startsWith('biz-fault-'))
 ])
 
-/**
- * Return metadata for the catalog scenarios (hidden building-block scenarios excluded).
- */
 function listScenarios () {
   return Object.entries(SCENARIOS)
     .filter(([id]) => !HIDDEN_SCENARIOS.has(id))
@@ -329,15 +174,6 @@ function listScenarios () {
     }))
 }
 
-/**
- * Activate a scenario by ID, register it as active, and schedule auto-reset
- * based on the chosen clear mode/duration.
- * @param {string} id
- * @param {object} [opts] fault param overrides (e.g. seconds, cap_mb,
- *   ramp_minutes) plus clear_mode ('auto'|'manual') and clear_minutes; the clear
- *   fields fall back to the scenario's defaults when absent.
- * @returns {{ ok: boolean, scenario?: object, error?: string }}
- */
 async function activateScenario (id, opts = {}) {
   const scenario = SCENARIOS[id]
   if (!scenario) return { ok: false, error: `Unknown scenario '${id}'` }
@@ -367,19 +203,12 @@ async function activateScenario (id, opts = {}) {
   }
 }
 
-/**
- * Reset a specific scenario by ID.
- */
 async function resetScenario (id) {
   const scenario = SCENARIOS[id]
   if (!scenario) return { ok: false, error: `Unknown scenario '${id}'` }
   return scenario.reset()
 }
 
-/**
- * Reset all known scenarios + any services not covered by a named scenario,
- * then clear the active scenario state.
- */
 async function resetAll () {
   const scenarioResets = Object.entries(SCENARIOS).map(([id, s]) =>
     s.reset().then(r => ({ id, ...r })).catch(e => ({ id, ok: false, error: e.message }))
@@ -389,12 +218,9 @@ async function resetAll () {
 
   state.clearActiveScenario()
 
-  // Zero out all local fault state
   for (const key of Object.keys(state.getFaults())) {
     const currentFault = state.getFaults()[key]
-    state.setFault(key, Object.fromEntries(
-      Object.keys(currentFault).map(k => [k, typeof currentFault[k] === 'number' ? 0 : false])
-    ))
+    state.setFault(key, Object.keys(currentFault).map(k => [k, typeof currentFault[k] === 'number' ? 0 : false]))
   }
 
   return results

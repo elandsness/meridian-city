@@ -54,7 +54,7 @@ export default function EntityDetailPage({ entityType: entityTypeProp, fields })
         <dl className="grid grid-cols-2 gap-4">
           {columns.map((c) => (
             <div key={c}>
-              <dt className="text-xs text-slate-400 uppercase tracking-wide">{c.replace(/_/g, ' ')}</dt>
+              <dt className="text-xs text-slate-400 uppercase tracking-wide">{def?.fields?.[c]?.label ?? c.replace(/_/g, ' ')}</dt>
               <dd className="text-sm text-slate-800 mt-0.5">{formatValue(entity[c])}</dd>
             </div>
           ))}
