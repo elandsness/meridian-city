@@ -20,7 +20,7 @@ public record ServiceRequestResponse(
     public static ServiceRequestResponse from(ServiceRequest request) {
         return new ServiceRequestResponse(
                 request.getId(),
-                request.getCitizenId(),
+                request.getIdentityId(),
                 request.getCategory(),
                 request.getPriority(),
                 request.getStatus(),

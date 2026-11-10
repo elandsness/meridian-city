@@ -1,7 +1,6 @@
 package com.meridian.journey.web;
 
 import com.meridian.journey.service.FaultGateRegistry;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -18,10 +17,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/admin/fault-gates")
-@RequiredArgsConstructor
 public class FaultGateAdminController {
 
     private final FaultGateRegistry registry;
+
+    public FaultGateAdminController(FaultGateRegistry registry) {
+        this.registry = registry;
+    }
 
     @GetMapping
     public Map<String, FaultGateRegistry.FaultGateState> list() {

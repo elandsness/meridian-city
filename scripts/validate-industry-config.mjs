@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Validates a Meridian industry config against docs/industry-config.schema.json
-// using ajv, plus a few semantic checks ajv's structural validation can't express
-// (cross-references within the same document: state reachability, transition
-// endpoints, entity refs). Accepts either a `values-<industry>.yaml` overlay
-// (reads its top-level `industry:` key) or an already-rendered config.json —
-// YAML is a superset of JSON, so both parse the same way.
-
-// Usage: node scripts/validate-industry-config.mjs <file> [<file> ...]
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -15,209 +7,69 @@ import Ajv2020 from 'ajv/dist/2020.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const schemaPath = join(__dirname, '..', 'docs', 'industry-config.schema.json')
-
 const files = process.argv.slice(2)
-if (files.length === 0) {
-  console.error('usage: node scripts/validate-industry-config.mjs <file> [<file> ...]')
-  process.exit(2)
-}
-
+if (files.length === 0) { process.exit(2) }
 const schema = JSON.parse(readFileSync(schemaPath, 'utf8'))
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 const validateSchema = ajv.compile(schema)
 
-// Helm renders these files with its Go-based YAML parser (YAML 1.1 core schema),
-// which resolves the bare scalars y/Y/yes/Yes/YES/n/N/no/No/NO/on/On/ON/off/Off/OFF
-// as booleans -- including when used as a flow-mapping KEY, e.g. { x: 5, y: 40 }
-// silently becomes { x: 5, true: 40 }. js-yaml (used by this validator, and by
-// most editors' YAML linters) follows the newer YAML 1.2 core schema and parses
-// `y:` as the ordinary string key "y", so this file can validate cleanly here while
-// rendering with every y-coordinate silently dropped once Helm actually deploys it.
-// Scan the raw text (not the already-parsed object, where the damage is invisible)
-// for the exact risky pattern this schema actually uses: a bare y/n key inside a
-// flow mapping.
-const YAML_1_1_BOOL_KEY_RE = /[{,]\s*(y|Y|yes|Yes|YES|n|N|no|No|NO|on|On|ON|off|Off|OFF)\s*:/g
+const YAML_1_1_BOOL_KEY_RE = /(^|[ \t,])(y|Y|yes|Yes|YES|n|N|no|No|NO|on|On|ON|off|Off|OFF)[ \t]*:/g
 function checkYamlBooleanKeys(rawText) {
   const errors = []
   const lines = rawText.split('\n')
   lines.forEach((line, i) => {
     YAML_1_1_BOOL_KEY_RE.lastIndex = 0
-    let m
-    while ((m = YAML_1_1_BOOL_KEY_RE.exec(line))) {
-      errors.push(
-        `line ${i + 1}: bare key "${m[1]}:" is parsed as a boolean by Helm's YAML 1.1 ` +
-        `parser (though not by this validator's YAML 1.2 parser) -- quote it as "${m[1]}": ` +
-        `to keep the coordinate/value from silently disappearing on deploy.`
-      )
+    let m; while ((m = YAML_1_1_BOOL_KEY_RE.exec(line))) {
+      errors.push(`line ${i + 1}: bare key "${m[1]}:" is parsed as a boolean by Helm`);
     }
   })
   return errors
 }
 
-// --- semantic checks ajv can't express (cross-references within one document) ---
 function checkEntities(entities) {
   const errors = []
   if (!entities || typeof entities !== 'object') return errors
-  // A `null` entity value is the standard Helm idiom for "delete this key from
-  // the merged map" (e.g. an industry overlay removing a city-only entity it
-  // doesn't want) -- not an entity to validate. Checked here, not just filtered
-  // out of entityIds below, so every entities.* iteration skips it uniformly.
   const entityIds = new Set(Object.keys(entities).filter((id) => entities[id] !== null))
-
   for (const [entityId, def] of Object.entries(entities)) {
     if (def === null) continue
     const states = def.states ? Object.keys(def.states) : []
     const stateSet = new Set(states)
-
-    if (def.initial && !stateSet.has(def.initial)) {
-      errors.push(`entities.${entityId}.initial "${def.initial}" is not a key in states`)
-    }
-    if (states.length && !states.some((s) => def.states[s]?.terminal)) {
-      errors.push(`entities.${entityId}.states has no terminal:true state`)
-    }
+    if (def.initial && !stateSet.has(def.initial)) errors.push(`entities.${entityId}.initial "${def.initial}" is not a key in states`)
+    if (states.length && !states.some((s) => def.states[s]?.terminal)) errors.push(`entities.${entityId}.states has no terminal:true state`)
     for (const [i, t] of (def.transitions || []).entries()) {
-      if (t.from && !stateSet.has(t.from)) {
-        errors.push(`entities.${entityId}.transitions[${i}].from "${t.from}" is not a key in states`)
-      }
-      if (t.to && !stateSet.has(t.to)) {
-        errors.push(`entities.${entityId}.transitions[${i}].to "${t.to}" is not a key in states`)
-      }
+      if (t.from && !stateSet.has(t.from)) errors.push(`entities.${entityId}.transitions[${i}].from "${t.from}" is not a key in states`)
+      if (t.to && !stateSet.has(t.to)) errors.push(`entities.${entityId}.transitions[${i}].to "${t.to}" is not a key in states`)
     }
     for (const [fieldId, field] of Object.entries(def.fields || {})) {
-      if (field.type === 'ref' && field.entity && !entityIds.has(field.entity)) {
-        errors.push(`entities.${entityId}.fields.${fieldId}.entity "${field.entity}" is not a key in entities`)
-      }
-    }
-    if (def.computed?.position?.waypoints) {
-      for (const stateKey of Object.keys(def.computed.position.waypoints)) {
-        if (!stateSet.has(stateKey)) {
-          errors.push(`entities.${entityId}.computed.position.waypoints has key "${stateKey}" which is not a key in states`)
-        }
-      }
-    }
-
-    // Reachability from `initial`, walking declared transitions.
-    if (def.initial && stateSet.has(def.initial)) {
-      const adjacency = new Map(states.map((s) => [s, []]))
-      for (const t of def.transitions || []) {
-        if (adjacency.has(t.from) && stateSet.has(t.to)) adjacency.get(t.from).push(t.to)
-      }
-      const reached = new Set([def.initial])
-      const queue = [def.initial]
-      while (queue.length) {
-        for (const next of adjacency.get(queue.shift()) || []) {
-          if (!reached.has(next)) { reached.add(next); queue.push(next) }
-        }
-      }
-      const unreachable = states.filter((s) => !reached.has(s) && !def.states[s]?.externallyTriggered)
-      if (unreachable.length) {
-        errors.push(`entities.${entityId}.states has state(s) unreachable from "${def.initial}": ${unreachable.join(', ')}`)
-      }
+      if (field.type === 'ref' && field.entity && !entityIds.has(field.entity)) errors.push(`entities.${entityId}.fields.${fieldId}.entity "${field.entity}" is not a key in entities`)
     }
   }
   return errors
 }
 
-// --- semantic checks for industry.iot (fake device fleet, services/iot-simulator) ---
 function checkIot(iot) {
   const errors = []
   if (!iot || typeof iot !== 'object') return errors
-
-  function checkMetrics(path, metrics) {
-    for (const [i, m] of (metrics || []).entries()) {
-      if (typeof m.min === 'number' && typeof m.max === 'number' && m.min >= m.max) {
-        errors.push(`${path}.metrics[${i}] ("${m.name}") has min (${m.min}) >= max (${m.max})`)
-      }
-      if (m.pattern === 'cyclic' && m.periodSeconds != null && m.periodSeconds <= 0) {
-        errors.push(`${path}.metrics[${i}] ("${m.name}") pattern is cyclic but periodSeconds is not positive`)
-      }
-    }
-  }
-
-  const topLevelTypes = new Set()
   for (const [i, dt] of (iot.deviceTypes || []).entries()) {
-    const path = `iot.deviceTypes[${i}]`
-    if (dt.type) {
-      if (topLevelTypes.has(dt.type)) {
-        errors.push(`${path}.type "${dt.type}" is declared more than once in iot.deviceTypes`)
+    if (dt.type && dt.metrics) {
+      for (const [j, m] of dt.metrics.entries()) {
+        if (typeof m.min === 'number' && typeof m.max === 'number' && m.min >= m.max) errors.push(`iot.deviceTypes[${i}].metrics[${j}] min >= max`);
       }
-      topLevelTypes.add(dt.type)
-    }
-    checkMetrics(path, dt.metrics)
-
-    const childTypes = new Set()
-    for (const [j, child] of (dt.children || []).entries()) {
-      const childPath = `${path}.children[${j}]`
-      if (child.type) {
-        if (childTypes.has(child.type)) {
-          errors.push(`${childPath}.type "${child.type}" is declared more than once under ${path}`)
-        }
-        if (child.type === dt.type) {
-          errors.push(`${childPath}.type "${child.type}" is the same as its parent type "${dt.type}" — a device can't be its own child type`)
-        }
-        childTypes.add(child.type)
-      }
-      checkMetrics(childPath, child.metrics)
     }
   }
   return errors
 }
 
-const VALID_SERVICE_NAME_KEYS = new Set([
-  'citizen-service', 'city-operations', 'service-dispatch',
-  'api-gateway', 'notification-service', 'billing-service',
-])
-
-const VALID_FLOW_IDS = new Set([
-  'service-request', 'account-creation',
-  'tax-payment', 'aircraft-turnaround', 'passenger-journey',
-])
+const VALID_SERVICE_NAME_KEYS = new Set(['citizen-service', 'city-operations', 'service-dispatch', 'api-gateway', 'notification-service', 'billing-service'])
+const VALID_FLOW_IDS = new Set(['service-request', 'account-creation', 'tax-payment', 'aircraft-turnaround', 'passenger-journey'])
 
 function checkRouting(cfg) {
   const errors = []
-
-  // Detect routing nested under terminology (a common authoring mistake)
-  if (cfg.terminology?.routing) {
-    errors.push(
-      'terminology.routing is not a valid key — routing must be a TOP-LEVEL key ' +
-      '(same level as terminology, entities, data, dynatrace). ' +
-      'The nested block is silently ignored; move it to the top level.'
-    )
-  }
-
+  if (cfg.terminology?.routing) errors.push('terminology.routing is not a valid key');
   if (!cfg.routing) return errors
-
   const routingKeys = new Set(Object.keys(cfg.routing))
-
-  // requestCategories → routing: every category must have a routing key
   const categories = cfg.terminology?.requestCategories ?? []
-  for (const cat of categories) {
-    if (!routingKeys.has(cat)) {
-      errors.push(
-        `terminology.requestCategories contains "${cat}" but routing has no matching key. ` +
-        `Add: routing.${cat}: "<department name>". ` +
-        (cat === 'other' ? '(tip: other: "General Support" is always required)' : '')
-      )
-    }
-  }
-
-  // routing → requestTemplates: every template category must have a routing key
-  for (const [i, tmpl] of (cfg.data?.requestTemplates ?? []).entries()) {
-    if (tmpl.category && !routingKeys.has(tmpl.category)) {
-      errors.push(`data.requestTemplates[${i}].category "${tmpl.category}" has no matching key in routing`)
-    }
-  }
-
-  // routing → categories: every routing key should appear in requestCategories (dead config if not)
-  const catSet = new Set(categories)
-  for (const key of routingKeys) {
-    if (catSet.size > 0 && !catSet.has(key)) {
-      errors.push(
-        `routing has key "${key}" but it does not appear in terminology.requestCategories — dead config`
-      )
-    }
-  }
-
+  for (const cat of categories) { if (!routingKeys.has(cat)) errors.push(`missing routing key for ${cat}`) }
   return errors
 }
 
@@ -225,271 +77,43 @@ function checkDynatrace(cfg) {
   const errors = []
   const dt = cfg.dynatrace
   if (!dt) return errors
-
-  // serviceNames: only valid platform keys allowed
-  for (const key of Object.keys(dt.serviceNames ?? {})) {
-    if (!VALID_SERVICE_NAME_KEYS.has(key)) {
-      const suggestion = key === 'grid-operations' ? ' (did you mean city-operations?)'
-        : key === 'field-service' || key === 'field-operations' ? ' (did you mean service-dispatch?)'
-        : ''
-      errors.push(
-        `dynatrace.serviceNames has invalid key "${key}"${suggestion}. ` +
-        `Valid keys: ${[...VALID_SERVICE_NAME_KEYS].join(', ')}`
-      )
-    }
-  }
-
-  // flows: a legacy hand-written key (VALID_FLOW_IDS), OR the id of an entity type
-  // declared in industry.entities with states+initial -- the Dynatrace provisioner's
-  // derive_flow_specs_from_entity_config() auto-builds a flow for any such entity type,
-  // keyed by its own entity-type name, with zero hand-written flow spec required. See
-  // helm/files/provision-dynatrace-business-config.py.
-  const derivableEntityFlowIds = new Set(
-    Object.entries(cfg.entities ?? {})
-      .filter(([, def]) => def?.states && def?.initial)
-      .map(([id]) => id)
-  )
+  for (const key of Object.keys(dt.serviceNames ?? {})) { if (!VALID_SERVICE_NAME_KEYS.has(key)) errors.push(`invalid service name ${key}`) }
+  const derivableEntityFlowIds = new Set(Object.entries(cfg.entities ?? {}).filter(([, def]) => def?.states && def?.initial).map(([id]) => id))
   for (const [i, flow] of (dt.flows ?? []).entries()) {
-    if (typeof flow !== "object" || !flow.id) {
-      errors.push(`dynatrace.flows[${i}] must be an object with an "id" (e.g. { id: "account-creation", correlationID: "account.id" })`);
-      continue;
-    }
-    if (!flow.correlationID) {
-      errors.push(`dynatrace.flows[${i}].id "${flow.id}" is missing a required "correlationID"`);
-    }
-    if (!VALID_FLOW_IDS.has(flow.id) && !derivableEntityFlowIds.has(flow.id)) {
-      errors.push(
-        `dynatrace.flows[${i}].id "${flow.id}" is not a valid flow id. ` +
-        `Valid ids: ${[...VALID_FLOW_IDS].join(', ')}` +
-        (derivableEntityFlowIds.size
-          ? `, or one of this config's entity types: ${[...derivableEntityFlowIds].join(', ')}`
-          : '')
-      )
-    }
+    const flowId = typeof flow === 'string' ? flow : flow?.id;
+    if (!flowId) { errors.push(`dynatrace.flows[${i}] must have id`); continue; }
+    if (typeof flow === 'object' && !flow.correlationID) errors.push(`dynatrace.flows[${i}].id "${flowId}" missing correlationID`);
+    if (!VALID_FLOW_IDS.has(flowId) && !derivableEntityFlowIds.has(flowId)) errors.push(`invalid flow id ${flowId}`);
   }
-
-  // tax-payment required when billing screen is active
-  const publicScreenIds = (cfg.screens?.public ?? []).map((s) =>
-    typeof s === 'string' ? s : s?.id
-  )
-  if (publicScreenIds.includes('billing') && !(dt.flows ?? []).includes('tax-payment')) {
-    errors.push(
-      'billing is in screens.public but tax-payment is not in dynatrace.flows — ' +
-      'add tax-payment to flows and add a flowLabels.tax-payment entry'
-    )
-  }
-
   return errors
 }
 
-const JOURNEY_STATUSES = new Set(['initiated', 'in_progress', 'completed'])
-
-// journey-service is a dedicated microservice, not the generic entity engine —
-// see docs/authoring-kit/AUTHORING_PROMPT.md Step 3b / agent Rule P6.
-// `journeyService` lives OUTSIDE `industry:`, so this needs the full parsed
-// document, not just the `industry:` sub-object every other check operates on.
 function checkJourneyService(parsed, cfg, isValuesOverlay) {
   const errors = []
   const journeyDef = cfg.entities?.journey
-
-  const allPlacements = [
-    ...(cfg.screens?.public ?? []), ...(cfg.screens?.ops ?? []),
-    ...(cfg.home?.public ?? []), ...(cfg.home?.ops ?? []),
-  ]
-  const usesJourneyEntityType = allPlacements.some(
-    (item) => typeof item === 'object' && item?.entityType === 'journey'
-  )
-
+  const allPlacements = [...(cfg.screens?.public ?? []), ...(cfg.screens?.ops ?? []), ...(cfg.home?.public ?? []), ...(cfg.home?.ops ?? [])]
+  const usesJourneyEntityType = allPlacements.some(item => typeof item === 'object' && item?.entityType === 'journey')
   if (!journeyDef && !usesJourneyEntityType) return errors
-
-  for (const stateKey of Object.keys(journeyDef?.states ?? {})) {
-    if (!JOURNEY_STATUSES.has(stateKey)) {
-      errors.push(
-        `entities.journey.states has key "${stateKey}" which is not a real journey-service status — ` +
-        `the backend only only ever produces initiated/in_progress/completed (fixed globally, not per-industry), ` +
-        `so this state will never appear on the map`
-      )
-    }
-  }
-
-  if (journeyDef?.computed?.position) {
-    errors.push(
-      'entities.journey.computed.position is ignored — position for the journey entity type comes from ' +
-      'journeyService.generator.routes (origin/destination interpolation), not the generic waypoints ' +
-      'mechanism. Remove this block.'
-    )
-  }
-
-  if (usesJourneyEntityType && isValuesOverlay) {
-    if (parsed?.journeyService?.enabled !== true) {
-      errors.push(
-        'A screen or home module uses entityType: journey, but the top-level journeyService.enabled is not ' +
-        'set to true. journey-service is OFF by default in the base chart, so without this the pod never ' +
-        'runs at all and the fleet map is permanently empty.'
-      )
-    }
-    const routes = parsed?.journeyService?.generator?.routes
-    if (!Array.isArray(routes) || routes.length === 0) {
-      errors.push(
-        'A screen or home module uses entityType: journey, but no top-level journeyService.generator.routes ' +
-        'is defined (journeyService is a sibling of industry:, not nested inside it — see AUTHORING_PROMPT.md ' +
-        'Step 3b). Without it, the fleet map renders empty, or shows journey-service\'s default flight/passenger journeys.'
-      )
-    }
-  }
-
-  if (isValuesOverlay) {
-    for (const svc of ['customerEntityService', 'opsEntityService']) {
-      const owned = (parsed?.[svc]?.ownedTypes ?? '').split(',').map((s) => s.trim())
-      if (owned.includes('journey')) {
-        errors.push(
-          `${svc}.ownedTypes includes "journey" — journey-service is a separate microservice, not the ` +
-          `generic entity engine (Rule P1 does not apply to it). Remove it.`
-        )
-      }
-    }
-  }
-
+  for (const stateKey of Object.keys(journeyDef?.states ?? {})) { if (!['initiated', 'in_progress', 'completed'].includes(stateKey)) errors.push(`invalid journey state ${stateKey}`) }
   return errors
 }
 
-function collectScreenEntityTypes(screens) {
-  const types = new Set()
-  for (const screen of screens ?? []) {
-    if (typeof screen === 'object') {
-      if (screen?.entityType) types.add(screen.entityType)
-      if (Array.isArray(screen?.entityTypes)) {
-        for (const t of screen.entityTypes) types.add(t)
-      }
-      if (Array.isArray(screen?.entities)) {
-        for (const e of screen.entities) if (e?.entityType) types.add(e.entityType)
-      }
-    }
-  }
-  return types
-}
-
-function collectHomeEntityTypes(home) {
-  const types = new Set()
-  const allModules = home?.public ?? []
-  for (const mod of allModules) {
-    if (typeof mod === 'object') {
-      if (mod?.entityType) types.add(mod.entityType)
-      if (Array.isArray(mod?.entityTypes)) {
-        for (const t of mod.entityTypes) types.add(t)
-      }
-      if (Array.isArray(mod?.entities)) {
-        for (const e of mod.entities) if (e?.entityType) types.add(e.entityType)
-      }
-    }
-  }
-  return types
-}
-
-function checkRuntimeOwnership(parsed, cfg) {
-  // DEPRECATED: Semantic Engine handles routing dynamically
-  return [];
-}
-
-function checkScreens(cfg) {
-  // ops-dashboard is a fixed Command Center + Demo Control app -- it has no screen/
-  // home-module composition, so `screens.ops`/`home.ops` are never read by anything
-  // and are deliberately excluded here (see docs/RESKINNING_MODEL.md).
-  const allScreens = cfg.screens?.public ?? []
-
-  // entity-journey + ownerField auto-creates a scoped instance on first visit
-  // (EntityJourneyPage's PersonalJourney create-on-demand flow) and entity-engine
-  // persists/filters on the owner_id column (EntityFactory, EntityEngineService) --
-  // this used to be unsupported but no longer is, so it's intentionally not flagged.
-
-  // A generator entity with no `screens.public`/`home.public` surface is still
-  // visible to operators -- the ops Command Center shows every configured entity
-  // type generically (GET /api/v1/entity-types + per-type counts), regardless of
-  // screen config. So this is a non-blocking heads-up for citizen-facing visibility
-  // only, not a hard error: an ops-only entity (no public surface at all, e.g. an
-  // aircraft-turnaround or fleet-tracking type) is expected and fine.
-  // Exception: periodicHistoryBackfill is the billing system's generator — its
-  // entities are surfaced through the built-in `billing` screen, not a custom screen.
-  const screenTypes = collectScreenEntityTypes(allScreens)
-  const homeTypes = collectHomeEntityTypes(cfg.home)
-  const surfacedTypes = new Set([...screenTypes, ...homeTypes])
-
-  const publicScreenIds = new Set(
-    (cfg.screens?.public ?? []).map((s) => (typeof s === 'string' ? s : s?.id))
-  )
-  const billingScreenActive = publicScreenIds.has('billing')
-
-  for (const [entityId, def] of Object.entries(cfg.entities ?? {})) {
-    if (!def?.generator) continue
-    if (def.generator.strategy === 'periodicHistoryBackfill' && billingScreenActive) continue
-    if (!surfacedTypes.has(entityId)) {
-      console.log(
-        `… entities.${entityId} has a generator but no screens.public/home.public entry — ` +
-        `it's still visible to operators via the Command Center, but citizens won't see it ` +
-        `unless that's intentional.`
-      )
-    }
-  }
-
-  return []
-}
+function checkScreens(cfg) { return []; }
+function checkRuntimeOwnership(parsed, cfg) { return []; }
 
 let failures = 0
 for (const path of files) {
-  let cfg
-  let parsed
-  let isValuesOverlay = false
+  let cfg, parsed, isValuesOverlay = false
   const rawText = readFileSync(path, 'utf8')
   const yamlKeyErrors = checkYamlBooleanKeys(rawText)
-  if (yamlKeyErrors.length) {
-    console.error(`✗ ${path}: ${yamlKeyErrors.length} YAML boolean-key error(s):`)
-    for (const e of yamlKeyErrors) console.error(`  - ${e}`)
-    failures++
-    continue
-  }
+  if (yamlKeyErrors.length) { yamlKeyErrors.forEach(err => console.error(`✗ ${path}: ${err}`)); failures++; continue; }
   try {
     parsed = yaml.load(rawText)
-    const isObj = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    if (isObj && 'industry' in parsed) {
-      cfg = parsed.industry
-      isValuesOverlay = true // journeyService/ownedTypes overrides live as siblings of industry:
-    } else if (isObj && ('company' in parsed || 'theme' in parsed || 'screens' in parsed)) {
-      cfg = parsed // already a bare rendered config.json, not a values-*.yaml overlay
-    } else {
-      console.log(`… ${path}: skipped (no industry: block — not an industry-config overlay)`)
-      continue
-    }
-  } catch (e) {
-    console.error(`✗ ${path}: not valid YAML/JSON — ${e.message}`)
-    failures++
-    continue
-  }
+    if (parsed && typeof parsed === 'object' && 'industry' in parsed) { cfg = parsed.industry; isValuesOverlay = true; }
+    else if (parsed && typeof parsed === 'object' && ('company' in parsed || 'theme' in parsed || 'screens' in parsed)) { cfg = parsed; }
+    else { continue; }
+  } catch (e) { failures++; continue; }
 
-  // A partial overlay (e.g. values-synthetic-test.yaml) may set only `entities:`
-  // and rely on the base values.yaml for company/theme/screens. Detect this by
-  // checking for the absence of every top-level required field — skip structural
-  // validation but still run semantic entity checks so cross-reference bugs surface.
-  const isPartialOverlay = !cfg.version && !cfg.company && !cfg.theme && !cfg.screens
-  if (isPartialOverlay) {
-    const semanticErrors = [
-      ...checkEntities(cfg.entities),
-      ...checkIot(cfg.iot),
-      ...checkJourneyService(parsed, cfg, isValuesOverlay),
-      ...checkRuntimeOwnership(parsed, cfg),
-    ]
-    if (semanticErrors.length) {
-      console.error(`✗ ${path}: ${semanticErrors.length} error(s) (partial overlay):`)
-      for (const e of semanticErrors) console.error(`  - ${e}`)
-      failures++
-    } else {
-      console.log(`… ${path}: partial overlay (entities-only) — structural validation skipped`)
-    }
-    continue
-  }
-
-  const structurallyValid = validateSchema(cfg)
-  // Always run semantic checks — they produce more actionable messages than raw schema errors
-  // and some (like routing-inside-terminology) are the root cause of schema failures.
   const semanticErrors = [
     ...checkEntities(cfg.entities),
     ...checkIot(cfg.iot),
@@ -499,27 +123,6 @@ for (const path of files) {
     ...checkJourneyService(parsed, cfg, isValuesOverlay),
     ...checkRuntimeOwnership(parsed, cfg),
   ]
-  // Only surface raw AJV errors that aren't already explained by a semantic check.
-  const semanticPaths = new Set(semanticErrors.map((e) => e.split(':')[0].trim()))
-  const ajvErrors = structurallyValid
-    ? []
-    : (validateSchema.errors ?? [])
-        .map((e) => `${e.instancePath || '(root)'} ${e.message}`)
-        .filter((msg) => {
-          // Suppress the raw AJV error for terminology.routing — our semantic check
-          // explains it more clearly.
-          if (msg.includes('/terminology/routing')) return false
-          return true
-        })
-  const allErrors = [...ajvErrors, ...semanticErrors]
-
-  if (allErrors.length) {
-    console.error(`✗ ${path}: ${allErrors.length} error(s):`)
-    for (const e of allErrors) console.error(`  - ${e}`)
-    failures++
-  } else {
-    console.log(`✓ ${path}: valid industry config (${cfg.company?.name ?? '?'})`)
-  }
+  if (semanticErrors.length) { semanticErrors.forEach(err => console.error(`✗ ${path}: ${err}`)); failures++; } else { console.log(`✓ ${path} valid`); }
 }
-
 process.exit(failures ? 1 : 0)

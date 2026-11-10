@@ -1,161 +1,103 @@
 package com.meridian.journey.service;
 
+import com.meridian.journey.config.JourneyGeneratorProperties;
 import com.meridian.journey.config.JourneyLifecycleProperties;
-import com.meridian.journey.domain.Journey;
-import com.meridian.journey.domain.JourneyStage;
-import com.meridian.journey.dto.CreateJourneyRequest;
-import com.meridian.journey.dto.JourneyResponse;
-import com.meridian.journey.messaging.JourneyEventPublisher;
-import com.meridian.journey.repository.JourneyRepository;
-import com.meridian.journey.repository.JourneyStageRepository;
-import com.meridian.journey.util.BusinessEventLogger;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import com.meridian.journey.dto.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class JourneyService {
+    private static final Logger log = LoggerFactory.getLogger(JourneyService.class);
+    
+    private final JourneyGeneratorProperties generatorProps;
+    private final JourneyLifecycleProperties lifecycleProps;
+    private final JourneyGenerator generator;
+    private final Map<String, Journey> activeJourneys = new ConcurrentHashMap<>();
 
-    private final JourneyRepository journeyRepository;
-    private final JourneyStageRepository journeyStageRepository;
-    private final JourneyEventPublisher journeyEventPublisher;
-    private final BusinessEventLogger businessEventLogger;
-    private final JourneyLifecycleProperties lifecycleProperties;
+    public JourneyService(JourneyGeneratorProperties generatorProps, JourneyLifecycleProperties lifecycleProps, JourneyGenerator generator) {
+        this.generatorProps = generatorProps;
+        this.lifecycleProps = lifecycleProps;
+        this.generator = generator;
+    }
 
-    @Transactional(readOnly = true)
-    public List<JourneyResponse> listByEntityType(String entityType) {
-        if (entityType == null || entityType.isBlank()) {
-            return List.of();
+    public void initializeJourney(CreateJourneyRequest request) {
+        String id = request.getIdentityId();
+        if (activeJourneys.containsKey(id)) {
+            log.info("Journey already active for {}. Skipping.", id);
+            return;
         }
-        return journeyRepository.findByEntityTypeOrderByCreatedAtDesc(entityType).stream()
-                .map(this::toResponse)
-                .toList();
+        
+        log.info("Initializing new journey for identity: {}", id);
+        Journey journey = generator.generate(id, request.getEntityType());
+        activeJourneys.put(id, journey);
     }
 
-    @Transactional(readOnly = true)
-    public List<JourneyResponse> board(String entityType, String status, String direction) {
-        List<Journey> journeys;
-        boolean hasType = entityType != null && !entityType.isBlank();
-        boolean hasStatus = status != null && !status.isBlank();
-        boolean hasDirection = direction != null && !direction.isBlank();
-
-        if (hasType && hasStatus) {
-            journeys = journeyRepository.findByEntityTypeAndStatus(entityType, status);
-        } else if (hasType && hasDirection) {
-            journeys = journeyRepository.findByEntityTypeAndDirection(entityType, direction);
-        } else if (hasType) {
-            journeys = journeyRepository.findByEntityTypeOrderByCreatedAtDesc(entityType);
-        } else if (hasStatus) {
-            journeys = journeyRepository.findByStatusOrderByCreatedAtDesc(status);
-        } else {
-            journeys = journeyRepository.findAllByOrderByCreatedAtDesc();
-        }
-        return journeys.stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public JourneyResponse getForUser(String userId) {
-        Journey journey = journeyRepository.findByEntityTypeAndUserId(lifecycleProperties.getPrimaryJourneyEntityType(), userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "personal journey not found for user: " + userId));
-        return toResponse(journey);
-    }
-
-    @Transactional(readOnly = true)
-    public JourneyResponse get(String id) {
-        Journey journey = journeyRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "journey not found: " + id));
-        return toResponse(journey);
-    }
-
-    @Transactional
-    public Journey create(Journey journey) {
-        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.nextDelaySeconds()));
-        journey = journeyRepository.save(journey);
-        log.info("Created journey id={} entityType={} name={}", journey.getId(), journey.getEntityType(), journey.getName());
-        return journey;
-    }
-
-    @Transactional
-    public JourneyResponse createFromRequest(CreateJourneyRequest req) {
-        Journey journey = Journey.create(
-                req.getEntityType(), req.getName(), req.getRelatedId(), req.getRelatedId(), 
-                req.getDirection(), req.getOrigin(), req.getDestination(), req.getMetadata(),
-                req.getInitialStatus() != null ? req.getInitialStatus() : "in_progress",
-                req.getOriginX(), req.getOriginY(), req.getDestX(), req.getDestY());
-        journey.setNextTransitionAt(OffsetDateTime.now().plusSeconds(lifecycleProperties.nextDelaySeconds()));
-        journey = journeyRepository.save(journey);
-        businessEventLogger.journeyStatus(journey);
-        journeyEventPublisher.publishJourneyEvent("journey.created", journey);
-        log.info("Created journey id={} entityType={} name={} (external)", journey.getId(), journey.getEntityType(), journey.getName());
-        return toResponse(journey);
-    }
-
-    private JourneyResponse toResponse(Journey j) {
-        List<JourneyStage> stages = journeyStageRepository.findByJourneyIdOrderByStageOrderAsc(j.getId());
-        List<JourneyResponse.Stage> stageResponses = stages.stream()
-                .map(s -> JourneyResponse.Stage.builder()
-                        .stageName(s.getStageName())
-                        .stageOrder(s.getStageOrder())
-                        .progress(s.getProgress())
-                        .enteredAt(s.getEnteredAt())
-                        .exitedAt(s.getExitedAt())
-                        .build())
-                .toList();
-
-        double liveProgress = effectiveProgress(j);
-        return JourneyResponse.builder()
-                .id(j.getId())
-                .entityType(j.getEntityType())
-                .name(j.getName())
-                .relatedId(j.getRelatedId())
-                .direction(j.getDirection())
-                .origin(j.getOrigin())
-                .destination(j.getDestination())
-                .status(j.getStatus())
-                .state(j.getStatus())
-                .progress(liveProgress)
-                .position(interpolatePosition(j, liveProgress))
-                .stages(stageResponses)
-                .scheduledAt(j.getScheduledAt())
-                .createdAt(j.getCreatedAt())
-                .updatedAt(j.getUpdatedAt())
-                .build();
-    }
-
-    private double effectiveProgress(Journey j) {
-        OffsetDateTime stageStart = j.getUpdatedAt();
-        OffsetDateTime stageEnd = j.getNextTransitionAt();
-        if (stageStart == null || stageEnd == null || !stageEnd.isAfter(stageStart)) {
-            return j.getProgress();
-        }
-        String nextStatus = lifecycleProperties.getNextStatus(j.getStatus());
-        if (nextStatus == null) {
-            return j.getProgress();
-        }
-        double stageStartProgress = j.getProgress();
-        double stageEndProgress = lifecycleProperties.progressFor(nextStatus);
-        long totalMillis = java.time.Duration.between(stageStart, stageEnd).toMillis();
-        long elapsedMillis = java.time.Duration.between(stageStart, OffsetDateTime.now()).toMillis();
-        double fraction = Math.max(0.0, Math.min(1.0, elapsedMillis / (double) totalMillis));
-        return stageStartProgress + (stageEndProgress - stageStartProgress) * fraction;
-    }
-
-    private JourneyResponse.Position interpolatePosition(Journey j, double progress) {
-        if (j.getOriginX() == null || j.getOriginY() == null || j.getDestX() == null || j.getDestY() == null) {
+    public JourneyResponse getJourney(String identityId) {
+        Journey journey = activeJourneys.get(identityId);
+        if (journey == null) {
+            log.warn("No active journey found for identity: {}", identityId);
             return null;
         }
-        double t = Math.max(0.0, Math.min(1.0, progress));
-        double x = j.getOriginX() + (j.getDestX() - j.getOriginX()) * t;
-        double y = j.getOriginY() + (j.getDestY() - j.getOriginY()) * t;
-        return JourneyResponse.Position.builder().x(x).y(y).build();
+        return mapToResponse(journey);
+    }
+
+    public void updateJourneyProgress(String identityId, double progress) {
+        Journey journey = activeJourneys.get(identityId);
+        if (journey != null) {
+            journey.setProgress(progress);
+            log.debug("Updated progress for {}: {}", identityId, progress);
+        }
+    }
+
+    public void endJourney(String identityId) {
+        Journey journey = activeJourneys.remove(identityId);
+        if (journey != null) {
+            log.info("Ending journey for {}. Final state: {}", identityId, journey.getStatus());
+        }
+    }
+
+    private JourneyResponse mapToResponse(Journey j) {
+        return JourneyResponse.builder()
+            .id(j.getId())
+            .entityType(j.getEntityType())
+            .name(j.getName())
+            .relatedId(j.getRelatedId())
+            .direction(j.getDirection())
+            .origin(j.getOrigin())
+            .destination(j.getDestination())
+            .status(j.getStatus())
+            .state(j.getState())
+            .progress(j.getProgress())
+            .position(JourneyResponse.Position.builder().x(j.getX()).y(j.getY()).build())
+            .stages(mapStages(j.getStages()))
+            .scheduledAt(j.getScheduledAt())
+            .createdAt(j.getCreatedAt())
+            .updatedAt(j.getUpdatedAt())
+            .build();
+    }
+
+    private List<JourneyResponse.Stage> mapStages(List<JourneyStage> stages) {
+        if (stages == null) return Collections.emptyList();
+        List<JourneyResponse.Stage> respStages = new ArrayList<>();
+        for (JourneyStage s : stages) {
+            respStages.add(JourneyResponse.Stage.builder()
+                .stageName(s.getStageName())
+                .stageOrder(s.getStageOrder())
+                .progress(s.getProgress())
+                .enteredAt(s.getEnteredAt())
+                .exitedAt(s.getExitedAt())
+                .build());
+        }
+        return respStages;
+    }
+
+    public Map<String, Journey> getActiveJourneys() {
+        return activeJourneys;
     }
 }
