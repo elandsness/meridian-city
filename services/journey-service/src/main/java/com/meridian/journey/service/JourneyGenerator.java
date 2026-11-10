@@ -2,88 +2,70 @@ package com.meridian.journey.service;
 
 import com.meridian.journey.config.JourneyGeneratorProperties;
 import com.meridian.journey.config.JourneyLifecycleProperties;
-import com.meridian.journey.domain.Journey;
-import com.meridian.journey.repository.JourneyRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.meridian.journey.dto.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class JourneyGenerator {
+    private static final Logger log = LoggerFactory.getLogger(JourneyGenerator.class);
+    
+    private final JourneyGeneratorProperties generatorProps;
+    private final JourneyLifecycleProperties lifecycleProps;
 
-    private final JourneyRepository journeyRepository;
-    private final JourneyLifecycleProperties lifecycleProperties;
-    private final JourneyGeneratorProperties generatorProperties;
-    private final JourneyService journeyService;
-
-    @Scheduled(fixedRateString = \"${journey.generator.interval-ms:60000}\")
-    @Transactional
-    public void generateJourneys() {
-        if (!generatorProperties.isEnabled()) {
-            return;
-        }
-
-        log.info(\"Tick: Generating new journeys...\");
-
-        List<String> activeStatuses = lifecycleProperties.getActiveStatuses();
-        int currentActive = journeyRepository.countByStatusIn(activeStatuses);
-        
-        if (currentActive >= generatorProperties.getMaxActive()) {
-            log.info(\"Board is saturated ({} active journeys). Skipping generation.\", currentActive);
-            return;
-        }
-
-        spawnGenericJourney();
+    public JourneyGenerator(JourneyGeneratorProperties generatorProps, JourneyLifecycleProperties lifecycleProps) {
+        this.generatorProps = generatorProps;
+        this.lifecycleProps = lifecycleProps;
     }
 
-    private void spawnGenericJourney() {
-        String[] types = generatorProperties.getEntityTypes();
-        if (types == null || types.length == 0) {
-            log.warn(\"No entity types configured for journey generation.\");
-            return;
+    public Journey generate(String identityId, String entityType) {
+        log.info("Generating journey for {} of type {}", identityId, entityType);
+        
+        String type = (entityType != null) ? entityType : lifecycleProps.getPrimaryJourneyEntityType();
+        
+        // Simple mock generation
+        Journey journey = new Journey();
+        journey.setId(UUID.randomUUID().toString());
+        journey.setEntityType(type);
+        journey.setRelatedId(identityId);
+        journey.setName(type + " " + identityId);
+        
+        // Random route
+        if (generatorProps.getRoutes() != null && !generatorProps.getRoutes().isEmpty()) {
+            JourneyGeneratorProperties.RouteConfig route = generatorProps.getRoutes().get(ThreadLocalRandom.current().nextInt(generatorProps.getRoutes().size()));
+            journey.setOrigin(route.getOrigin());
+            journey.setDestination(route.getDestination());
+            journey.setDirection(route.getOrigin() + " -> " + route.getDestination());
+            journey.setX(route.getOriginX());
+            journey.setY(route.getOriginY());
+        } else {
+            journey.setOrigin("Unknown");
+            journey.setDestination("Unknown");
+            journey.setDirection("Unknown");
+            journey.setX(0.0);
+            journey.setY(0.0);
         }
 
-        String type = types[ThreadLocalRandom.current().nextInt(types.length)];
-        
-        List<JourneyGeneratorProperties.RouteConfig> routes = generatorProperties.getRoutes();
-        if (routes == null || routes.isEmpty()) {
-            log.warn(\"No routes configured to generate journey for type {}.\", type);
-            return;
-        }
-        
-        JourneyGeneratorProperties.RouteConfig route = routes.get(ThreadLocalRandom.current().nextInt(routes.size()));
-        
-        String name = type.substring(0, 1).toUpperCase() + type.substring(1) + \" \" + 
-                     UUID.randomUUID().toString().substring(0, 5);
+        journey.setStatus(type == "passenger" ? "DEPARTED" : "ACTIVE");
+        journey.setState(type == "passenger" ? "In-Flight" : "Operating");
+        journey.setProgress(0.0);
+        journey.setCreatedAt(OffsetDateTime.now());
+        journey.setUpdatedAt(OffsetDateTime.now());
+        journey.setScheduledAt(OffsetDateTime.now().plusHours(1));
 
-        String initialStatus = generatorProperties.getInitialStatuses() != null 
-            ? generatorProperties.getInitialStatuses().get(type) 
-            : \"initiated\";
+        // Stages
+        List<JourneyStage> stages = new ArrayList<>();
+        stages.add(new JourneyStage("Check-in", 1, 0.0, OffsetDateTime.now(), null));
+        stages.add(new JourneyStage("Boarding", 2, 0.0, null, null));
+        stages.add(new JourneyStage("Flight", 3, 0.0, null, null));
+        stages.add(new JourneyStage("Arrival", 4, 0.0, null, null));
+        journey.setStages(stages);
 
-        String metadata = createMetadata(type);
-
-        Journey journey = Journey.create(
-                type, name, null, null, 
-                \"inbound\", route.getOrigin(), route.getDestination(), 
-                metadata, initialStatus,
-                route.getOriginX(), route.getOriginY(), route.getDestX(), route.getDestY());
-        
-        journeyService.create(journey);
-        log.info(\"Generated journey: {} [{}] from {} to {}\", name, type, route.getOrigin(), route.getDestination());
-    }
-
-    private String createMetadata(String type) {
-        if (\"passenger\".equalsIgnoreCase(type)) {
-            boolean hasBag = ThreadLocalRandom.current().nextDouble() < generatorProperties.getBagProbability();
-            return String.format(\"{\\\"has_bag\\\": %b}\", hasBag);
-        }
-        return null;
+        return journey;
     }
 }

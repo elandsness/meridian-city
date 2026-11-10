@@ -13,7 +13,7 @@ const schema = JSON.parse(readFileSync(schemaPath, 'utf8'))
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 const validateSchema = ajv.compile(schema)
 
-const YAML_1_1_BOOL_KEY_RE = /[{,}\s*(y|Y|yes|Yes|YES|n|N|no|No|NO|on|On|ON|off|Off|OFF)\s*:/g
+const YAML_1_1_BOOL_KEY_RE = /(^|[ \t,])(y|Y|yes|Yes|YES|n|N|no|No|NO|on|On|ON|off|Off|OFF)[ \t]*:/g
 function checkYamlBooleanKeys(rawText) {
   const errors = []
   const lines = rawText.split('\n')
@@ -106,7 +106,7 @@ for (const path of files) {
   let cfg, parsed, isValuesOverlay = false
   const rawText = readFileSync(path, 'utf8')
   const yamlKeyErrors = checkYamlBooleanKeys(rawText)
-  if (yamlKeyErrors.length) { console.error(`✗ ${path}: ${yamlKeyErrors.length} errors`); failures++; continue; }
+  if (yamlKeyErrors.length) { yamlKeyErrors.forEach(err => console.error(`✗ ${path}: ${err}`)); failures++; continue; }
   try {
     parsed = yaml.load(rawText)
     if (parsed && typeof parsed === 'object' && 'industry' in parsed) { cfg = parsed.industry; isValuesOverlay = true; }
@@ -123,6 +123,6 @@ for (const path of files) {
     ...checkJourneyService(parsed, cfg, isValuesOverlay),
     ...checkRuntimeOwnership(parsed, cfg),
   ]
-  if (semanticErrors.length) { console.error(`✗ ${path}: ${semanticErrors.length} errors`); failures++; } else { console.log(`✓ ${path} valid`); }
+  if (semanticErrors.length) { semanticErrors.forEach(err => console.error(`✗ ${path}: ${err}`)); failures++; } else { console.log(`✓ ${path} valid`); }
 }
 process.exit(failures ? 1 : 0)

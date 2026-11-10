@@ -1,24 +1,25 @@
 package com.meridian.journey.config;
 
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 @Configuration
-@RequiredArgsConstructor
-@Slf4j
+@Component
 public class IndustryJourneyBridge {
+    private static final Logger log = LoggerFactory.getLogger(IndustryJourneyBridge.class);
 
     private final JourneyLifecycleProperties props;
 
-    // We expect a JSON structure passed via SPRING_APPLICATION_JSON from Helm
-    // that matches the industry.entities.<type>.states and transitions.
-    
+    public IndustryJourneyBridge(JourneyLifecycleProperties props) {
+        this.props = props;
+    }
+
     @Value("${journey.industry.entities:{}}")
     private String industryEntitiesRaw;
 
@@ -54,29 +55,27 @@ public class IndustryJourneyBridge {
                 }
             }
 
-        Map<String, Object> states = (Map<String, Object>) entityCfg.get("states");
-        if (states != null) {
-            // Use sequence if available for ordering, otherwise use map keys
-            List<String> sequence = (List<String>) entityCfg.get("sequence");
-            if (sequence != null) {
-                for (String stateId : sequence) {
-                    Map<String, Object> s = (Map<String, Object>) states.get(stateId);
-                    if (s != null) {
-                        allStates.add(s);
-                        // Store the ID in the state map itself so the progress loop can find it
-                        s.put("__id", stateId);
+            Map<String, Object> states = (Map<String, Object>) entityCfg.get("states");
+            if (states != null) {
+                List<String> sequence = (List<String>) entityCfg.get("sequence");
+                if (sequence != null) {
+                    for (String stateId : sequence) {
+                        Map<String, Object> s = (Map<String, Object>) states.get(stateId);
+                        if (s != null) {
+                            allStates.add(s);
+                            s.put("__id", stateId);
+                        }
                     }
-                }
-            } else {
-                for (Map.Entry<String, Object> stateEntry : states.entrySet()) {
-                    Map<String, Object> s = (Map<String, Object>) stateEntry.getValue();
-                    if (s != null) {
-                        s.put("__id", stateEntry.getKey());
-                        allStates.add(s);
+                } else {
+                    for (Map.Entry<String, Object> stateEntry : states.entrySet()) {
+                        Map<String, Object> s = (Map<String, Object>) stateEntry.getValue();
+                        if (s != null) {
+                            s.put("__id", stateEntry.getKey());
+                            allStates.add(s);
+                        }
                     }
                 }
             }
-        }
         }
         props.setTransitions(transMap);
 

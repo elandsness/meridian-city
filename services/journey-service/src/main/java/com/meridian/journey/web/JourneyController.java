@@ -1,65 +1,24 @@
 package com.meridian.journey.web;
 
-import com.meridian.journey.dto.CreateJourneyRequest;
 import com.meridian.journey.dto.JourneyResponse;
 import com.meridian.journey.service.JourneyService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/journeys")
-@RequiredArgsConstructor
-@Slf4j
 public class JourneyController {
-
+    private static final Logger log = LoggerFactory.getLogger(JourneyController.class);
     private final JourneyService journeyService;
 
-    @GetMapping
-    public List<JourneyResponse> board(
-            @RequestParam(required = false) String entityType,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String direction) {
-        return journeyService.board(entityType, status, direction);
+    public JourneyController(JourneyService journeyService) {
+        this.journeyService = journeyService;
     }
 
-    @GetMapping("/departures")
-    public List<JourneyResponse> departures() {
-        return journeyService.board(null, null, "departure");
-    }
-
-    @GetMapping("/arrivals")
-    public List<JourneyResponse> arrivals() {
-        return journeyService.board(null, null, "arrival");
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<JourneyResponse> getMe(@RequestParam("user_id") String userId) {
-        log.info("Request for personal journey: userId={}", userId);
-        return ResponseEntity.ok(journeyService.getForUser(userId));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<JourneyResponse> get(@PathVariable String id) {
-        JourneyResponse journey = journeyService.get(id);
-        return ResponseEntity.ok(journey);
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public JourneyResponse create(@RequestBody CreateJourneyRequest request) {
-        return journeyService.createFromRequest(request);
+    @GetMapping("/{identityId}")
+    public JourneyResponse getJourney(@PathVariable String identityId) {
+        log.info("Requesting journey for identity: {}", identityId);
+        return journeyService.getJourney(identityId);
     }
 }
