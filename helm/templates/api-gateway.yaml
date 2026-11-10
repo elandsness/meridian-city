@@ -141,7 +141,7 @@ spec:
   ingressClassName: {{ .Values.apiGateway.ingress.className }}
   {{- end }}
   rules:
-    - host: {{ .Values.apiGateway.s-gateway.ingress.host }}
+    - host: {{ .Values.apiGateway.ingress.host }}
       http:
         paths:
           - path: /

@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.time.OffsetDateTime;
 
 /**
- * Represents a citizen service request (e.g., pothole report, noise complaint).
+ * Represents a service request (e.g., pothole report, noise complaint).
  * The lifecycle is configurable via industry config.
  */
 @Entity
