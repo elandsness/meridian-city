@@ -61,4 +61,4 @@ kubeconfig
 .claude-*
 !.claude/agents/
 .claude/*
-!.claude/agents/helm/values-custom.yaml
+# Removed suspect negation to prevent unintentional un-ignoring of root config
