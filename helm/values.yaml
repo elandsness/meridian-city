@@ -1003,7 +1003,7 @@ transactionService:
 # (see helm/values-trucking.yaml for the pattern).
 # ---------------------------------------------------------------------------
 journeyService:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: "journey-service"

@@ -9,11 +9,10 @@ observability. React frontends (`frontends/`), polyglot backends (`services/`),
 deployed to Kubernetes via Helm (`helm/`) onto a local kind cluster.
 
 - Frontends: `public-portal`, `ops-dashboard` (React + Vite + react-query)
-- Backends: Java/Spring (`citizen-service`, `service-dispatch`, `city-operations`),
-  Python/FastAPI (`analytics-service`, `ai-service`), Node
+- Backends: Java/Spring (`customer-entity-service`, `ops-entity-service`, `identity-service`, 
+  `journey-service`, `workflow-service`), Python/FastAPI (`analytics-service`, `ai-service`), Node
   (`api-gateway`, `demo-control-api`, `notification-service`, `traffic-bot`),
-  Go (`iot-simulator`, `movement-service`). This list isn't exhaustive — several
-  newer generic services exist too (entity-engine, journey-service, etc.).
+  Go (`iot-simulator`, `movement-service`, `routing-service`). This list isn't exhaustive.
 - All traffic enters through `api-gateway`, which proxies `/api/v1/*` by prefix.
 
 ## API conventions — READ BEFORE TOUCHING ANY ENDPOINT

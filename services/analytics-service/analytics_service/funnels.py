@@ -15,12 +15,9 @@ CONFIG_PATH = os.getenv("INDUSTRY_CONFIG_PATH", "/etc/config/config.json")
 class DynamicFunnelList(list):
     """
     A list subclass that dynamically updates its members based on the industry config.
-    This prevents a breaking change to the API surface while moving to a generic engine.
     """
     def __contains__(self, item):
         try:
-            # In a production FastAPI app, we would handle this in the route validator.
-            # Here we use a sync wrapper for the demo's API validation constant.
             import asyncio
             try:
                 loop = asyncio.get_event_loop()
@@ -39,20 +36,32 @@ FUNNEL_NAMES = DynamicFunnelList()
 
 async def load_funnel_definitions() -> dict[str, dict]:
     """
-    Dynamically derives funnel sequences and their corresponding entity types
-    directly from the `flows` section of the industry config.
-    Returns: { flow_name: { "entity_type": str, "stages": list[str] } }
+    Derives funnel definitions from the industry config.
+    Priority: 
+    1. Root 'flows' section (explicit overrides).
+    2. Derived from 'entities' sequence.
     """
     try:
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, 'r') as f:
                 config = json.load(f)
-                # Use the newly added 'flows' root property
-                flows_config = config.get("flows", {})
                 
-                # Return the config as-is if it matches our expected shape { flow: {entityType, stages} }
-                # This makes it totally dynamic; no hardcoded mapping required in code.
-                return flows_config
+                # 1. Explicit flows override
+                flows_config = config.get("flows", {})
+                if flows_config:
+                    return flows_config
+                
+                # 2. Derive from entities
+                entities = config.get("entities", {})
+                derived_flows = {}
+                for entity_type, defn in entities.items():
+                    sequence = defn.get("sequence")
+                    if sequence and isinstance(sequence, list):
+                        derived_flows[entity_type] = {
+                            "entityType": entity_type,
+                            "stages": sequence
+                        }
+                return derived_flows
     except Exception as e:
         logger.error(f"Failed to load business flow definitions: {e}")
     
@@ -80,4 +89,3 @@ async def _query_entity_event_funnel(pool, entity_type: str, stages: list[str]) 
                 entity_type, stage, WINDOW_HOURS)
             result.append({"stage": stage, "count": int(count)})
     return result
-

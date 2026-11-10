@@ -28,8 +28,8 @@ public class BusinessEventLogger {
     private String accountType;
 
     public void identityRegistered(String identityId, String email, String zoneId) {
-        BUSINESS_EVENTS.info("identity.registered",
-                StructuredArguments.keyValue("event.type", "identity.registered"),
+        BUSINESS_EVENTS.info("citizen.registered",
+                StructuredArguments.keyValue("event.type", "citizen.registered"),
                 StructuredArguments.keyValue(accountType + ".id", identityId),
                 StructuredArguments.keyValue("email", email),
                 StructuredArguments.keyValue("zone_id", zoneId),

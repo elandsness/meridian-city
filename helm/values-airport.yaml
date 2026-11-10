@@ -111,11 +111,12 @@ industry:
 
   dynatrace:
     serviceNames:
-      "citizen-service": "Passenger Services"
-      "city-operations": "Airfield Ops Center"
-      "service-dispatch": "Airport Dispatch"
+      "customer-entity-service": "Passenger Services"
+      "ops-entity-service": "Airfield Ops Center"
+      "identity-service": "Passenger Accounts"
+      "journey-service": "Passenger Journeys"
       "api-gateway": "Airport Gateway"
-      "notification-service": "Passenger Alerts"
+      "notification-service": "Passenger Alerts" 
     flowLabels:
       "passenger-journey": "Passenger Journey"
       "aircraft-turnaround": "Aircraft Turnaround"
@@ -224,6 +225,8 @@ industry:
           to: "claimed"
           timer: { minSeconds: 1200, maxSeconds: 3600 }
           signal: { eventType: "luggage.claimed", correlationId: "luggage.id" }
+      linkOnCreate:
+        passenger_id: { entity: "passenger", required: true }
       generator: { strategy: "simpleSteadyState", maxActive: 60, intervalMs: 25000 }
 
     aircraft:

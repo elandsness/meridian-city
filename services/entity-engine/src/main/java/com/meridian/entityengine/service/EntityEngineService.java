@@ -97,14 +97,19 @@ public class EntityEngineService {
                 .map(Map.Entry::getKey)
                 .toList();
         if (uniqueFields.isEmpty()) return Map.of();
-        List<EntityRecord> active = repository.findByEntityTypeAndStateNotIn(entityType, terminalStates(def));
         Map<String, Set<Object>> usedValues = new HashMap<>();
-        for (String field : uniqueFields) {
-            usedValues.put(field, active.stream()
-                    .map(r -> r.getField(field))
-                    .filter(v -> v != null)
-                    .collect(Collectors.toSet()));
-        }
+        uniqueFields.forEach(f -> usedValues.put(f, new HashSet<>()));
+        int page = 0;
+        List<EntityRecord> batch;
+        do {
+            batch = repository.findByEntityTypeAndStateNotIn(entityType, terminalStates(def), PageRequest.of(page++, 500));
+            for (EntityRecord r : batch) {
+                for (String f : uniqueFields) {
+                    Object val = r.getField(f);
+                    if (val != null) usedValues.get(f).add(val);
+                }
+            }
+        } while (batch.size() == 500);
         return usedValues;
     }
 
@@ -171,14 +176,14 @@ public class EntityEngineService {
             Map<String, Object> filter = castMap(query.get("filter"));
             List<String> excludeStates = filter == null ? List.of() : castStringList(filter.get("stateNotIn"));
 
-            List<EntityRecord> candidates = repository.findByEntityTypeAndStateNotIn(targetEntityType, excludeStates);
-            if (candidates.isEmpty()) {
+            Optional<EntityRecord> pickedOpt = repository.findRandomByEntityTypeAndStateNotIn(targetEntityType, excludeStates);
+            if (pickedOpt.isEmpty()) {
                 if (linkDef.isRequired()) {
                     throw new IllegalStateException("linkOnCreate for " + refField + " found no candidate " + targetEntityType + " and is required");
                 }
-                return; // best-effort, matching today's pickDepartingFlight() behavior
+                return;
             }
-            EntityRecord picked = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+            EntityRecord picked = pickedOpt.get();
             record.setLink(refField, picked.getId());
         });
     }

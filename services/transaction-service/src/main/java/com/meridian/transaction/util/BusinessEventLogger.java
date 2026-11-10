@@ -33,7 +33,7 @@ public class BusinessEventLogger {
 
     // Checkout events
     public void checkoutCompleted(String orderId, String cartId, String identityId, int totalCents, int itemCount) {
-        String eventType = "order.checkout_completed";
+        String eventType = "checkout.completed";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
                 StructuredArguments.keyValue(orderType + ".id", orderId),
@@ -89,7 +89,7 @@ public class BusinessEventLogger {
 
     // Bill events
     public void billIssued(String billId, String identityId, String period, int amountCents) {
-        String eventType = "bill.issued";
+        String eventType = "tax.bill_issued";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
                 StructuredArguments.keyValue(billType + ".id", billId),
@@ -100,7 +100,7 @@ public class BusinessEventLogger {
     }
 
     public void billPaymentCompleted(String billId, String identityId, int amountCents) {
-        String eventType = "bill.payment_completed";
+        String eventType = "tax.payment_completed";
         BUSINESS_EVENTS.info(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
                 StructuredArguments.keyValue(billType + ".id", billId),
@@ -110,7 +110,7 @@ public class BusinessEventLogger {
     }
 
     public void billPaymentFailed(String billId, String identityId, int amountCents) {
-        String eventType = "bill.payment_failed";
+        String eventType = "tax.payment_failed";
         BUSINESS_EVENTS.warn(eventType,
                 StructuredArguments.keyValue("event.type", eventType),
                 StructuredArguments.keyValue(billType + ".id", billId),

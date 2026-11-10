@@ -16,16 +16,16 @@ public class IndustryJourneyBridge {
 
     private final JourneyLifecycleProperties props;
 
-    public IndustryJourneyBridge(JourneyLifecycleProperties props) {
+    public IndustryJourneyBridge(JourneyLifecycleProperties props, JourneyIndustryProperties industryProps) {
         this.props = props;
+        this.industryProps = industryProps;
     }
 
-    @Value("${journey.industry.entities:{}}")
-    private String industryEntitiesRaw;
+    private final JourneyIndustryProperties industryProps;
 
     @PostConstruct
     public void alignWithIndustry() {
-        Map<String, Object> entities = parseJsonMap(industryEntitiesRaw);
+        Map<String, Object> entities = industryProps.getEntities();
 
         if (entities == null || entities.isEmpty()) {
             log.info("No industry entities found, using defaults.");

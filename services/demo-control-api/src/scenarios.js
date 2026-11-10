@@ -27,26 +27,7 @@ const RATE_PARAM = { name: 'rate', label: 'Failure rate', min: 5, max: 100, step
  * It contains core platform faults and industry-specific business faults.
  */
 const SCENARIOS = {
-  'db-slowdown': {
-    name: 'Database Slowdown',
-    description: 'Injects DB query latency into the identity service, visible as slow spans.',
-    clear: { mode: 'auto', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [{ name: 'seconds', label: 'DB latency', min: 1, max: 10, step: 1, default: 2, unit: 's' }],
-    async activate (opts = {}) {
-      const seconds = Number(opts.seconds) > 0 ? Number(opts.seconds) : 2
-      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
-        db_slowdown_enabled: true, db_slowdown_seconds: seconds,
-      })
-      state.setFault('citizen-service', { db_slowdown_enabled: true, db_slowdown_seconds: seconds })
-      return r
-    },
-    async reset () {
-      const r = await proxy.post(`${config.CITIZEN_SERVICE_URL}/admin/fault`, {
-        db_slowdown_enabled: false, db_slowdown_seconds: 0,
-      })
-      state.setFault('citizen-service', { db_slowdown_enabled: false, db_slowdown_seconds: 0 })
-      return r
-    },
+
   },
   'llm-latency': {
     name: 'LLM Latency Spike',
@@ -96,21 +77,7 @@ const SCENARIOS = {
       return r
     },
   },
-  'cascade-failure': {
-    name: 'Cascade Failure',
-    description: 'Triggers Database Slowdown + LLM Latency Spike simultaneously.',
-    clear: { mode: 'manual', minutes: 5, min: CLEAR_MIN, max: CLEAR_MAX },
-    params: [],
-    async activate (opts = {}) {
-      await SCENARIOS['db-slowdown'].activate(opts)
-      await SCENARIOS['llm-latency'].activate(opts)
-      return { ok: true, data: { message: 'cascade-failure activated' } }
-    },
-    async reset () {
-      await SCENARIOS['db-slowdown'].reset()
-      await SCENARIOS['llm-latency'].reset()
-      return { ok: true, data: { message: 'cascade-failure reset' } }
-    },
+
   },
 }
 
