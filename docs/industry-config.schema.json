@@ -212,18 +212,25 @@
         "flows": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": [
-              "id"
-            ],
-            "properties": {
-              "id": {
+            "anyOf": [
+              {
                 "type": "string"
               },
-              "correlationID": {
-                "type": "string"
+              {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "correlationID": {
+                    "type": "string"
+                  }
+                }
               }
-            }
+            ]
           }
         }
       }
