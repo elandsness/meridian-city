@@ -21,7 +21,7 @@
         <java.version>21</java.version>
         <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
         <postgresql.version>42.7.14</postgresql.version>
-        <spring-kafka.version>3.3.0</spring-kafka.version>
+        <spring-kafka.version>4.1.2</spring-kafka.version>
     </properties>
 
     <dependencies>
@@ -57,10 +57,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Spring Kafka -->
+        <!-- Spring Kafka. Spring Boot 4 split Kafka's autoconfiguration (the
+             KafkaTemplate bean) out of spring-kafka into this separate starter.
+             Without it, nothing autowiring KafkaTemplate can start (confirmed live). -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
         <!-- Database -->
@@ -76,6 +78,13 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <!-- Spring Boot 4 split Flyway's autoconfiguration out of flyway-core into
+             this separate starter. Without it, migrations silently never run (no
+             error, no log line at all; confirmed live against meridian-0l7p). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
 
         <!-- Utilities -->

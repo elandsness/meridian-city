@@ -25,7 +25,7 @@
              does not use (see spring-boot-jackson2 dependency below). -->
         <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
         <postgresql.version>42.7.14</postgresql.version>
-        <spring-kafka.version>3.3.0</spring-kafka.version>
+        <spring-kafka.version>4.1.2</spring-kafka.version>
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
     </properties>
 
@@ -53,6 +53,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- Spring Boot 4 split Flyway's autoconfiguration out of flyway-core into
+             this separate starter. Without it, migrations silently never run (no
+             error, no log line at all; confirmed live against meridian-0l7p). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
         <!-- Only need BCryptPasswordEncoder for password hashing. The full
              spring-boot-starter-security pulls in autoconfiguration that locks
              every endpoint behind HTTP Basic with a random generated password,
@@ -70,10 +77,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Spring Kafka -->
+        <!-- Spring Kafka. Spring Boot 4 split Kafka's autoconfiguration (the
+             KafkaTemplate bean) out of spring-kafka into this separate starter.
+             Without it, nothing autowiring KafkaTemplate can start (confirmed live). -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
         <!-- Database -->

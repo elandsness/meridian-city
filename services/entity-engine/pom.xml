@@ -93,6 +93,13 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
+        <!-- Spring Boot 4 split Flyway's autoconfiguration out of flyway-core into
+             this separate starter. Without it, migrations silently never run (no
+             error, no log line at all; confirmed live against meridian-0l7p). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
 
         <!-- PostgreSQL Driver -->
         <dependency>
@@ -110,10 +117,15 @@
 
         <!-- Spring Kafka — generic kafkaTrigger bridge for entity creation from
              Kafka messages (e.g. iot.anomalies → incident). Conditional on
-             entity-engine.kafka-triggers-enabled; only wired on ops-entity-service. -->
+             entity-engine.kafka-triggers-enabled; only wired on ops-entity-service.
+             Also used for publishing business events (EntityKafkaPublisher) on
+             every entity-engine instance.
+             Spring Boot 4 split Kafka's autoconfiguration (the KafkaTemplate bean)
+             out of spring-kafka into this separate starter. Without it, nothing
+             autowiring KafkaTemplate can start (confirmed live). -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
         <!-- Logstash Logback Encoder for structured JSON logging -->
