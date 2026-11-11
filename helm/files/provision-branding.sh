@@ -17,7 +17,11 @@ fi
 
 echo "Generating logo for ${NAME} (${COLOR})..."
 
-cat > logo.svg <<EOF
+# bitnami/kubectl runs as a non-root UID with no write access to the
+# container's default working directory ("/") -- confirmed live
+# ("Permission denied" writing to the cwd). /tmp is writable by any UID.
+LOGO_PATH="/tmp/logo.svg"
+cat > "$LOGO_PATH" <<EOF
 <svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>.text { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-weight: 600; }</style>
@@ -29,5 +33,5 @@ cat > logo.svg <<EOF
 </svg>
 EOF
 
-kubectl create configmap "$CM_NAME" --from-file=logo.svg=logo.svg -n "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap "$CM_NAME" --from-file=logo.svg="$LOGO_PATH" -n "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 echo "Successfully provisioned branding ConfigMap: $CM_NAME"
