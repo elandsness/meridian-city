@@ -113,7 +113,18 @@ ensure_shared_operators() {
     info "Shared Strimzi operator present (${STRIMZI_RELEASE}/${STRIMZI_NAMESPACE})."
   else
     info "Installing shared Strimzi operator into '${STRIMZI_NAMESPACE}' (watchAnyNamespace=true)..."
+    # Pinned, not "latest at install time": this operator is installed ONCE per
+    # cluster and never touched again by this script (the `helm status` check
+    # above just skips reinstalling it), so an unpinned version only reflects
+    # whatever was current the day someone first ran `deploy.sh install` --
+    # confirmed live: this cluster's Strimzi sat at 1.1.0 since 2026-06-29,
+    # carrying known CVEs (Jetty CVE-2026-10051, Log4j CVE-2026-49844) in its
+    # bundled entity-operator image the whole time. Bump this value deliberately
+    # when a newer patched release is needed; `helm upgrade strimzi ...
+    # --version <new>` applies it to the running cluster (triggers a rolling
+    # restart of every managed Kafka cluster).
     helm upgrade --install "$STRIMZI_RELEASE" strimzi/strimzi-kafka-operator \
+      --version 1.3.1 \
       --namespace "$STRIMZI_NAMESPACE" --create-namespace \
       --set watchAnyNamespace=true --wait --timeout 5m
     success "Strimzi operator ready."
