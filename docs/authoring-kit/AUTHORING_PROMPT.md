@@ -312,6 +312,13 @@ Before outputting, verify:
        colors:
          brand: "#RRGGBB"
          accent: "#RRGGBB"
+       # logo / favicon: omit both unless you have a real brand asset URL. Leaving
+       # `logo` unset is NOT a missing feature -- the branding-provisioner Job
+       # auto-generates an on-brand logo (colors.brand + company.name) at deploy
+       # time for any non-"city" industry, and it's wired in as the default
+       # automatically. Only set `logo`/`favicon` to a direct-download `http(s)://`
+       # URL (downloaded at pod startup); never a bare local path like
+       # "/foo-logo.svg" -- nothing serves that path and it 404s in-browser.
      terminology: { ... }
      entities: { ... }
      screens: { ... }

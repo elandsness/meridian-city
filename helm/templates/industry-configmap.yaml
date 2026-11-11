@@ -39,6 +39,26 @@ refs) and means the browser never depends on an external image host at runtime.
 {{- if hasPrefix "http" (default "" $theme.logo) -}}
 {{- $_ := set $theme "logo" (printf "/industry-assets/logo-%s.png" $hash) -}}
 {{- end -}}
+
+{{- /* No explicit logo, and not the default city config: fall back to the
+     branding-provisioner Job's auto-generated /logo.svg (a square brand-color
+     mark) instead of leaving theme.logo empty, which would silently render
+     the built-in Meridian mark for an industry that never asked for it. The
+     default city config keeps theme.logo empty on purpose -- that IS "use the
+     Meridian city logo". Same fallback for favicon -- /logo.svg is a square
+     icon, so it doubles as a favicon; city's own values.yaml already sets a
+     real favicon so this never fires for it. */ -}}
+{{- if and (not $theme.logo) (ne $ind.id "city") -}}
+{{- $_ := set $theme "logo" "/logo.svg" -}}
+{{- end -}}
+{{- /* favicon is never actually empty here -- values.yaml's base sets
+     industry.theme.favicon: "/meridian-logo.svg", which deep-merges through
+     untouched for any overlay that doesn't set its own. So "still exactly the
+     generic default" (not "empty") is the real signal that this industry never
+     customized it. */ -}}
+{{- if and (eq $theme.favicon "/meridian-logo.svg") (ne $ind.id "city") -}}
+{{- $_ := set $theme "favicon" "/logo.svg" -}}
+{{- end -}}
 {{- $_ := set $ind "theme" $theme -}}
 
 {{- /* --- Replace remote background.src in status-map public screens --- */}}

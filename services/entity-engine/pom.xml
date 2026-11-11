@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.0</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -19,16 +19,48 @@
 
     <properties>
         <java.version>21</java.version>
-        <jackson-bom.version>2.22.4</jackson-bom.version>
-        <postgresql.version>42.7.5</postgresql.version>
-        <spring-kafka.version>3.3.0</spring-kafka.version>
+        <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
+        <postgresql.version>42.7.14</postgresql.version>
+        <!-- Was pinned to 3.3.0 (the Spring Boot 3.4.0-era default). Spring Boot 4.1.2
+             manages/tests spring-kafka against Spring Framework 7 at 4.1.2 — left pinned
+             at the old 3.3.0 value, this service would run spring-kafka 3.3.0 (built
+             against Spring Framework 6) on top of the Spring Framework 7 artifacts the
+             rest of the BOM pulls in, an untested combination. Bumped to match. -->
+        <spring-kafka.version>4.1.2</spring-kafka.version>
     </properties>
 
     <dependencies>
         <!-- Spring Boot Web -->
+        <!-- Excludes the transitive spring-boot-starter-jackson (Spring Boot 4's
+             Jackson 3 autoconfiguration, group tools.jackson.*) because this codebase's
+             DTOs/config still use Jackson 2 APIs/annotations (com.fasterxml.jackson.*)
+             throughout. spring-boot-jackson2 below restores Jackson 2 support via
+             Spring Boot 4's official compatibility bridge. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-jackson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Jackson 2 compatibility bridge (Spring Boot 4 defaults to Jackson 3,
+             but this service's DTOs/annotations are Jackson 2 — see exclusion above). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+
+        <!-- RestTemplateBuilder (RestTemplateConfig) moved out of spring-boot-starter-web's
+             transitive closure in Spring Boot 4 into this standalone module. Depending on
+             the module directly (not spring-boot-starter-restclient) avoids pulling in
+             another transitive spring-boot-starter-jackson (Jackson 3). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
         </dependency>
 
         <!-- Spring Boot JPA -->

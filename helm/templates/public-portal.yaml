@@ -42,6 +42,10 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/frontend-nginx-configmap.yaml") . | sha256sum }}
         checksum/industry-config: {{ include (print $.Template.BasePath "/industry-configmap.yaml") . | sha256sum }}
+        # Forces a pod restart whenever the generated logo's inputs change --
+        # logo.svg is subPath-mounted, which Kubernetes never live-updates in a
+        # running pod (see provision-branding-job.yaml for the full story).
+        checksum/branding: {{ printf "%s|%s|%s|%s" .Values.industry.company.name .Values.industry.theme.colors.brand .Values.industry.theme.colors.accent (.Values.industry.theme.icon | default "") | sha256sum }}
       labels:
         app: public-portal
         {{- include "meridian.labels" . | nindent 8 }}
@@ -54,6 +58,9 @@ spec:
         - name: industry-config
           configMap:
             name: industry-config
+        - name: branding
+          configMap:
+            name: {{ include "meridian.fullname" . }}-branding
         {{- if $assets }}
         - name: industry-assets
           emptyDir: {}
@@ -89,6 +96,9 @@ spec:
             - name: industry-config
               mountPath: /usr/share/nginx/html/config.json
               subPath: config.json
+            - name: branding
+              mountPath: /usr/share/nginx/html/logo.svg
+              subPath: logo.svg
             {{- if $assets }}
             - name: industry-assets
               mountPath: /usr/share/nginx/html/industry-assets

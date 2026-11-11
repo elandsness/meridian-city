@@ -2,6 +2,15 @@
 # Uses bitnami/kubectl (same image storage-class-job.yaml already relies on)
 # instead of a bespoke "provisioner" image that was never actually built by
 # CI -- the script only needs bash + kubectl, both already on that image.
+#
+# pre-install,pre-upgrade (NOT post-): ops-dashboard.yaml/public-portal.yaml
+# mount the generated ConfigMap with `subPath`, which Kubernetes never live-
+# updates in a running pod -- content is frozen at whatever it was when that
+# container started, permanently, regardless of how many times this Job
+# re-runs afterward. Running as a pre-hook means the ConfigMap holds the
+# CORRECT content before the Deployments are even applied, so a pod that gets
+# (re)created this same upgrade (see checksum/branding below) picks up
+# accurate content at creation time instead of being one Job-run behind.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,8 +19,8 @@ metadata:
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "4"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation
 data:
   provision-branding.sh: |
@@ -23,8 +32,8 @@ metadata:
   name: {{ include "meridian.fullname" . }}-branding-provisioner
   namespace: {{ .Release.Namespace }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-4"
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   template:
@@ -39,6 +48,10 @@ spec:
               value: {{ .Values.industry.company.name | quote }}
             - name: BRANDING_COLOR
               value: {{ .Values.industry.theme.colors.brand | quote }}
+            - name: BRANDING_ACCENT
+              value: {{ .Values.industry.theme.colors.accent | quote }}
+            - name: BRANDING_ICON
+              value: {{ (.Values.industry.theme.icon | default "") | quote }}
             - name: BRANDING_NAMESPACE
               value: {{ .Release.Namespace | quote }}
             - name: BRANDING_CONFIGMAP_NAME
@@ -62,8 +75,8 @@ metadata:
   name: {{ include "meridian.fullname" . }}-provisioner
   namespace: {{ .Release.Namespace }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "4"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -72,8 +85,8 @@ metadata:
   name: {{ include "meridian.fullname" . }}-provisioner
   namespace: {{ .Release.Namespace }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "4"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation
 rules:
   - apiGroups: [""]
@@ -86,8 +99,8 @@ metadata:
   name: {{ include "meridian.fullname" . }}-provisioner
   namespace: {{ .Release.Namespace }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "4"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation
 roleRef:
   apiGroup: rbac.authorization.k8s.io

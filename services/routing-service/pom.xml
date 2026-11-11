@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.0</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <jackson-bom.version>2.22.4</jackson-bom.version>
+        <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
         <postgresql.version>42.7.5</postgresql.version>
         <spring-kafka.version>3.3.0</spring-kafka.version>
     </properties>
@@ -28,7 +28,23 @@
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <exclusions>
+                <!-- Spring Boot 4 defaults to Jackson 3 (tools.jackson:*) via this starter.
+                     This codebase uses Jackson 2 directly (RoutingEngine's ObjectMapper) and
+                     relies on Jackson 2's SNAKE_CASE property-naming-strategy, so we exclude
+                     the Jackson 3 starter and restore Jackson 2 via spring-boot-jackson2 below. -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-jackson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Jackson 2 compatibility bridge (Spring Boot 4 defaults to Jackson 3) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
 
         <!-- Spring Boot Actuator -->
