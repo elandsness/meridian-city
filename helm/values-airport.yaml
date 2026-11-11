@@ -45,7 +45,7 @@ industry:
         template: "entity-grid-list"
         entities:
           - id: "requests"
-            entityType: "service_request"
+            entityType: "passenger_request"
             label: "Requests"
       - "messages"
 
@@ -118,8 +118,8 @@ industry:
       "api-gateway": "Airport Gateway"
       "notification-service": "Passenger Alerts" 
     flowLabels:
-      "passenger-journey": "Passenger Journey"
-      "aircraft-turnaround": "Aircraft Turnaround"
+      "passenger": "Passenger Journey"
+      "aircraft": "Aircraft Turnaround"
       "luggage": "Luggage Logistics"
       "flight_departure": "Departure Flow"
       "flight_arrival": "Arrival Flow"
@@ -139,13 +139,18 @@ industry:
     # entity-engine never generates/tracks city data (citizen signups, tax bills,
     # store orders, city incidents/work orders) on a non-city deployment, and the
     # Command Center only ever shows flows relevant to this industry.
-    # `service_request` is NOT nulled -- airport defines and wants its own version
-    # below, which already fully replaces (not merges with) the city one.
+    # `service_request` IS nulled too -- redefining a base entity in place does
+    # NOT replace it, it deep-merges: the city's own fields/states/generator
+    # sub-keys survive underneath whatever you add, since only an explicit
+    # `null` deletes a map key during Helm's merge. Airport's equivalent
+    # "thing a passenger submits" lives below as its own entity type,
+    # `passenger_request`, so it never collides with the city's key at all.
     citizen: null
     bill: null
     cart: null
     incident: null
     work_order: null
+    service_request: null
 
     passenger:
       displayName: "Passenger"
@@ -377,7 +382,7 @@ industry:
           origin: [{ values: ["London LHR", "New York JFK", "Tokyo HND", "Paris CDG", "Dubai DXB", "Singapore SIN", "Frankfurt FRA"] }]
           gate: [{ values: ["A1", "A2", "B5", "B12", "C3", "D8"] }]
 
-    service_request:
+    passenger_request:
       displayName: "Service Request"
       displayNamePlural: "Service Requests"
       idPrefix: "req"
@@ -390,23 +395,23 @@ industry:
         description: { type: "string" }
       initial: "submitted"
       states:
-        submitted: { label: "Submitted", tone: "slate" }
+        submitted: { label: "Submitted", tone: "slate", notify: true }
         validated: { label: "Validated", tone: "blue" }
         in_progress: { label: "In Progress", tone: "amber", isKpi: true }
-        resolved: { label: "Resolved", tone: "green", terminal: true, isKpi: true }
+        resolved: { label: "Resolved", tone: "green", terminal: true, isKpi: true, notify: true }
       transitions:
         - from: "submitted"
           to: "validated"
           timer: { minSeconds: 300, maxSeconds: 7200 }
-          signal: { eventType: "request.validated", correlationId: "service_request.id" }
+          signal: { eventType: "request.validated", correlationId: "passenger_request.id" }
         - from: "validated"
           to: "in_progress"
           timer: { minSeconds: 300, maxSeconds: 7200 }
-          signal: { eventType: "request.in_progress", correlationId: "service_request.id" }
+          signal: { eventType: "request.in_progress", correlationId: "passenger_request.id" }
         - from: "in_progress"
           to: "resolved"
           timer: { minSeconds: 300, maxSeconds: 7200 }
-          signal: { eventType: "request.resolved", correlationId: "service_request.id" }
+          signal: { eventType: "request.resolved", correlationId: "passenger_request.id" }
       generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000, ownerField: "passenger_id" }
 trafficBot:
   enabled: true
