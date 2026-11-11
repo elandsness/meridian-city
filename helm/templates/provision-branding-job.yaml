@@ -23,8 +23,8 @@ spec:
               value: {{ .Values.industry.theme.colors.brand | quote }}
             - name: BRANDING_NAMESPACE
               value: {{ .Release.Namespace | quote }}
-            - name: BRANDING_HASH
-              value: {{ .Values.global.instanceHash | quote }}
+            - name: BRANDING_CONFIGMAP_NAME
+              value: {{ include "meridian.fullname" . }}-branding
           command: ["python3", "/scripts/provision-branding.py"]
           volumeMounts:
             - name: scripts
@@ -33,3 +33,48 @@ spec:
         - name: scripts
           configMap:
             name: {{ include "meridian.fullname" . }}-scripts
+---
+# Namespace-scoped: the provisioner only ever touches a ConfigMap in its own
+# release namespace (multi-tenancy isolation -- no cluster-wide access needed,
+# unlike storage-class-job.yaml's ClusterRole).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "meridian.fullname" . }}-provisioner
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "4"
+    "helm.sh/hook-delete-policy": before-hook-creation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "meridian.fullname" . }}-provisioner
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "4"
+    "helm.sh/hook-delete-policy": before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "meridian.fullname" . }}-provisioner
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "4"
+    "helm.sh/hook-delete-policy": before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "meridian.fullname" . }}-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "meridian.fullname" . }}-provisioner
+    namespace: {{ .Release.Namespace }}

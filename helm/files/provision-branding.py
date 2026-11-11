@@ -21,8 +21,12 @@ def main():
     name = os.environ.get("BRANDING_NAME", "Meridian City")
     color = os.environ.get("BRANDING_COLOR", "#0B3D91")
     namespace = os.environ.get("BRANDING_NAMESPACE", "meridian")
-    hash_val = os.environ.get("BRANDING_HASH", "").strip()
-    cm_name = f"meridian-branding-{hash_val}" if hash_val else "meridian-branding"
+    # Helm computes the exact ConfigMap name ops-dashboard's volume mount
+    # expects (`{meridian.fullname}-branding`, honoring fullnameOverride/
+    # truncation) and passes it straight through -- reconstructing that
+    # naming convention independently here would drift the moment the Helm
+    # helper changes.
+    cm_name = os.environ.get("BRANDING_CONFIGMAP_NAME", "meridian-branding")
     print(f"Generating logo for {name} ({color})...")
     svg_content = generate_logo_svg(name, color)
     with open("logo.svg", "w") as f:
