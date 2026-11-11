@@ -380,9 +380,18 @@ the authoring prompt but consistently fail the validator or break the live demo:
 ### Checklist E — Images
 
 - [ ] `theme.heroImage`, `theme.logo`, `theme.favicon` (when set) use direct-download URLs
-      or local paths. No Google Drive, Dropbox, or invented `raw.githubusercontent.com` paths.
-- [ ] When uncertain, omit `theme.logo` and `theme.favicon` — the built-in Meridian mark
-      recolored to `brand` looks correct; a 404 looks broken.
+      only (`http(s)://...`, downloaded at pod startup into `/industry-assets/`). Never
+      invent a local path like `/nhvr-logo.svg` — unless that exact file is actually
+      committed to `frontends/public-portal/public/` AND `frontends/ops-dashboard/public/`,
+      it 404s in-browser (broken image icon). No Google Drive, Dropbox, or invented
+      `raw.githubusercontent.com` URLs either.
+- [ ] `theme.logo` is almost always best left **omitted**: the branding-provisioner Job
+      auto-generates an on-brand logo (a mark in `theme.colors.brand` + `company.name`)
+      at deploy time and the chart wires it in as the default automatically for any
+      non-`city` industry — no asset to source or commit. Only set `theme.logo`
+      explicitly when the SE provided a real brand asset URL to use instead.
+- [ ] `theme.favicon`, if left unset, falls back to the default Meridian favicon — fine
+      for most configs; only override with a real URL if the SE explicitly wants one.
 
 ---
 
@@ -436,8 +445,8 @@ After the validator passes, print:
    ./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-<industry>.yaml
    ```
 2. A 3–5 bullet rationale: why these entity types, screens, and flows were chosen.
-3. Any manual steps needed (e.g. committing custom SVG assets to `frontends/public-portal/public/`
-   before triggering CI if using custom logo/favicon).
+3. Any manual steps needed (only if `theme.logo`/`theme.favicon` were explicitly set
+   to a real brand asset URL rather than omitted).
 
 ---
 

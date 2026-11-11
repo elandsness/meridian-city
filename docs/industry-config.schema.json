@@ -96,6 +96,10 @@
         },
         "favicon": {
           "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional single emoji representing the industry (e.g. \"🚚\" for trucking). Rendered centered in a brand-colored, accent-ringed circle by the branding-provisioner Job and used as the default logo/favicon. Omit for the generic chevron mark."
         }
       }
     },

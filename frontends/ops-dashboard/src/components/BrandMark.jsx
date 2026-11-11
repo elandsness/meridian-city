@@ -9,7 +9,17 @@ export default function BrandMark({ className = 'w-8 h-8' }) {
   // A non-empty theme.logo overrides the built-in mark with an image; empty = use
   // the inline brand mark below (the Meridian City default).
   if (cfg.theme?.logo) {
-    return <img src={cfg.theme.logo} alt={`${cfg.company.name} logo`} className={className} />
+    // object-fit: contain -- className is always a square (w-N h-N) box, but a
+    // custom theme.logo (an SE-supplied URL) isn't guaranteed to be square and
+    // would otherwise be stretched/distorted to fill it.
+    return (
+      <img
+        src={cfg.theme.logo}
+        alt={`${cfg.company.name} logo`}
+        className={className}
+        style={{ objectFit: 'contain' }}
+      />
+    )
   }
   return (
     <svg viewBox="0 0 200 200" className={className} role="img" aria-label="Meridian City logo">
