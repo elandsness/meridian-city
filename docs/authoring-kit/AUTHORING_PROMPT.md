@@ -134,9 +134,24 @@ entities:
         effects:                           # Side effects (e.g. spawn linked entity)
           - { action: "spawnLinked", entityType: "...", fields: { ... } }
     computed:
-      position: { type: point2d, interpolation: linear, waypoints: { <state>: {x: 1, "y": 2} } }
-    generator: { strategy: simpleSteadyState, intervalMs: 20000, maxActive: 10,
-                 ownerField: "<field_name>" }  # OPTIONAL -- see below
+      position: { type: point2d, interpolation: linear, waypoints: { <state>: [{x: 1, "y": 2}] } }
+      # Each state's value is a LIST of points, even for a single-point state --
+      # the backend deserializes this as a List, and a bare {x, "y"} object
+      # (no enclosing []) fails to parse and crashes the service on startup.
+      # A state a moving entity passes *through* along a path can list several
+      # points (e.g. an aircraft's taxi route); most states just need one: [{x, "y"}].
+    generator:
+      strategy: simpleSteadyState
+      intervalMs: 20000
+      maxActive: 10
+      ownerField: "<field_name>"   # OPTIONAL -- see below
+      fields:                      # REQUIRED for every generated field -- see below
+        <field_name>:
+          values: [...]            # string/enum fields: list of sample values to pick from
+          # OR, for number fields: { min: <n>, max: <n> }
+          # OR, for boolean fields: { probability: 0.5 }
+          # OR, for string fields needing a realistic person's name instead of a
+          # fixed list: { faker: "fullName" | "firstName" | "lastName" | "streetAddress" }
 ```
 
 **`generator.ownerField`** names the field on this entity (must be one of the
@@ -153,13 +168,52 @@ If an entity genuinely has no per-user owner (e.g. a vehicle, a shipment with
 no individual account behind it), omit `ownerField` and don't set
 `notify: true` on any of its states.
 
+**`generator.fields` is not optional decoration — every generated field needs
+an entry here, or it is `null` forever.** The engine only fills in a field's
+value one of two ways: a literal `default:` on the field itself, or a
+matching `generator.fields.<field_name>` hint (shown above). A field with
+neither — including an `enum` field with its own `values:` list declared —
+is left `null` on every generated record, in every business event, with no
+error or warning anywhere. (The one exception: a `ref`-type field, and any
+field a transition's `effects` always sets explicitly — see below — don't
+need a generator hint.) When you finish Step 3 for an entity, go back and
+confirm every field in its `fields:` block has a `default`, a
+`generator.fields` entry, or is genuinely meant to stay empty until some
+transition's `effects` sets it.
+
+**`effects[].fields` values are literals unless you explicitly say
+otherwise.** `{ action: "spawnLinked", entityType: "...", fields: { x: "y" } }`
+sets the new entity's field `x` to the literal string `"y"` — it does **not**
+copy field `y`'s value from the entity that triggered the effect, even if
+`y` happens to be a real field name on either entity. To copy a value across
+instead, use `{ from: "<field_name>" }` (or `{ from: "id" }` for the
+triggering entity's own id): `fields: { permit_number: { from: "permit_number" } }`.
+This is an easy, silent mistake — `fields: { permit_number: "permit_number" }`
+looks like it should copy the value, but actually writes the literal string
+`"permit_number"` into every spawned entity's `permit_number` field.
+
 ### ⚠️ CRITICAL GOTCHAS
 1. **THE NORWAY PROBLEM:** Always quote `"y"` in waypoints (e.g., `"y": 280`). Unquoted `y` is read as boolean `true` and crashes the app.
 2. **ID HYGIENE:** `idPrefix` must be `[a-z][a-z0-9]*` (no hyphens).
 3. **AUTO-ADVANCE:** Every transition that is not `userTriggerable` MUST have a `timer` block, or the entity will stay stuck forever.
 4. **RESERVED NAMES:** `work_order` and `journey` are reserved. Do not redefine them (you may still `null` out `work_order` if unused).
 5. **CORRELATION:** Ensure the `correlationId` in the signal block exactly matches a field name defined in the `fields` block.
-6. **`domain` IS MANDATORY, NOT OPTIONAL:** the backend runs as two separate
+6. **WAYPOINTS ARE LISTS:** every `computed.position.waypoints.<state>` value
+   MUST be wrapped in `[...]`, even for a single point (`[{x: 1, "y": 2}]`,
+   never `{x: 1, "y": 2}`) — confirmed live: a bare object crashes the
+   service on startup (`Cannot deserialize ... from Object value`).
+7. **GENERATED FIELDS NEED `generator.fields`:** a field with no `default`
+   and no matching `generator.fields.<field_name>` entry is `null` on every
+   record, forever — this includes `enum` fields, which still need a hint
+   present (even `{}`) to unlock their own declared `values:` list. Confirmed
+   live: an entity with a full `fields:` block but no `generator.fields` had
+   every single business event carry nothing but nulls.
+8. **`effects[].fields` DOES NOT COPY VALUES BY DEFAULT:** a plain string
+   value is always a literal, never a reference to another field — use
+   `{ from: "<field_name>" }` to copy. Confirmed live:
+   `fields: { permit_number: "permit_number" }` wrote the literal string
+   `"permit_number"` into every spawned entity instead of the real value.
+9. **`domain` IS MANDATORY, NOT OPTIONAL:** the backend runs as two separate
    deployments, one that only processes entities with `domain: customer`, one
    that only processes `domain: ops`. An entity with no `domain` is never
    picked up by either one — it will never be created or advanced, no matter
@@ -224,6 +278,17 @@ Before outputting, verify:
    personalized "my `<entity>`" screen, is `generator.ownerField` set to a
    real field on that entity? Without it, notifications for that entity
    publish with a null owner and are silently dropped.
+10. **Waypoints Are Lists:** Is every `computed.position.waypoints.<state>`
+    value wrapped in `[...]`, with no bare `{x, "y"}` objects?
+11. **Generated-Field Coverage:** For every field in every entity, is at
+    least one of these true: it has a `default`, it has a matching
+    `generator.fields.<field_name>` entry, it's `type: ref`, or some
+    transition's `effects` always sets it? A field with none of these is
+    silently `null` forever.
+12. **Effect Field References:** In every `effects[].fields` (or
+    `callService`'s `body`), does any value that should copy another field's
+    data use `{ from: "<field_name>" }` — never a plain string, which is
+    always a literal?
 
 ---
 

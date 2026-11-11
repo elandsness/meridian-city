@@ -61,7 +61,13 @@ function checkIot(iot) {
 }
 
 const VALID_SERVICE_NAME_KEYS = new Set(['customer-entity-service', 'ops-entity-service', 'identity-service', 'journey-service', 'movement-service', 'routing-service', 'workflow-service', 'api-gateway', 'notification-service', 'billing-service'])
-const VALID_FLOW_IDS = new Set(['service-request', 'account-creation', 'tax-payment', 'aircraft-turnaround', 'passenger-journey'])
+// The provisioner's hand-written legacy FLOW_SPECS (service-request,
+// account-creation, tax-payment, aircraft-turnaround, passenger-journey, ...)
+// were removed entirely (helm/files/provision-dynatrace-business-config.py:
+// `FLOW_SPECS = []`, `DEFAULT_FLOW_KEYS = []`). Every flow is now derived
+// from an industry.entities type with states/initial -- there is no more
+// hardcoded legacy-id allowlist to check against.
+const VALID_FLOW_IDS = new Set()
 
 function checkRouting(cfg) {
   const errors = []
@@ -105,6 +111,92 @@ function checkJourneyService(parsed, cfg, isValuesOverlay) {
 function checkScreens(cfg) { return []; }
 function checkRuntimeOwnership(parsed, cfg) { return []; }
 
+// Confirmed live: a bare {x, "y"} object (no enclosing array) fails Jackson
+// deserialization on the backend (`List<Waypoint>` expected) and crashes the
+// service on startup. AUTHORING_PROMPT.md's own example used to show this
+// wrong shape -- fixed there too, but keep this check so a stale/cached
+// prompt copy can't reintroduce it silently.
+function checkWaypoints(entities) {
+  const errors = []
+  for (const [entityId, def] of Object.entries(entities || {})) {
+    if (!def) continue
+    const waypoints = def.computed?.position?.waypoints
+    if (!waypoints || typeof waypoints !== 'object') continue
+    for (const [state, val] of Object.entries(waypoints)) {
+      if (!Array.isArray(val)) errors.push(`entities.${entityId}.computed.position.waypoints.${state} must be an array of points (e.g. [{x: 1, "y": 2}]), not a bare object -- the backend deserializes this as a List and crashes on startup otherwise`)
+    }
+  }
+  return errors
+}
+
+// Fields set by some transition's spawnLinked/set effect don't need a
+// generator.fields hint -- collect which (entityType, fieldName) pairs are
+// covered that way before flagging "will always be null".
+function collectEffectSetFields(entities) {
+  const result = {}
+  for (const def of Object.values(entities || {})) {
+    if (!def) continue
+    for (const t of def.transitions || []) {
+      for (const eff of t.effects || []) {
+        if (eff?.action === 'spawnLinked' && eff.entityType && eff.fields && typeof eff.fields === 'object') {
+          result[eff.entityType] = result[eff.entityType] || new Set()
+          for (const f of Object.keys(eff.fields)) result[eff.entityType].add(f)
+        }
+      }
+    }
+  }
+  return result
+}
+
+// Confirmed live: entities.permit had a complete `fields:` block (including
+// an `enum` field with its own `values:` list) but no `generator.fields` --
+// every single generated record, in every business event, carried nothing
+// but nulls for all of them. Scoped to `required: true` fields to avoid
+// flagging fields intentionally left to be filled in later via the API.
+function checkGeneratedFieldCoverage(entities) {
+  const errors = []
+  if (!entities || typeof entities !== 'object') return errors
+  const effectSetFields = collectEffectSetFields(entities)
+  for (const [entityId, def] of Object.entries(entities)) {
+    if (!def || typeof def !== 'object') continue
+    const genFields = def.generator?.fields || {}
+    const externallySet = effectSetFields[entityId] || new Set()
+    for (const [fieldName, fieldDef] of Object.entries(def.fields || {})) {
+      if (!fieldDef?.required) continue
+      if (fieldDef.type === 'ref' || fieldDef.type === 'password') continue
+      if (fieldDef.default !== undefined) continue
+      if (Object.prototype.hasOwnProperty.call(genFields, fieldName)) continue
+      if (externallySet.has(fieldName)) continue
+      errors.push(`entities.${entityId}.fields.${fieldName} is required but has no default, no generator.fields.${fieldName} hint, and no effect sets it -- it will be null on every generated record`)
+    }
+  }
+  return errors
+}
+
+// Confirmed live: `fields: { permit_number: "permit_number" }` on a
+// spawnLinked effect wrote the literal string "permit_number" into every
+// spawned entity -- a plain string is always a literal value, never a field
+// reference (use `{ from: "permit_number" }` to copy). Flagging the specific
+// case where the literal string equals its own key: that's never a
+// plausible intentional value, only ever a forgotten `{ from: ... }`.
+function checkEffectFieldRefs(entities) {
+  const errors = []
+  for (const [entityId, def] of Object.entries(entities || {})) {
+    if (!def) continue
+    for (const [ti, t] of (def.transitions || []).entries()) {
+      for (const [ei, eff] of (t.effects || []).entries()) {
+        if (eff?.action !== 'spawnLinked' || !eff.fields || typeof eff.fields !== 'object') continue
+        for (const [key, val] of Object.entries(eff.fields)) {
+          if (typeof val === 'string' && val === key) {
+            errors.push(`entities.${entityId}.transitions[${ti}].effects[${ei}].fields.${key} is the literal string "${key}" -- if you meant to copy entities.${entityId}'s own "${key}" field, use { from: "${key}" } instead (a plain string is always a literal, never a field reference)`)
+          }
+        }
+      }
+    }
+  }
+  return errors
+}
+
 // `service_request` is the one base-chart entity industries are told to
 // "redefine" rather than null. Helm deep-merges maps key-by-key, so a
 // redefinition does NOT replace the city's own fields/states/generator --
@@ -132,12 +224,23 @@ for (const path of files) {
     else { continue; }
   } catch (e) { failures++; continue; }
 
+  const schemaErrors = []
+  if (!validateSchema(cfg)) {
+    for (const e of validateSchema.errors ?? []) {
+      schemaErrors.push(`${e.instancePath || '(root)'} ${e.message}${e.params ? ' ' + JSON.stringify(e.params) : ''}`)
+    }
+  }
+
   const semanticErrors = [
+    ...schemaErrors,
     ...checkEntities(cfg.entities),
     ...checkIot(cfg.iot),
     ...checkRouting(cfg),
     ...checkDynatrace(cfg),
     ...checkBaseEntityRedefinition(cfg),
+    ...checkWaypoints(cfg.entities),
+    ...checkGeneratedFieldCoverage(cfg.entities),
+    ...checkEffectFieldRefs(cfg.entities),
     ...checkScreens(cfg),
     ...checkJourneyService(parsed, cfg, isValuesOverlay),
     ...checkRuntimeOwnership(parsed, cfg),
