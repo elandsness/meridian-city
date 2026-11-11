@@ -27,8 +27,6 @@ const RATE_PARAM = { name: 'rate', label: 'Failure rate', min: 5, max: 100, step
  * It contains core platform faults and industry-specific business faults.
  */
 const SCENARIOS = {
-
-  },
   'llm-latency': {
     name: 'LLM Latency Spike',
     description: 'Injects latency before every AI service LLM call.',
@@ -76,8 +74,6 @@ const SCENARIOS = {
       state.setFault('analytics-service', { memory_pressure_enabled: false })
       return r
     },
-  },
-
   },
 }
 
