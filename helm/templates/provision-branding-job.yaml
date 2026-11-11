@@ -1,4 +1,22 @@
 # This Job generates a custom branding logo based on the industry config.
+# Uses bitnami/kubectl (same image storage-class-job.yaml already relies on)
+# instead of a bespoke "provisioner" image that was never actually built by
+# CI -- the script only needs bash + kubectl, both already on that image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meridian.fullname" . }}-branding-provisioner-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "meridian.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "4"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  provision-branding.sh: |
+{{ .Files.Get "files/provision-branding.sh" | indent 4 }}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -15,7 +33,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: provisioner
-          image: {{ .Values.global.imagePrefix }}/provisioner:latest
+          image: bitnami/kubectl:latest
           env:
             - name: BRANDING_NAME
               value: {{ .Values.industry.company.name | quote }}
@@ -25,14 +43,15 @@ spec:
               value: {{ .Release.Namespace | quote }}
             - name: BRANDING_CONFIGMAP_NAME
               value: {{ include "meridian.fullname" . }}-branding
-          command: ["python3", "/scripts/provision-branding.py"]
+          command: ["/bin/bash", "/scripts/provision-branding.sh"]
           volumeMounts:
             - name: scripts
               mountPath: /scripts
       volumes:
         - name: scripts
           configMap:
-            name: {{ include "meridian.fullname" . }}-scripts
+            name: {{ include "meridian.fullname" . }}-branding-provisioner-script
+            defaultMode: 0755
 ---
 # Namespace-scoped: the provisioner only ever touches a ConfigMap in its own
 # release namespace (multi-tenancy isolation -- no cluster-wide access needed,
