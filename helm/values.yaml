@@ -325,7 +325,7 @@ industry:
         assigned_to: { type: string }
       initial: submitted
       states:
-        submitted: { label: "Submitted", tone: slate }
+        submitted: { label: "Submitted", tone: slate, notify: true }
         rejected:
           label: "Rejected"
           tone: red
@@ -341,6 +341,7 @@ industry:
           tone: green
           terminal: true
           isKpi: true
+          notify: true
         abandoned: { label: "Abandoned", tone: slate, terminal: true }
       transitions:
         # Manual advancement by ops-dashboard operators — these are user-triggerable

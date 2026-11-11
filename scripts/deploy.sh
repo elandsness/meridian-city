@@ -280,11 +280,40 @@ ensure_local_llm_model() {
   fi
 }
 
+# Validate every -f/--values file passed on the command line against
+# docs/industry-config.schema.json before any of it reaches Helm. A
+# structurally-wrong industry config doesn't error when passed to
+# `helm -f` -- it just lands on keys nothing reads, and the chart's
+# default city config applies untouched. Catch that here instead.
+validate_values_files() {
+  local files=() prev=""
+  for arg in "$@"; do
+    case "$prev" in
+      -f|--values) files+=("$arg") ;;
+    esac
+    case "$arg" in
+      --values=*) files+=("${arg#--values=}") ;;
+    esac
+    prev="$arg"
+  done
+  [[ ${#files[@]} -eq 0 ]] && return 0
+  if ! command -v node &>/dev/null; then
+    warn "node not found -- skipping industry config validation for: ${files[*]}"
+    return 0
+  fi
+  if ! node "${SCRIPT_DIR}/validate-industry-config.mjs" "${files[@]}"; then
+    error "Industry config validation failed for: ${files[*]}"
+    error "Fix the errors above before deploying -- an invalid file silently contributes nothing to the deploy, it does not fail the way this just did."
+    exit 1
+  fi
+}
+
 install_or_upgrade() {
   local cmd="$1"
   shift
   local dt_enabled=false
 
+  validate_values_files "$@"
   check_prerequisites
   resolve_instance "$cmd"
 

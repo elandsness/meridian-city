@@ -66,9 +66,13 @@ const VALID_FLOW_IDS = new Set(['service-request', 'account-creation', 'tax-paym
 function checkRouting(cfg) {
   const errors = []
   if (cfg.terminology?.routing) errors.push('terminology.routing is not a valid key');
+  const categories = cfg.terminology?.requestCategories ?? []
+  if (!Array.isArray(categories)) {
+    errors.push('terminology.requestCategories must be an array of category-key strings (labels belong in `routing`, keyed by the same category strings)')
+    return errors
+  }
   if (!cfg.routing) return errors
   const routingKeys = new Set(Object.keys(cfg.routing))
-  const categories = cfg.terminology?.requestCategories ?? []
   for (const cat of categories) { if (!routingKeys.has(cat)) errors.push(`missing routing key for ${cat}`) }
   return errors
 }
@@ -101,6 +105,20 @@ function checkJourneyService(parsed, cfg, isValuesOverlay) {
 function checkScreens(cfg) { return []; }
 function checkRuntimeOwnership(parsed, cfg) { return []; }
 
+// `service_request` is the one base-chart entity industries are told to
+// "redefine" rather than null. Helm deep-merges maps key-by-key, so a
+// redefinition does NOT replace the city's own fields/states/generator --
+// it silently inherits whatever the overlay doesn't explicitly override.
+// Give every entity its own distinct key (and null service_request like the
+// other base entities) instead.
+function checkBaseEntityRedefinition(cfg) {
+  const errors = []
+  if (cfg.entities && Object.prototype.hasOwnProperty.call(cfg.entities, 'service_request') && cfg.entities.service_request !== null) {
+    errors.push('entities.service_request is redefined (non-null) -- this merges with the base city entity instead of replacing it (Helm deep-merges maps; only `null` deletes a key). Give your entity a new key and set `service_request: null` instead.')
+  }
+  return errors
+}
+
 let failures = 0
 for (const path of files) {
   let cfg, parsed, isValuesOverlay = false
@@ -119,6 +137,7 @@ for (const path of files) {
     ...checkIot(cfg.iot),
     ...checkRouting(cfg),
     ...checkDynatrace(cfg),
+    ...checkBaseEntityRedefinition(cfg),
     ...checkScreens(cfg),
     ...checkJourneyService(parsed, cfg, isValuesOverlay),
     ...checkRuntimeOwnership(parsed, cfg),
