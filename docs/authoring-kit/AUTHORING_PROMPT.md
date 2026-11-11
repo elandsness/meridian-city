@@ -64,23 +64,36 @@ nothing to do with any of that, and every dashboard will show those
 irrelevant flows mixed in with yours. This is not cosmetic — it is a real,
 previously-shipped bug.
 
-**Fix:** at the very top of your `entities:` block, explicitly delete every
-one of those six you are not reusing by setting it to YAML `null` (the
-standard idiom for removing a key from a merged map):
+**Fix:** at the very top of your `entities:` block, explicitly delete **all
+six** of those by setting each to YAML `null` (the standard idiom for
+removing a key from a merged map):
 
 ```yaml
 entities:
   citizen: null
+  service_request: null
   bill: null
   cart: null
   incident: null
   work_order: null
-  # (leave service_request out of this list if you intend to redefine it below —
-  #  a full redefinition replaces it; only entities you want GONE need null)
 ```
 
-Only skip nulling an entity if your industry is genuinely reusing it as-is or
-redefining it with your own fields/states below.
+**⚠️ Null `service_request` too, even if your industry wants an equivalent
+"thing the customer submits."** Helm deep-merges YAML *maps* key-by-key at
+every nesting level — redefining `service_request` with your own
+`fields`/`states`/`generator` does **not** replace the base chart's version,
+it merges on top of it. You will silently inherit the city's own leftover
+fields (`citizen_id`, `category`, `priority`, `title`, `zone_id`, …) and
+orphaned states (`abandoned`, `submitted`, `validated`, `rejected`, …) mixed
+into your entity. (Only `null` deletes a map key; a YAML *list*, like
+`transitions`, is fully replaced rather than merged, so this particular trap
+is specific to `fields`/`states`/`generator`.)
+
+Instead, give your own "thing the customer submits" entity a **brand new
+key** that doesn't collide with any base-chart entity (e.g. `claim`,
+`permit`, `ticket`) and define it fully below, like any other entity you're
+adding. Only skip nulling an entity if your industry is genuinely reusing it
+completely as-is, unmodified.
 
 ### Entity type DSL
 ```yaml
@@ -105,6 +118,8 @@ entities:
         terminal: true             # final state
         isError: true              # error terminal state
         isKpi: true                # count this as a business KPI
+        notify: true               # publish an owner-facing notification on reaching
+                                    # this state -- REQUIRES generator.ownerField below
         glyph: "<emoji>"
     transitions:
       - from: <state_key>
@@ -120,8 +135,23 @@ entities:
           - { action: "spawnLinked", entityType: "...", fields: { ... } }
     computed:
       position: { type: point2d, interpolation: linear, waypoints: { <state>: {x: 1, "y": 2} } }
-    generator: { strategy: simpleSteadyState, intervalMs: 20000, maxActive: 10 }
+    generator: { strategy: simpleSteadyState, intervalMs: 20000, maxActive: 10,
+                 ownerField: "<field_name>" }  # OPTIONAL -- see below
 ```
+
+**`generator.ownerField`** names the field on this entity (must be one of the
+keys under `fields:` above) that holds whoever "owns" each instance — e.g.
+`citizen_id`, `passenger_id`, `operator_id`. Set it whenever either is true:
+- any state above sets `notify: true` (without it, those notifications
+  publish with a null owner and are silently dropped), or
+- you want a personalized "my `<entity>`" portal screen for this entity type
+  (a `screens.public`/`home.public` entry using `template: "entity-journey"`
+  also takes its own `ownerField:` — use the **same field name** in both
+  places).
+
+If an entity genuinely has no per-user owner (e.g. a vehicle, a shipment with
+no individual account behind it), omit `ownerField` and don't set
+`notify: true` on any of its states.
 
 ### ⚠️ CRITICAL GOTCHAS
 1. **THE NORWAY PROBLEM:** Always quote `"y"` in waypoints (e.g., `"y": 280`). Unquoted `y` is read as boolean `true` and crashes the app.
@@ -144,17 +174,29 @@ entities:
 ## Step 4 — The Rest of the Config
 Continue with the standard Meridian sections:
 - **terminology**: Map generic nouns to industry nouns (e.g. `customer` $ightarrow$ `Patient`).
+  `terminology.requestCategories` is a flat **array of category-key strings**
+  (e.g. `["lost-item", "billing", "other"]`) — the human-readable label for
+  each category goes in `routing` (same keys, label/department values), not
+  inline here.
 - **screens**: Compose the public portal's UI using the module catalog (`screens.public`).
+  Every entry is either a bare template-id string (e.g. `"home"`) or an
+  object with a required `id` key plus `template` and whatever that template
+  needs (`entityType`, `entities: [...]`, etc.) — see `values-airport.yaml`'s
+  `screens:`/`home:` blocks for worked examples of the real template catalog
+  (`welcome-hero`, `ticker`, `entity-grid-list`, `entity-map`,
+  `entity-journey`, …). Do not invent your own module shape.
   ops-dashboard is a fixed Command Center + Demo Control app — there's no `screens.ops`/
   `home.ops` to compose.
-- **home**: Define the public portal's home layout. Lead it with a `template: ticker`
+- **home**: Define the public portal's home layout (same `screenList` shape as
+  `screens`, under `home.public`). Lead it with a `template: ticker`
   module carrying 6-8 GENERATED, light/funny,
   industry-flavored headlines — a cheap, high-charm touch for almost any demo.
   Generate the tone and content yourself from the industry's own flavor (an
   airport's headlines read differently than a hospital's or a bank's); don't
   reuse another industry's items verbatim.
 - **data**: Provide realistic seeds for zones and request templates.
-- **routing**: Map request categories to departments (MUST include `other: "General Support"`).
+- **routing**: Map request categories to departments (MUST include `other: "General Support"`,
+  and MUST have one key for every entry in `terminology.requestCategories`).
 - **dynatrace**: Map fixed platform service keys to industry labels and list the flows to enable.
 
 ---
@@ -167,12 +209,56 @@ Before outputting, verify:
 4. **Y-Quoting:** Are all `"y"` keys quoted?
 5. **Routing Sync:** Does every key in `routing` exist in `terminology.requestCategories`?
 6. **Domain Completeness:** Does every entity you defined have a `domain: customer` or `domain: ops`?
-7. **Base Entity Cleanup:** Is every one of `citizen`/`bill`/`cart`/`incident`/`work_order`
-   that your industry does NOT reuse set to `null` at the top of `entities:`?
+7. **Base Entity Cleanup:** Is every one of `citizen`/`service_request`/`bill`/`cart`/
+   `incident`/`work_order` that your industry does NOT reuse **completely as-is**
+   set to `null` at the top of `entities:`? (This includes `service_request` —
+   see "THE BASE CONFIG YOU ARE OVERLAYING" above. If you need an equivalent
+   entity, give it a new key instead of redefining `service_request` in place.)
+8. **Envelope Check:** Is the entire output wrapped under a single top-level
+   `industry:` key, with `version: 1`, a unique `id`, and both `company`/`theme`
+   populated (all four are schema-required)? See "Output format" below for the
+   exact shape — a file missing this wrapper deploys with **zero effect**: Helm
+   merges its keys into the wrong place and the chart's default city config
+   applies untouched, with no error.
+9. **Owner Field:** For every entity with any `notify: true` state, or any
+   personalized "my `<entity>`" screen, is `generator.ownerField` set to a
+   real field on that entity? Without it, notifications for that entity
+   publish with a null owner and are silently dropped.
 
 ---
 
 ## Output format
-1. A single fenced ```yaml block.
+1. A single fenced ```yaml block. **The entire document must be wrapped under
+   one top-level `industry:` key** — this file is consumed as a Helm `-f`
+   values overlay, and every backend/frontend template reads
+   `.Values.industry.*`. A bare document (no `industry:` wrapper) merges its
+   keys into the wrong place in Helm's values tree and silently has no
+   effect at all. Minimum required shape:
+   ```yaml
+   industry:
+     version: 1
+     id: "<short-kebab-case-id>"
+     primaryFlow: "<entity-type-or-flow-name>"
+     company:
+       name: "<Full company name>"
+       short: "<Short name>"
+       tagline: "<Tagline>"
+     theme:
+       colors:
+         brand: "#RRGGBB"
+         accent: "#RRGGBB"
+     terminology: { ... }
+     entities: { ... }
+     screens: { ... }
+     home: { ... }
+     data: { ... }
+     routing: { ... }
+     dynatrace: { ... }
+   ```
+   `version`, `company`, `theme`, and `screens` are required by
+   `docs/industry-config.schema.json` — validate with
+   `node scripts/validate-industry-config.mjs helm/values-<industry>.yaml`
+   before handing the file back; a structurally-wrong file does not error
+   when deployed, it just does nothing.
 2. A **Semantic Rationale**: Explain the chosen Signal Chain and how it represents the industry's "Golden Path."
 3. The **deploy command** (validate $ightarrow$ install).

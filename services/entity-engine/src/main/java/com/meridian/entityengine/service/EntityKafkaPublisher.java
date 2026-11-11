@@ -17,8 +17,14 @@ import java.util.Map;
  * reads it generically and never sees the source entity's own field name
  * (see {@link #ownerField}).
  *
- * Only emits for entity type + state combinations that have a downstream
- * consumer — everything else is a no-op.
+ * `bill` keeps its own hand-written mapping (its two states map to
+ * domain-specific event names and payload fields — "tax.bill_issued" /
+ * "tax.payment_completed" with period/amount_cents — that aren't derivable
+ * from the state name alone). Every other entity type is fully generic:
+ * reaching any state marked `notify: true` in its config
+ * (`entities.<type>.states.<state>.notify`) publishes a
+ * "<entity_type>.<state>" event with no entity type or state name
+ * special-cased in code — see {@link #publishRequestEvent}.
  */
 @Component
 @RequiredArgsConstructor
@@ -31,10 +37,15 @@ public class EntityKafkaPublisher {
     /** Called after every state transition (applyTransition) and after issueOutstanding. */
     public void publish(EntityRecord record) {
         try {
-            switch (record.getEntityType()) {
-                case "bill" -> publishBillEvent(record);
-                case "service_request" -> publishRequestEvent(record);
-                default -> { /* no downstream consumer for this type */ }
+            String entityType = record.getEntityType();
+            if (entityType.equals("bill")) {
+                publishBillEvent(record);
+                return;
+            }
+            var def = configLoader.getAllDefinitions().get(entityType);
+            var stateDef = def != null ? def.getStates().get(record.getState()) : null;
+            if (stateDef != null && stateDef.isNotify()) {
+                publishRequestEvent(record);
             }
         } catch (Exception e) {
             // Non-fatal: Kafka publish failures must not roll back entity state.
@@ -65,13 +76,13 @@ public class EntityKafkaPublisher {
         kafkaTemplate.send("billing.events", record.getId(), payload);
     }
 
+    /** Caller has already confirmed the current state is notify:true. */
     private void publishRequestEvent(EntityRecord record) {
         String state = record.getState();
-        if (!state.equals("submitted") && !state.equals("resolved")) return;
-
+        String entityType = record.getEntityType();
         Map<String, Object> payload = new HashMap<>();
-        payload.put("event_type", "service_request." + state);
-        payload.put("owner_id", record.getField(ownerField("service_request")));
+        payload.put("event_type", entityType + "." + state);
+        payload.put("owner_id", record.getField(ownerField(entityType)));
         payload.put("status", state);
         payload.put("request_id", record.getId());
         kafkaTemplate.send("requests.events", record.getId(), payload);

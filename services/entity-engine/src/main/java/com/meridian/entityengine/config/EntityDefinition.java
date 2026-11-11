@@ -56,6 +56,10 @@ public class EntityDefinition {
         private String glyph;
         private String kpiField;
         private boolean externallyTriggered;
+        // Reaching this state publishes a generic owner-facing notification
+        // (EntityKafkaPublisher -> "requests.events" -> notification-service).
+        // Config-driven on purpose: no entity type or state *name* is special-cased.
+        private boolean notify;
     }
 
     @Data
