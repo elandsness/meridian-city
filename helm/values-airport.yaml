@@ -118,8 +118,8 @@ industry:
       "api-gateway": "Airport Gateway"
       "notification-service": "Passenger Alerts" 
     flowLabels:
-      "passenger-journey": "Passenger Journey"
-      "aircraft-turnaround": "Aircraft Turnaround"
+      "passenger": "Passenger Journey"
+      "aircraft": "Aircraft Turnaround"
       "luggage": "Luggage Logistics"
       "flight_departure": "Departure Flow"
       "flight_arrival": "Arrival Flow"
