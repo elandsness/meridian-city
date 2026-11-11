@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.0</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -19,8 +19,8 @@
 
     <properties>
         <java.version>21</java.version>
-        <jackson-bom.version>2.22.4</jackson-bom.version>
-        <postgresql.version>42.7.5</postgresql.version>
+        <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
+        <postgresql.version>42.7.14</postgresql.version>
         <spring-kafka.version>3.3.0</spring-kafka.version>
     </properties>
 
@@ -28,7 +28,21 @@
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <exclusions>
+                <!-- Spring Boot 4 defaults to Jackson 3 (tools.jackson:*) via this starter.
+                     This codebase stays on Jackson 2 (SNAKE_CASE naming strategy, Jackson 2
+                     annotations in DTOs), so pull in the Jackson 2 compatibility bridge
+                     (spring-boot-jackson2) below instead. -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-jackson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

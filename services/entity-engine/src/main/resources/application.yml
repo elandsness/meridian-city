@@ -4,8 +4,12 @@ server:
 spring:
   application:
     name: entity-engine
-  jackson:
+  jackson2:
     # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
+    # Renamed from `spring.jackson` -> `spring.jackson2`: Spring Boot 4's Jackson 2
+    # compatibility bridge (spring-boot-jackson2) binds its ObjectMapper customizer to
+    # the spring.jackson2.* namespace, not spring.jackson.* (which now configures the
+    # Jackson 3 ObjectMapper this service doesn't use).
     property-naming-strategy: SNAKE_CASE
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}

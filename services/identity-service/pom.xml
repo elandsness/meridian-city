@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.0</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -19,8 +19,12 @@
 
     <properties>
         <java.version>21</java.version>
-        <jackson-bom.version>2.22.4</jackson-bom.version>
-        <postgresql.version>42.7.5</postgresql.version>
+        <!-- Spring Boot 4.1.x renamed the Jackson-2-BOM override property to
+             jackson-2-bom.version; its own `jackson-bom.version` now controls
+             the Jackson 3 BOM (tools.jackson:jackson-bom), which this service
+             does not use (see spring-boot-jackson2 dependency below). -->
+        <jackson-2-bom.version>2.22.4</jackson-2-bom.version>
+        <postgresql.version>42.7.14</postgresql.version>
         <spring-kafka.version>3.3.0</spring-kafka.version>
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
     </properties>
@@ -29,7 +33,21 @@
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <exclusions>
+                <!-- Spring Boot 4 defaults to Jackson 3 (tools.jackson); this codebase
+                     still uses Jackson 2 APIs/annotations and relies on Jackson 2's
+                     SNAKE_CASE property-naming-strategy, so pull in the Jackson 2
+                     compatibility bridge (spring-boot-jackson2, below) instead. -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-jackson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

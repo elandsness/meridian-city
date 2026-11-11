@@ -2,7 +2,7 @@ spring:
   application:
     name: identity-service
 
-  jackson:
+  jackson2:
     # snake_case at the HTTP boundary to match the rest of the platform (API_CONVENTIONS §1).
     property-naming-strategy: SNAKE_CASE
 
