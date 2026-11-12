@@ -429,11 +429,5 @@ industry:
           timer: { minSeconds: 300, maxSeconds: 7200 }
           signal: { eventType: "request.resolved", correlationId: "passenger_request.id" }
       generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000, ownerField: "passenger_id" }
-trafficBot:
-  enabled: true
-  image:
-    repository: "traffic-bot"
-    tag: ""
-  config:
-    # Average HTTP requests per minute sent to the API gateway. Kept low so only a
-    # handful of flows are in-flight at once; server-side schedulers complete them.
+# trafficBot: no override needed -- base values.yaml now defaults enabled: true
+# with a complete config block (see helm/values.yaml).
