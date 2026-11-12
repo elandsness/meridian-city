@@ -58,8 +58,8 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: db-password
+                  name: {{ include "meridian.dbPasswordSecretName" . }}
+                  key: {{ include "meridian.dbPasswordSecretKey" . }}
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "none"
             - name: ENTITY_CONFIG_PATH
@@ -176,8 +176,8 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: db-password
+                  name: {{ include "meridian.dbPasswordSecretName" . }}
+                  key: {{ include "meridian.dbPasswordSecretKey" . }}
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "none"
             - name: ENTITY_CONFIG_PATH
@@ -288,8 +288,8 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: db-password
+                  name: {{ include "meridian.dbPasswordSecretName" . }}
+                  key: {{ include "meridian.dbPasswordSecretKey" . }}
             # Flyway owns the schema; Hibernate maps without validating (mirrors
             # every other Java service here), so a fresh image never crash-loops
             # on ddl validate.

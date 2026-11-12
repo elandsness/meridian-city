@@ -39,6 +39,9 @@ dynatrace:
   # Required scopes: metrics.ingest, logs.ingest, openTelemetryTrace.ingest,
   #                  entities.read, settings.write, DataExport
   apiToken: ""
+  # Escape hatch: point to an existing Secret (e.g. kubectl create secret generic my-dt-token --from-literal=apiToken=sk-...)
+  apiTokenExistingSecret: ""
+  apiTokenExistingSecretKey: ""
 
   # REQUIRED: OTLP ingest endpoint for OpenTelemetry data
   # Format: https://<environment-id>.live.dynatrace.com/api/v2/otlp
@@ -74,6 +77,9 @@ dynatrace:
     # apiToken above. Create one under Access Tokens with scopes:
     #   settings:objects:read, settings:objects:write, settings:schemas:read
     platformToken: ""
+    # Escape hatch: point to an existing Secret (e.g. kubectl create secret generic my-dt-platform-token --from-literal=platform-token=dt...)
+    platformTokenExistingSecret: ""
+    platformTokenExistingSecretKey: ""
 
 # ---------------------------------------------------------------------------
 # BindPlane collector routing (OPTIONAL, default OFF, UNTESTED from this
@@ -109,6 +115,9 @@ bindplane:
   dynatrace:
     environmentId: ""
     apiToken: ""
+  # Escape hatch: point to an existing Secret (e.g. kubectl create secret generic my-dt-token --from-literal=apiToken=sk-...)
+  apiTokenExistingSecret: ""
+  apiTokenExistingSecretKey: ""
 
 # ---------------------------------------------------------------------------
 # RUM (Real User Monitoring) — front-end user sessions for the two SPAs.
@@ -138,12 +147,18 @@ llm:
   openai:
     # REQUIRED if provider=openai
     apiKey: ***
+    # Escape hatch: point to an existing Secret (e.g. kubectl create secret generic my-openai-secret --from-literal=api-key=sk-...)
+    existingSecret: ""
+    existingSecretKey: ""
     model: "gpt-4o"
     baseUrl: "https://api.openai.com/v1"
 
   anthropic:
     # REQUIRED if provider=anthropic
     apiKey: ***
+    # Escape hatch: point to an existing Secret (e.g. kubectl create secret generic my-anthropic-secret --from-literal=api-key=sk-...)
+    existingSecret: ""
+    existingSecretKey: ""
     model: "claude-sonnet-4-6"
 
   local:
@@ -179,6 +194,18 @@ generateSampleData: "if_needed"
 # NOTE: this is the CLUSTER-side credential. CI image builds authenticate
 # separately via the DOCKERHUB_USERNAME / DOCKERHUB_TOKEN GitHub Actions repo
 # secrets — see docs/setup-guide.md (Continuous Integration).
+
+# ---------------------------------------------------------------------------
+# Application & Database Secrets
+# ---------------------------------------------------------------------------
+auth:
+  password: "" # Escape hatch: passwordExistingSecret: "", passwordExistingSecretKey: ""
+  demoApiKey: "" # Escape hatch: demoApiKeyExistingSecret: "", demoApiKeyExistingSecretKey: ""
+
+postgresql:
+  auth:
+    password: "" # Escape hatch: passwordExistingSecret: "", passwordExistingSecretKey: ""
+
 dockerhub:
   username: ""
   token: ""

@@ -143,6 +143,68 @@ global.namespace stays available as an explicit override.
 {{- .Values.dynatrace.businessConfig.eventProvider | default (printf "%s.city" (include "meridian.fullname" .)) -}}
 {{- end }}
 
+
+{{/*
+Secret reference helpers.
+These resolve to either a user-provided existing secret or the chart-managed default.
+*/}}
+
+{{/* OpenAI API Key */}}
+{{- define "meridian.llmOpenaiSecretName" -}}
+{{- .Values.llm.openai.existingSecret | default (include "meridian.appSecret" .) -}}
+{{- end -}}
+{{- define "meridian.llmOpenaiSecretKey" -}}
+{{- .Values.llm.openai.existingSecretKey | default "llm-openai-api-key" -}}
+{{- end -}}
+
+{{/* Anthropic API Key */}}
+{{- define "meridian.llmAnthropicSecretName" -}}
+{{- .Values.llm.anthropic.existingSecret | default (include "meridian.appSecret" .) -}}
+{{- end -}}
+{{- define "meridian.llmAnthropicSecretKey" -}}
+{{- .Values.llm.anthropic.existingSecretKey | default "llm-anthropic-api-key" -}}
+{{- end -}}
+
+{{/* Auth Password */}}
+{{- define "meridian.authPasswordSecretName" -}}
+{{- .Values.auth.passwordExistingSecret | default (include "meridian.appSecret" .) -}}
+{{- end -}}
+{{- define "meridian.authPasswordSecretKey" -}}
+{{- .Values.auth.passwordExistingSecretKey | default "auth-password" -}}
+{{- end -}}
+
+{{/* Auth Demo API Key */}}
+{{- define "meridian.authDemoApiKeySecretName" -}}
+{{- .Values.auth.demoApiKeyExistingSecret | default (include "meridian.appSecret" .) -}}
+{{- end -}}
+{{- define "meridian.authDemoApiKeySecretKey" -}}
+{{- .Values.auth.demoApiKeyExistingSecretKey | default "demo-api-key" -}}
+{{- end -}}
+
+{{/* DB Password */}}
+{{- define "meridian.dbPasswordSecretName" -}}
+{{- .Values.postgresql.auth.passwordExistingSecret | default (include "meridian.appSecret" .) -}}
+{{- end -}}
+{{- define "meridian.dbPasswordSecretKey" -}}
+{{- .Values.postgresql.auth.passwordExistingSecretKey | default "db-password" -}}
+{{- end -}}
+
+{{/* Dynatrace API Token */}}
+{{- define "meridian.dynatraceApiTokenSecretName" -}}
+{{- .Values.dynatrace.apiTokenExistingSecret | default (include "meridian.dynatraceTokensSecret" .) -}}
+{{- end -}}
+{{- define "meridian.dynatraceApiTokenSecretKey" -}}
+{{- .Values.dynatrace.apiTokenExistingSecretKey | default "apiToken" -}}
+{{- end -}}
+
+{{/* Dynatrace Platform Token */}}
+{{- define "meridian.dynatracePlatformTokenSecretName" -}}
+{{- .Values.dynatrace.businessConfig.platformTokenExistingSecret | default (printf "%s-dt-business-config" (include "meridian.fullname" .)) -}}
+{{- end -}}
+{{- define "meridian.dynatracePlatformTokenSecretKey" -}}
+{{- .Values.dynatrace.businessConfig.platformTokenExistingSecretKey | default "platform-token" -}}
+{{- end -}}
+
 {{/*
 Common environment variables injected into every application service.
 Provides OTel service name, OTLP exporter endpoint, and DB/Kafka coordinates.
@@ -166,8 +228,8 @@ All identity coordinates are per-instance (see helpers above).
 - name: DB_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "meridian.appSecret" .context }}
-      key: db-password
+      name: {{ include "meridian.dbPasswordSecretName" .context }}
+      key: {{ include "meridian.dbPasswordSecretKey" .context }}
 {{- end }}
 
 {{/*

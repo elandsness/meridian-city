@@ -45,15 +45,15 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: llm-openai-api-key
+                  name: {{ include "meridian.llmOpenaiSecretName" . }}
+                  key: {{ include "meridian.llmOpenaiSecretKey" . }}
             {{- end }}
             {{- if eq .Values.llm.provider "anthropic" }}
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: llm-anthropic-api-key
+                  name: {{ include "meridian.llmAnthropicSecretName" . }}
+                  key: {{ include "meridian.llmAnthropicSecretKey" . }}
             {{- end }}
             {{- if eq .Values.llm.provider "local" }}
             - name: LOCAL_LLM_ENDPOINT

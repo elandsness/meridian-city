@@ -711,6 +711,8 @@ dynatrace:
   # Required scopes: metrics.ingest, logs.ingest, openTelemetryTrace.ingest,
   #                  entities.read, settings.write, DataExport
   apiToken: ""
+  apiTokenExistingSecret: ""
+  apiTokenExistingSecretKey: ""
 
   # REQUIRED: OTLP ingest endpoint for OpenTelemetry data
   # Format: https://<environment-id>.live.dynatrace.com/api/v2/otlp
@@ -777,6 +779,8 @@ dynatrace:
     #   settings:objects:read, settings:objects:write, settings:schemas:read
     # NOTE: this is a PLATFORM token, distinct from dynatrace.apiToken (classic).
     platformToken: ""
+    platformTokenExistingSecret: ""
+    platformTokenExistingSecretKey: ""
     # bizevent provider stamped on every extracted Meridian business event.
     # Empty -> derived per-instance as "<release>.city" (e.g. meridian-a1b2.city)
     # so each instance's bizevents, OpenPipeline, and Business Flows are isolated
@@ -795,12 +799,16 @@ llm:
   openai:
     # REQUIRED if provider=openai
     apiKey: ""
+    existingSecret: ""
+    existingSecretKey: ""
     model: "gpt-4o"
     baseUrl: "https://api.openai.com/v1"
 
   anthropic:
     # REQUIRED if provider=anthropic
     apiKey: ""
+    existingSecret: ""
+    existingSecretKey: ""
     model: "claude-sonnet-4-6"
 
   local:
@@ -835,12 +843,16 @@ llm:
 auth:
   username: "demo"
   password: "dynatrace"
+  passwordExistingSecret: ""
+  passwordExistingSecretKey: ""
   # Lets an external demo-automation system call the ops panel's scenario/trigger
   # APIs (POST /api/v1/demo-control/scenarios/:id/start, etc. via api-gateway) with
   # a stable `x-demo-api-key` header instead of logging in as the operator. Empty
   # disables the header entirely (JWT-only, today's behavior). Set per-instance,
   # e.g. `--set auth.demoApiKey=<generated-value>`, when wiring up external triggers.
   demoApiKey: ""
+  demoApiKeyExistingSecret: ""
+  demoApiKeyExistingSecretKey: ""
 
 # ---------------------------------------------------------------------------
 # API Gateway (Node.js / Fastify)
@@ -1725,6 +1737,8 @@ postgresql:
     username: "meridian"
     # REQUIRED: change this before deploying
     password: "meridian-secret-change-me"
+    passwordExistingSecret: ""
+    passwordExistingSecretKey: ""
     database: "meridian"
   storage:
     size: "10Gi"
