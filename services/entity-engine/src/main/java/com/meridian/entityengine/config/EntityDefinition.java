@@ -31,6 +31,7 @@ public class EntityDefinition {
     private TriggersDef triggers;
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class FieldDef {
         private String type; // string | number | boolean | date | enum | ref
         private boolean required;
@@ -45,6 +46,7 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class StateDef {
         private String label;
         private String tone;
@@ -63,6 +65,7 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TransitionDef {
         private String from;
         private String to;
@@ -80,18 +83,21 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SignalDef {
         private String eventType;    // e.g. "passenger.boarded"
         private String correlationId; // e.g. "passenger.id"
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TimerDef {
         private Double minSeconds;
         private Double maxSeconds;
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class LinkOnCreateDef {
         private Map<String, Object> query;
         private String strategy;
@@ -99,11 +105,13 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ComputedDef {
         private PositionDef position;
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PositionDef {
         private String type; // "point2d"
         private String interpolation; // linear | easeInOut
@@ -111,12 +119,14 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Waypoint {
         private double x;
         private double y;
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class GeneratorDef {
         private String strategy; // simpleSteadyState | periodicHistoryBackfill
         private Long intervalMs;
@@ -132,6 +142,7 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class BackfillDef {
         private int minPeriods;
         private int maxPeriods;
@@ -140,6 +151,7 @@ public class EntityDefinition {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AmountRangeDef {
         private long minCents;
         private long maxCents;

@@ -247,7 +247,7 @@ industry:
           timer: { minSeconds: 1200, maxSeconds: 3600 }
           signal: { eventType: "luggage.claimed", correlationId: "luggage.id" }
       linkOnCreate:
-        passenger_id: { entity: "passenger", required: true }
+        passenger_id: { query: { entity: "passenger" }, required: true }
       generator: { strategy: "simpleSteadyState", maxActive: 60, intervalMs: 25000 }
 
     aircraft:
