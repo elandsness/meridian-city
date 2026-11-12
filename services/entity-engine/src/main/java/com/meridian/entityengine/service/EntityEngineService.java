@@ -45,7 +45,14 @@ public class EntityEngineService {
 
     public List<EntityRecord> list(String entityType, String stateFilter, Map<String, String> fieldFilters, int page, int size) {
         configLoader.require(entityType);
-        var pageRequest = PageRequest.of(page, size, Sort.by("createdAt").ascending());
+        // Most-recent-first: callers hit this unfiltered/unpaged (page=0, default
+        // size=100), so once an entity type outlives one page of continuous
+        // generation, ascending order would permanently return only its oldest
+        // (by now terminal) rows and bury every currently-active instance past
+        // page 0 -- e.g. frontends/public-portal's flight board/map, which filter
+        // out terminal states client-side and end up rendering nothing despite a
+        // non-empty table.
+        var pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
         List<EntityRecord> records = stateFilter == null
                 ? repository.findByEntityType(entityType, pageRequest)
                 : repository.findByEntityTypeAndState(entityType, stateFilter, pageRequest);
