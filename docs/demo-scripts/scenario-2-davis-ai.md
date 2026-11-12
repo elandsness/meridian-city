@@ -18,10 +18,21 @@
 
 ## Script
 
+> **Service name note:** `demo-control-api`'s DB-slowdown fault target is still
+> internally keyed and labeled `citizen-service` (`services/demo-control-api/src/state.js`,
+> `CITIZEN_SERVICE_URL` in the Helm template) — a leftover from before the
+> rewrite that was never updated to the current service name. `identity-service`
+> runs on the same port (8081) that `CITIZEN_SERVICE_URL` points at, but the
+> hostname `citizen-service` has no matching Kubernetes Service anymore, so
+> **this specific fault toggle is likely broken** (connection error, not a
+> slowdown) until that's fixed in code. Verify with
+> `kubectl logs -l app=demo-control-api` before relying on it live; the
+> narrative below describes the intended behavior.
+
 ### 1. Show the healthy baseline (1 min)
 
-In Dynatrace Services → citizen-service:
-> "Here's citizen-service in its normal state. Response time is stable, error rate is near zero. Davis AI is constantly learning this baseline — what's normal for this service, at this time of day, under this load."
+In Dynatrace Services → workflow-service:
+> "Here's workflow-service in its normal state. Response time is stable, error rate is near zero. Davis AI is constantly learning this baseline — what's normal for this service, at this time of day, under this load."
 
 Point out the response time graph and the green health indicator.
 
@@ -31,10 +42,12 @@ In the Ops Dashboard → Demo Control Panel:
 1. Under **Failure Injection**, toggle on **"Citizen Service — DB Slowdown"** (set
    the seconds slider, e.g. 3s) — or click **▶ Activate** on the **"Database
    Slowdown"** scenario (2s, auto-resets after 5 min)
-2. The toggle switches on; citizen-service now delays its service-request DB write
+2. The toggle switches on; it's intended to delay the service-request database
+   write (currently in `workflow-service`) — see the service-name note above if
+   it doesn't appear to take effect
 
-> "I just injected an artificial delay before citizen-service's service-request
-> database write. This simulates a struggling database — a slow query, lock
+> "I just injected an artificial delay before the service-request database
+> write. This simulates a struggling database — a slow query, lock
 > contention, a connection-pool problem — on the request-submission path. The
 > traffic bot is submitting requests continuously, so it'll start hitting this."
 
@@ -52,7 +65,7 @@ Click on the Problem:
 > "There it is. Davis AI has detected a degradation. Let's see what it found."
 
 Point out:
-- **Impact scope**: Which services are affected (citizen-service, and downstream via service-dispatch if cascading)
+- **Impact scope**: Which services are affected (workflow-service, and downstream via Kafka to notification-service if cascading)
 - **Root cause hypothesis**: Davis points to the SQL query response time as the primary anomaly
 - **Evidence trail**: The anomaly timeline shows exactly when the slowdown started
 - **Suggested actions** (if shown)
@@ -63,7 +76,7 @@ Point out:
 
 In Problems → Root Cause → View traces:
 - Compare a trace from before the injection with one from during
-- Point out: the citizen-service DB write span now shows the injected delay (2–3s) instead of a few ms
+- Point out: the workflow-service DB write span now shows the injected delay (2–3s) instead of a few ms
 
 ### 6. Reset and show recovery (1 min)
 

@@ -1,6 +1,6 @@
-# Meridian City Platform — Setup Guide
+# Meridian Demo Platform — Setup Guide
 
-This guide walks through deploying the Meridian City Platform into a cloud-managed Kubernetes cluster from scratch. Follow every step in order.
+This guide walks through deploying the Meridian Demo Platform into a cloud-managed Kubernetes cluster from scratch. It deploys the default "Meridian City" industry profile — to deploy a different industry, add a second `-f helm/values-<industry>.yaml` to the install command in Step 4 (see the [authoring kit](authoring-kit/README.md)). Follow every step in order.
 
 ---
 
@@ -184,7 +184,7 @@ Expected output: all pods `Running` with `1/1` or `2/2` Ready (the `2/2` means O
 ### Verify the API gateway responds
 
 ```bash
-kubectl port-forward svc/api-gateway 3000:3000 -n meridian
+kubectl port-forward svc/api-gateway 3000:3000 -n meridian-<hash>
 curl http://localhost:3000/health
 # Expected: {"status":"ok","services":{...}}
 ```
@@ -203,18 +203,30 @@ Then open:
 
 ## Step 6: Seed Demo Data
 
+`deploy.sh install` already runs this for you (via `scripts/semantic-seed.py`),
+so you only need this step if you want to re-seed independently:
+
 ```bash
-./scripts/seed-data.sh
+./scripts/deploy.sh seed
 ```
 
-This populates:
-- 5 city zones
-- 15 smart buildings, 30 connected vehicles, 10 industrial machines (device ids
-  match the IoT simulator: `bldg-000…`, `veh-000…`, `mach-000…`)
-- 50 citizens
-- 8 sample service requests and 4 sample incidents in various states
+This is **not** static fixture data. The seeder reads the active industry's
+config (whatever entity types, fields, and terminology `values-<industry>.yaml`
+declares) and asks your configured LLM to generate realistic first-boot records
+for each entity type — for the default city profile that means zones,
+citizens, service requests, and so on; for an airport config it would generate
+flights and passengers instead, with no change to the script itself. Records
+are inserted into the entity engine's `entities.entity` table.
 
-Run `./scripts/seed-data.sh --check` at any time to verify data counts.
+Controlled by `generateSampleData: always | if_needed | never` in
+`values-custom.yaml` (default `if_needed`, which skips generation — safe to
+re-run `./scripts/deploy.sh seed` — if `entities.entity` already has rows).
+Set it to `always` and re-run to force fresh generation, or `never` to skip
+seeding entirely (e.g. if you're loading your own data).
+
+> `scripts/seed-data.sh` (static SQL against the pre-rewrite per-type Postgres
+> tables) is no longer invoked by `deploy.sh` and is kept only for reference on
+> old branches — don't use it against the current schema.
 
 ---
 
@@ -223,28 +235,30 @@ Run `./scripts/seed-data.sh --check` at any time to verify data counts.
 ### OneAgent injection
 
 ```bash
-kubectl describe pod -l app=citizen-service -n meridian | grep -A5 "Init Containers"
+kubectl describe pod -l app=identity-service -n meridian-<hash> | grep -A5 "Init Containers"
 ```
 
 You should see an `install-oneagent` init container — confirms OneAgent is injecting.
 The DynaKube uses `applicationMonitoring` (code-module injection via the CSI driver,
 no host OneAgent — the host agent crash-loops on kind). Pods are only injected if
 they (re)started **after** the DynaKube reached `Running`; if you don't see it, run
-the `kubectl -n meridian rollout restart deploy` from Step 4.
+the `kubectl -n meridian-<hash> rollout restart deploy` from Step 4.
 
 ### Services visible in Dynatrace
 
 In Dynatrace: **Observe and Explore → Services**
 
-After 2-3 minutes of traffic from the traffic bot, you should see:
-- `citizen-service`
-- `service-dispatch`
-- `city-operations`
+After 2-3 minutes of traffic from the traffic bot, you should see all 16 backend
+services, including:
+- `customer-entity-service` / `ops-entity-service`
+- `identity-service`, `workflow-service`, `transaction-service`, `journey-service`, `routing-service`
 - `api-gateway`
 - `ai-service`
 - `analytics-service`
 - `notification-service`
-- `iot-simulator`
+- `iot-simulator`, `movement-service`
+
+See [architecture.md](architecture.md) for the full list.
 
 ### OTel metrics from IoT
 
@@ -406,15 +420,15 @@ On first install the most common cause is **Kafka still provisioning** (3–5 mi
 the Kafka-dependent Java services wait on a `wait-for-kafka` init container until
 the broker is up. Give it a few minutes:
 ```bash
-kubectl get pods -n meridian
-kubectl get kafka -n meridian      # broker Ready?
+kubectl get pods -n meridian-<hash>
+kubectl get kafka -n meridian-<hash>      # broker Ready?
 ```
 
 If a pod stays in `Init` well after Kafka is ready, check OneAgent injection /
 the DynaKube:
 ```bash
 kubectl get pods -n dynatrace
-kubectl describe dynakube meridian -n dynatrace        # look at Status / Conditions
+kubectl describe dynakube meridian-<hash> -n dynatrace        # look at Status / Conditions
 ```
 A `dynatrace.apiToken` with insufficient scopes leaves the DynaKube in `Error`.
 The operator token for `applicationMonitoring` needs more than ingest scopes —
@@ -429,7 +443,7 @@ Java services (Spring Boot) will crash-loop until PostgreSQL is healthy. This is
 
 Check ai-service logs:
 ```bash
-kubectl logs -l app=ai-service -n meridian --tail=50
+kubectl logs -l app=ai-service -n meridian-<hash> --tail=50
 ```
 
 Common causes:

@@ -8,7 +8,7 @@
 
 **Tech Stack:** React, Vite, Tailwind CSS, JavaScript (no TypeScript migration), Helm (values-*.yaml), OpenTelemetry, Dynatrace
 
-**Spec:** `docs/Generic-Entity-Engine-Audit-Report.md` (the audit report this plan implements)
+**Spec:** `docs/archive/Generic-Entity-Engine-Audit-Report.md` (the audit report this plan implements)
 
 ## Global Constraints
 

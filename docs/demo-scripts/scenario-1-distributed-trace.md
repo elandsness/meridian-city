@@ -2,7 +2,20 @@
 
 **Duration**: ~5 minutes  
 **Dynatrace features**: Distributed traces, service flow, SQL visibility, Kafka publish  
-**Narrative**: "Watch a citizen's service request travel through four services in a single distributed trace."
+**Narrative**: "Watch a citizen's service request travel end-to-end in a single distributed trace."
+
+> **Updated for the generic entity platform:** the service-request lifecycle
+> (submit → dispatch → work order) that used to span three Java services
+> (`citizen-service` → `service-dispatch` → `city-operations`) is now handled
+> inside **one** generic service, `workflow-service` — those three services no
+> longer exist. The synchronous trace below is shorter as a result
+> (api-gateway → workflow-service, with the Kafka hop to notification-service
+> still async/separate). If you want a genuinely multi-hop cross-service trace
+> for this talk track, use a custom entity type routed through
+> `customer-entity-service` → `routing-service` instead (any industry overlay
+> that keeps `routing-service` in the loop for its entities), or use the
+> `journey-service` → `movement-service` fleet flow (Scenario 3-style) which is
+> inherently multi-service.
 
 ---
 
@@ -42,22 +55,20 @@ In Dynatrace Distributed Traces:
 
 Point out:
 
-- **api-gateway** → receives the HTTP request from the citizen's browser
-- **citizen-service** → validates the request, writes to PostgreSQL (SQL query visible — point out the table name and parameters), then publishes to Kafka `requests.events`
-- **service-dispatch** → routes based on category and zone; another SQL write visible
-- **city-operations** → creates the work order (SQL write)
+- **api-gateway** → receives the HTTP request from the citizen's browser, proxies to `workflow-service`
+- **workflow-service** → validates the request, writes it to PostgreSQL (SQL query visible — point out the table name and parameters), applies dispatch/priority logic, creates the linked work order (another SQL write), then publishes to Kafka `workflow.events`
 
-> notification-service consumes `requests.events` asynchronously and creates the
+> notification-service consumes `workflow.events` asynchronously and creates the
 > in-app notification — it appears as a separate (Kafka-linked) trace, not part
-> of this synchronous four-service waterfall.
+> of this synchronous waterfall.
 
 > "Dynatrace captured this entire flow automatically. I didn't add a single line of monitoring code. And notice — I can see the exact SQL query, the database host, even the execution time at each step."
 
 ### 5. Show the Service Flow (1 min)
 
-Switch to **Services → citizen-service → Service Flow**:
+Switch to **Services → workflow-service → Service Flow**:
 
-> "Here's the service dependency map for citizen-service. Dynatrace builds this automatically from live traffic. You can see all the upstream callers and downstream dependencies — and the health of each connection."
+> "Here's the service dependency map for workflow-service. Dynatrace builds this automatically from live traffic. You can see all the upstream callers and downstream dependencies — and the health of each connection."
 
 ### 6. Optional: Show a slow trace comparison
 
@@ -70,4 +81,4 @@ Use the Demo Control Panel to inject a DB slowdown, then submit another request.
 - Zero-code instrumentation via OneAgent
 - Full end-to-end visibility including SQL and message queue
 - Automatic service dependency mapping
-- This trace spans Node.js (api-gateway) and Java (citizen-service, service-dispatch, city-operations); the platform also instruments Python and Go (see Scenarios 3 & 4)
+- This trace spans Node.js (`api-gateway`) and Java (`workflow-service`); the platform also instruments Python and Go (see Scenarios 3 & 4), and a custom industry's own entity types can add more hops through `customer-entity-service`/`ops-entity-service` and `routing-service`

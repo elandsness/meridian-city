@@ -1,9 +1,21 @@
-# Meridian City — Observability & Instrumentation
+# Meridian Demo Platform — Observability & Instrumentation
 
-> Status: living document. Owns *how every behavior is observed in Dynatrace*.
-> Pairs with [REQUIREMENTS.md](REQUIREMENTS.md) (what the app does) and
-> [dynatrace-config-guide.md](dynatrace-config-guide.md) (tenant-side config:
-> log processing, funnels, SLOs, dashboards).
+> **Status: partially historical.** This document captures the design of a
+> specific instrumentation initiative (adding RUM and OpenLLMetry, and
+> extending business events to the commerce/billing domains) written under the
+> **pre-rewrite service names** (`citizen-service`, `service-dispatch`,
+> `city-operations`, `commerce-service`, `billing-service`). Those services no
+> longer exist — see the README's
+> [breaking-change notice](../README.md#-breaking-change--read-before-touching-an-existing-deployment-or-config).
+> §1 (RUM injection mechanism) and §2 (OpenLLMetry integration) describe
+> implementation patterns that are still accurate in shape, just under renamed
+> services (`identity-service`, `routing-service`/`workflow-service`,
+> `transaction-service`). §§3–5's **specific funnel/flow-id catalog is
+> superseded** — Dynatrace Business Flows are no longer a hardcoded list; they're
+> derived automatically from `industry.entities`' state machines. For the
+> current business-event/flow model, see
+> [architecture.md § Business Events](architecture.md#business-events-log-extraction)
+> and [dynatrace-config-guide.md](dynatrace-config-guide.md).
 
 ## Goal: full-stack observability
 
@@ -130,32 +142,43 @@ the pipeline) — see [dynatrace-config-guide.md](dynatrace-config-guide.md) §2
 
 ### Existing events
 
-| `event.type` | Owning service | Key fields |
+| `event.type` | Owning service (current) | Key fields |
 | --- | --- | --- |
-| `citizen.registered` | citizen-service | `citizen.id` |
-| `service_request.submitted` | citizen-service | `request.id`, `citizen.id`, `request.category`, `request.priority` |
-| `service_request.validated` | citizen-service | `request.id` |
-| `service_request.status_updated` | citizen-service | `request.id`, `status` (old/new) |
-| `service_request.dispatched` | service-dispatch | `request.id`, `assigned_department`, `zone_id` |
-| `service_request.assigned` | service-dispatch | `request.id`, `assigned_to` |
-| `workorder.created` | city-operations | `work_order.id`, `request.id`, `assigned_department` |
-| `incident.created` | city-operations | `incident.id`, `asset.id`, `severity` |
-| `iot.anomaly_detected` | city-operations | `asset.id`, `anomaly.type` |
+| `citizen.registered` | identity-service | `account.id` (field name is configurable; the event.type string itself is still the literal `citizen.registered`) |
+| `service_request.submitted` | workflow-service | `request.id`, `citizen.id`, `request.category`, `request.priority` |
+| `service_request.validated` | workflow-service | `request.id` |
+| `service_request.status_updated` | workflow-service | `request.id`, `status` (old/new) |
+| `service_request.dispatched` | workflow-service | `request.id`, `assigned_department`, `zone_id` |
+| `service_request.assigned` | workflow-service | `request.id`, `assigned_to` |
+| `workorder.created` | workflow-service | `work_order.id`, `request.id`, `assigned_department` |
+| `incident.created` | workflow-service | `incident.id`, `asset.id`, `severity` |
+| `iot.anomaly_detected` | workflow-service | `asset.id`, `anomaly.type` |
 | `chatbot.interaction` | ai-service | `session.id`, `gen_ai.*`, token counts |
 
-### New events (this effort)
+For custom entity types defined in a `values-<industry>.yaml` overlay (anything
+not in the base city model above), the owning service is `customer-entity-service`
+or `ops-entity-service` per that entity's `domain`, and the event catalog isn't a
+fixed list — it's whatever `event.type`/state names the industry config declares.
 
-| `event.type` | Owning service | Key fields | Slice |
-| --- | --- | --- | --- |
-| `incident.commented` | city-operations | `incident.id`, `comment.author` | 4 |
-| `incident.resolved` | city-operations | `incident.id`, `severity` | 4 |
-| `cart.item_added` | commerce-service | `cart.id`, `citizen.id`, `product.id`, `quantity` | 5 |
-| `checkout.completed` | commerce-service | `order.id`, `citizen.id`, `order.total_cents`, `order.item_count` | 5 |
-| `order.packed` | commerce-service | `order.id`, `citizen.id` | 5 |
-| `order.shipped` | commerce-service | `order.id`, `citizen.id`, `carrier` | 5 |
-| `order.delivered` | commerce-service | `order.id`, `citizen.id` | 5 |
-| `tax.bill_issued` | billing-service | `bill.id`, `citizen.id`, `bill.period`, `bill.amount_cents` | 6 |
-| `tax.payment_completed` | billing-service | `bill.id`, `citizen.id`, `bill.amount_cents` | 6 |
+### Historical: events added for the commerce/billing domains (pre-rewrite)
+
+The table below predates the transaction-service rewrite; the domain still
+exists (carts, checkout, orders, bills) but owned by `transaction-service` now,
+and the specific flow ids (`purchase`, `tax-payment`) referenced in §4 below
+were removed from the provisioner — current Business Flows for this domain
+come from whatever `industry.entities` types you define for it.
+
+| `event.type` | Owning service (then) → now | Key fields |
+| --- | --- | --- |
+| `incident.commented` | city-operations → workflow-service | `incident.id`, `comment.author` |
+| `incident.resolved` | city-operations → workflow-service | `incident.id`, `severity` |
+| `cart.item_added` | commerce-service → transaction-service | `cart.id`, `citizen.id`, `product.id`, `quantity` |
+| `checkout.completed` | commerce-service → transaction-service | `order.id`, `citizen.id`, `order.total_cents`, `order.item_count` |
+| `order.packed` | commerce-service → transaction-service | `order.id`, `citizen.id` |
+| `order.shipped` | commerce-service → transaction-service | `order.id`, `citizen.id`, `carrier` |
+| `order.delivered` | commerce-service → transaction-service | `order.id`, `citizen.id` |
+| `tax.bill_issued` | billing-service → transaction-service | `bill.id`, `citizen.id`, `bill.period`, `bill.amount_cents` |
+| `tax.payment_completed` | billing-service → transaction-service | `bill.id`, `citizen.id`, `bill.amount_cents` |
 
 ---
 
@@ -186,8 +209,8 @@ to its server-side business-process funnel in Dynatrace — the headline
 
 Defined in [dynatrace-config-guide.md](dynatrace-config-guide.md) §4–6. New with
 this effort:
-- **SLO: Checkout success rate** — commerce-service service errors.
-- **SLO: Payment processing availability** — billing-service availability.
+- **SLO: Checkout success rate** — transaction-service service errors.
+- **SLO: Payment processing availability** — transaction-service availability.
 - Dashboard tiles: Purchase funnel, Orders today, Revenue (sum of order totals),
   RUM Core Web Vitals, RUM user actions by application.
 
@@ -197,8 +220,8 @@ this effort:
 
 1. **RUM**: both web apps report sessions, user actions, Core Web Vitals, and JS
    errors; a session is tagged with the citizen email.
-2. **Traces**: commerce-service and billing-service appear as service-map nodes
-   with DB + Kafka spans; a multi-hop trace spans gateway → commerce → Kafka →
+2. **Traces**: transaction-service appears as a service-map node with DB + Kafka
+   spans; a multi-hop trace spans gateway → transaction-service → Kafka →
    notification-service.
 3. **AI**: AI Observability shows OpenLLMetry `gen_ai` spans with token usage.
 4. **Business events / funnels**: the new events appear; Purchase and Tax Payment

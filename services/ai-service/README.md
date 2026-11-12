@@ -33,9 +33,9 @@ Spans flow through the OTel Collector → Dynatrace AI Observability.
 
 ## Chatbot capabilities
 
-- Answer questions about city services (uses static knowledge base)
-- Look up service request status (calls citizen-service)
-- Report current incidents (calls city-operations)
+- Answer questions about the active industry's services (uses static knowledge base)
+- Look up service request status (calls workflow-service)
+- Report current incidents (calls workflow-service)
 - Route complex requests to appropriate department
 
 ## Fault injection

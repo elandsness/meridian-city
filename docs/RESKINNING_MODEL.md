@@ -1,6 +1,14 @@
 # Meridian Reskinning Model
 
-This document describes the reskinning model for the Meridian demo platform.
+This document describes the conceptual reskinning model for the Meridian demo
+platform — the mental model, not the authoritative DSL reference. For the
+current, maintained config contract (every key, the full screen/module catalog,
+and the platform rules the DSL alone doesn't cover), use
+[authoring-kit/README.md](authoring-kit/README.md) and
+[authoring-kit/AUTHORING_PROMPT.md](authoring-kit/AUTHORING_PROMPT.md) instead —
+some specifics below (fixed Dynatrace flow catalog, stale service names,
+example files) are superseded; they're kept here only where they still
+illustrate the underlying idea.
 
 ## Overview
 
@@ -21,7 +29,7 @@ deploy = (instanceHash, industry)
   industry     → branding, terminology, screens, flows, data   (NEW)
 ```
 
-App workload names (`api-gateway`, `citizen-service`, etc.) stay plain and namespace-isolated. The industry axis changes what the **user** and **Dynatrace** see, not the k8s object names.
+App workload names (`api-gateway`, `identity-service`, `customer-entity-service`, etc.) stay plain and namespace-isolated. The industry axis changes what the **user** and **Dynatrace** see, not the k8s object names.
 
 ## What Can Be Configured
 
@@ -198,7 +206,7 @@ industry:
           to: diagnosing
           timer: { minSeconds: 30, maxSeconds: 180 }
         - from: diagnosing
-          to: repaired
+          to: repairing
           when: { probability: 0.7 }
           timer: { minSeconds: 60, maxSeconds: 300 }
         - from: repairing
@@ -254,38 +262,46 @@ industry:
 
 Reskin the Dynatrace service map and business flows. Two mechanisms:
 
-- **Path A (serviceNames):** Rename OneAgent services in the Dynatrace service map. Each rule scoped to this instance's namespace.
-- **Path A (flowLabels/flows):** Rename and select which Business Flows to provision. Flows that aren't listed are dropped.
+- **serviceNames:** Rename OneAgent services in the Dynatrace service map. Keys
+  must be exact, current service names — the key list itself is fixed, but
+  which entity types become Business Flows is not (see below).
+- **flowLabels / flows:** `flows` is **not** a fixed catalog you pick from —
+  each entry must be the exact key of an `industry.entities` type that defines
+  a `states` state machine + `initial`; the provisioner derives one Business
+  Flow per listed type automatically, with steps named `<entity_type>.<state>`.
+  `flowLabels` supplies the display label for each.
 
 ```yaml
 industry:
   dynatrace:
     serviceNames:
-      citizen-service: "Passenger Services"
-      service-dispatch: "Operations Dispatch"
-      city-operations: "Airfield Operations"
+      customer-entity-service: "Passenger Services"
+      ops-entity-service: "Airfield Operations"
+      identity-service: "Passenger Identity"
+      journey-service: "Ground Vehicle Journeys"
+      movement-service: "Ground Vehicle Movement"
+      routing-service: "Operations Dispatch"
+      workflow-service: "Airport Workflow"
       api-gateway: "Airport API Gateway"
       notification-service: "Passenger Notifications"
-      commerce-service: "Airport Retail"
       billing-service: "Airport Fees"
-      demo-control-api: "Demo Control"
     flowLabels:
-      service-request: "Maintenance Request Lifecycle"
-      account-creation: "Passenger Registration"
-      iot-incident: "Ground Equipment Incident Resolution"
-      purchase: "Airport Retail Purchase"
-      tax-payment: "Airport Fee Payment"
+      passenger_request: "Maintenance Request Lifecycle"
+      passenger: "Passenger Journey"
     flows:
-      - service-request
-      - account-creation
-      - iot-incident
-      - aircraft-turnaround
-      - passenger-journey
+      - passenger_request
+      - passenger
 ```
 
-**Deployments you may rename:** `citizen-service`, `service-dispatch`, `city-operations`, `api-gateway`, `notification-service`, `commerce-service`, `billing-service`, `demo-control-api`.
+**Service names you may rename:** the fixed key list is `customer-entity-service`,
+`ops-entity-service`, `identity-service`, `journey-service`, `movement-service`,
+`routing-service`, `workflow-service`, `api-gateway`, `notification-service`,
+`billing-service`. Invented keys are silently ignored.
 
-**Available flow keys:** `service-request`, `account-creation`, `iot-incident`, `purchase`, `tax-payment`, `aircraft-turnaround`, `passenger-journey`.
+**Flow ids:** not a fixed catalog — any key of an `industry.entities` type with
+`states`/`initial` works. There is no more hardcoded legacy list (the old
+`service-request`/`tax-payment`/`aircraft-turnaround`-style ids some earlier
+configs used were removed from the provisioner entirely).
 
 ## What Cannot Be Configured
 
@@ -293,8 +309,8 @@ The following require code changes:
 
 1. **New screen types** — The screen registry is fixed. You can't add a new screen type without code.
 2. **New home module types** — The home module registry (component library) is fixed. You can't add a new module type without code.
-3. **New entity field types** — The entity field types are fixed (string, number, enum, boolean, point2d). You can't add a new field type without code.
-4. **New Dynatrace flow keys** — The flow key catalog is fixed. You can't add a new flow key without code.
+3. **New entity field types** — The entity field types are fixed (string, number, enum, boolean, point2d, ref). You can't add a new field type without code.
+4. **New `dynatrace.serviceNames` keys** — that key list is fixed to the platform's real service names. (Business Flow ids, by contrast, are *not* fixed — see §7.)
 
 ## How to Reskin
 
@@ -338,132 +354,31 @@ For a faster reskin, use the Meridian Industry Authoring Kit:
 5. Save it as `helm/values-<industry>.yaml`.
 6. Validate and deploy as above.
 
-## Example: Airport to Bank Reskin
+## Example: Airport vs. NHVR (trucking regulator)
 
-### Before (Airport)
+Both configs below actually ship in the repo — [`helm/values-airport.yaml`](../helm/values-airport.yaml)
+and [`helm/values-nhvr.yaml`](../helm/values-nhvr.yaml) — so read them end-to-end
+for the real, current, complete shape rather than a hand-trimmed excerpt here.
+The shape to notice, side by side:
 
-```yaml
-industry:
-  id: airport
-  company:
-    name: "Meridian Airport"
-    tagline: "Every journey, on time."
-  terminology:
-    customer: "Passenger"
-    request: "Maintenance ticket"
-  screens:
-    public:
-      - home
-      - { id: my-journey, label: "My Journey" }
-      - { id: service-requests, label: "Help & requests" }
-      - messages
-    ops:
-      - overview
-      - { id: flight-board, label: "Flight Board" }
-      - { id: airfield, label: "Airfield" }
-      - { id: requests, label: "Maintenance queue" }
-      - { id: iot, label: "Ground equipment" }
-      - { id: incidents, label: "Operational incidents" }
-      - { id: analytics, label: "On-time performance" }
-      - demo-control
-  home:
-    public:
-      - { id: city-home, label: "Welcome" }
-      - { id: news-ticker, label: "Flight Updates", headlines: ["Flight 123 On Time"] }
-      - { id: transit-map, label: "Shuttle Map" }
-      - { id: weather, label: "Airport Weather", location: "Meridian Airport", units: "fahrenheit" }
-    ops:
-      - { id: ops-overview, label: "Overview" }
-      - { id: flight-summary, label: "Flight Summary" }
-  data:
-    zones: [terminal-1, terminal-2, concourse-a, airfield, baggage-hall]
-    requestTemplates:
-      - { category: terminal, title: "Jet bridge stuck", description: "..." }
-      - { category: baggage, title: "Carousel jammed", description: "..." }
-    chatQuestions:
-      - "How long is the security wait?"
-      - "Which gate does my flight leave from?"
-  routing:
-    terminal: "Terminal Operations"
-    baggage: "Baggage Handling"
-    airfield: "Airfield Operations"
-  dynatrace:
-    serviceNames:
-      citizen-service: "Passenger Services"
-      api-gateway: "Airport API Gateway"
-    flowLabels:
-      service-request: "Maintenance Request Lifecycle"
-      account-creation: "Passenger Registration"
-    flows: [service-request, account-creation, aircraft-turnaround, passenger-journey]
-```
+| | Airport | NHVR |
+|---|---|---|
+| `company.name` | Meridian International Airport | National Heavy Vehicle Regulator |
+| `terminology.customer` | Passenger | Operator |
+| Moving fleet (`journeyService`) | ground vehicles between gates/stands | trucks between depots/hubs |
+| `industry.entities` | e.g. a passenger/flight-shaped set, `domain: customer`/`ops` per type | permits/inspections-shaped set |
+| `dynatrace.flows` | the keys of its own `industry.entities` types | the keys of its own `industry.entities` types |
 
-### After (Bank)
-
-```yaml
-industry:
-  id: bank
-  company:
-    name: "Meridian Bank"
-    tagline: "Your financial partner."
-  terminology:
-    customer: "Client"
-    request: "Service request"
-  screens:
-    public:
-      - home
-      - { id: accounts, label: "Accounts" }
-      - { id: transactions, label: "Transactions" }
-      - { id: service-requests, label: "Help & requests" }
-      - messages
-    ops:
-      - overview
-      - { id: accounts, label: "Accounts" }
-      - { id: requests, label: "Service requests" }
-      - { id: incidents, label: "Fraud alerts" }
-      - { id: iot, label: "Branch systems" }
-      - { id: analytics, label: "Analytics" }
-      - demo-control
-  home:
-    public:
-      - account-summary
-      - transaction-feed
-      - quick-actions
-      - { id: news-ticker, headlines: ["S&P 500 Up 1.2%", "Federal Reserve Holds Rates"] }
-    ops:
-      - ops-overview
-  data:
-    zones: [corporate-office, retail-branches, call-center, data-center, vault]
-    requestTemplates:
-      - { category: compliance, title: "Suspicious wire transfer flagged", description: "..." }
-      - { category: retail-branches, title: "ATM out of cash", description: "..." }
-    chatQuestions:
-      - "How do I report fraud?"
-      - "Where is the nearest branch?"
-  routing:
-    compliance: "Compliance & Fraud"
-    retail-branches: "Branch Operations"
-    call-center: "Call Center"
-    data-center: "IT Operations"
-    vault: "Vault & Cash Management"
-  dynatrace:
-    serviceNames:
-      citizen-service: "Client Services"
-      api-gateway: "Bank API Gateway"
-    flowLabels:
-      service-request: "Service Request Lifecycle"
-      account-creation: "Account Opening"
-    flows: [service-request, account-creation, account-opening, wire-transfer]
-```
-
-**That's it.** The same codebase, different industry, zero code changes.
+The public portal, ops Command Center, entity engine, and Dynatrace provisioning
+are byte-for-byte the same code in both deployments — only the YAML differs.
 
 ## Demo Flow
 
-1. **Presenter reskins** — Changes `values-airport.yaml` to `values-bank.yaml` (or uses the Authoring Kit to generate a new one).
-2. **Presenter deploys** — Runs `./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-bank.yaml`.
-3. **Presenter shows demo** — Same demo flow (submit a request → show trace in Dynatrace), but in bank context (file a fraud alert → show trace).
+1. **Presenter reskins** — picks (or authors with the kit) a `values-<industry>.yaml`.
+2. **Presenter deploys** — `./scripts/deploy.sh install -f helm/values-custom.yaml -f helm/values-<industry>.yaml`.
+3. **Presenter shows demo** — same demo flow (submit a request → show trace in Dynatrace), just in that industry's own vocabulary.
 
-The demo flow is **identical**. Only the config changes.
+The demo flow is **identical** across industries. Only the config changes.
 
 ## Limitations
 
@@ -479,23 +394,19 @@ These are acceptable limitations for a demo platform. If you need dynamic reskin
 2. **Theme editor** — UI for editing themes without YAML.
 3. **Component marketplace** — Shareable component libraries.
 4. **Industry templates** — Pre-built industry configs for common use cases.
-5. **Live hot-swap** — Architecture designed so live hot-swap is feasible later (see [`docs/INDUSTRY_PLATFORM_PLAN.md`](./INDUSTRY_PLATFORM_PLAN.md) §2, decision #2).
+5. **Live hot-swap** — Architecture designed so live hot-swap is feasible later (see the archived [`INDUSTRY_PLATFORM_PLAN.md`](archive/INDUSTRY_PLATFORM_PLAN.md) §2, decision #2 — historical design doc, written before this platform existed).
 
 ## References
 
-- **Authoring Kit:** `docs/authoring-kit/`
+- **Authoring Kit (current, maintained reference):** `docs/authoring-kit/`
 - **Authoring Prompt (LLM-assisted reskinning):** `docs/authoring-kit/AUTHORING_PROMPT.md`
-- **Platform Design Plan:** `docs/INDUSTRY_PLATFORM_PLAN.md`
-- **Audit Report:** `docs/Generic-Entity-Engine-Audit-Report.md`
+- **Platform Design Plan (historical):** `docs/archive/INDUSTRY_PLATFORM_PLAN.md`
+- **Audit Report (historical):** `docs/archive/Generic-Entity-Engine-Audit-Report.md`
 - **Industry Config Schema:** `docs/industry-config.schema.json`
 - **Working Agreement (API conventions):** `docs/API_CONVENTIONS.md`
-- **Worked Examples:**
-  - `helm/values-airport.yaml` (Meridian Airport)
-  - `helm/values-bank.yaml` (Meridian Bank)
-  - `helm/values-hospital.yaml` (Meridian Hospital)
-  - `helm/values-baseball.yaml` (Meridian Baseball)
-  - `helm/values-powerutility.yaml` (Meridian Power)
-  - `helm/values-oilandgas.yaml` (Meridian Oil)
+- **Worked Examples (the only two that currently exist):**
+  - `helm/values-airport.yaml` (Meridian International Airport)
+  - `helm/values-nhvr.yaml` (National Heavy Vehicle Regulator)
 - **Component Registry (public portal):** `frontends/public-portal/src/config/componentRegistry.jsx`
 - **Page Composer (public portal):** `frontends/public-portal/src/components/PageComposer.jsx`
 - **Configurable Components:**
