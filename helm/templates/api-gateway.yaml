@@ -87,7 +87,7 @@ spec:
             - name: DEMO_CONTROL_API_URL
               value: "http://demo-control-api:3001"
             - name: INDUSTRY_CONFIG_PATH
-              value: "/etc/meridian/industry-config/industry-config.json"
+              value: "/etc/meridian/industry-config/config.json"
             {{- include "meridian.commonEnv" (dict "context" $) | nindent 12 }}
           livenessProbe:
             httpGet:
