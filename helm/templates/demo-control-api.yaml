@@ -36,7 +36,7 @@ spec:
             - name: K8S_NAMESPACE
               value: {{ include "meridian.namespace" . | quote }}
             - name: INDUSTRY_CONFIG_PATH
-              value: "/etc/meridian/industry-config/industry-config.json"
+              value: "/etc/meridian/industry-config/config.json"
             # URLs for services that support fault injection
             - name: CITIZEN_SERVICE_URL
               value: "http://citizen-service:8081"

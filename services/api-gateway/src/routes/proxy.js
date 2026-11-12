@@ -9,12 +9,6 @@ class RouteResolver {
     
     this.systemRoutes = [
       {
-        prefix: '/api/v1/incidents',
-        target: config.WORKFLOW_SERVICE_URL,
-        serviceName: 'workflow-service',
-        requiresAuth: false,
-      },
-      {
         prefix: '/api/v1/auth',
         target: config.IDENTITY_SERVICE_URL,
         serviceName: 'identity-service',
