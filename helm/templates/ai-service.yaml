@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ai-service
-  namespace: {{ include "meridian.namespace" . }}
+  namespace: {{{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: ai-service
@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: ai-service
-          image: {{ include "meridian.image" (dict "repository" .Values.aiService.image.repository "tag" .Values.aiService.image.tag "context" $) }}
+          image: {{{ include "meridian.image" (dict "repository" .Values.aiService.image.repository "tag" .Values.aiService.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
@@ -45,15 +45,15 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: llm-openai-api-key
+                  name: {{ include "meridian.llmOpenaiSecretName" . }
+                  key: {{ include "meridian.llmOpenaiSecretKey" . }
             {{- end }}
             {{- if eq .Values.llm.provider "anthropic" }}
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.appSecret" . }}
-                  key: llm-anthropic-api-key
+                  name: {{ include "meridian.llmAnthropicSecretName" . }
+                  key: {{ include "meridian.llmAnthropicSecretKey" . }
             {{- end }}
             {{- if eq .Values.llm.provider "local" }}
             - name: LOCAL_LLM_ENDPOINT
@@ -104,7 +104,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ai-service
-  namespace: {{ include "meridian.namespace" . }}
+  namespace: {{{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: ai-service

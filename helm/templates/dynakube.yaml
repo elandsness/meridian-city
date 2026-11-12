@@ -16,7 +16,7 @@ spec:
   apiUrl: {{ .Values.dynatrace.apiUrl | quote }}
 
   # Reference to the (per-instance) secret containing the Dynatrace API token.
-  tokens: {{ include "meridian.dynatraceTokensSecret" . }}
+  tokens: {{ include "meridian.dynatraceApiTokenSecretName" . }}
 
   # applicationMonitoring: inject the OneAgent code module into pods in this
   # instance's namespace. Uses the operator bootstrapper mode (no CSI driver

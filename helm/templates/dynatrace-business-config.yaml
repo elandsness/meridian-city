@@ -26,6 +26,7 @@ token + apps base URL are available.
 # =========================================================================== #
 # PROVISION — post-install / post-upgrade
 # =========================================================================== #
+{{- if not .Values.dynatrace.businessConfig.platformTokenExistingSecret }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -37,6 +38,7 @@ metadata:
 type: Opaque
 stringData:
   platform-token: {{ $bc.platformToken | quote }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -82,8 +84,8 @@ spec:
             - name: DT_PLATFORM_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ $provName }}
-                  key: platform-token
+                  name: {{ include "meridian.dynatracePlatformTokenSecretName" . }}
+                  key: {{ include "meridian.dynatracePlatformTokenSecretKey" . }}
             - name: DT_EVENT_PROVIDER
               value: {{ $provider | quote }}
             - name: DT_LOG_NAMESPACE
@@ -115,6 +117,7 @@ spec:
 # DT_ACTION=delete). Its own Secret/ConfigMap are rendered fresh at uninstall
 # time because the provision set's hooks are deleted after they succeed.
 # =========================================================================== #
+{{- if not .Values.dynatrace.businessConfig.platformTokenExistingSecret }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -128,6 +131,7 @@ metadata:
 type: Opaque
 stringData:
   platform-token: {{ $bc.platformToken | quote }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -188,8 +192,8 @@ spec:
             - name: DT_PLATFORM_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ $deprovName }}
-                  key: platform-token
+                  name: {{ include "meridian.dynatracePlatformTokenSecretName" . }}
+                  key: {{ include "meridian.dynatracePlatformTokenSecretKey" . }}
             - name: DT_EVENT_PROVIDER
               value: {{ $provider | quote }}
             - name: DT_LOG_NAMESPACE
