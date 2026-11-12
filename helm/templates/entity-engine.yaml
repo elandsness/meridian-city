@@ -13,7 +13,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: customer-entity-service
-  namespace: {{{ include "meridian.namespace" . }}
+  namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: customer-entity-service
@@ -39,7 +39,7 @@ spec:
         {{- include "meridian.kafkaWaitInitContainer" . | nindent 8 }}
       containers:
         - name: customer-entity-service
-          image: {{{ include "meridian.image" (dict "repository" .Values.customerEntityService.image.repository "tag" .Values.customerEntityService.image.tag "context" $) }}
+          image: {{ include "meridian.image" (dict "repository" .Values.customerEntityService.image.repository "tag" .Values.customerEntityService.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
@@ -52,14 +52,14 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: "customer-entity-service"
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
             - name: SPRING_DATASOURCE_USERNAME
               value: {{ .Values.postgresql.auth.username | quote }}
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.dbPasswordSecretName" . }
-                  key: {{ include "meridian.dbPasswordSecretKey" . }
+                  name: {{ include "meridian.dbPasswordSecretName" . }}
+                  key: {{ include "meridian.dbPasswordSecretKey" . }}
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "none"
             - name: ENTITY_CONFIG_PATH
@@ -113,7 +113,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: customer-entity-service
-  namespace: {{{ include "meridian.namespace" . }}
+  namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: customer-entity-service
@@ -133,7 +133,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ops-entity-service
-  namespace: {{{ include "meridian.namespace" . }}
+  namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: ops-entity-service
@@ -157,7 +157,7 @@ spec:
             name: entity-config
       containers:
         - name: ops-entity-service
-          image: {{{ include "meridian.image" (dict "repository" .Values.opsEntityService.image.repository "tag" .Values.opsEntityService.image.tag "context" $) }}
+          image: {{ include "meridian.image" (dict "repository" .Values.opsEntityService.image.repository "tag" .Values.opsEntityService.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
@@ -170,14 +170,14 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: "ops-entity-service"
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
             - name: SPRING_DATASOURCE_USERNAME
               value: {{ .Values.postgresql.auth.username | quote }}
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.dbPasswordSecretName" . }
-                  key: {{ include "meridian.dbPasswordSecretKey" . }
+                  name: {{ include "meridian.dbPasswordSecretName" . }}
+                  key: {{ include "meridian.dbPasswordSecretKey" . }}
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "none"
             - name: ENTITY_CONFIG_PATH
@@ -226,7 +226,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ops-entity-service
-  namespace: {{{ include "meridian.namespace" . }}
+  namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: ops-entity-service
@@ -245,7 +245,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: entity-engine
-  namespace: {{{ include "meridian.namespace" . }}
+  namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: entity-engine
@@ -269,7 +269,7 @@ spec:
             name: entity-config
       containers:
         - name: entity-engine
-          image: {{{ include "meridian.image" (dict "repository" .Values.entityEngine.image.repository "tag" .Values.entityEngine.image.tag "context" $) }}
+          image: {{ include "meridian.image" (dict "repository" .Values.entityEngine.image.repository "tag" .Values.entityEngine.image.tag "context" $) }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
@@ -282,14 +282,14 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: "entity-engine"
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
+              value: "jdbc:postgresql://{{ include "meridian.dbRwService" . }}:5432/{{ .Values.postgresql.auth.database }}"
             - name: SPRING_DATASOURCE_USERNAME
               value: {{ .Values.postgresql.auth.username | quote }}
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "meridian.dbPasswordSecretName" . }
-                  key: {{ include "meridian.dbPasswordSecretKey" . }
+                  name: {{ include "meridian.dbPasswordSecretName" . }}
+                  key: {{ include "meridian.dbPasswordSecretKey" . }}
             # Flyway owns the schema; Hibernate maps without validating (mirrors
             # every other Java service here), so a fresh image never crash-loops
             # on ddl validate.
@@ -334,7 +334,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: entity-engine
-  namespace: {{{ include "meridian.namespace" . }}
+  namespace: {{ include "meridian.namespace" . }}
   labels:
     {{- include "meridian.labels" . | nindent 4 }}
     app.kubernetes.io/component: entity-engine
