@@ -1,0 +1,367 @@
+industry:
+  version: 1
+  id: nhvr
+  primaryFlow: "access_permit_journey"
+
+  company:
+    name: "National Heavy Vehicle Regulator"
+    short: "NHVR Go"
+    tagline: "Safe access, every axle, every route."
+
+  theme:
+    colors:
+      brand: "#002B49"
+      accent: "#FDB813"
+    icon: "🚛"
+    # logo/favicon intentionally omitted: no "/nhvr-logo.svg" asset was ever
+    # committed to frontends/*/public/, so that path 404'd in-browser. Leaving
+    # these unset lets the branding-provisioner Job auto-generate an on-brand
+    # logo (the icon above, in a brand/accent-colored circle) instead.
+
+  terminology:
+    customer: "Heavy Vehicle Operator"
+    customers: "Heavy Vehicle Operators"
+    permit: "Access Permit Application"
+    permits: "Access Permit Applications"
+    requestCategories: ["class1_osom", "class2_bdouble", "pbs_vehicle", "fatigue_ewd", "other"]
+
+  entities:
+    citizen: null
+    bill: null
+    cart: null
+    incident: null
+    work_order: null
+    # NOT reusing the base chart's `service_request` entity -- Helm deep-merges
+    # a redefinition instead of replacing it, so staying under that key would
+    # silently inherit the city's own fields/states (citizen_id, priority,
+    # zone_id, abandoned/rejected/submitted/validated, ...). Using a brand new
+    # key (`permit`) avoids any collision entirely; null service_request too
+    # so nothing from the base chart shows up under its original name either.
+    service_request: null
+
+    permit:
+      displayName: "Access Permit Application"
+      displayNamePlural: "Access Permit Applications"
+      idPrefix: "prm"
+      domain: customer
+      fields:
+        permit_number:
+          type: string
+          required: true
+        operator_id:
+          type: string
+          required: true
+        operator_name:
+          type: string
+          required: true
+        vehicle_class:
+          type: enum
+          required: true
+          values: ["Class 1 OSOM", "Class 2 B-Double", "Type 1 Road Train", "PBS High Productivity"]
+        gross_mass_tonnes:
+          type: number
+          required: true
+        jurisdiction:
+          type: enum
+          required: true
+          values: ["QLD", "NSW", "VIC", "SA", "TAS", "ACT"]
+        route_name:
+          type: string
+          required: true
+      initial: lodged
+      states:
+        lodged:
+          label: "Lodged in NHVR Go"
+          tone: slate
+          glyph: "📝"
+          notify: true
+        route_scoped:
+          label: "Route Scoped & Validated"
+          tone: blue
+          glyph: "🗺️"
+        council_review_delayed:
+          label: "Road Manager Consent Delayed"
+          tone: orange
+          isError: true
+          glyph: "⏳"
+        road_manager_consented:
+          label: "Road Managers Consented"
+          tone: blue
+          isKpi: true
+          glyph: "🏛️"
+        access_refused:
+          label: "Access Refused (Bridge/Road Rating)"
+          tone: red
+          terminal: true
+          isError: true
+          glyph: "🚫"
+          notify: true
+        permit_issued:
+          label: "Access Permit Issued"
+          tone: green
+          isKpi: true
+          glyph: "✅"
+          notify: true
+        trip_completed:
+          label: "Freight Journey Completed"
+          tone: green
+          terminal: true
+          isKpi: true
+          glyph: "🏁"
+      transitions:
+        - from: lodged
+          to: route_scoped
+          label: "Automated GIS Route Check"
+          userTriggerable: false
+          timer: { minSeconds: 15, maxSeconds: 30 }
+          signal:
+            eventType: "permit.route_scoped"
+            correlationId: "permit_number"
+        - from: route_scoped
+          to: road_manager_consented
+          label: "Consent Granted by Local Councils"
+          userTriggerable: false
+          timer: { minSeconds: 30, maxSeconds: 60 }
+          when: { faultGate: "permit-council-consented", probability: 0.75 }
+          signal:
+            eventType: "permit.council_consented"
+            correlationId: "permit_number"
+        - from: route_scoped
+          to: council_review_delayed
+          label: "Council Requests Extension of Time (EOT)"
+          userTriggerable: false
+          timer: { minSeconds: 20, maxSeconds: 40 }
+          when: { faultGate: "permit-council-delayed", probability: 0.15 }
+          signal:
+            eventType: "permit.council_eot_requested"
+            correlationId: "permit_number"
+        - from: route_scoped
+          to: access_refused
+          label: "Infrastructure Refusal under HVNL"
+          userTriggerable: false
+          timer: { minSeconds: 20, maxSeconds: 40 }
+          when: { faultGate: "permit-access-refused", probability: 0.10 }
+          signal:
+            eventType: "permit.access_refused"
+            correlationId: "permit_number"
+        - from: council_review_delayed
+          to: road_manager_consented
+          label: "Escalated Consent Approved"
+          userTriggerable: true
+          signal:
+            eventType: "permit.escalation_cleared"
+            correlationId: "permit_number"
+        - from: road_manager_consented
+          to: permit_issued
+          label: "Generate and Deliver HVNL Permit"
+          userTriggerable: false
+          timer: { minSeconds: 15, maxSeconds: 30 }
+          signal:
+            eventType: "permit.issued"
+            correlationId: "permit_number"
+          effects:
+            - action: "spawnLinked"
+              entityType: "intercept"
+              fields:
+                permit_number: { from: "permit_number" }
+                inspection_station: "Marulan Heavy Vehicle Safety Station"
+        - from: permit_issued
+          to: trip_completed
+          label: "Log Successful Transit"
+          userTriggerable: false
+          timer: { minSeconds: 60, maxSeconds: 120 }
+          signal:
+            eventType: "permit.journey_completed"
+            correlationId: "permit_number"
+      computed:
+        position:
+          type: point2d
+          interpolation: linear
+          waypoints:
+            lodged: [{ x: 100, "y": 180 }]
+            route_scoped: [{ x: 300, "y": 180 }]
+            council_review_delayed: [{ x: 450, "y": 70 }]
+            access_refused: [{ x: 450, "y": 300 }]
+            road_manager_consented: [{ x: 550, "y": 180 }]
+            permit_issued: [{ x: 750, "y": 180 }]
+            trip_completed: [{ x: 950, "y": 180 }]
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 15000
+        maxActive: 10
+        ownerField: operator_id
+        fields:
+          permit_number:
+            values: ["NHVR-24-10482", "NHVR-24-20931", "NHVR-24-30558", "NHVR-24-40127", "NHVR-24-50764", "NHVR-24-60295"]
+          operator_id:
+            values: ["OP-10432", "OP-20876", "OP-30198", "OP-40567", "OP-50321", "OP-60742"]
+          operator_name:
+            values: ["Linfox Logistics", "Toll Group", "Lindsay Australia", "Followmont Transport", "K&S Freighters", "Scotts Refrigerated Freightways"]
+          vehicle_class: {}
+          jurisdiction: {}
+          gross_mass_tonnes:
+            min: 18
+            max: 85
+          route_name:
+            values: ["Hume Highway Freight Corridor", "Bruce Highway Heavy Haul Route", "Sturt Highway Interstate Link", "Pacific Highway Corridor", "Newell Highway Route"]
+
+    intercept:
+      displayName: "Safety Intercept"
+      displayNamePlural: "Safety Intercepts"
+      idPrefix: "itc"
+      domain: ops
+      fields:
+        intercept_id:
+          type: string
+          required: true
+        permit_number:
+          type: ref
+          required: true
+          entity: permit
+        inspection_station:
+          type: string
+          required: true
+        officer_callsign:
+          type: string
+          required: true
+          default: "SCO-Alpha"
+      initial: flagged_by_anpr
+      states:
+        flagged_by_anpr:
+          label: "Targeted by Camera Network"
+          tone: slate
+          glyph: "📷"
+        weighbridge_checked:
+          label: "Weigh-in-Motion & Log Verified"
+          tone: blue
+          glyph: "⚖️"
+        defect_notice_issued:
+          label: "Defect Notice / Breach Issued"
+          tone: red
+          isError: true
+          terminal: true
+          glyph: "🚨"
+        cleared_safe:
+          label: "Inspection Passed & Cleared"
+          tone: green
+          terminal: true
+          isKpi: true
+          glyph: "🛡️"
+      transitions:
+        - from: flagged_by_anpr
+          to: weighbridge_checked
+          label: "Direct Vehicle to Safety Bay"
+          userTriggerable: false
+          timer: { minSeconds: 15, maxSeconds: 30 }
+          signal:
+            eventType: "intercept.bay_arrival"
+            correlationId: "permit_number"
+        - from: weighbridge_checked
+          to: cleared_safe
+          label: "Standards Compliant - Release"
+          userTriggerable: false
+          timer: { minSeconds: 20, maxSeconds: 40 }
+          when: { faultGate: "intercept-cleared", probability: 0.85 }
+          signal:
+            eventType: "intercept.cleared"
+            correlationId: "permit_number"
+        - from: weighbridge_checked
+          to: defect_notice_issued
+          label: "Record Over-Mass or Fatigue Breach"
+          userTriggerable: false
+          timer: { minSeconds: 15, maxSeconds: 30 }
+          when: { faultGate: "intercept-defect", probability: 0.15 }
+          signal:
+            eventType: "intercept.breach_recorded"
+            correlationId: "permit_number"
+        - from: defect_notice_issued
+          to: cleared_safe
+          label: "Rectification & Secondary Release"
+          userTriggerable: true
+          signal:
+            eventType: "intercept.rectification_approved"
+            correlationId: "permit_number"
+      computed:
+        position:
+          type: point2d
+          interpolation: linear
+          waypoints:
+            flagged_by_anpr: [{ x: 300, "y": 380 }]
+            weighbridge_checked: [{ x: 550, "y": 380 }]
+            defect_notice_issued: [{ x: 750, "y": 480 }]
+            cleared_safe: [{ x: 750, "y": 380 }]
+      generator:
+        strategy: simpleSteadyState
+        intervalMs: 20000
+        maxActive: 6
+        fields:
+          intercept_id:
+            values: ["INT-5521", "INT-6042", "INT-7183", "INT-8304", "INT-9465"]
+
+
+  iot:
+    enabled: true
+    tickIntervalMs: 30000
+    deviceTypes:
+      - type: "wim_sensor"
+        displayName: "WIM Sensor"
+        count: 10
+        metrics:
+          - { name: "iot.wim_sensor.status", unit: "status", min: 0, max: 1, pattern: "steady" }
+      - type: "anpr_camera"
+        displayName: "ANPR Camera"
+        count: 15
+        metrics:
+          - { name: "iot.anpr_camera.status", unit: "status", min: 0, max: 1, pattern: "steady" }
+
+  screens:
+    public:
+      - "home"
+      - id: "permits"
+        label: "Access Permits"
+        template: "entity-grid-list"
+        entities:
+          - id: "permits"
+            entityType: "permit"
+            label: "Access Permit Applications"
+
+  home:
+    public:
+      - id: "nhvr-hero"
+        template: "welcome-hero"
+        position: "full"
+      - id: "nhvr-ticker"
+        template: "ticker"
+        position: "full"
+        height: "slim"
+        label: "🚚 NHVR NATIONAL SAFETY & ACCESS FEED"
+        items:
+          - "Over-height truck detection active on Sydney M2 tunnel approaches; no diversions reported."
+          - "Automated Weigh-in-Motion (WIM) sensors deployed on Hume Highway freight corridor."
+          - "Free cuppas for truckies at participating Driver Reviver rest stops this long weekend."
+          - "24 local councils transition to pre-approved automated B-Double access networks."
+          - "Electronic Work Diary (EWD) system update version 4.2 certified under national regulations."
+          - "Class 1 OSOM wind farm component transit convoy safely transits Pacific Highway."
+
+  data:
+    zones: ["hume_corridor", "bruce_corridor", "sturt_highway"]
+    requestTemplates:
+      - { category: "class1_osom", title: "Class 1 OSOM Access Permit Application", description: "Oversize/overmass access permit request." }
+      - { category: "class2_bdouble", title: "Class 2 B-Double / Road Train Notice Exemption", description: "B-Double or road train network access." }
+
+  routing:
+    class1_osom: "Heavy Vehicle Access Assessment Team"
+    class2_bdouble: "National Network Road Access Unit"
+    pbs_vehicle: "Performance Based Standards Certification Panel"
+    fatigue_ewd: "Driver Safety & Fatigue Assurance Division"
+    other: "General Support"
+
+  dynatrace:
+    serviceNames:
+      "customer-entity-service": "NHVR Go Portal"
+      "ops-entity-service": "Roadside Compliance Ops"
+      "api-gateway": "NHVR Gateway"
+      "notification-service": "Operator Alerts"
+    flows:
+      - "permit"
+      - "intercept"

@@ -134,7 +134,7 @@ function SystemStatus({ status, onResetAll }) {
         <button
           onClick={handlePurgeMessages}
           disabled={purgeLoading}
-          title="Delete all citizen inbox messages from the database"
+          title="Delete all messages from the database"
           className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
         >
           {purgeLoading ? '…' : '🗑 Purge Messages'}

@@ -31,26 +31,8 @@ spec:
               value: {{ .Values.trafficBot.config.targetUrl | quote }}
             - name: REQUESTS_PER_MINUTE
               value: {{ .Values.trafficBot.config.requestsPerMinute | quote }}
-            - name: SCENARIO_CITIZEN_REQUESTS
-              value: {{ .Values.trafficBot.config.scenarios.citizenRequests | quote }}
-            - name: SCENARIO_ACCOUNT_CREATION
-              value: {{ .Values.trafficBot.config.scenarios.accountCreation | quote }}
-            - name: SCENARIO_BROWSING
-              value: {{ .Values.trafficBot.config.scenarios.browsing | quote }}
-            - name: SCENARIO_STORE_PURCHASE
-              value: {{ .Values.trafficBot.config.scenarios.storePurchase | quote }}
-            - name: SCENARIO_PAY_TAX
-              value: {{ .Values.trafficBot.config.scenarios.payTax | quote }}
-            - name: SCENARIO_INJECT_ANOMALY
-              value: {{ .Values.trafficBot.config.scenarios.injectAnomaly | quote }}
-            - name: SCENARIO_CHATBOT
-              value: {{ .Values.trafficBot.config.scenarios.chatbot | quote }}
             - name: INDUSTRY_CONFIG
               value: {{ .Values.industry | toJson | quote }}
-            # Industry demo-data overlay (zones, request templates, chat questions).
-            # Empty {} => traffic-bot uses its built-in City defaults.
-            - name: INDUSTRY_DATA
-              value: {{ .Values.industry.data | default dict | toJson | quote }}
           livenessProbe:
             httpGet:
               path: /health
