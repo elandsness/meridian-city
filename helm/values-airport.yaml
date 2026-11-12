@@ -35,6 +35,22 @@ industry:
     requestPlural: "Requests"
     requestCategories: ["lost-item", "accessibility", "flight-query", "lounge-access", "baggage", "other"]
 
+
+  iot:
+    enabled: true
+    tickIntervalMs: 30000
+    deviceTypes:
+      - type: "security_camera"
+        displayName: "Security Camera"
+        count: 20
+        metrics:
+          - { name: "iot.security_camera.status", unit: "status", min: 0, max: 1, pattern: "steady" }
+      - type: "gate_sensor"
+        displayName: "Gate Sensor"
+        count: 10
+        metrics:
+          - { name: "iot.gate_sensor.status", unit: "status", min: 0, max: 1, pattern: "steady" }
+
   screens:
     public:
       - "home"
@@ -413,20 +429,5 @@ industry:
           timer: { minSeconds: 300, maxSeconds: 7200 }
           signal: { eventType: "request.resolved", correlationId: "passenger_request.id" }
       generator: { strategy: "simpleSteadyState", maxActive: 15, intervalMs: 30000, ownerField: "passenger_id" }
-trafficBot:
-  enabled: true
-  image:
-    repository: "traffic-bot"
-    tag: ""
-  config:
-    # Average HTTP requests per minute sent to the API gateway. Kept low so only a
-    # handful of flows are in-flight at once; server-side schedulers complete them.
-    requestsPerMinute: 0
-    scenarios:
-      citizenRequests: false
-      accountCreation: false
-      browsing: false
-      storePurchase: false
-      payTax: false
-      injectAnomaly: false  # auto-inject/clear IoT anomalies so incidents flow without an operator
-      chatbot: false   # low-weight (lowest journey weight) steady chat traffic so the llm-latency scenario has a `meridian.chat` baseline to deviate from; set false to avoid real LLM API cost
+# trafficBot: no override needed -- base values.yaml now defaults enabled: true
+# with a complete config block (see helm/values.yaml).

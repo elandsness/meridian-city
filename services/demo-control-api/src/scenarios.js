@@ -22,6 +22,55 @@ const CLEAR_MAX = 30
 const pctToFrac = (v, def) => (Number(v) > 0 ? Number(v) : def) / 100
 const RATE_PARAM = { name: 'rate', label: 'Failure rate', min: 5, max: 100, step: 5, default: 30, unit: '%' }
 
+// Named faultGate -> its own declared default rate, but ONLY for gates that
+// guard a transition into an isError:true state. A `faultGate` can equally
+// name the HAPPY-path branch of a split (e.g. values-nhvr.yaml's
+// `intercept-cleared` @0.85 alongside `intercept-defect` @0.15, so an SE can
+// dial the whole split) -- "Business Failures" must never touch those, or it
+// silently suppresses the success rate, and since the admin API has no
+// unconfigure/delete, resetting afterwards would pin it at a permanent 0%
+// instead of restoring its real baseline.
+function buildFailureGateDefaults (entities) {
+  const defaults = {}
+  for (const def of Object.values(entities || {})) {
+    if (!def) continue
+    const states = def.states || {}
+    for (const t of def.transitions || []) {
+      const gateName = t.when?.faultGate
+      if (!gateName) continue
+      if (states[t.to]?.isError) defaults[gateName] = Number(t.when.probability) || 0
+    }
+  }
+  return defaults
+}
+const FAILURE_GATE_DEFAULTS = buildFailureGateDefaults(industryConfig.entities)
+if (Object.keys(FAILURE_GATE_DEFAULTS).length === 0) {
+  console.warn('[scenarios] No failure-path faultGates found in industry config -- "Business Failures" will sweep every discovered gate (including any happy-path ones) until this is populated.')
+}
+
+const FAULT_GATE_SERVICES = [
+  { name: 'customer-entity-service', url: () => config.CUSTOMER_ENTITY_SERVICE_URL },
+  { name: 'ops-entity-service', url: () => config.OPS_ENTITY_SERVICE_URL },
+  { name: 'journey-service', url: () => config.JOURNEY_SERVICE_URL },
+]
+
+/** Live gate names per service, filtered to known failure gates -- unless
+ * none are known at all, in which case every discovered gate is swept
+ * (preserves the old, cruder behavior rather than silently doing nothing). */
+async function discoverFailureGates () {
+  const haveDefaults = Object.keys(FAILURE_GATE_DEFAULTS).length > 0
+  const found = []
+  for (const s of FAULT_GATE_SERVICES) {
+    const res = await proxy.get(`${s.url()}/api/v1/admin/fault-gates`)
+    if (!res.ok || !res.data) continue
+    for (const gateName of Object.keys(res.data)) {
+      if (haveDefaults && !(gateName in FAILURE_GATE_DEFAULTS)) continue
+      found.push({ url: s.url(), gateName, defaultRate: FAILURE_GATE_DEFAULTS[gateName] ?? 0 })
+    }
+  }
+  return found
+}
+
 /**
  * The SCENARIOS object is now built dynamically.
  * It contains core platform faults and industry-specific business faults.
@@ -78,28 +127,6 @@ const SCENARIOS = {
 }
 
 // Dynamically inject Business Process Faults from Industry Config
-if (industryConfig.businessFaults && Array.isArray(industryConfig.businessFaults)) {
-  industryConfig.businessFaults.forEach((f, index) => {
-    const id = `biz-fault-${index}`
-    SCENARIOS[id] = {
-      name: f.label || 'Business Process Failure',
-      description: f.description || 'Injects a business-process failure into the flow.',
-      clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
-      params: [RATE_PARAM],
-      async activate (opts = {}) {
-        const rate = pctToFrac(opts.rate, 30)
-        return proxy.post(`${f.targetServiceUrl}/api/v1/admin/fault-gates/${f.faultGateName}`, {
-          enabled: true, rate,
-        })
-      },
-      async reset () {
-        return proxy.post(`${f.targetServiceUrl}/api/v1/admin/fault-gates/${f.faultGateName}`, {
-          enabled: false, rate: 0,
-        })
-      },
-    }
-  })
-}
 
 // The umbrella scenario for all business exceptions
 SCENARIOS['business-exceptions'] = {
@@ -108,18 +135,26 @@ SCENARIOS['business-exceptions'] = {
   clear: { mode: 'manual', minutes: 10, min: CLEAR_MIN, max: CLEAR_MAX },
   params: [RATE_PARAM],
   async activate (opts = {}) {
-    const businessFaultKeys = Object.keys(SCENARIOS).filter(k => k.startsWith('biz-fault-'))
-    const activations = businessFaultKeys.map(k => SCENARIOS[k].activate(opts))
-    await Promise.all(activations)
-    return { ok: true, data: { message: 'business-exceptions activated' } }
+    const rate = pctToFrac(opts.rate, 30)
+    const gates = await discoverFailureGates()
+    await Promise.all(gates.map(g => proxy.post(`${g.url}/api/v1/admin/fault-gates/${g.gateName}`, {
+      enabled: true, rate,
+    })))
+    return { ok: true, data: { message: 'business-exceptions activated', gates: gates.map(g => g.gateName) } }
   },
   async reset () {
-    const businessFaultKeys = Object.keys(SCENARIOS).filter(k => k.startsWith('biz-fault-'))
-    const resets = businessFaultKeys.map(k => SCENARIOS[k].reset())
-    await Promise.all(resets)
-    return { ok: true, data: { message: 'business-exceptions reset' } }
+    // Restore each gate's own declared default rather than force-disabling it --
+    // there's no unconfigure/delete on the admin API, so {enabled:false, rate:0}
+    // would permanently zero out a gate whose authored baseline is a positive
+    // "fires out of the box" rate (see FaultGateRegistry.java's javadoc).
+    const gates = await discoverFailureGates()
+    await Promise.all(gates.map(g => proxy.post(`${g.url}/api/v1/admin/fault-gates/${g.gateName}`, {
+      enabled: g.defaultRate > 0, rate: g.defaultRate,
+    })))
+    return { ok: true, data: { message: 'business-exceptions reset', gates: gates.map(g => g.gateName) } }
   },
 }
+
 
 const HIDDEN_SCENARIOS = new Set([
   ...Object.keys(SCENARIOS).filter(k => k.startsWith('biz-fault-'))
@@ -142,6 +177,9 @@ async function activateScenario (id, opts = {}) {
   if (!scenario) return { ok: false, error: `Unknown scenario '${id}'` }
 
   const result = await scenario.activate(opts)
+  if (!result || result.ok === false) {
+    return { ok: false, error: result?.error || 'Failed to activate scenario' }
+  }
 
   const clearDefault = scenario.clear || { mode: 'manual', minutes: 5 }
   const mode = (opts.clear_mode === 'auto' || opts.clear_mode === 'manual')
@@ -155,7 +193,7 @@ async function activateScenario (id, opts = {}) {
   })
 
   return {
-    ok: result.ok !== false,
+    ok: true,
     scenario: {
       id,
       name: scenario.name,

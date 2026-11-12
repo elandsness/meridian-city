@@ -1583,7 +1583,7 @@ iotSimulator:
 # Drives realistic distributed traces through the full service stack.
 # ---------------------------------------------------------------------------
 trafficBot:
-  enabled: false
+  enabled: true
   image:
     repository: "traffic-bot"
     tag: ""

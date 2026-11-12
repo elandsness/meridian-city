@@ -15,7 +15,7 @@ import {
   setJourneyEnabled,
   purgeMessages,
 } from '../api/demo.js';
-import { getIncidents } from '../api/incidents.js';
+import { getCommandCenterStatus } from '../api/commandCenter.js';
 import { getFaultGates, setFaultGate, clearFaultGate } from '../api/devices.js';
 import { DEMO_GUIDE } from '../data/demoGuide.js';
 
@@ -134,7 +134,7 @@ function SystemStatus({ status, onResetAll }) {
         <button
           onClick={handlePurgeMessages}
           disabled={purgeLoading}
-          title="Delete all citizen inbox messages from the database"
+          title="Delete all messages from the database"
           className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
         >
           {purgeLoading ? '…' : '🗑 Purge Messages'}
@@ -749,14 +749,18 @@ function LiveCounters() {
     refetchInterval: 5_000,
     retry: false,
   });
-  const { data: incData } = useQuery({
-    queryKey: ['incidents', 'open'],
-    queryFn: () => getIncidents({ status: 'open', limit: 100 }),
+  const { data: commandCenter } = useQuery({
+    queryKey: ['command-center'],
+    queryFn: getCommandCenterStatus,
     refetchInterval: 10_000,
     retry: false,
   });
 
-  const incidents = Array.isArray(incData) ? incData : incData?.incidents ?? [];
+  // Generic across every industry: sum the error-state count the command-center
+  // aggregator already computes per entity/journey flow, rather than hardcoding
+  // a specific "incident" entity type that only city/airport-style industries have.
+  const flows = Array.isArray(commandCenter?.flows) ? commandCenter.flows : [];
+  const errorCount = flows.reduce((sum, f) => sum + (f.errorCount ?? 0), 0);
   const running = traffic?.running ?? traffic?.status === 'running';
   const rpm = traffic?.rpm_current ?? traffic?.rate_rpm ?? traffic?.rpm ?? 0;
   const completed = traffic?.journeys_completed ?? null;
@@ -767,7 +771,7 @@ function LiveCounters() {
     { label: 'Traffic', value: running ? 'Running' : 'Stopped', cls: running ? 'text-green-400' : 'text-gray-400' },
     { label: 'Requests / min', value: Math.round(rpm), cls: 'text-cyan-400' },
     { label: 'Journeys run', value: completed != null ? Number(completed).toLocaleString() : '—', cls: 'text-cyan-400' },
-    { label: 'Open incidents', value: incidents.length, cls: incidents.length > 0 ? 'text-rose-400' : 'text-gray-300' },
+    { label: 'Flow errors', value: errorCount, cls: errorCount > 0 ? 'text-rose-400' : 'text-gray-300' },
   ];
 
   return (
