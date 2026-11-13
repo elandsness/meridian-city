@@ -34,7 +34,7 @@ export default function Register() {
     if (form.address) payload.zone_id = form.address
 
     try {
-      await client.post('/api/v1/citizens', payload)
+      await client.post('/api/v1/identity', payload)
       setSuccess(true)
     } catch (err) {
       setError(
