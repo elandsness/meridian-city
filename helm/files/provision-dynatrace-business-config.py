@@ -578,9 +578,15 @@ def provision():
     print("- Logs routing entry (merge into shared object)")
     routing = list_objects(ROUTING_SCHEMA)
     if not routing:
-        sys.exit("FATAL: no %s object found" % ROUTING_SCHEMA)
-    robj = routing[0]
-    rvalue = robj["value"]
+        print("  creating missing routing object")
+        status, body = api("POST", "/objects", [{"schemaId": ROUTING_SCHEMA, "scope": "environment", "value": {"routingEntries": []}}])
+        if status not in (200, 201) or not isinstance(body, list) or not body:
+            sys.exit("FATAL: create routing failed: %s %s" % (status, body))
+        robj = body[0]
+        rvalue = robj.get("value", {}) if isinstance(robj, dict) else {}
+    else:
+        robj = routing[0]
+        rvalue = robj.get("value", {}) if isinstance(robj, dict) else {}
     # Key this instance's entry by its (per-instance) pipeline name so concurrent
     # instances each own exactly one entry.
     entries = [e for e in rvalue.get("routingEntries", []) if e.get("description") != PIPE_NAME]
