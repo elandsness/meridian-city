@@ -63,6 +63,13 @@ public class WorkflowService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public java.util.List<ServiceRequestResponse> findByCitizenId(String citizenId) {
+        return serviceRequestRepository.findByIdentityId(citizenId).stream()
+                .map(ServiceRequestResponse::from)
+                .toList();
+    }
+
     private static void requireField(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, name + " is required");
