@@ -23,7 +23,7 @@ const GROUP_ID = 'notification-service'
 // When set, only these comma-separated topics are subscribed. Lets industry
 // configs (e.g. airport, which has no store/billing) suppress irrelevant inbox
 // messages without touching the notification service code.
-const ALL_TOPICS = ['requests.events', 'commerce.events', 'billing.events']
+const ALL_TOPICS = ['requests.events', 'commerce.events', 'billing.events', 'journey.events']
 const ENABLED_TOPICS = process.env.ENABLED_TOPICS
   ? process.env.ENABLED_TOPICS.split(',').map((t) => t.trim()).filter(Boolean)
   : ALL_TOPICS
@@ -109,6 +109,25 @@ async function mapBillingToInbox (payload) {
   }
 }
 
+
+async function mapJourneyToInbox (payload) {
+  const eventType = payload.eventType || payload.event_type || ''
+  const ownerId = payload.ownerId || payload.owner_id
+  const status = (payload.status || '').toLowerCase()
+  const journeyId = payload.journeyId || payload.journey_id || ''
+  if (!ownerId) return
+  if (status === 'completed') {
+    await insert({
+      ownerId,
+      type: 'journey_completed',
+      title: 'Journey completed',
+      body: `Your journey ${journeyId} has been completed. Safe travels!`,
+      metadata: payload,
+    })
+  }
+}
+
+
 async function mapRequestToInbox (payload) {
   const eventType = payload.eventType || payload.event_type || ''
   const ownerId = payload.ownerId || payload.owner_id
@@ -166,6 +185,8 @@ async function start () {
             await mapCommerceToInbox(payload)
           } else if (topic === 'billing.events') {
             await mapBillingToInbox(payload)
+          } else if (topic === 'journey.events') {
+            await mapJourneyToInbox(payload)
           }
         } catch (err) {
           console.error(JSON.stringify({
