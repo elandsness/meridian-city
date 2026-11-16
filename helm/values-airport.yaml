@@ -140,6 +140,7 @@ industry:
       - "aircraft"
       - "flight_departure"
       - "flight_arrival"
+      - "passenger_request"
 
   entities:
     # Helm deep-merges `industry.entities` across -f files with the chart's own
