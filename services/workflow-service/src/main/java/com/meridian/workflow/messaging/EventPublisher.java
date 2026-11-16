@@ -14,14 +14,17 @@ public class EventPublisher {
         this.kafkaTemplate = kafkaTemplate;
     }
 
+    public void publishEvent(String entityId, String entityType, String state) {
+        publishEvent(entityId, null, entityType, state);
+    }
+
     public void publishEvent(String entityId, String ownerId, String entityType, String state) {
         String eventType = entityType + "." + state;
         String topic = "events";
         
-        // Simple event payload
         EventPayload payload = new EventPayload(entityId, ownerId, eventType, state);
         
-        log.info("Publishing event: topic={} entityId={} eventType={}", topic, entityId, eventType);
+        log.info("Publishing event: topic={} entityId={} eventType={} ownerId={}", topic, entityId, eventType, ownerId);
         kafkaTemplate.send(topic, entityId, payload);
     }
 
