@@ -20,7 +20,7 @@ public class EventPublisher {
 
     public void publishEvent(String entityId, String ownerId, String entityType, String state) {
         String eventType = entityType + "." + state;
-        String topic = "events";
+        String topic = "requests.events";
         
         EventPayload payload = new EventPayload(entityId, ownerId, eventType, state);
         

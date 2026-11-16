@@ -30,6 +30,7 @@ public class JourneyEventPublisher {
         event.put("eventType", eventType);
         event.put("journeyId", journey.getId());
         event.put("entityType", journey.getEntityType());
+        event.put("ownerId", journey.getUserId());
         event.put("status", journey.getStatus());
         event.put("progress", journey.getProgress());
         send(journey.getId(), event);
