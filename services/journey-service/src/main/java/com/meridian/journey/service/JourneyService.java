@@ -62,6 +62,7 @@ public class JourneyService {
     public void endJourney(String identityId) {
         Journey journey = activeJourneys.remove(identityId);
         if (journey != null) {
+            journey.setStatus("completed");
             eventPublisher.publishJourneyEvent("journey.completed", journey);
             log.info("Ending journey for {}. Final state: {}", identityId, journey.getStatus());
         }
