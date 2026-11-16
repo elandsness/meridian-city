@@ -42,7 +42,7 @@ public class WorkflowService {
 
         serviceRequest = serviceRequestRepository.save(serviceRequest);
 
-        eventPublisher.publishEvent(serviceRequest.getId(), "service_request", "submitted");
+        eventPublisher.publishEvent(serviceRequest.getId(), serviceRequest.getIdentityId(), "service_request", "submitted");
         log.info("Service request created and event published: requestId={} identityId={}", serviceRequest.getId(), serviceRequest.getIdentityId());
 
         return ServiceRequestResponse.from(serviceRequest);
