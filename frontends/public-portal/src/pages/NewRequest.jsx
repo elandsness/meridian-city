@@ -55,7 +55,7 @@ export default function NewRequest() {
       const created = await createServiceRequest(payload)
       addActionProperties(action, { 'request.id': created?.id })
       endAction(action)
-      navigate('/service-requests', { state: { success: true } })
+      navigate('/service-requests/my-requests', { state: { success: true } })
     } catch (err) {
       reportError(err)
       endAction(action)

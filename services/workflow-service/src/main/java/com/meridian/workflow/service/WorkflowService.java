@@ -4,6 +4,7 @@ import com.meridian.workflow.domain.ServiceRequest;
 import com.meridian.workflow.dto.CreateServiceRequestDto;
 import com.meridian.workflow.dto.ServiceRequestResponse;
 import com.meridian.workflow.repository.ServiceRequestRepository;
+import com.meridian.workflow.messaging.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -17,9 +18,11 @@ public class WorkflowService {
     private static final Logger log = LoggerFactory.getLogger(WorkflowService.class);
 
     private final ServiceRequestRepository serviceRequestRepository;
+    private final EventPublisher eventPublisher;
 
-    public WorkflowService(ServiceRequestRepository serviceRequestRepository) {
+    public WorkflowService(ServiceRequestRepository serviceRequestRepository, EventPublisher eventPublisher) {
         this.serviceRequestRepository = serviceRequestRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -39,7 +42,8 @@ public class WorkflowService {
 
         serviceRequest = serviceRequestRepository.save(serviceRequest);
 
-        log.info("Service request created: requestId={} identityId={}", serviceRequest.getId(), serviceRequest.getIdentityId());
+        eventPublisher.publishEvent(serviceRequest.getId(), "service_request", "submitted");
+        log.info("Service request created and event published: requestId={} identityId={}", serviceRequest.getId(), serviceRequest.getIdentityId());
 
         return ServiceRequestResponse.from(serviceRequest);
     }

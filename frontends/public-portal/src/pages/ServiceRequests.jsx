@@ -52,7 +52,7 @@ export default function ServiceRequests() {
           <h1 className="text-2xl font-bold tracking-tight">{requestPlural}</h1>
           <p className="text-slate-500 text-sm mt-1">Track your {requestPlural.toLowerCase()} and their status.</p>
         </div>
-        <Button to="/service-requests/new" variant="primary">Submit new {requestSingular.toLowerCase()}</Button>
+        <Button to="/service-requests" variant="primary">Submit new {requestSingular.toLowerCase()}</Button>
       </div>
 
       {isLoading && <p className="text-slate-500">Loading…</p>}
@@ -68,7 +68,7 @@ export default function ServiceRequests() {
           <div className="text-center py-8">
             <p className="text-slate-500">You have no {requestPlural.toLowerCase()} yet.</p>
             <div className="mt-4 flex justify-center">
-              <Button to="/service-requests/new" variant="primary" size="sm">Submit your first {requestSingular.toLowerCase()}</Button>
+              <Button to="/service-requests" variant="primary" size="sm">Submit your first {requestSingular.toLowerCase()}</Button>
             </div>
           </div>
         </Card>
