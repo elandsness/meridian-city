@@ -27,6 +27,12 @@ class RouteResolver {
         requiresAuth: false,
       },
       {
+        prefix: '/api/v1/service-requests',
+        target: config.WORKFLOW_SERVICE_URL,
+        serviceName: 'workflow-service',
+        requiresAuth: false,
+      },
+      {
         prefix: '/api/v1/transaction',
         target: config.TRANSACTION_SERVICE_URL,
         serviceName: 'transaction-service',
