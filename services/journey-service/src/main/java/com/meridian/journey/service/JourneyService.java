@@ -18,12 +18,14 @@ public class JourneyService {
     private final JourneyGeneratorProperties generatorProps;
     private final JourneyLifecycleProperties lifecycleProps;
     private final JourneyGenerator generator;
+    private final com.meridian.journey.messaging.JourneyEventPublisher eventPublisher;
     private final Map<String, Journey> activeJourneys = new ConcurrentHashMap<>();
 
-    public JourneyService(JourneyGeneratorProperties generatorProps, JourneyLifecycleProperties lifecycleProps, JourneyGenerator generator) {
+    public JourneyService(JourneyGeneratorProperties generatorProps, JourneyLifecycleProperties lifecycleProps, JourneyGenerator generator, com.meridian.journey.messaging.JourneyEventPublisher eventPublisher) {
         this.generatorProps = generatorProps;
         this.lifecycleProps = lifecycleProps;
         this.generator = generator;
+        this.eventPublisher = eventPublisher;
     }
 
     public void initializeJourney(CreateJourneyRequest request) {
@@ -36,6 +38,7 @@ public class JourneyService {
         log.info("Initializing new journey for identity: {}", id);
         Journey journey = generator.generate(id, request.getEntityType());
         activeJourneys.put(id, journey);
+        eventPublisher.publishJourneyEvent("journey.initiated", journey);
     }
 
     public JourneyResponse getJourney(String identityId) {
@@ -51,6 +54,7 @@ public class JourneyService {
         Journey journey = activeJourneys.get(identityId);
         if (journey != null) {
             journey.setProgress(progress);
+            eventPublisher.publishJourneyEvent("journey.updated", journey);
             log.debug("Updated progress for {}: {}", identityId, progress);
         }
     }
@@ -58,6 +62,8 @@ public class JourneyService {
     public void endJourney(String identityId) {
         Journey journey = activeJourneys.remove(identityId);
         if (journey != null) {
+            journey.setStatus("completed");
+            eventPublisher.publishJourneyEvent("journey.completed", journey);
             log.info("Ending journey for {}. Final state: {}", identityId, journey.getStatus());
         }
     }
