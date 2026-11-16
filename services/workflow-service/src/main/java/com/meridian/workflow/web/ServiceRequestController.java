@@ -30,11 +30,16 @@ public class ServiceRequestController {
     }
 
     @GetMapping
-    public List<ServiceRequestResponse> listByStatus(@RequestParam(required = false) String status) {
+    public List<ServiceRequestResponse> listRequests(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String citizen_id) {
+        if (citizen_id != null && !citizen_id.isBlank()) {
+            return workflowService.findByCitizenId(citizen_id);
+        }
         if (status != null && !status.isBlank()) {
             return workflowService.listByStatus(status);
         }
-        // Return all by default
+        // Return empty list if no filter is provided to avoid leaking all requests
         return List.of();
     }
 }
