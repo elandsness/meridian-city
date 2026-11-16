@@ -58,8 +58,6 @@ industry:
       - "my-account"
       - id: "service-requests"
         label: "Help & requests"
-        template: "entity-list"
-        entityType: "passenger_request"
       - "messages"
 
   home:

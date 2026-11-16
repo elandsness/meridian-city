@@ -74,21 +74,6 @@ export function getActiveScreens(config) {
     .map((item) => (typeof item === 'string' ? { id: item } : item))
     .filter((it) => it && (it.template ? TEMPLATES[it.template] : SCREENS[it.id]))
     .map((it) => {
-      if (it.id === 'service-requests') {
-        const def = SCREENS['service-requests']
-        return {
-          id: it.id,
-          path: def.path,
-          component: def.component,
-          protected: def.protected,
-          subRoutes: [
-            { path: 'my-requests', component: it.template ? TEMPLATES[it.template] : ServiceRequests },
-            { path: ':id', component: RequestDetail },
-          ],
-          icon: it.icon ?? def.icon,
-          label: it.label ?? (def.termKey ? term(def.termKey, def.label) : def.label),
-        }
-      }
       if (it.template) {
         const Template = TEMPLATES[it.template]
         return {
