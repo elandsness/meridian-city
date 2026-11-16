@@ -21,7 +21,7 @@ public class JourneyService {
     private final JourneyGeneratorProperties generatorProps;
     private final JourneyLifecycleProperties lifecycleProps;
     private final JourneyGenerator generator;
-    private final Map<String, Journey> activeJourneys = new ConcurrentHashMap<>();
+    private final Map<String, com.meridian.journey.dto.Journey> activeJourneys = new ConcurrentHashMap<>();
 
     public JourneyService(JourneyGeneratorProperties generatorProps, JourneyLifecycleProperties lifecycleProps, JourneyGenerator generator) {
         this.generatorProps = generatorProps;
@@ -37,12 +37,12 @@ public class JourneyService {
         }
         
         log.info("Initializing new journey for identity: {}", id);
-        Journey journey = generator.generate(id, request.getEntityType());
+        com.meridian.journey.dto.Journey journey = generator.generate(id, request.getEntityType());
         activeJourneys.put(id, journey);
     }
 
     public JourneyResponse getJourney(String identityId) {
-        Journey journey = activeJourneys.get(identityId);
+        com.meridian.journey.dto.Journey journey = activeJourneys.get(identityId);
         if (journey == null) {
             log.warn("No active journey found for identity: {}", identityId);
             return null;
@@ -51,7 +51,7 @@ public class JourneyService {
     }
 
     public void updateJourneyProgress(String identityId, double progress) {
-        Journey journey = activeJourneys.get(identityId);
+        com.meridian.journey.dto.Journey journey = activeJourneys.get(identityId);
         if (journey != null) {
             journey.setProgress(progress);
             log.debug("Updated progress for {}: {}", identityId, progress);
@@ -59,13 +59,13 @@ public class JourneyService {
     }
 
     public void endJourney(String identityId) {
-        Journey journey = activeJourneys.remove(identityId);
+        com.meridian.journey.dto.Journey journey = activeJourneys.remove(identityId);
         if (journey != null) {
             log.info("Ending journey for {}. Final state: {}", identityId, journey.getStatus());
         }
     }
 
-    private JourneyResponse mapToResponse(Journey j) {
+    private JourneyResponse mapToResponse(com.meridian.journey.dto.Journey j) {
         return JourneyResponse.builder()
             .id(j.getId())
             .entityType(j.getEntityType())
@@ -100,7 +100,7 @@ public class JourneyService {
         return respStages;
     }
 
-    public Map<String, Journey> getActiveJourneys() {
+    public Map<String, com.meridian.journey.dto.Journey> getActiveJourneys() {
         return activeJourneys;
     }
 }
