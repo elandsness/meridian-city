@@ -50,6 +50,18 @@ export const SCREENS = {
       { path: ':id', component: RequestDetail },
     ],
   },
+  'apply-permit': {
+    path: '/service-requests/new',
+    label: 'Apply for Permit',
+    component: NewRequest,
+    protected: true,
+  },
+  'active-permits': {
+    path: '/service-requests',
+    label: 'My Active Permits',
+    component: ServiceRequests,
+    protected: true,
+  },
   store: {
     path: '/store',
     label: 'City store',
