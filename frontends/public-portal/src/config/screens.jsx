@@ -43,10 +43,10 @@ export const SCREENS = {
     path: '/service-requests',
     label: 'Service requests',
     termKey: 'requestPlural',
-    component: NewRequest,
+    component: ServiceRequests,
     protected: true,
     subRoutes: [
-      { path: 'my-requests', component: ServiceRequests },
+      { path: 'new', component: NewRequest },
       { path: ':id', component: RequestDetail },
     ],
   },

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useConfig } from '../../config/ConfigContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useNavigate } from 'react-router-dom'
 import { getEntities, createEntity, unwrapEntities } from '../../api/entities.js'
 import { displayName } from '../../lib/format.js'
 import Card from '../../ui/Card.jsx'
@@ -10,6 +11,7 @@ import EntityCard from './EntityCard.jsx'
 
 function PersonalJourney({ entityType, userId, userName, ownerField, label, stepsProp, description, cfg, def }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const queryKey = ['entity-journey-mine', entityType, userId]
 
   const { data, isLoading, isError } = useQuery({
@@ -24,6 +26,14 @@ function PersonalJourney({ entityType, userId, userName, ownerField, label, step
     mutationFn: () => createEntity(entityType, { [ownerField]: userId, name: userName }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   })
+
+  const handleStart = () => {
+    if (entityType === 'permit') {
+      navigate('/service-requests/new')
+    } else {
+      create()
+    }
+  }
 
   const noEntity = !isLoading && !isError && !entity && !isCreating
 
@@ -41,7 +51,7 @@ function PersonalJourney({ entityType, userId, userName, ownerField, label, step
         <Card>
           <div className="text-center py-8 space-y-3">
             <p className="text-slate-500">You don\'t have an active {def?.displayName ?? label ?? 'journey'} yet.</p>
-            <Button variant="primary" size="sm" onClick={() => create()}>
+            <Button variant="primary" size="sm" onClick={handleStart}>
               Start a {def?.displayName ?? label ?? 'journey'}
             </Button>
           </div>
