@@ -339,15 +339,7 @@ industry:
       - id: "service-requests"
         label: "Apply for Permit"
       - id: "active-permits"
-        template: "entity-journey"
-        entityType: "service_request"
         label: "My Active Permit Applications"
-        ownerField: "citizen_id"
-      - id: "permit-tracker-grid"
-        template: "entity-list"
-        entityType: "permit"
-        label: "Live National Assessment Queue"
-        fields: ["permit_number", "operator_name", "vehicle_class", "gross_mass_tonnes", "jurisdiction", "route_name"]
 
   home:
     public:
