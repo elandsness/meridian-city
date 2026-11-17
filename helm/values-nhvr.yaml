@@ -336,9 +336,10 @@ industry:
   screens:
     public:
       - id: "home"
-      - id: "service-requests"
-        label: "Apply for Permit"
       - id: "active-permits"
+        template: "entity-journey"
+        entityType: "permit"
+        ownerField: "operator_id"
         label: "My Active Permit Applications"
       - id: "permit-tracker-grid"
         template: "entity-list"
