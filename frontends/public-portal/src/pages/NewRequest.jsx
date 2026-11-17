@@ -37,25 +37,19 @@ export default function NewRequest() {
     setError('')
     setLoading(true)
 
-    // Citizen login now mints a real citizen id (user.id === citizen_id). Fall
-    // back to a seeded citizen only for the anonymous/operator case.
     const { location, ...rest } = form
     const payload = {
       ...rest,
       citizen_id: user?.id ?? 'cit-00001',
     }
-    // citizen-service has no free-text location field; map it onto the optional
-    // zone_id. Keep it omitted when blank.
     if (location) payload.zone_id = location
 
-    // RUM custom action; request.id (from the response) is the join key to the
-    // service_request.submitted business event (see docs/INSTRUMENTATION.md).
     const action = startAction('service_request.submit')
     try {
       const created = await createServiceRequest(payload)
       addActionProperties(action, { 'request.id': created?.id })
       endAction(action)
-      navigate('/service-requests/my-requests', { state: { success: true } })
+      navigate('/service-requests', { state: { success: true } })
     } catch (err) {
       reportError(err)
       endAction(action)
