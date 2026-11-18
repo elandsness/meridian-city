@@ -336,6 +336,7 @@ industry:
   screens:
     public:
       - id: "home"
+      - id: "service-requests"
       - id: "active-permits"
         template: "entity-journey"
         entityType: "permit"
